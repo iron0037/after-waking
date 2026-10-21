@@ -5,3 +5,7 @@ out/
 .vite/
 tools/art/output/
 .claude/settings.local.json
+
+# Reference images (copyrighted; local only)
+docs/flagships.jpg
+docs/reference/
