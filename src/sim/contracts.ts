@@ -192,9 +192,12 @@ export function contractProgress(state: GameState, c: Contract): ContractProgres
       return { have, need, ready: have >= need - 0.05, label: `${Math.floor(have)} / ${need} t aboard` };
     }
     case "specimens": {
-      const have = specimensFrom(state.ship.specimens, c.bodyId ?? "");
+      const rover = state.location.kind === "surface" ? state.location.rover?.specimens : undefined;
+      const aboard = specimensFrom(state.ship.specimens, c.bodyId ?? "");
+      const have = aboard + specimensFrom(rover, c.bodyId ?? "");
       const need = c.count ?? 0;
-      return { have, need, ready: have >= need, label: `${have} / ${need} samples aboard` };
+      // Only samples in the ship's racks can be turned in.
+      return { have, need, ready: aboard >= need, label: `${have} / ${need} samples collected` };
     }
     case "survey": {
       const ids = c.surveyBodyIds ?? [];

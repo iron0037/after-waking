@@ -1,5 +1,5 @@
 /** Small formatting and color helpers for the system screen. */
-import { KIND_LABEL, type BodyKind } from "../../../sim";
+import { KIND_LABEL, type BodyKind, type BodyProgress, type Contract, type GameState, contractTargetsByBody } from "../../../sim";
 
 export const FONT = (px: number, weight = "normal") =>
   `${weight} ${px}px "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace`;
@@ -44,4 +44,15 @@ export function mix(a: string, b: string, t: number): string {
 /** Lighten (amt > 0) or darken (amt < 0) a hex color. */
 export function shade(hex: string, amt: number): string {
   return amt >= 0 ? mix(hex, "#ffffff", amt) : mix(hex, "#000000", -amt);
+}
+
+/** Active contracts that still have work at each body: specimen jobs name one world, survey jobs name several. */
+export function contractTargets(state: GameState): Map<string, Contract[]> {
+  return contractTargetsByBody(state);
+}
+
+/** "3/26 · 12%" for a world with a surface, "—" otherwise. */
+export function progressLabel(p: BodyProgress): string {
+  if (p.regions === 0) return "—";
+  return `${p.regionsVisited}/${p.regions} · ${Math.round(p.explored * 100)}%`;
 }

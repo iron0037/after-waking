@@ -85,7 +85,53 @@
   vertical-align: middle;
 }
 
+.sys-table td.sys-prog {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.sys-calm {
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
+  color: var(--good);
+  border: 1px solid #2d5a35;
+  border-radius: 8px;
+  vertical-align: middle;
+}
+.sys-job {
+  margin-left: 6px;
+  color: var(--accent);
+  cursor: help;
+}
+.sys-table tbody tr.selected .sys-calm {
+  color: var(--good);
+}
+
 /* selected body */
+.sys-nick {
+  font-size: 13px;
+  font-weight: normal;
+}
+.sys-calm-tag {
+  margin-left: 6px;
+  color: var(--good);
+  border-color: #2d5a35;
+}
+.sys-explore dd {
+  font-size: 13px;
+}
+.sys-contract {
+  padding: 6px 8px;
+  border: 1px solid #5a4417;
+  border-radius: 4px;
+  background: #1e1a10;
+  font-size: 12px;
+  cursor: help;
+}
+.sys-contract .sys-job {
+  margin-left: 0;
+}
+
 .sys-selected {
   display: flex;
   flex-direction: column;
@@ -186,6 +232,16 @@
   width: 10px;
   display: inline-block;
   background: #15213b;
+}
+.sys-recap {
+  padding: 8px;
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  background: #0f1d30;
+  line-height: 1.45;
+}
+.sys-recap-warn {
+  margin-top: 4px;
 }
 .sys-unscanned {
   border-top: 1px solid var(--border);

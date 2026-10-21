@@ -1,6 +1,6 @@
 /** Renders a region's terrain once into an offscreen canvas: flat tile colors with hillshaded relief. */
-import type { BodyKind, RegionMap } from "../../../sim";
-import { Terrain } from "../../../sim";
+import type { BodyKind, RegionKnowledge, RegionMap } from "../../../sim";
+import { isExplored, Terrain } from "../../../sim";
 import { TERRAIN_COLORS } from "../../palette";
 
 /** Pixels per tile in the offscreen image; relief shading is smooth at this resolution. */
@@ -57,5 +57,53 @@ export function buildTerrainImage(map: RegionMap, kind: BodyKind): HTMLCanvasEle
     }
   }
   ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+/**
+ * The same terrain as faint "orbital imagery": darkened, desaturated and cooled. Unswept ground is
+ * shown with this until the rover's sensors paint it in.
+ */
+export function buildFoggedImage(terrain: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = terrain.width;
+  canvas.height = terrain.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  ctx.drawImage(terrain, 0, 0);
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = image.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] as number;
+    const g = d[i + 1] as number;
+    const b = d[i + 2] as number;
+    const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+    const dim = 0.36;
+    d[i] = (lum + (r - lum) * 0.4) * dim * 0.85;
+    d[i + 1] = (lum + (g - lum) * 0.4) * dim * 0.97 + 3;
+    d[i + 2] = (lum + (b - lum) * 0.4) * dim * 1.18 + 12;
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+/** Full-color terrain where the rover has swept, fogged imagery everywhere else. */
+export function composePainted(
+  terrain: HTMLCanvasElement,
+  fogged: HTMLCanvasElement,
+  map: RegionMap,
+  know: RegionKnowledge,
+): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = terrain.width;
+  canvas.height = terrain.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  ctx.drawImage(fogged, 0, 0);
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (isExplored(know, x, y)) ctx.drawImage(terrain, x * SUB, y * SUB, SUB, SUB, x * SUB, y * SUB, SUB, SUB);
+    }
+  }
   return canvas;
 }

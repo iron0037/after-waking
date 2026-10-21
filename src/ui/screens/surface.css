@@ -120,3 +120,39 @@
   width: 100%;
   margin-top: 12px;
 }
+
+.explored-line {
+  margin-top: 8px;
+  color: var(--cyan);
+}
+.explored-bar {
+  margin-top: 4px;
+}
+
+.leaf-mark {
+  display: inline-block;
+  width: 8px;
+  height: 11px;
+  margin-right: 7px;
+  background: #5fd47a;
+  border-radius: 0 100% 0 100%;
+  vertical-align: middle;
+}
+.leaf-mark.big {
+  width: 11px;
+  height: 15px;
+  margin-right: 10px;
+}
+.deposit-table tbody tr.dim .leaf-mark {
+  background: #4f7a5a;
+}
+
+.contract-note {
+  margin-top: 10px;
+  padding: 6px 8px;
+  border: 1px solid #5a4417;
+  border-radius: 4px;
+  background: #1e1a10;
+  line-height: 1.4;
+  cursor: help;
+}

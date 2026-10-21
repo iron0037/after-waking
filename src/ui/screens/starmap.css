@@ -66,6 +66,53 @@
   flex-shrink: 0;
 }
 
+.sm-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 30px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+}
+.sm-ring {
+  color: var(--cyan);
+  opacity: 0.7;
+}
+.sm-gap {
+  margin-bottom: 8px;
+}
+.sm-minibar {
+  display: inline-block;
+  width: 34px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+  vertical-align: middle;
+}
+.sm-minibar.wide {
+  width: 90px;
+}
+.sm-minibar > span {
+  display: block;
+  height: 100%;
+  background: var(--cyan);
+  opacity: 0.8;
+}
+.sm-prog {
+  width: 40px;
+  padding-left: 0;
+}
+.sm-contracts {
+  margin-top: 10px;
+}
+.sm-contracts ul {
+  margin: 4px 0 0;
+  padding-left: 16px;
+}
+
 .sm-list tr {
   cursor: pointer;
 }

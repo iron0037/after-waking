@@ -3,28 +3,38 @@ import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS } from "../../data/commodities";
 import { CLAN_NAMES, UPGRADES, type ClanId } from "../../data/ship";
 import {
+  acceptContract,
   buyFuel,
   buyUpgrade,
   cargoTonnes,
+  completeContract,
+  contractProgress,
   DAY,
   formatDate,
   formatDuration,
   fuelPrice,
+  NEW_SPECIES_BONUS,
   payLoan,
   sell,
   sellAll,
   sellPrice,
+  sellSpecimens,
   shipStats,
+  SHIP_SPECIMEN_SLOTS,
+  SPECIMEN_PRICE,
+  specimenCount,
   wait,
+  type Contract,
 } from "../../sim";
 import { cr, pct, tonnes } from "../format";
 import { useSession, type GameSession } from "../session";
 import "./hub.css";
 
-type Tab = "market" | "shipyard" | "exchange" | "depart";
+type Tab = "market" | "jobs" | "shipyard" | "exchange" | "depart";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "market", label: "Market" },
+  { id: "jobs", label: "Jobs" },
   { id: "shipyard", label: "Shipyard" },
   { id: "exchange", label: "Exchange" },
   { id: "depart", label: "Depart" },
@@ -32,6 +42,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const TAB_BLURB: Record<Tab, string> = {
   market: "The Exchange clan runs the Concourse scales. Everything is weighed, nothing is free.",
+  jobs: "The clan boards by the Concourse gate. Paper contracts, wet signatures, and a deadline on every one.",
   shipyard: "Gantries, sparks and clan salesmen. Every part on the shelf was pulled from somebody's grandmother's engine room.",
   exchange: "Brass counters under dim lamps. The note on your ship is older than most of the clerks.",
   depart: "Last checks at the airlock. The Verge is out there, and it doesn't care about your schedule.",
@@ -39,7 +50,12 @@ const TAB_BLURB: Record<Tab, string> = {
 
 export function Hub({ session }: { session: GameSession }) {
   useSession(session);
-  const [tab, setTab] = useState<Tab>("market");
+  const { state } = session;
+  const contracts = state.contracts ?? [];
+  const starterOffers = contracts.filter((c) => c.status === "offered" && c.starter).length;
+  const [tab, setTab] = useState<Tab>(() =>
+    starterOffers > 0 && state.stats.folds === 0 && contracts.every((c) => c.status === "offered") ? "jobs" : "market",
+  );
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -54,9 +70,15 @@ export function Hub({ session }: { session: GameSession }) {
   return (
     <div class="full hub">
       <header class="hub-head">
-        <div>
-          <h1 class="hub-title">The Intrepid</h1>
-          <div class="muted">Five miles of hull, two million voices, and a berth with your name on the lease.</div>
+        <div class="hub-id">
+          <img class="hub-ship" src="./assets/freighter.png" alt={state.ship.name} title={state.ship.name} />
+          <div>
+            <h1 class="hub-title">The Intrepid</h1>
+            <div class="muted">Five miles of hull, two million voices, and a berth with your name on the lease.</div>
+            <div class="muted small">
+              Your ship: <span class="accent">{state.ship.name}</span>
+            </div>
+          </div>
         </div>
         <nav class="hub-tabs" role="tablist">
           {TABS.map((t, i) => (
@@ -69,6 +91,7 @@ export function Hub({ session }: { session: GameSession }) {
               title={`${t.label} (${i + 1})`}
             >
               <span class="hub-tab-key">{i + 1}</span> {t.label}
+              {t.id === "jobs" && starterOffers > 0 && <span class="hub-badge">{starterOffers}</span>}
             </button>
           ))}
         </nav>
@@ -76,6 +99,7 @@ export function Hub({ session }: { session: GameSession }) {
       <p class="hub-blurb muted">{TAB_BLURB[tab]}</p>
       <div class="hub-body">
         {tab === "market" && <Market session={session} />}
+        {tab === "jobs" && <Jobs session={session} />}
         {tab === "shipyard" && <Shipyard session={session} />}
         {tab === "exchange" && <Exchange session={session} />}
         {tab === "depart" && <Depart session={session} />}
@@ -168,6 +192,10 @@ function Market({ session }: { session: GameSession }) {
         </div>
       </section>
 
+      <section class="panel hub-wide">
+        <SpecimenDesk session={session} />
+      </section>
+
       <section class="panel">
         <h2>Plicite fuel</h2>
         <dl class="kv">
@@ -198,6 +226,213 @@ function Market({ session }: { session: GameSession }) {
           Plicite is what makes folds possible. The Lyceum says it is just chemistry. The Exchange says it is just money.
         </p>
       </section>
+    </div>
+  );
+}
+
+function SpecimenDesk({ session }: { session: GameSession }) {
+  const { state, world } = session;
+  const specimens = state.ship.specimens ?? {};
+  const held = specimenCount(specimens);
+  const reserved = new Set(
+    (state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId),
+  );
+  const rows = Object.entries(specimens)
+    .filter(([, n]) => n > 0)
+    .map(([key, count]) => {
+      const [bodyId = "", ...rest] = key.split("|");
+      let bodyName = bodyId;
+      try {
+        bodyName = world.body(bodyId).body.name;
+      } catch {
+        /* unknown body: show the raw id */
+      }
+      return {
+        key,
+        species: rest.join("|"),
+        bodyName,
+        count,
+        reserved: reserved.has(bodyId),
+        isNew: !state.catalogedSpecies.includes(key),
+      };
+    })
+    .sort((a, b) => a.bodyName.localeCompare(b.bodyName) || a.species.localeCompare(b.species));
+  const sellable = rows.filter((r) => !r.reserved);
+  const estimate = sellable.reduce((sum, r) => sum + r.count * SPECIMEN_PRICE + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
+
+  return (
+    <>
+      <div class="hub-section-head">
+        <h2>Lyceum specimen desk</h2>
+        <span class={held >= SHIP_SPECIMEN_SLOTS ? "accent" : "muted"}>
+          Containment: {held} / {SHIP_SPECIMEN_SLOTS}
+        </span>
+      </div>
+      {rows.length > 0 ? (
+        <table class="data">
+          <thead>
+            <tr>
+              <th>Species</th>
+              <th>Collected on</th>
+              <th class="num">Count</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td>{r.species}</td>
+                <td>{r.bodyName}</td>
+                <td class="num">{r.count}</td>
+                <td>
+                  {r.reserved ? (
+                    <span class="tag good" title="Reserved for an active specimen contract; the desk won't buy these.">
+                      held for contract
+                    </span>
+                  ) : r.isNew ? (
+                    <span class="tag accent-tag">new species +{cr(NEW_SPECIES_BONUS)}</span>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p class="muted">The containment racks are empty. The rover brings samples back from flora on the surface.</p>
+      )}
+      <div class="hub-actions">
+        <button
+          class="btn primary"
+          disabled={sellable.length === 0}
+          title={sellable.length === 0 ? "Nothing here the desk can buy." : "Sell every unreserved specimen"}
+          onClick={() => session.act((s) => sellSpecimens(s))}
+        >
+          Sell specimens
+        </button>
+        <span class="muted small">
+          {sellable.length > 0 ? `about ${cr(estimate)}. ` : ""}
+          {cr(SPECIMEN_PRICE)} each; the first sale of a new species pays a bonus of {cr(NEW_SPECIES_BONUS)}.
+        </span>
+      </div>
+    </>
+  );
+}
+
+// --- jobs --------------------------------------------------------------------------------
+
+function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
+  const { state } = session;
+  const active = c.status === "active";
+  const progress = contractProgress(state, c);
+  const left = c.deadline !== null ? c.deadline - state.time : 0;
+  const urgent = active && left < 14 * DAY;
+  const activeCount = (state.contracts ?? []).filter((x) => x.status === "active").length;
+
+  return (
+    <div class={`panel hub-contract ${active ? "active" : ""}`}>
+      <div class="hub-card-head">
+        <div>
+          <span class="tag">{CLAN_NAMES[c.clan]}</span> <strong>{c.title}</strong>
+          {c.starter && !active && (
+            <>
+              {" "}
+              <span class="tag good" title="A gentle job near home to teach the loop.">
+                New captain
+              </span>
+            </>
+          )}
+        </div>
+        <span class="accent">{cr(c.reward)}</span>
+      </div>
+      <div class="muted small">{c.text}</div>
+      {active ? (
+        <>
+          <div class="hub-contract-row">
+            <span class={urgent ? "danger" : "muted"}>{left > 0 ? `${formatDuration(left)} left` : "Overdue"}</span>
+            <span class={progress.ready ? "good" : ""}>{progress.label}</span>
+          </div>
+          <div class="bar hub-contract-bar">
+            <span style={{ width: `${pct(progress.have, progress.need)}%` }} />
+          </div>
+          <button
+            class="btn primary"
+            disabled={!progress.ready}
+            title={progress.ready ? `Turn in for ${cr(c.reward)}` : `Not yet: ${progress.label}`}
+            onClick={() => session.act((s) => completeContract(s, c.id))}
+          >
+            Turn in
+          </button>
+        </>
+      ) : (
+        <div class="hub-contract-row">
+          <span class="muted">{c.durationDays} days to complete</span>
+          <button
+            class="btn"
+            disabled={activeCount >= 4}
+            title={activeCount >= 4 ? "You can hold at most 4 active contracts." : `Sign with ${CLAN_NAMES[c.clan]}`}
+            onClick={() => session.act((s) => acceptContract(s, c.id))}
+          >
+            Accept
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Jobs({ session }: { session: GameSession }) {
+  const contracts = session.state.contracts ?? [];
+  const active = contracts.filter((c) => c.status === "active");
+  const offered = contracts.filter((c) => c.status === "offered");
+  const past = contracts.filter((c) => c.status === "done" || c.status === "failed");
+
+  return (
+    <div class="hub-jobs">
+      <section>
+        <h2>Active contracts ({active.length} / 4)</h2>
+        {active.length > 0 ? (
+          <div class="hub-cards hub-contracts">
+            {active.map((c) => (
+              <ContractCard key={c.id} session={session} c={c} />
+            ))}
+          </div>
+        ) : (
+          <p class="muted">Nothing signed. Take a job below; deliveries and sample runs are turned in aboard the Intrepid.</p>
+        )}
+      </section>
+
+      <section>
+        <h2>On offer</h2>
+        {offered.length > 0 ? (
+          <div class="hub-cards hub-contracts">
+            {offered.map((c) => (
+              <ContractCard key={c.id} session={session} c={c} />
+            ))}
+          </div>
+        ) : (
+          <p class="muted">The boards are bare. New postings appear every few weeks.</p>
+        )}
+      </section>
+
+      {past.length > 0 && (
+        <details class="hub-history">
+          <summary>History ({past.length})</summary>
+          <table class="data">
+            <tbody>
+              {[...past].reverse().map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <span class={c.status === "done" ? "good" : "danger"}>{c.status === "done" ? "Done" : "Lapsed"}</span>
+                  </td>
+                  <td>{c.title}</td>
+                  <td class="muted">{CLAN_NAMES[c.clan]}</td>
+                  <td class="num">{c.status === "done" ? cr(c.reward) : <span class="muted">-</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
     </div>
   );
 }

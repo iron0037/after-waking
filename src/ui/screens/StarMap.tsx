@@ -10,13 +10,19 @@ import {
   INTREPID_POS,
   KIND_LABEL,
   landableBodies,
+  contractTargetsBySystem,
+  explorationScore,
   positionOf,
   shipStats,
   SPECTRAL,
+  systemProgress,
   type Body,
+  type Contract,
   type StarSystem,
+  type SystemProgress,
   type Vec2,
 } from "../../sim";
+import { CLAN_NAMES } from "../../data/ship";
 import { Canvas } from "../Canvas";
 import { BODY_COLOR, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
@@ -53,11 +59,32 @@ function starRadius(s: StarSystem): number {
   return 2.5 + clamp(t, 0, 1) * 3.5;
 }
 
+/**
+ * Blended exploration score for a system, 0..1: how much of it has been scanned, landed on and
+ * walked. Regions visited alone is usually tiny, so it counts for less.
+ */
+interface Paint {
+  progress: SystemProgress;
+  score: number;
+}
+
+/** System ids that hold a target of an active contract, with the contracts pointing there. */
+function contractTargets(session: GameSession): Map<string, Contract[]> {
+  return contractTargetsBySystem(session.state);
+}
+
 export function StarMap({ session }: { session: GameSession }) {
   useSession(session);
   const { state, world } = session;
   const fromId = currentSystemId(state);
   const docked = state.location.kind === "intrepid";
+  const targets = contractTargets(session);
+  const paint = new Map<string, Paint>();
+  for (const s of world.galaxy.systems) {
+    if (!s.charted && !state.visitedSystems.includes(s.id)) continue;
+    const progress = systemProgress(state, world, s.id);
+    paint.set(s.id, { progress, score: explorationScore(state, world, s.id) });
+  }
 
   const nodes = useMemo<Node[]>(
     () => [
@@ -409,8 +436,18 @@ export function StarMap({ session }: { session: GameSession }) {
     const r = starRadius(s);
     const color = SPECTRAL[s.spectral].color;
     const isHover = hovered === n.id;
+    const pt = paint.get(n.id);
 
-    const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 4.5);
+    if (s.home) {
+      const hr = r * 8;
+      const halo = ctx.createRadialGradient(x, y, r, x, y, hr);
+      halo.addColorStop(0, "rgba(126, 231, 135, 0.16)");
+      halo.addColorStop(1, "rgba(126, 231, 135, 0)");
+      ctx.fillStyle = halo;
+      ctx.fillRect(x - hr, y - hr, hr * 2, hr * 2);
+    }
+
+    const glow =ctx.createRadialGradient(x, y, 0, x, y, r * 4.5);
     glow.addColorStop(0, `${color}aa`);
     glow.addColorStop(0.3, `${color}33`);
     glow.addColorStop(1, `${color}00`);
@@ -425,6 +462,46 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.arc(x, y, r * 0.45, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
     ctx.fill();
+
+    // exploration "paint": a thin ring that fills in as the system is scanned, landed on and walked
+    if (pt && (pt.score > 0 || pt.progress.visited)) {
+      const ringR = r + 9;
+      const full = pt.score >= 0.995;
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = UI.cyan;
+      ctx.globalAlpha = 0.14;
+      ctx.beginPath();
+      ctx.arc(x, y, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      if (full) {
+        ctx.fillStyle = UI.good;
+        ctx.globalAlpha = 0.06;
+        ctx.fill();
+      }
+      if (pt.score > 0) {
+        ctx.strokeStyle = full ? UI.good : UI.cyan;
+        ctx.globalAlpha = full ? 0.75 : 0.45;
+        ctx.lineWidth = full ? 2 : 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pt.score);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    if (targets.has(n.id)) {
+      const mx = x - r - 6;
+      const my = y - r - 6;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - 4.5);
+      ctx.lineTo(mx + 4.5, my);
+      ctx.lineTo(mx, my + 4.5);
+      ctx.lineTo(mx - 4.5, my);
+      ctx.closePath();
+      ctx.fillStyle = UI.accent;
+      ctx.fill();
+    }
 
     if (state.visitedSystems.includes(n.id)) {
       const mx = x + r + 4;
@@ -443,7 +520,7 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.fillStyle = s.charted ? UI.text : UI.muted;
     const flip = x + 140 > w;
     ctx.textAlign = flip ? "right" : "left";
-    ctx.fillText(n.name, flip ? x - r - 7 : x + r + 7, y + 4);
+    ctx.fillText(s.home ? `${n.name} ⌂` : n.name, flip ? x - r - 12 : x + r + 12, y + 4);
   };
 
   const drawIntrepid = (ctx: CanvasRenderingContext2D) => {
@@ -531,9 +608,18 @@ export function StarMap({ session }: { session: GameSession }) {
             Center on ship
           </button>
         </div>
-        <div class="viewport-hint">
-          Wheel: zoom · Drag: pan · Click: select · Esc: clear · <span class="good">◆</span> visited
+        <div class="sm-legend">
+          <div>
+            <span class="good">◆</span> visited · <span class="accent">◆</span> contract target
+          </div>
+          <div>
+            <span class="sm-ring">◯</span> ring: how thoroughly explored (full ring = painted)
+          </div>
+          <div>
+            <span class="good">⌂</span> home systems: calm, surveyed by the first scouts
+          </div>
         </div>
+        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: select · Esc: clear</div>
       </div>
 
       <aside class="side">
@@ -573,6 +659,14 @@ export function StarMap({ session }: { session: GameSession }) {
                 </dd>
               </dl>
             </section>
+
+            {target.star && (
+              <ExplorationBlock
+                star={target.star}
+                paint={paint.get(target.id)}
+                contracts={targets.get(target.id) ?? []}
+              />
+            )}
 
             {plan && target.id !== fromId && (
               <section class="panel">
@@ -649,9 +743,18 @@ export function StarMap({ session }: { session: GameSession }) {
                 >
                   <td class={n.star && !n.star.charted ? "muted" : ""}>
                     {n.name}
-                    {state.visitedSystems.includes(n.id) && <span class="good"> ◆</span>}
+                    {n.star?.home && <span class="good" title="Home system"> ⌂</span>}
+                    {state.visitedSystems.includes(n.id) && <span class="good" title="Visited"> ◆</span>}
+                    {targets.has(n.id) && <span class="accent" title="Active contract target"> ◆</span>}
                   </td>
                   <td class="muted">{n.star ? n.star.spectral : "ship"}</td>
+                  <td class="sm-prog">
+                    {paint.get(n.id) && (
+                      <span class="sm-minibar" title={`${Math.round((paint.get(n.id)?.score ?? 0) * 100)}% explored`}>
+                        <span style={{ width: `${Math.round((paint.get(n.id)?.score ?? 0) * 100)}%` }} />
+                      </span>
+                    )}
+                  </td>
                   <td class={`num ${ly > stats.foldRangeLy ? "danger" : ""}`}>{ly.toFixed(1)} ly</td>
                 </tr>
               ))}
@@ -660,6 +763,57 @@ export function StarMap({ session }: { session: GameSession }) {
         </section>
       </aside>
     </>
+  );
+}
+
+function ExplorationBlock({ star, paint, contracts }: { star: StarSystem; paint: Paint | undefined; contracts: Contract[] }) {
+  const p = paint?.progress;
+  return (
+    <section class="panel">
+      <h3>Exploration</h3>
+      {star.home && (
+        <div class="good small sm-gap">⌂ Home system: calm, surveyed by the first scouts. A gentle place to learn the work.</div>
+      )}
+      {p ? (
+        <dl class="kv">
+          <dt>Explored</dt>
+          <dd>
+            <span class="sm-minibar wide">
+              <span style={{ width: `${Math.round((paint?.score ?? 0) * 100)}%` }} />
+            </span>{" "}
+            {Math.round((paint?.score ?? 0) * 100)}%
+          </dd>
+          <dt>Bodies scanned</dt>
+          <dd>
+            {p.scanned} / {p.bodies}
+          </dd>
+          <dt>Bodies surveyed</dt>
+          <dd>
+            {p.surveyed} / {p.bodies}
+          </dd>
+          <dt>Worlds landed on</dt>
+          <dd>{p.landed}</dd>
+          <dt>Regions visited</dt>
+          <dd>
+            {p.regionsVisited} / {p.regionsTotal}
+          </dd>
+        </dl>
+      ) : (
+        <div class="muted small">Uncharted: nothing on record.</div>
+      )}
+      {contracts.length > 0 && (
+        <div class="sm-contracts">
+          <h3 class="accent">◆ Contracts pointing here</h3>
+          <ul>
+            {contracts.map((c) => (
+              <li key={c.id}>
+                <strong>{c.title}</strong> <span class="muted">({CLAN_NAMES[c.clan]})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -695,6 +849,15 @@ function BodyList({ session, systemId }: { session: GameSession; systemId: strin
           <span class="sm-dot" style={{ background: BODY_COLOR[body.kind] }} />
           <span class="sm-body-name">
             {body.name}
+            {body.nickname && <span class="muted"> · {body.nickname}</span>}
+            {body.easy && (
+              <>
+                {" "}
+                <span class="tag good" title="A calm world: mild hazards and shallow seams, good for new captains.">
+                  calm
+                </span>
+              </>
+            )}
             {landable.has(body.id) && <span class="good" title="Landable with your current ship"> ▼</span>}
           </span>
           <span class="muted">{KIND_LABEL[body.kind]}</span>

@@ -6,6 +6,8 @@ import {
   formatDuration,
   SPECTRAL,
   type Body,
+  type BodyProgress,
+  type Contract,
   type FlightPlan,
   type FlightTarget,
   type GameState,
@@ -50,6 +52,9 @@ export interface Scene {
   route: Route | null;
   flight: FlightOverlay | null;
   heading: number;
+  /** Exploration progress per body, and active contracts that still have work there. */
+  progress: Map<string, BodyProgress>;
+  targets: Map<string, Contract[]>;
 }
 
 export interface HitTarget {
@@ -93,6 +98,9 @@ export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, 
     const p = pos.get(b.id) as Vec2;
     const r = discRadius(b, proj.zoom);
     drawBodyDisc(ctx, b, p, r, proj, state.scannedBodies.includes(b.id));
+    const prog = scene.progress.get(b.id);
+    if (prog && prog.regionsVisited > 0) drawProgressRing(ctx, p, r, prog.explored);
+    if (scene.targets.has(b.id)) drawContractMark(ctx, p, r);
     hits.push({ id: b.id, x: p.x, y: p.y, r });
   }
 
@@ -255,6 +263,44 @@ function drawBodyDisc(ctx: CanvasRenderingContext2D, body: Body, p: Vec2, r: num
   }
 }
 
+/** A thin painted ring around a world the player has landed on: the arc is how much surface is mapped. */
+function drawProgressRing(ctx: CanvasRenderingContext2D, p: Vec2, r: number, explored: number): void {
+  const ringR = r + 3.5;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = rgba(UI.cyan, 0.2);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, ringR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = rgba(UI.cyan, 0.9);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, ringR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, Math.max(0.07, explored)));
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Small accent diamond up and to the left of a world that an active contract points at. */
+function drawContractMark(ctx: CanvasRenderingContext2D, p: Vec2, r: number): void {
+  const x = p.x - r * 0.75 - 5;
+  const y = p.y - r * 0.75 - 5;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x, y - 4.5);
+  ctx.lineTo(x + 4.5, y);
+  ctx.lineTo(x, y + 4.5);
+  ctx.lineTo(x - 4.5, y);
+  ctx.closePath();
+  ctx.fillStyle = UI.accent;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = UI.space;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string, Vec2>, proj: Projection, w: number): void {
   const { state, detail } = scene;
   const orbitingId = state.location.kind === "space" ? state.location.orbiting : null;
@@ -319,9 +365,16 @@ function drawTooltip(ctx: CanvasRenderingContext2D, scene: Scene, body: Body, p:
   const here = loc.kind === "space" && loc.orbiting === body.id;
   const d = dist(scene.shipReal, bodyPosition(scene.detail, body, scene.time));
   const lines = [body.name, `${shortKind(body.kind)} · ${here ? "in orbit" : `${fmtAU(d)} AU away`}`];
+  const prog = scene.progress.get(body.id);
+  if (prog && prog.regionsVisited > 0) {
+    lines.push(`landed ${prog.regionsVisited}/${prog.regions} regions · ${Math.round(prog.explored * 100)}% mapped`);
+  }
+  const jobs = scene.targets.get(body.id) ?? [];
+  const first = jobs[0];
+  if (first) lines.push(`◆ ${first.title}`);
   ctx.font = FONT(11);
   const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
-  const height = 38;
+  const height = 8 + lines.length * 15;
   const r = discRadius(body, proj.zoom);
   let x = p.x + r + 12;
   if (x + width > w - 6) x = p.x - r - 12 - width;
@@ -336,10 +389,10 @@ function drawTooltip(ctx: CanvasRenderingContext2D, scene: Scene, body: Body, p:
   ctx.stroke();
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = UI.text;
-  ctx.fillText(lines[0] as string, x + 8, y + 12);
-  ctx.fillStyle = UI.muted;
-  ctx.fillText(lines[1] as string, x + 8, y + 27);
+  lines.forEach((line, i) => {
+    ctx.fillStyle = i === 0 ? UI.text : line.startsWith("◆") ? UI.accent : UI.muted;
+    ctx.fillText(line, x + 8, y + 12 + i * 15);
+  });
 }
 
 // --- route and ship ----------------------------------------------------------------------

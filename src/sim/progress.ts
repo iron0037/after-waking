@@ -3,6 +3,7 @@
  * player has covered, and reminders of what's already known when returning somewhere.
  */
 import { remainingTonnes } from "./actions";
+import type { Contract } from "./contracts";
 import type { Body } from "./bodies";
 import { shipStats } from "./ship";
 import type { GameState } from "./state";
@@ -66,6 +67,42 @@ export function systemProgress(state: GameState, world: World, systemId: string)
     p.regionsTotal += bp.regions;
   }
   return p;
+}
+
+/**
+ * One number for "how thoroughly have I covered this system", 0..1, for progress rings:
+ * scanning counts most, then landing on its worlds, then working several regions.
+ */
+export function explorationScore(state: GameState, world: World, systemId: string): number {
+  const p = systemProgress(state, world, systemId);
+  const surfaced = world.system(systemId).bodies.filter((b) => b.regions > 0).length;
+  const scanned = p.bodies > 0 ? p.scanned / p.bodies : 0;
+  const landed = Math.min(1, p.landed / Math.max(1, surfaced));
+  return Math.min(1, 0.4 * scanned + 0.3 * landed + 0.3 * Math.min(1, p.regionsVisited / 5));
+}
+
+/** Bodies an active contract still needs work on, with those contracts. Surveyed targets drop off. */
+export function contractTargetsByBody(state: GameState): Map<string, Contract[]> {
+  const map = new Map<string, Contract[]>();
+  const add = (id: string, c: Contract) => map.set(id, [...(map.get(id) ?? []), c]);
+  for (const c of state.contracts ?? []) {
+    if (c.status !== "active") continue;
+    if (c.kind === "specimens" && c.bodyId) add(c.bodyId, c);
+    if (c.kind === "survey") for (const id of c.surveyBodyIds ?? []) if (!state.surveyedBodies.includes(id)) add(id, c);
+  }
+  return map;
+}
+
+/** The same targets, rolled up by star system. */
+export function contractTargetsBySystem(state: GameState): Map<string, Contract[]> {
+  const map = new Map<string, Contract[]>();
+  for (const [bodyId, contracts] of contractTargetsByBody(state)) {
+    const systemId = bodyId.split(".")[0] as string;
+    const list = map.get(systemId) ?? [];
+    for (const c of contracts) if (!list.includes(c)) list.push(c);
+    map.set(systemId, list);
+  }
+  return map;
 }
 
 export interface RegionRecap {

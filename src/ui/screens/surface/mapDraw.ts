@@ -197,6 +197,77 @@ export function drawDeposits(
   }
 }
 
+const LEAF = "#5fd47a";
+const LEAF_DIM = "#4f7a5a";
+
+/** A little sprout on every flora site the rover has spotted; sampled ones are dimmed and ticked. */
+export function drawFlora(
+  ctx: CanvasRenderingContext2D,
+  L: Layout,
+  map: RegionMap,
+  know: RegionKnowledge,
+  selectedId: number | null,
+  timeMs: number,
+): void {
+  const u = Math.max(5, L.ts * 0.36);
+  ctx.setLineDash([]);
+  for (const f of map.flora) {
+    if (!know.floraFound.includes(f.id)) continue;
+    const x = cx(L, f.x);
+    const y = cy(L, f.y);
+    const sampled = know.floraSampled.includes(f.id);
+    const color = sampled ? LEAF_DIM : LEAF;
+
+    ctx.fillStyle = "rgba(5, 7, 15, 0.8)";
+    ctx.beginPath();
+    ctx.arc(x, y, u + 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = Math.max(1.2, u * 0.16);
+    ctx.lineCap = "round";
+    // stem
+    ctx.beginPath();
+    ctx.moveTo(x, y + u * 0.75);
+    ctx.lineTo(x, y - u * 0.15);
+    ctx.stroke();
+    // leaves: left, right, and a bud on top
+    leaf(ctx, x, y + u * 0.2, -1, u);
+    leaf(ctx, x, y + u * 0.2, 1, u);
+    ctx.beginPath();
+    ctx.ellipse(x, y - u * 0.4, u * 0.2, u * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineCap = "butt";
+
+    if (sampled) {
+      ctx.strokeStyle = UI.text;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x + u * 0.35, y + u * 0.95);
+      ctx.lineTo(x + u * 0.7, y + u * 1.3);
+      ctx.lineTo(x + u * 1.3, y + u * 0.55);
+      ctx.stroke();
+    }
+
+    if (f.id === selectedId) {
+      const pulse = 0.5 + 0.5 * Math.sin(timeMs / 260);
+      const grow = pulse * 2;
+      ctx.strokeStyle = `rgba(126, 231, 135, ${0.55 + pulse * 0.4})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - L.ts / 2 - 2 - grow, y - L.ts / 2 - 2 - grow, L.ts + 4 + grow * 2, L.ts + 4 + grow * 2);
+    }
+  }
+}
+
+/** One leaf curling out from (x, y) to the left (dir -1) or right (dir 1). */
+function leaf(ctx: CanvasRenderingContext2D, x: number, y: number, dir: number, u: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.quadraticCurveTo(x + dir * u * 0.9, y - u * 0.1, x + dir * u * 0.85, y - u * 0.75);
+  ctx.quadraticCurveTo(x + dir * u * 0.15, y - u * 0.55, x, y);
+  ctx.fill();
+}
+
 /** Corner brackets around a tile with a drill rig set up. */
 function drillMark(ctx: CanvasRenderingContext2D, L: Layout, d: Deposit, depleted: boolean): void {
   const x0 = L.ox + d.x * L.ts + 1;
@@ -277,14 +348,46 @@ export function drawHoverTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Ve
   ctx.strokeRect(L.ox + tile.x * L.ts + 0.5, L.oy + tile.y * L.ts + 0.5, L.ts - 1, L.ts - 1);
 }
 
-/** The rover at a (possibly fractional) tile position. `shift` nudges it off the ship's pad. */
-export function drawRover(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, timeMs: number, shift: boolean): void {
+let roverImg: HTMLImageElement | null = null;
+
+/** The rover sprite once it has loaded; null until then (callers fall back to a plain marker). */
+function roverSprite(): HTMLImageElement | null {
+  if (!roverImg && typeof Image !== "undefined") {
+    roverImg = new Image();
+    roverImg.src = "./assets/rover.png";
+  }
+  return roverImg && roverImg.complete && roverImg.naturalWidth > 0 ? roverImg : null;
+}
+
+/**
+ * The rover at a (possibly fractional) tile position. `shift` nudges it off the ship's pad;
+ * `facing` is +1 or -1 and mirrors the sprite to the direction of travel.
+ */
+export function drawRover(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, timeMs: number, shift: boolean, facing = 1): void {
   const off = shift ? L.ts * 0.26 : 0;
   const x = cx(L, at.x) + off;
   const y = cy(L, at.y) + off;
-  const r = Math.max(4, L.ts * 0.3);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 350);
   ctx.setLineDash([]);
+  const sprite = roverSprite();
+  if (sprite) {
+    const w = L.ts * 2;
+    const h = w * (sprite.naturalHeight / sprite.naturalWidth);
+    ctx.fillStyle = `rgba(95, 212, 255, ${0.1 + pulse * 0.1})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y + h * 0.12, w * 0.5, h * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(facing < 0 ? -1 : 1, 1);
+    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    ctx.imageSmoothingEnabled = prev;
+    return;
+  }
+  const r = Math.max(4, L.ts * 0.3);
   ctx.fillStyle = `rgba(95, 212, 255, ${0.12 + pulse * 0.15})`;
   ctx.beginPath();
   ctx.arc(x, y, r * (1.5 + pulse * 0.5), 0, Math.PI * 2);

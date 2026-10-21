@@ -135,6 +135,74 @@
   border-color: var(--good);
 }
 
+.hub-id {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hub-ship {
+  /* the sprite is 68x51: 2x keeps the pixels crisp */
+  width: 136px;
+  height: auto;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+.hub-badge {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #1a1100;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.hub-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.hub-jobs h2 {
+  margin: 0 0 10px;
+}
+.hub-contracts {
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+}
+.hub-contract {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub-contract.active {
+  border-color: var(--accent);
+}
+.hub-contract .btn {
+  align-self: flex-start;
+}
+.hub-contract-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.hub-contract-bar {
+  height: 6px;
+}
+.hub-history summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.hub-history table {
+  margin-top: 8px;
+}
+.tag.accent-tag {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .hub-checklist {
   list-style: none;
   margin: 0 0 16px;

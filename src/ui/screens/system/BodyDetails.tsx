@@ -1,6 +1,7 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import {
+  contractProgress,
   DAY,
   formatDuration,
   formatPressure,
@@ -9,6 +10,9 @@ import {
   TECTONICS_LABEL,
   WEATHER_LABEL,
   type Body,
+  type BodyProgress,
+  type Contract,
+  type GameState,
   type SystemDetail,
 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
@@ -31,13 +35,58 @@ export function BodyHeader({ body, detail, scanned }: { body: Body; detail: Syst
     <div class="sys-body-head">
       <span class="sys-swatch" style={{ background: BODY_COLOR[body.kind] }} />
       <div>
-        <h2 class="sys-body-name">{body.name}</h2>
+        <h2 class="sys-body-name">
+          {body.name}
+          {body.nickname && <span class="muted sys-nick"> · {body.nickname}</span>}
+        </h2>
         <div class="muted small">
           {KIND_LABEL[body.kind]} · {body.radiusEarth.toFixed(2)} R⊕ {scanned && <span class="tag">scanned</span>}
+          {body.easy && <span class="tag sys-calm-tag">calm</span>}
         </div>
       </div>
       <div class="sys-body-orbit muted small">{orbitSummary(detail, body)}</div>
     </div>
+  );
+}
+
+/** How much of the world the player has covered, plus any active contract that points here. */
+export function Exploration({
+  state,
+  progress,
+  contracts,
+}: {
+  state: GameState;
+  progress: BodyProgress;
+  contracts: Contract[];
+}) {
+  const landed = progress.regionsVisited > 0;
+  const showSurface = progress.regions > 0 && (progress.scanned || landed);
+  if (!showSurface && contracts.length === 0) return null;
+  return (
+    <>
+      <h3>Exploration</h3>
+      {showSurface && (
+        <dl class="kv sys-explore">
+          <dt>Regions visited</dt>
+          <dd class={landed ? "" : "muted"}>
+            {progress.regionsVisited} / {progress.regions}
+          </dd>
+          <dt>Surface explored</dt>
+          <dd class={landed ? "" : "muted"}>{Math.round(progress.explored * 100)}%</dd>
+          <dt>Orbital survey</dt>
+          <dd class={progress.surveyed ? "good" : "muted"}>{progress.surveyed ? "Done" : "Not yet"}</dd>
+        </dl>
+      )}
+      {contracts.map((c) => {
+        const p = contractProgress(state, c);
+        return (
+          <div key={c.id} class="sys-contract" title={c.text}>
+            <span class="sys-job">◆</span> <b>{c.title}</b>
+            <div class="muted small">{p.label}</div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 

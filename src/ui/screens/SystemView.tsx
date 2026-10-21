@@ -4,6 +4,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  bodyProgress,
   clamp,
   flightPlan,
   flyTo,
@@ -27,11 +28,11 @@ import {
 import { useSession, type GameSession } from "../session";
 import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
-import { BodyHeader, Environment } from "./system/BodyDetails";
+import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
 import { BodyList } from "./system/BodyList";
 import { HOME_VIEW, zoomAt, type ViewState } from "./system/projection";
 import { RegionPicker, bestRegion } from "./system/RegionPicker";
-import { fmtAU } from "./system/util";
+import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
 
 interface Flight {
@@ -73,6 +74,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const shipReal = shipPosition(state, world) as Vec2;
   const starDist = Math.hypot(shipReal.x, shipReal.y);
   const atEdge = starDist >= detail.edgeAU * 0.98;
+
+  // Recomputed per render (not per animation frame): exploration rings and contract markers.
+  const progress = new Map(detail.bodies.map((b) => [b.id, bodyProgress(state, b)] as const));
+  const targets = contractTargets(state);
 
   const selected: Body | null = selectedId ? (detail.bodies.find((b) => b.id === selectedId) ?? null) : null;
   const orbitingSel = selected !== null && selected.id === orbitingId;
@@ -210,6 +215,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       route,
       flight,
       heading: headingRef.current,
+      progress,
+      targets,
     });
     hitsRef.current = result.hits;
     headingRef.current = result.heading;
@@ -317,6 +324,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             orbitingId={orbitingId}
             selectedId={selected?.id ?? null}
             hoverId={hoverId}
+            progress={progress}
+            targets={targets}
             onSelect={select}
             onHover={(id) => !busy && setHoverId(id)}
           />
@@ -325,6 +334,11 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
         {selected ? (
           <section class="panel sys-selected">
             <BodyHeader body={selected} detail={detail} scanned={scanned} />
+            <Exploration
+              state={state}
+              progress={progress.get(selected.id) ?? bodyProgress(state, selected)}
+              contracts={targets.get(selected.id) ?? []}
+            />
 
             {!orbitingSel && planRes && (
               <>
@@ -394,6 +408,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                     <RegionPicker
                       body={selected}
                       state={state}
+                      world={world}
                       sensorTier={sensorTierFor(state, selected.id)}
                       reachM={stats.drillMaxDepthM}
                       selected={region}
