@@ -13,5 +13,8 @@ export function deserialize(json: string): GameState {
   if (data.version !== SAVE_VERSION) {
     throw new Error(`Save version ${data.version} isn't supported (expected ${SAVE_VERSION}).`);
   }
+  // Fields added after the first M1 builds.
+  data.surveyedBodies ??= [];
+  data.payrollOwed ??= 0;
   return data;
 }

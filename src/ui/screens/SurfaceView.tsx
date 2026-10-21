@@ -23,6 +23,7 @@ import {
   recallRover,
   remainingTonnes,
   shipStats,
+  SHIFT_FACTOR,
   stowRover,
   Terrain,
   TERRAIN_INFO,
@@ -243,7 +244,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         const bad = plan.energy > rover.energy;
         const strands = plan.back === null || plan.energy + plan.back > rover.energy;
         lines.push({
-          text: `Drive ${formatDuration(plan.minutes)} · ${plan.energy.toFixed(1)} energy`,
+          text: `Drive ${formatDuration(plan.minutes * SHIFT_FACTOR)} · ${plan.energy.toFixed(1)} energy`,
           color: bad || strands ? UI.danger : UI.good,
         });
         if (bad) lines.push({ text: "Not enough energy", color: UI.danger });
@@ -367,7 +368,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           <h3>Actions</h3>
           <div class="btn-row">
             {!rover && (
-              <button class="btn" disabled={busy} onClick={() => session.act((s, w) => deployRover(s, w))}>
+              <button class="btn" disabled={busy} onClick={() => {
+                  const r = session.act((s, w) => deployRover(s, w));
+                  if (r.ok && r.value.chargedHours >= 0.5) {
+                    session.notify(`Charged the rover's cells for ${formatDuration(r.value.chargedHours * HOUR)} before rolling out.`);
+                  }
+                }}>
                 Deploy rover
               </button>
             )}
@@ -575,9 +581,10 @@ function DepositPanel({
   const runDrill = (maxHours: number): void => {
     const r = session.act((s, w) => drill(s, w, dep.id, maxHours));
     if (!r.ok) return;
-    const { tonnes: got, hours, depleted, roverFull } = r.value;
-    const why = depleted ? "deposit worked out" : roverFull ? "cargo bed full" : hours < maxHours - 0.01 ? "rover energy low" : "";
-    session.notify(`Drilled ${tonnes(got)} of ${commodity.name.toLowerCase()} in ${formatDuration(hours * HOUR)}${why ? ` (${why})` : ""}.`);
+    const { tonnes: got, hours, depleted, roverFull, incident } = r.value;
+    const why = incident ? "interrupted" : depleted ? "deposit worked out" : roverFull ? "cargo bed full" : hours < maxHours - 0.01 ? "rover energy low" : "";
+    session.notify(`Drilled ${tonnes(got)} of ${commodity.name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}${why ? ` (${why})` : ""}.`);
+    if (incident) session.notify(incident, "error");
   };
 
   return (
@@ -636,7 +643,7 @@ function DepositPanel({
               disabled={busy || prospectBlockers.length > 0}
               onClick={() => session.act((s, w) => prospect(s, w, dep.id))}
             >
-              Prospect ({formatDuration(PROSPECT_MINUTES)})
+              Prospect ({formatDuration(PROSPECT_MINUTES * SHIFT_FACTOR)})
             </button>
           </div>
         </>
@@ -658,9 +665,10 @@ function DepositPanel({
           </div>
           {drillBlockers.length === 0 && (
             <p class="muted small act-note">
-              Full run: about {tonnes(rate * hoursFull)} in {formatDuration(hoursFull * HOUR + setupMin)}. 4 h run: about{" "}
-              {tonnes(rate * hours4)} in {formatDuration(hours4 * HOUR + setupMin)}.
-              {!isSite && ` Includes ${formatDuration(DRILL_SETUP_MINUTES)} rig setup, once per site.`}
+              Full run: about {tonnes(rate * hoursFull)} in {formatDuration((hoursFull * HOUR + setupMin) * SHIFT_FACTOR)}. 4 h
+              of drilling: about {tonnes(rate * hours4)} in {formatDuration((hours4 * HOUR + setupMin) * SHIFT_FACTOR)}.
+              {!isSite && ` Includes ${formatDuration(DRILL_SETUP_MINUTES * SHIFT_FACTOR)} rig setup, once per site.`} Times
+              include crew rest between shifts.
             </p>
           )}
         </>

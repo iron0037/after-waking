@@ -7,8 +7,6 @@ import type { Rng } from "./rng";
 import { clamp } from "./units";
 
 export const FUEL_BASE_PRICE = 220;
-/** Tonnes of recent sales at which a commodity's price is halved. */
-const GLUT_HALF_TONNES = 400;
 
 export interface MarketState {
   /** Last simulated day (absolute day number). */
@@ -42,7 +40,8 @@ export function stepMarket(market: MarketState, rng: Rng, day: number): void {
 }
 
 export function sellPrice(market: MarketState, id: CommodityId): number {
-  return Math.round((COMMODITIES[id].basePrice * market.mult[id]) / (1 + market.glut[id] / GLUT_HALF_TONNES));
+  const c = COMMODITIES[id];
+  return Math.round((c.basePrice * market.mult[id]) / (1 + market.glut[id] / c.marketDepthT));
 }
 
 export function fuelPrice(market: MarketState): number {

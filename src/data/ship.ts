@@ -50,7 +50,7 @@ export const BASE_STATS: ShipStats = {
   cruiseSpeedC: 0.25,
   sensorTier: 1,
   drillMaxDepthM: 250,
-  drillRateTph: 2,
+  drillRateTph: 1.2,
   roverCargoT: 20,
   roverEnergy: 100,
   roverCanClimb: false,
@@ -80,7 +80,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "expandedHold",
     name: "Expanded hold",
     vendor: "exchange",
-    price: 12_000,
+    price: 22_000,
     description: "+100 t cargo capacity. Adds 150 t of hull mass, so folds cost more.",
     apply: (s) => {
       s.cargoCapacityT += 100;
@@ -91,7 +91,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "auxTanks",
     name: "Auxiliary plicite tanks",
     vendor: "midshipmen",
-    price: 9_000,
+    price: 14_000,
     description: "+40 fuel capacity.",
     apply: (s) => {
       s.fuelCapacity += 40;
@@ -102,7 +102,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "driveCoil2",
     name: "Fold coil Mk II",
     vendor: "midshipmen",
-    price: 30_000,
+    price: 55_000,
     description: "Maximum fold range 13 ly.",
     apply: (s) => {
       s.foldRangeLy = Math.max(s.foldRangeLy, 13);
@@ -112,7 +112,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "landingStruts",
     name: "Heavy struts & lift thrusters",
     vendor: "midshipmen",
-    price: 18_000,
+    price: 28_000,
     description: "Lift off from worlds up to 1.9 g.",
     apply: (s) => {
       s.ratings.maxGravityG = Math.max(s.ratings.maxGravityG, 1.9);
@@ -123,7 +123,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "pressureHull2",
     name: "Pressure hull Mk II",
     vendor: "midshipmen",
-    price: 22_000,
+    price: 38_000,
     description: "Land under up to 12 atm, from −200 °C to 260 °C.",
     apply: (s) => {
       s.ratings.maxPressureAtm = Math.max(s.ratings.maxPressureAtm, 12);
@@ -136,7 +136,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "radShielding",
     name: "Radiation baffles",
     vendor: "lyceum",
-    price: 11_000,
+    price: 18_000,
     description: "Survive surface radiation up to level 3.",
     apply: (s) => {
       s.ratings.maxRadiation = Math.max(s.ratings.maxRadiation, 3);
@@ -147,7 +147,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "surveyArray",
     name: "Helm survey array",
     vendor: "helm",
-    price: 14_000,
+    price: 16_000,
     description: "Sensor tier 2: sharper orbital region readings, wider rover detection.",
     apply: (s) => {
       s.sensorTier = Math.max(s.sensorTier, 2);
@@ -157,7 +157,7 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "deepDrill",
     name: "Deep-core drill",
     vendor: "diggers",
-    price: 15_000,
+    price: 24_000,
     description: "Drill to 700 m at double the extraction rate.",
     apply: (s) => {
       s.drillMaxDepthM = Math.max(s.drillMaxDepthM, 700);

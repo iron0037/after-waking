@@ -7,6 +7,7 @@ import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { UPGRADES_BY_ID } from "../data/ship";
 import {
   buyFuel,
+  buyFuelOnCredit,
   buyUpgrade,
   deployRover,
   drill,
@@ -21,12 +22,15 @@ import {
   remainingTonnes,
   scanBody,
   sellAll,
+  sensorTierFor,
+  surveyBody,
   stowRover,
   recallRover,
   wait,
   type Result,
 } from "./actions";
 import type { Body } from "./bodies";
+import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
@@ -41,12 +45,22 @@ export interface BotReport {
   tripsCompleted: number;
   /** Unexpected action failures: these indicate bugs or dead ends in the loop. */
   errors: string[];
-  tripSummaries: { system: string; days: number; tonnes: number; revenue: number }[];
+  tripSummaries: { system: string; days: number; tonnes: number; revenue: number; net: number }[];
 }
 
-const UPGRADE_PRIORITY = ["deepDrill", "roverSled", "expandedHold", "roverCells", "auxTanks", "landingStruts", "surveyArray"];
+export interface BotOptions {
+  /** Fly a detailed orbital survey of each world before landing. */
+  survey?: boolean;
+  /** Upgrades to buy, in order, whenever there's a comfortable cushion. Empty = never upgrade. */
+  upgrades?: readonly string[];
+  /** Keep at least this many credits after buying an upgrade. */
+  reserve?: number;
+}
 
-export function runBot(seed: number, trips: number): BotReport {
+export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
+
+export function runBot(seed: number, trips: number, options: BotOptions = {}): BotReport {
+  const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000 } = options;
   const world = new World(seed);
   const state = newGame({ seed });
   const rng = new Rng(seed ^ 0xb07);
@@ -63,15 +77,16 @@ export function runBot(seed: number, trips: number): BotReport {
 
   let tripsCompleted = 0;
   for (let trip = 0; trip < trips && errors.length < 20; trip++) {
+    // Refit at the Intrepid. Upgrades are investments, so they're outside the trip's profit.
+    for (const id of upgrades) {
+      const upgrade = UPGRADES_BY_ID.get(id);
+      if (upgrade && !state.ship.upgrades.includes(id) && state.credits - upgrade.price > reserve) buyUpgrade(state, id);
+    }
     const start = state.time;
     const creditsBefore = state.credits;
-
-    // Refit at the Intrepid.
-    for (const id of UPGRADE_PRIORITY) {
-      const upgrade = UPGRADES_BY_ID.get(id);
-      if (upgrade && !state.ship.upgrades.includes(id) && state.credits - upgrade.price > 12_000) buyUpgrade(state, id);
-    }
+    const loanPaidBefore = state.stats.loanPaid ?? 0;
     buyFuel(state, 999);
+    if (state.ship.fuel < shipStats(state.ship).fuelCapacity * 0.6) buyFuelOnCredit(state, 999);
 
     const target = chooseSystem(state, world);
     if (!target) {
@@ -82,7 +97,7 @@ export function runBot(seed: number, trips: number): BotReport {
     if (must("fold out", fold(state, world, target)) === null) break;
 
     const tonnesBefore = state.stats.tonnesMined;
-    mineSystem(state, world, target, rng, must);
+    mineSystem(state, world, target, rng, must, survey);
 
     if (must("fly to edge", flyTo(state, world, { edge: true })) === null) break;
     if (state.time < state.foldReadyAt) wait(state, state.foldReadyAt - state.time);
@@ -95,8 +110,9 @@ export function runBot(seed: number, trips: number): BotReport {
       days: Math.round((state.time - start) / DAY),
       tonnes: Math.round(state.stats.tonnesMined - tonnesBefore),
       revenue: sold.ok ? sold.value : 0,
+      // Fuel bought before departure is a trip cost; fuel left in the tanks carries over.
+      net: state.credits - creditsBefore + ((state.stats.loanPaid ?? 0) - loanPaidBefore),
     });
-    void creditsBefore;
   }
 
   return { state, tripsCompleted, errors, tripSummaries };
@@ -146,6 +162,7 @@ function mineSystem(
   systemId: string,
   rng: Rng,
   must: <T>(label: string, r: Result<T>) => T | null,
+  survey: boolean,
 ): void {
   const detail = world.system(systemId);
   const stats = () => shipStats(state.ship);
@@ -162,11 +179,13 @@ function mineSystem(
     if (holdFull() || state.time - arrived > 60 * DAY) return;
     if (must(`fly to ${body.name}`, flyTo(state, world, { bodyId: body.id })) === null) return;
     must(`scan ${body.name}`, scanBody(state, world));
+    if (survey && !state.surveyedBodies.includes(body.id)) must(`survey ${body.name}`, surveyBody(state, world));
 
     const regionCount = Math.min(body.regions, 12);
     // Fresh ground first: a region we've already worked is worth a fraction of its signal.
     const regionValue = (r: number) =>
-      regionSignal(state.seed, body, r, stats().sensorTier) / (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
+      regionSignal(state.seed, body, r, sensorTierFor(state, body.id), stats().drillMaxDepthM) /
+      (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
     const regions = Array.from({ length: regionCount }, (_, i) => i).sort((a, b) => regionValue(b) - regionValue(a));
     for (const region of regions.slice(0, 2)) {
       if (holdFull()) break;
@@ -198,11 +217,20 @@ function workRegion(
     const rover = loc.rover;
     if (holdRoom() - cargoTonnes(rover.cargo) <= 1) break;
 
+    // Rank by credits per hour of work: drilling time at this grade plus the drive there.
+    const valuePerHour = (d: Deposit, steps: number) => {
+      const rate = stats.drillRateTph * (0.4 + d.grade);
+      const tonnes = Math.min(remainingTonnes(know, d), stats.roverCargoT);
+      return (COMMODITIES[d.commodity].basePrice * tonnes) / (tonnes / rate + steps * 0.3 + 4);
+    };
     const candidates = map.deposits
       .filter((d) => know.discovered.includes(d.id) && remainingTonnes(know, d) > 0.5 && d.depthM <= stats.drillMaxDepthM)
       .map((d) => ({ d, path: findPath(map, rover, d, stats.roverCanClimb) }))
       .filter((c) => c.path !== null)
-      .sort((a, b) => a.path!.length - b.path!.length);
+      .map((c) => ({ ...c, score: valuePerHour(c.d, c.path!.length) }))
+      // Not worth the crew's wages (25 cr/h for six on shift) unless the bed is nearly full anyway.
+      .filter((c) => c.score >= 60 || cargoTonnes(rover.cargo) > stats.roverCargoT * 0.7)
+      .sort((a, b) => b.score - a.score);
 
     const homeCost = (from: { x: number; y: number }) =>
       (findPath(map, from, map.landing, stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
@@ -222,7 +250,7 @@ function workRegion(
       continue;
     }
 
-    if (explores >= 6) break;
+    if (explores >= 8) break;
     explores++;
     const tx = clampTo(rover.x + rng.int(-12, 12), map.width);
     const ty = clampTo(rover.y + rng.int(-12, 12), map.height);

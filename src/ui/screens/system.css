@@ -191,3 +191,12 @@
   border-top: 1px solid var(--border);
   padding-top: 8px;
 }
+
+.sys-survey {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border-bright);
+  border-radius: 4px;
+}

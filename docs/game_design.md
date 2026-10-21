@@ -189,3 +189,18 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
 | **Intrepid** | Simple and strong, but generic and widely used. |
 
 Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too close to "Adrift"), and **Cosmos** (generic and unsearchable).
+
+## Starting Clan Perks **[PROPOSED: user's Exchange idea + matching perks]**
+Your starting clan shapes the early game. Every perk is small but felt, and each has a matching cost so no choice is free.
+
+| Clan | Perk | Cost / friction |
+|---|---|---|
+| **Exchange** *(user's idea)* | Loan interest halved (3%); 10% off fuel and Exchange goods; slightly better sell prices | Exchange collectors are relentless; missed payments hurt your reputation with them twice as much |
+| **Helm** | Fold drive recharges 15% faster; 3 extra systems charted at start | Helm expects you to take enforcement jobs; refusing costs standing |
+| **Midshipmen** | 10% off Midshipmen ship upgrades; start with a skilled engineer | Fussy about maintenance: skipping refits costs reputation |
+| **Diggers** | Drill rate +15%; one free high-grade deposit lead per year | Diggers expect a cut of your biggest strikes (a tithe on plicite and platinum) |
+| **Lyceum** | Orbital scans and surveys take half the time; specimens sell for 15% more | Upkeep: the Lyceum asks you to carry its researchers, which takes up berths |
+| **Covenant** | Access to the Covenant's anomaly reports (the Awaken clue trail starts early) | Archive-derived upgrades cost 10% more: your brethren disapprove |
+| **Freebooters** | Black-market fuel 10% cheaper; smuggling jobs open from day one | Helm and Exchange start out cool toward you |
+
+Clan choice isn't in V1. These perks plug into the same modifiers the balance pass uses (loan rate, prices, rates).

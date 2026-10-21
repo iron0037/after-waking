@@ -9,6 +9,8 @@ export interface ShipState {
   upgrades: string[];
   fuel: number;
   cargo: Cargo;
+  /** Rover cell charge while stowed; it recharges from the ship's reactor before each deployment. */
+  roverEnergy?: number;
 }
 
 export function shipStats(ship: ShipState): ShipStats {

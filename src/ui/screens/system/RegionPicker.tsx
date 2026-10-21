@@ -10,17 +10,19 @@ export interface RegionPickerProps {
   body: Body;
   state: GameState;
   sensorTier: number;
+  /** Drill reach in metres: tier 2+ sensors count only seams within it. */
+  reachM: number;
   selected: number;
   onSelect: (region: number) => void;
 }
 
-export function RegionPicker({ body, state, sensorTier, selected, onSelect }: RegionPickerProps) {
+export function RegionPicker({ body, state, sensorTier, reachM, selected, onSelect }: RegionPickerProps) {
   const [hover, setHover] = useState<number | null>(null);
   const seed = state.seed;
 
   const signals = useMemo(
-    () => Array.from({ length: body.regions }, (_, r) => regionSignal(seed, body, r, sensorTier)),
-    [seed, body, sensorTier],
+    () => Array.from({ length: body.regions }, (_, r) => regionSignal(seed, body, r, sensorTier, reachM)),
+    [seed, body, sensorTier, reachM],
   );
   const max = Math.max(...signals, 0);
   const min = Math.min(...signals);
@@ -67,12 +69,12 @@ export function RegionPicker({ body, state, sensorTier, selected, onSelect }: Re
 }
 
 /** Index of the strongest-signal region, preferring ones not yet visited. */
-export function bestRegion(state: GameState, body: Body, sensorTier: number): number {
+export function bestRegion(state: GameState, body: Body, sensorTier: number, reachM: number): number {
   let best = 0;
   let bestScore = -1;
   for (let r = 0; r < body.regions; r++) {
     const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
-    const score = regionSignal(state.seed, body, r, sensorTier) * (visited ? 0.5 : 1);
+    const score = regionSignal(state.seed, body, r, sensorTier, reachM) * (visited ? 0.5 : 1);
     if (score > bestScore) {
       bestScore = score;
       best = r;

@@ -9,8 +9,9 @@ import { fuelPrice, sellCommodity } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
 import { findPath } from "./pathfinding";
+import type { Rng } from "./rng";
 import { addCargo, cargoTonnes, removeCargo, shipMassT, shipStats } from "./ship";
-import { advanceTime, log, type GameState, type RoverState } from "./state";
+import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverState } from "./state";
 import { emptyKnowledge, regionKey, type Deposit, type RegionKnowledge, type RegionMap } from "./surface";
 import { formatDuration } from "./time";
 import { DAY, HOUR, travelMinutes, type Vec2 } from "./units";
@@ -37,6 +38,16 @@ export const PROSPECT_ENERGY = 4;
 export const DRILL_SETUP_ENERGY = 6;
 export const RECALL_FUEL = 1.5;
 export const RECALL_MINUTES = 3 * HOUR;
+export const SURVEY_MINUTES = 12 * HOUR;
+/** Rover cells recharge from the ship's reactor at this many energy units per hour. */
+export const ROVER_CHARGE_PER_HOUR = 10;
+/**
+ * Surface crews work two 8-hour shifts a day, so hands-on work takes 1.5x its raw duration.
+ * Applies to driving, prospecting and drilling.
+ */
+export const SHIFT_FACTOR = 1.5;
+/** Chance per drilling hour of a plain equipment breakdown; weather and tectonics add to it. */
+export const INCIDENT_BASE_PER_HOUR = 0.003;
 
 export function foldRechargeMinutes(ly: number): number {
   return DAY * (1 + 0.75 * ly);
@@ -205,6 +216,25 @@ function orbitingBody(state: GameState, world: World): Body | null {
   return loc.kind === "space" && loc.orbiting ? world.body(loc.orbiting).body : null;
 }
 
+/** Sensor tier in effect for a body: the ship's array, plus one if we flew a detailed survey there. */
+export function sensorTierFor(state: GameState, bodyId: string): number {
+  return shipStats(state.ship).sensorTier + ((state.surveyedBodies ?? []).includes(bodyId) ? 1 : 0);
+}
+
+/** A slow, careful orbital pass: sharper region readings and wider rover detection on this body. */
+export function surveyBody(state: GameState, world: World): Result<Body> {
+  const body = orbitingBody(state, world);
+  if (!body) return fail("Enter orbit first.");
+  if (!state.scannedBodies.includes(body.id)) return fail("Run the standard scan first.");
+  state.surveyedBodies ??= [];
+  if (state.surveyedBodies.includes(body.id)) return fail("Already surveyed in detail.");
+  if (body.regions === 0) return fail("There's no surface to survey.");
+  advanceTime(state, SURVEY_MINUTES);
+  state.surveyedBodies.push(body.id);
+  log(state, "discovery", `Detailed survey of ${body.name} complete. Region readings sharpened; rover sensors will reach farther here.`);
+  return ok(body);
+}
+
 export function scanBody(state: GameState, world: World): Result<Body> {
   const body = orbitingBody(state, world);
   if (!body) return fail("Enter orbit first.");
@@ -306,15 +336,20 @@ export function currentRegion(state: GameState, world: World): RegionMap | null 
   return loc.kind === "surface" ? world.region(loc.bodyId, loc.region) : null;
 }
 
-export function deployRover(state: GameState, world: World): Result {
+/** Charge the rover's cells to full (taking time), then roll it out at the landing site. */
+export function deployRover(state: GameState, world: World): Result<{ chargedHours: number }> {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
   if (loc.rover) return fail("The rover is already out.");
+  const full = shipStats(state.ship).roverEnergy;
+  const stored = Math.min(full, state.ship.roverEnergy ?? full);
+  const chargedHours = (full - stored) / ROVER_CHARGE_PER_HOUR;
+  advanceTime(state, 15 + chargedHours * HOUR);
+  state.ship.roverEnergy = full;
   const map = world.region(loc.bodyId, loc.region);
-  loc.rover = { x: map.landing.x, y: map.landing.y, energy: shipStats(state.ship).roverEnergy, cargo: {} };
-  advanceTime(state, 15);
+  loc.rover = { x: map.landing.x, y: map.landing.y, energy: full, cargo: {} };
   revealAround(state, world);
-  return ok(undefined);
+  return ok({ chargedHours });
 }
 
 /** Drive toward (x, y). Stops early if energy runs short; reports how far it got. */
@@ -333,7 +368,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
     rover.energy -= step.energy;
     rover.x = step.x;
     rover.y = step.y;
-    advanceTime(state, step.minutes);
+    advanceTime(state, step.minutes * SHIFT_FACTOR);
     steps++;
     revealAround(state, world);
   }
@@ -344,7 +379,7 @@ function revealAround(state: GameState, world: World): void {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return;
   const { map, know, rover } = ctx.value;
-  const radius = 2 + shipStats(state.ship).sensorTier;
+  const radius = 2 + sensorTierFor(state, map.bodyId);
   const found = map.deposits.filter(
     (d) => !know.discovered.includes(d.id) && Math.max(Math.abs(d.x - rover.x), Math.abs(d.y - rover.y)) <= radius,
   );
@@ -376,7 +411,7 @@ export function prospect(state: GameState, world: World, depositId: number): Res
   if (know.prospected.includes(d.id)) return ok(d);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
-  advanceTime(state, PROSPECT_MINUTES);
+  advanceTime(state, PROSPECT_MINUTES * SHIFT_FACTOR);
   know.prospected.push(d.id);
   log(
     state,
@@ -392,6 +427,8 @@ export interface DrillResult {
   hours: number;
   depleted: boolean;
   roverFull: boolean;
+  /** What interrupted the work, if anything (storm, quake, breakdown). */
+  incident: string | null;
 }
 
 /** Set up (once) and extract until the rover is full, the deposit runs out, energy fails, or maxHours pass. */
@@ -413,27 +450,81 @@ export function drill(state: GameState, world: World, depositId: number, maxHour
   if (!know.drillSites.includes(d.id)) {
     if (rover.energy < DRILL_SETUP_ENERGY) return fail("Not enough energy to set up the drill rig.");
     rover.energy -= DRILL_SETUP_ENERGY;
-    advanceTime(state, DRILL_SETUP_MINUTES);
+    advanceTime(state, DRILL_SETUP_MINUTES * SHIFT_FACTOR);
     know.drillSites.push(d.id);
   }
 
   const rate = stats.drillRateTph * (0.4 + d.grade);
-  const hours = Math.min(remaining / rate, room / rate, maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
+  let hours = Math.min(remaining / rate, room / rate, maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
   if (hours <= 0.01) return fail("Not enough rover energy to run the drill.");
+
+  const { body } = world.body(ctx.value.map.bodyId);
+  const incident = withRng(state, (rng) => rollIncident(rng, body, hours));
+  if (incident) hours *= incident.atFraction;
+
   const tonnes = Math.round(rate * hours * 10) / 10;
   addCargo(rover.cargo, d.commodity, tonnes, stats.roverCargoT);
   know.extracted[d.id] = (know.extracted[d.id] ?? 0) + tonnes;
   rover.energy -= hours * DRILL_ENERGY_PER_HOUR;
   state.stats.tonnesMined += tonnes;
-  advanceTime(state, hours * HOUR);
-  const result: DrillResult = {
+  advanceTime(state, hours * HOUR * SHIFT_FACTOR);
+  log(state, "info", `Drilled ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
+
+  if (incident) {
+    rover.energy = Math.max(0, rover.energy - incident.energy);
+    advanceTime(state, incident.lostHours * HOUR);
+    log(state, "warning", `${incident.text} Lost ${formatDuration(incident.lostHours * HOUR)}.`);
+  }
+  return ok({
     tonnes,
     hours,
     depleted: remainingTonnes(know, d) <= 0.05,
     roverFull: stats.roverCargoT - cargoTonnes(rover.cargo) <= 0.05,
-  };
-  log(state, "info", `Drilled ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR)}.`);
-  return ok(result);
+    incident: incident?.text ?? null,
+  });
+}
+
+interface Incident {
+  text: string;
+  /** Fraction of the planned drilling done before the interruption. */
+  atFraction: number;
+  lostHours: number;
+  energy: number;
+}
+
+/** Storms, quakes and breakdowns, more likely on wilder worlds and over longer shifts. */
+function rollIncident(rng: Rng, body: Body, hours: number): Incident | null {
+  const perHour = INCIDENT_BASE_PER_HOUR + 0.004 * body.weather + 0.006 * body.tectonics;
+  if (rng.next() >= 1 - Math.exp(-perHour * hours)) return null;
+  const kind = rng.weighted([
+    ["breakdown", INCIDENT_BASE_PER_HOUR],
+    ["storm", 0.004 * body.weather],
+    ["quake", 0.006 * body.tectonics],
+  ] as const);
+  const atFraction = rng.range(0.15, 0.9);
+  switch (kind) {
+    case "storm":
+      return {
+        text: "A storm rolled over the drill site; the crew sealed up and waited it out.",
+        atFraction,
+        lostHours: rng.range(6, 30),
+        energy: rng.range(5, 15),
+      };
+    case "quake":
+      return {
+        text: "A quake shook the rig loose and the bore had to be re-seated.",
+        atFraction,
+        lostHours: rng.range(4, 14),
+        energy: rng.range(10, 25),
+      };
+    default:
+      return {
+        text: "The drill head jammed and the crew spent a shift freeing it.",
+        atFraction,
+        lostHours: rng.range(3, 12),
+        energy: rng.range(5, 12),
+      };
+  }
 }
 
 /** Drive-free: the rover must already be at (or next to) the ship. Unloads, recharges, stows. */
@@ -453,6 +544,7 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
     jettisoned += tonnes - added;
   }
   advanceTime(state, ROVER_STOW_MINUTES);
+  state.ship.roverEnergy = rover.energy;
   (state.location as { rover: RoverState | null }).rover = null;
   if (jettisoned > 0.05) log(state, "warning", `The hold is full. ${jettisoned.toFixed(1)} t of ore left on the ground.`);
   return ok({ unloaded, jettisoned });
@@ -487,6 +579,7 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   state.credits += credits;
   state.stats.earned += credits;
   log(state, "trade", `Sold ${amount.toFixed(1)} t of ${COMMODITIES[id].name.toLowerCase()} for ${credits.toLocaleString()} cr.`);
+  settlePayroll(state); // the crew gets paid out of the proceeds
   return ok(credits);
 }
 
@@ -513,6 +606,30 @@ export function buyFuel(state: GameState, units: number): Result<number> {
   return ok(n);
 }
 
+/** The Exchange will advance fuel against the note, at a markup, until the balance hits this. */
+export const FUEL_CREDIT_LIMIT = 90_000;
+export const FUEL_CREDIT_MARKUP = 1.15;
+
+/** Units of fuel the Exchange would still advance on credit right now. */
+export function fuelCreditAvailable(state: GameState): number {
+  const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
+  const room = shipStats(state.ship).fuelCapacity - state.ship.fuel;
+  return Math.max(0, Math.min(Math.floor(room), Math.floor((FUEL_CREDIT_LIMIT - state.loan.balance) / price)));
+}
+
+/** Buy fuel on the Exchange's tab: no credits needed, but it's added to the loan with a markup. */
+export function buyFuelOnCredit(state: GameState, units: number): Result<number> {
+  const docked = atIntrepid(state);
+  if (!docked.ok) return docked;
+  const n = Math.min(Math.floor(units), fuelCreditAvailable(state));
+  if (n <= 0) return fail(state.loan.balance >= FUEL_CREDIT_LIMIT ? "The Exchange won't extend any more credit." : "Tanks are full.");
+  const cost = Math.round(n * fuelPrice(state.market) * FUEL_CREDIT_MARKUP);
+  state.ship.fuel += n;
+  state.loan.balance += cost;
+  log(state, "warning", `The Exchange advanced ${n} units of fuel against your note: +${cost.toLocaleString()} cr owed.`);
+  return ok(n);
+}
+
 export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
@@ -533,6 +650,7 @@ export function payLoan(state: GameState, amount: number): Result<number> {
   const pay = Math.min(Math.floor(amount), state.credits, state.loan.balance);
   if (pay <= 0) return fail(state.loan.balance <= 0 ? "Nothing owed." : "No credits to pay with.");
   state.credits -= pay;
+  state.stats.loanPaid = (state.stats.loanPaid ?? 0) + pay;
   state.loan.balance -= pay;
   log(state, "trade", `Paid ${pay.toLocaleString()} cr toward the Exchange note. Balance: ${state.loan.balance.toLocaleString()} cr.`);
   return ok(pay);

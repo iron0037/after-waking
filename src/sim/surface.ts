@@ -98,12 +98,16 @@ export function regionDeposits(seed: number, body: Body, region: number): Deposi
   return deposits;
 }
 
-/** Estimated value of a region's deposits, blurred by sensor quality. Tier 3+ is exact. */
-export function regionSignal(seed: number, body: Body, region: number, sensorTier: number): number {
-  const truth = regionDeposits(seed, body, region).reduce(
-    (sum, d) => sum + d.tonnes * d.grade * COMMODITIES[d.commodity].basePrice,
-    0,
-  );
+/**
+ * Estimated value of a region's deposits, blurred by sensor quality (tier 3+ is exact).
+ * Tier 1 sees surface signatures only, so it counts every seam. Tier 2+ penetrates the crust:
+ * given `reachM` (the drill's reach) it counts only value the ship can actually dig out.
+ */
+export function regionSignal(seed: number, body: Body, region: number, sensorTier: number, reachM = Infinity): number {
+  const depthAware = sensorTier >= 2;
+  const truth = regionDeposits(seed, body, region)
+    .filter((d) => !depthAware || d.depthM <= reachM)
+    .reduce((sum, d) => sum + d.tonnes * d.grade * COMMODITIES[d.commodity].basePrice, 0);
   const blur = sensorTier >= 3 ? 0 : sensorTier === 2 ? 0.2 : 0.5;
   const noise = rngFor(seed, body.id, region, "signal", sensorTier).range(-blur, blur);
   return Math.max(0, truth * (1 + noise));

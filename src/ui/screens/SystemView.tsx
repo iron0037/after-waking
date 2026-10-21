@@ -16,6 +16,9 @@ import {
   shipStats,
   SPECTRAL,
   SCAN_MINUTES,
+  SURVEY_MINUTES,
+  sensorTierFor,
+  surveyBody,
   type Body,
   type FlightTarget,
   type Vec2,
@@ -81,8 +84,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   // Landing: default to the strongest unvisited region until the player picks one.
   const canPickRegion = orbitingSel && scanned && selected.regions > 0;
   const defaultRegion = useMemo(
-    () => (canPickRegion ? bestRegion(state, selected, stats.sensorTier) : 0),
-    [canPickRegion, selected, stats.sensorTier, state.stats.landings],
+    () => (canPickRegion ? bestRegion(state, selected, sensorTierFor(state, selected.id), stats.drillMaxDepthM) : 0),
+    [canPickRegion, selected, stats.sensorTier, stats.drillMaxDepthM, state.stats.landings, state.surveyedBodies.length],
   );
   const region = regionPick && selected && regionPick.bodyId === selected.id ? regionPick.region : defaultRegion;
 
@@ -377,10 +380,22 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                   </>
                 ) : selected.regions > 0 ? (
                   <>
+                    {!state.surveyedBodies.includes(selected.id) && (
+                      <div class="sys-survey">
+                        <div class="muted small">
+                          A detailed survey sharpens these readings and, with penetrating sensors, counts only seams your drill can
+                          reach. Rover sensors also reach farther on this world.
+                        </div>
+                        <button class="btn" disabled={busy} onClick={() => session.act((s, w) => surveyBody(s, w))}>
+                          Detailed survey ({formatDuration(SURVEY_MINUTES)})
+                        </button>
+                      </div>
+                    )}
                     <RegionPicker
                       body={selected}
                       state={state}
-                      sensorTier={stats.sensorTier}
+                      sensorTier={sensorTierFor(state, selected.id)}
+                      reachM={stats.drillMaxDepthM}
                       selected={region}
                       onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
                     />

@@ -17,6 +17,8 @@ export interface Commodity {
   id: CommodityId;
   name: string;
   basePrice: number;
+  /** Tonnes the Intrepid can absorb before the price halves; recovers ~3% a day. */
+  marketDepthT: number;
   /** Map/UI tint for deposits of this commodity. */
   color: string;
   blurb: string;
@@ -26,56 +28,64 @@ export const COMMODITIES: Record<CommodityId, Commodity> = {
   ironNickel: {
     id: "ironNickel",
     name: "Iron-nickel ore",
-    basePrice: 40,
+    basePrice: 30,
+    marketDepthT: 5000,
     color: "#a0715a",
     blurb: "Bulk structural metal. The Intrepid's fabricators eat it by the kiloton.",
   },
   copper: {
     id: "copper",
     name: "Copper ore",
-    basePrice: 95,
+    basePrice: 71,
+    marketDepthT: 1800,
     color: "#d2804a",
     blurb: "Wiring, motors, heat exchangers. Always in demand, never glamorous.",
   },
   titanium: {
     id: "titanium",
     name: "Titanium ore",
-    basePrice: 170,
+    basePrice: 127,
+    marketDepthT: 1200,
     color: "#b8c4cc",
     blurb: "Hull plate and pressure vessels. The Midshipmen pay well for clean ore.",
   },
   rareEarths: {
     id: "rareEarths",
     name: "Rare-earth ore",
-    basePrice: 430,
+    basePrice: 322,
+    marketDepthT: 300,
     color: "#7fd1a8",
     blurb: "Magnets, lasers, sensor crystals. Scarce aboard and getting scarcer.",
   },
   uranium: {
     id: "uranium",
     name: "Uranium ore",
-    basePrice: 680,
+    basePrice: 506,
+    marketDepthT: 220,
     color: "#c8e64a",
     blurb: "Reactor fuel for the Intrepid's aging fission backup plants.",
   },
   platinum: {
     id: "platinum",
     name: "Platinum-group ore",
-    basePrice: 1150,
+    basePrice: 862,
+    marketDepthT: 70,
     color: "#e6e1ff",
     blurb: "Catalysts and contacts. A good platinum strike pays for a refit.",
   },
   waterIce: {
     id: "waterIce",
     name: "Water ice",
-    basePrice: 22,
+    basePrice: 16,
+    marketDepthT: 8000,
     color: "#9fd8ff",
     blurb: "Two million people drink, wash and breathe it. Cheap, but never refused.",
   },
   plicite: {
     id: "plicite",
     name: "Plicite-bearing ore",
-    basePrice: 2400,
+    basePrice: 1800,
+    marketDepthT: 600,
     color: "#ff5fd2",
     blurb:
       "The crystal that makes folding possible. It behaves almost too neatly, as if its lattice were designed. The Lyceum insists that's just good chemistry.",

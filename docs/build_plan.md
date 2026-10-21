@@ -74,6 +74,35 @@ after-waking/
   - Deep-seam dead ends: depth is now skewed shallow, so about 46% of seams are within the starting drill's reach.
 - **Design gap:** a broke captain can be stranded at the Intrepid without fuel money. The Exchange could extend fuel credit, at a price.
 
+**2026-10-21: balance pass** (12 seeds × 15 trips × 4 strategies; `BALANCE=1 npx vitest run tests/balance.test.ts`)
+- **Changes:**
+  - Six crew at 25 cr/day each, paid from sales at the Intrepid.
+  - Surface work runs in two shifts a day (1.5× duration).
+  - The rover recharges at 10 energy/h.
+  - Base drill rate is 1.2 t/h.
+  - Market depth now varies by commodity (5,000 t for iron down to 70 t for platinum).
+  - Ore prices are set to 75% of the original values.
+  - Upgrade prices are up roughly 1.5–1.8×.
+  - Drilling incidents: storms, quakes and breakdowns, scaled by each world's weather and tectonics.
+  - **New investments:**
+    - A detailed orbital survey (12 h) gives +1 sensor tier on that body.
+    - Sensor tier 2+ is depth-aware: the region map counts only seams the drill can reach.
+  - The Exchange advances fuel on credit (+15%, added to the loan, capped at a 90k balance), so a broke captain is never permanently stranded.
+- **Results:**
+
+| Strategy | Days/trip | Profit/trip, first 5 → last 5 | Trips profitable | Profit per 100 days |
+|---|---|---|---|---|
+| Bare ship | 26 | 19k → 7.5k | 66% | 44k |
+| Survey only | 28 | 21k → 11k | 69% | 48k (+11%) |
+| Upgrades only | 25 | 26k → 29k | 84% | 70k (+62%) |
+| Survey + upgrades | 26 | 25k → 36k | 89% | 82k (+88%) |
+
+- **Read:**
+  - Runs are generally profitable, with real risk: a third of a bare ship's trips lose money.
+  - Investments pay off and stack.
+  - A bare ship's returns fade as nearby rich seams are worked out, which pushes players outward and toward upgrades.
+- **Open:** the full M1 upgrade set is affordable within about a year. M2 needs long-term money sinks (research projects, bigger hulls, outposts) to fill a 5–50-year game.
+
 ## M1 Status (2026-10-21)
 **Playable end to end.** One complete trip was played by hand in the real UI:
 - Hub → fuel → star map → fold → system orrery → animated flight → scan.

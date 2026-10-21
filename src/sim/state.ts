@@ -57,10 +57,14 @@ export interface GameState {
   foldReadyAt: number;
   visitedSystems: string[];
   scannedBodies: string[];
+  /** Bodies given a detailed orbital survey: +1 effective sensor tier there. */
+  surveyedBodies: string[];
+  /** Crew wages accrued since the last payday (paid when docked at the Intrepid). */
+  payrollOwed: number;
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];
-  stats: { folds: number; tonnesMined: number; earned: number; landings: number };
+  stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number };
 }
 
 export interface NewGameOptions {
@@ -90,10 +94,12 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     foldReadyAt: GAME_START,
     visitedSystems: [],
     scannedBodies: [],
+    surveyedBodies: [],
+    payrollOwed: 0,
     regions: {},
     market: newMarket(Math.floor(GAME_START / DAY)),
     journal: [],
-    stats: { folds: 0, tonnesMined: 0, earned: 0, landings: 0 },
+    stats: { folds: 0, tonnesMined: 0, earned: 0, landings: 0, loanPaid: 0 },
   };
   log(
     state,
@@ -102,6 +108,10 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
   );
   return state;
 }
+
+/** Six crew at 25 cr a day each. (Crew become individuals with skills in M2.) */
+export const CREW_SIZE = 6;
+export const WAGE_PER_DAY = 25;
 
 export function log(state: GameState, kind: JournalKind, text: string): void {
   state.journal.push({ t: state.time, kind, text });
@@ -119,9 +129,24 @@ export function withRng<T>(state: GameState, fn: (rng: Rng) => T): T {
 export function advanceTime(state: GameState, minutes: number): void {
   if (minutes < 0) throw new Error("Time cannot run backwards");
   state.time += minutes;
+  state.payrollOwed += (minutes / DAY) * CREW_SIZE * WAGE_PER_DAY;
+  if (state.location.kind === "intrepid") settlePayroll(state);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);
+}
+
+/** Pay the crew what they're owed, as far as credits allow. Called whenever time passes at the Intrepid. */
+export function settlePayroll(state: GameState): void {
+  const owed = Math.round(state.payrollOwed);
+  if (owed < 1) return;
+  const paid = Math.min(owed, Math.max(0, state.credits));
+  state.credits -= paid;
+  state.payrollOwed -= paid;
+  if (paid >= 100) log(state, "trade", `Paid the crew ${paid.toLocaleString()} cr in wages.`);
+  if (state.payrollOwed >= 1) {
+    log(state, "warning", `Couldn't cover the crew's wages: ${Math.round(state.payrollOwed).toLocaleString()} cr still owed.`);
+  }
 }
 
 function settleLoan(state: GameState): void {
@@ -133,6 +158,7 @@ function settleLoan(state: GameState): void {
     loan.nextDue += loan.intervalDays * DAY;
     if (state.credits >= due) {
       state.credits -= due;
+      state.stats.loanPaid = (state.stats.loanPaid ?? 0) + due;
       loan.balance -= due;
       log(state, "trade", `Exchange loan payment of ${due.toLocaleString()} cr collected. Balance: ${loan.balance.toLocaleString()} cr.`);
     } else {
