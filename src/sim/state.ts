@@ -3,12 +3,14 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import { starterContracts, tickContracts, type Contract } from "./contracts";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
 import type { ShipState, Cargo } from "./ship";
 import type { RegionKnowledge } from "./surface";
 import { formatDate, GAME_START } from "./time";
 import { DAY, YEAR, type Vec2 } from "./units";
+import { World } from "./world";
 
 export const SAVE_VERSION = 1;
 
@@ -17,6 +19,8 @@ export interface RoverState {
   y: number;
   energy: number;
   cargo: Cargo;
+  /** Specimens riding in the rover's sample cases, keyed "bodyId|species". */
+  specimens?: Record<string, number>;
 }
 
 export type Location =
@@ -61,6 +65,11 @@ export interface GameState {
   surveyedBodies: string[];
   /** Crew wages accrued since the last payday (paid when docked at the Intrepid). */
   payrollOwed: number;
+  contracts: Contract[];
+  /** When the job board next gets a new posting. */
+  nextContractAt: number;
+  /** Species (by specimen key) already sold to the Lyceum; the first sale of each pays a bonus. */
+  catalogedSpecies: string[];
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];
@@ -96,15 +105,35 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     scannedBodies: [],
     surveyedBodies: [],
     payrollOwed: 0,
+    contracts: [],
+    nextContractAt: GAME_START + 20 * DAY,
+    catalogedSpecies: [],
     regions: {},
     market: newMarket(Math.floor(GAME_START / DAY)),
     journal: [],
     stats: { folds: 0, tonnesMined: 0, earned: 0, landings: 0, loanPaid: 0 },
   };
+  // The first scouts charted the near stars: their scan records come with the ship's nav package,
+  // and the home worlds were surveyed in detail.
+  const world = new World(seed);
+  for (const sys of world.galaxy.systems) {
+    if (!sys.charted) continue;
+    for (const body of world.system(sys.id).bodies) {
+      state.scannedBodies.push(body.id);
+      if (body.easy) state.surveyedBodies.push(body.id);
+    }
+  }
+  state.contracts = starterContracts(world, state.surveyedBodies);
+
   log(
     state,
     "info",
     `The Exchange signs over the freighter ${shipName}, along with a 48,000-credit note. The fuel tanks hold 40 units of plicite. The Verge is waiting.`,
+  );
+  log(
+    state,
+    "info",
+    "Helm's nav package includes the first scouts' records for the twelve charted stars. The three nearest are well-trodden ground: a good place to learn the trade. The job board has work for new captains.",
   );
   return state;
 }
@@ -131,6 +160,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   state.time += minutes;
   state.payrollOwed += (minutes / DAY) * CREW_SIZE * WAGE_PER_DAY;
   if (state.location.kind === "intrepid") settlePayroll(state);
+  tickContracts(state);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);

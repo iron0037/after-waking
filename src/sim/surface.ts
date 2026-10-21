@@ -4,6 +4,7 @@
  * what the player has discovered or dug out is stored separately in RegionKnowledge.
  */
 import { COMMODITIES, type CommodityId } from "../data/commodities";
+import { FLORA_PREFIX, FLORA_SUFFIX } from "../data/names";
 import type { Body } from "./bodies";
 import { hashSeed, rngFor } from "./rng";
 import { clamp, type Vec2 } from "./units";
@@ -44,6 +45,16 @@ export interface Deposit extends DepositSpec {
   y: number;
 }
 
+export interface FloraSpec {
+  id: number;
+  species: string;
+}
+
+export interface FloraSite extends FloraSpec {
+  x: number;
+  y: number;
+}
+
 export interface RegionMap {
   bodyId: string;
   region: number;
@@ -52,6 +63,8 @@ export interface RegionMap {
   terrain: Uint8Array;
   elevation: Float32Array;
   deposits: Deposit[];
+  /** Specimen sites, on living worlds only. */
+  flora: FloraSite[];
   landing: Vec2;
 }
 
@@ -63,6 +76,11 @@ export interface RegionKnowledge {
   /** Tonnes already removed from each deposit. */
   extracted: Record<number, number>;
   visits: number;
+  /** Flora sites spotted by the rover, and those already sampled. */
+  floraFound: number[];
+  floraSampled: number[];
+  /** Tiles swept by rover sensors, as a bitset of 32-bit words (row-major). The "painted" map. */
+  explored: number[];
 }
 
 export function regionKey(bodyId: string, region: number): string {
@@ -70,7 +88,80 @@ export function regionKey(bodyId: string, region: number): string {
 }
 
 export function emptyKnowledge(): RegionKnowledge {
-  return { discovered: [], prospected: [], drillSites: [], extracted: {}, visits: 0 };
+  return {
+    discovered: [],
+    prospected: [],
+    drillSites: [],
+    extracted: {},
+    visits: 0,
+    floraFound: [],
+    floraSampled: [],
+    explored: [],
+  };
+}
+
+/** Fill in fields added since a save was written. */
+export function normalizeKnowledge(k: RegionKnowledge): RegionKnowledge {
+  k.floraFound ??= [];
+  k.floraSampled ??= [];
+  k.explored ??= [];
+  return k;
+}
+
+const TILES = REGION_SIZE * REGION_SIZE;
+
+export function isExplored(k: RegionKnowledge, x: number, y: number): boolean {
+  const i = y * REGION_SIZE + x;
+  return (((k.explored[i >> 5] ?? 0) >>> (i & 31)) & 1) === 1;
+}
+
+/** Mark every tile within `radius` (Chebyshev) of (cx, cy) as swept. Returns how many were new. */
+export function markExplored(k: RegionKnowledge, cx: number, cy: number, radius: number): number {
+  let fresh = 0;
+  for (let y = Math.max(0, cy - radius); y <= Math.min(REGION_SIZE - 1, cy + radius); y++) {
+    for (let x = Math.max(0, cx - radius); x <= Math.min(REGION_SIZE - 1, cx + radius); x++) {
+      const i = y * REGION_SIZE + x;
+      const word = k.explored[i >> 5] ?? 0;
+      const bit = 1 << (i & 31);
+      if ((word & bit) === 0) {
+        k.explored[i >> 5] = (word | bit) | 0;
+        fresh++;
+      }
+    }
+  }
+  return fresh;
+}
+
+/** Fraction of the region's tiles the rover has swept, 0..1. */
+export function exploredFraction(k: RegionKnowledge | undefined): number {
+  if (!k?.explored?.length) return 0;
+  let count = 0;
+  for (const word of k.explored) {
+    let w = word >>> 0;
+    while (w) {
+      w &= w - 1;
+      count++;
+    }
+  }
+  return count / TILES;
+}
+
+/** The handful of plant species that grow on a living world; stable per body. */
+export function bodySpecies(seed: number, body: Body): string[] {
+  if (!body.life) return [];
+  const rng = rngFor(seed, body.id, "species");
+  const names = new Set<string>();
+  const want = rng.int(3, 6);
+  while (names.size < want) names.add(`${rng.pick(FLORA_PREFIX)} ${rng.pick(FLORA_SUFFIX)}`);
+  return [...names];
+}
+
+/** Specimen sites in one region of a living world. */
+export function regionFlora(seed: number, body: Body, region: number): FloraSpec[] {
+  const species = bodySpecies(seed, body);
+  if (species.length === 0) return [];
+  const rng = rngFor(seed, body.id, region, "flora");
+  return Array.from({ length: rng.int(2, 5) }, (_, id) => ({ id, species: rng.pick(species) }));
 }
 
 /** Deposit list without positions; cheap enough to compute for every region in an orbital scan. */
@@ -78,7 +169,8 @@ export function regionDeposits(seed: number, body: Body, region: number): Deposi
   const rng = rngFor(seed, body.id, region, "deposits");
   const entries = Object.entries(body.resources) as [CommodityId, number][];
   if (entries.length === 0) return [];
-  const richness = rng.range(0.3, 1.6);
+  // Home worlds: reliable but modest, since the first scouts skimmed the best seams.
+  const richness = body.easy ? rng.range(0.45, 0.9) : rng.range(0.3, 1.6);
   const count = Math.round(rng.range(3, 9) * richness * (body.kind === "asteroid" ? 0.6 : 1));
   const deposits: DepositSpec[] = [];
   for (let i = 0; i < count; i++) {
@@ -91,7 +183,8 @@ export function regionDeposits(seed: number, body: Body, region: number): Deposi
       id: i,
       commodity,
       grade: Math.round(grade * 100) / 100,
-      depthM: Math.round(15 + 885 * Math.pow(rng.next(), 1.7)),
+      // Home worlds: the first scouts drilled the shallow seams' cores; most are within a starter drill's reach.
+      depthM: Math.round(15 + (body.easy ? 385 : 885) * Math.pow(rng.next(), 1.7)),
       tonnes: Math.round(rng.range(30, 260) * (0.5 + grade) * sizeScale),
     });
   }
@@ -147,7 +240,19 @@ export function generateRegion(seed: number, body: Body, region: number): Region
     return { ...spec, x: landing.x + 3, y: landing.y };
   });
 
-  return { bodyId: body.id, region, width: w, height: h, terrain, elevation, deposits, landing };
+  const flora: FloraSite[] = regionFlora(seed, body, region).map((spec) => {
+    for (let tries = 0; tries < 200; tries++) {
+      const x = placeRng.int(1, w - 2);
+      const y = placeRng.int(1, h - 2);
+      const t = terrain[y * w + x] as Terrain;
+      if (TERRAIN_INFO[t].passable !== "yes") continue;
+      if (Math.abs(x - landing.x) + Math.abs(y - landing.y) < 3) continue;
+      return { ...spec, x, y };
+    }
+    return { ...spec, x: landing.x, y: landing.y + 2 };
+  });
+
+  return { bodyId: body.id, region, width: w, height: h, terrain, elevation, deposits, flora, landing };
 }
 
 function classify(body: Body, e: number, rough: number, seaLevel: number, ruggedness: number): Terrain {

@@ -34,7 +34,10 @@
       "prompt": "enormous long cylindrical generation starship, rotating habitat rings, docking arms, side view, isolated on plain gray background",
       "seed": 2077,
       "width": 1216,
-      "height": 832
+      "height": 832,
+      "moss_prompt": "Pixel art game sprite of a colossal generation starship seen exactly from the side, isolated on a plain flat light gray background. The hull is immensely long and slender, about eight times longer than it is tall, shaped like a gently tapering whale. The bow is split horizontally like a slightly open jaw: a long upper hull and a shorter, sharper lower prow, with a recessed docking bay between them. The hull is built from large segmented plates in weathered white and cool gray, with thin faded orange stripes, rows of small amber window lights along the flank, a few hangar doors on the belly, and clustered engine bells at the blunt stern. Clean silhouette, limited palette, crisp pixel edges, no background scenery.",
+      "pixel": 4,
+      "colors": 32
     },
     {
       "id": "title",
@@ -44,7 +47,8 @@
       "height": 832,
       "pixel": 4,
       "colors": 48,
-      "cutout": false
+      "cutout": false,
+      "moss_prompt": "Pixel art title screen illustration. Deep space with a purple and teal nebula and scattered stars. In the middle distance floats a colossal, impossibly long whale-shaped generation starship in weathered white and gray, its flank dotted with amber window lights. In the foreground, a tiny boxy cargo freighter with orange stripes departs, leaving a faint blue engine trail. Wide cinematic composition, limited palette, crisp pixel edges, no text."
     }
   ]
 }

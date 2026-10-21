@@ -16,5 +16,8 @@ export function deserialize(json: string): GameState {
   // Fields added after the first M1 builds.
   data.surveyedBodies ??= [];
   data.payrollOwed ??= 0;
+  data.contracts ??= [];
+  data.nextContractAt ??= data.time;
+  data.catalogedSpecies ??= [];
   return data;
 }

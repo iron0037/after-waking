@@ -22,6 +22,11 @@ export interface StarSystem {
   luminosity: number;
   /** The nearest stars were charted by the first scouts: their bodies are known in advance. */
   charted: boolean;
+  /**
+   * One of the few systems nearest the Intrepid, explored thoroughly by the first scouts:
+   * a gentle star, calm landable worlds and shallow seams. Where new captains learn the trade.
+   */
+  home: boolean;
 }
 
 export interface Galaxy {
@@ -50,6 +55,8 @@ export const SPECTRAL: Record<SpectralClass, SpectralProfile> = {
 export interface GalaxyOptions {
   count: number;
   chartedCount: number;
+  /** The nearest N charted systems are "home": benign by design. */
+  homeCount: number;
   /** Every new star is placed this far from an existing one, so the map is connected. */
   linkLy: [number, number];
   minSeparationLy: number;
@@ -59,6 +66,7 @@ export interface GalaxyOptions {
 export const DEFAULT_GALAXY: GalaxyOptions = {
   count: 22,
   chartedCount: 12,
+  homeCount: 3,
   linkLy: [3, 7.5],
   minSeparationLy: 2.6,
   maxRadiusLy: 32,
@@ -88,9 +96,11 @@ export function generateGalaxy(seed: number, options: GalaxyOptions = DEFAULT_GA
 
   const systems = positions.map((pos, i): StarSystem => {
     const starRng = rngFor(seed, "star", i);
-    const spectral = starRng.weighted(
-      (Object.keys(SPECTRAL) as SpectralClass[]).map((k) => [k, SPECTRAL[k].weight] as const),
-    );
+    const home = i < options.homeCount;
+    // Home stars are calm orange or yellow dwarfs: no flare stars next door.
+    const spectral: SpectralClass = home
+      ? starRng.weighted([["K", 60], ["G", 40]] as const)
+      : starRng.weighted((Object.keys(SPECTRAL) as SpectralClass[]).map((k) => [k, SPECTRAL[k].weight] as const));
     const profile = SPECTRAL[spectral];
     const t = starRng.next();
     const charted = i < options.chartedCount;
@@ -104,6 +114,7 @@ export function generateGalaxy(seed: number, options: GalaxyOptions = DEFAULT_GA
       mass: lerp(profile.mass, t),
       luminosity: lerp(profile.luminosity, t * t),
       charted,
+      home,
     };
   });
 

@@ -11,6 +11,17 @@ export interface ShipState {
   cargo: Cargo;
   /** Rover cell charge while stowed; it recharges from the ship's reactor before each deployment. */
   roverEnergy?: number;
+  /** Live specimens in the containment racks, keyed "bodyId|species". */
+  specimens?: Record<string, number>;
+}
+
+export const SHIP_SPECIMEN_SLOTS = 16;
+export const ROVER_SPECIMEN_SLOTS = 6;
+
+export function specimenCount(specimens: Record<string, number> | undefined): number {
+  let n = 0;
+  for (const v of Object.values(specimens ?? {})) n += v;
+  return n;
 }
 
 export function shipStats(ship: ShipState): ShipStats {

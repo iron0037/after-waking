@@ -9,17 +9,35 @@ import { fuelPrice, sellCommodity } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
 import { findPath } from "./pathfinding";
+import { fail, ok, type Result } from "./result";
 import type { Rng } from "./rng";
-import { addCargo, cargoTonnes, removeCargo, shipMassT, shipStats } from "./ship";
+import {
+  addCargo,
+  cargoTonnes,
+  removeCargo,
+  ROVER_SPECIMEN_SLOTS,
+  SHIP_SPECIMEN_SLOTS,
+  shipMassT,
+  shipStats,
+  specimenCount,
+} from "./ship";
 import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverState } from "./state";
-import { emptyKnowledge, regionKey, type Deposit, type RegionKnowledge, type RegionMap } from "./surface";
+import { specimenKey } from "./contracts";
+import {
+  emptyKnowledge,
+  markExplored,
+  normalizeKnowledge,
+  regionKey,
+  type Deposit,
+  type FloraSite,
+  type RegionKnowledge,
+  type RegionMap,
+} from "./surface";
 import { formatDuration } from "./time";
 import { DAY, HOUR, travelMinutes, type Vec2 } from "./units";
 import type { World } from "./world";
 
-export type Result<T = void> = { ok: true; value: T } | { ok: false; reason: string };
-const ok = <T>(value: T): Result<T> => ({ ok: true, value });
-const fail = (reason: string): Result<never> => ({ ok: false, reason });
+export type { Result } from "./result";
 
 // --- tuning ------------------------------------------------------------------------------
 
@@ -284,7 +302,7 @@ export function surfaceBurnFuel(state: GameState, body: Body): number {
 
 export function knowledge(state: GameState, bodyId: string, region: number): RegionKnowledge {
   const key = regionKey(bodyId, region);
-  return (state.regions[key] ??= emptyKnowledge());
+  return normalizeKnowledge((state.regions[key] ??= emptyKnowledge()));
 }
 
 export function land(state: GameState, world: World, region: number): Result {
@@ -380,13 +398,18 @@ function revealAround(state: GameState, world: World): void {
   if (!ctx.ok) return;
   const { map, know, rover } = ctx.value;
   const radius = 2 + sensorTierFor(state, map.bodyId);
-  const found = map.deposits.filter(
-    (d) => !know.discovered.includes(d.id) && Math.max(Math.abs(d.x - rover.x), Math.abs(d.y - rover.y)) <= radius,
-  );
+  markExplored(know, rover.x, rover.y, radius);
+  const near = (p: { x: number; y: number }) => Math.max(Math.abs(p.x - rover.x), Math.abs(p.y - rover.y)) <= radius;
+  const found = map.deposits.filter((d) => !know.discovered.includes(d.id) && near(d));
   for (const d of found) know.discovered.push(d.id);
   if (found.length > 0) {
     const names = found.map((d) => COMMODITIES[d.commodity].name.toLowerCase());
     log(state, "discovery", `Rover sensors picked up ${found.length === 1 ? "a deposit" : `${found.length} deposits`}: ${names.join(", ")}.`);
+  }
+  const flora = map.flora.filter((f) => !know.floraFound.includes(f.id) && near(f));
+  for (const f of flora) know.floraFound.push(f.id);
+  if (flora.length > 0) {
+    log(state, "discovery", `Plant life spotted: ${[...new Set(flora.map((f) => f.species))].join(", ")}.`);
   }
 }
 
@@ -527,6 +550,30 @@ function rollIncident(rng: Rng, body: Body, hours: number): Incident | null {
   }
 }
 
+export const SAMPLE_MINUTES = 60;
+export const SAMPLE_ENERGY = 3;
+
+/** Take a living sample from a flora site next to the rover. */
+export function collectSample(state: GameState, world: World, siteId: number): Result<FloraSite> {
+  const ctx = surfaceCtx(state, world);
+  if (!ctx.ok) return ctx;
+  const { map, know, rover } = ctx.value;
+  const site = map.flora.find((f) => f.id === siteId);
+  if (!site || !know.floraFound.includes(siteId)) return fail("Unknown flora site.");
+  if (know.floraSampled.includes(siteId)) return fail("Already sampled here.");
+  if (Math.max(Math.abs(site.x - rover.x), Math.abs(site.y - rover.y)) > 1) return fail("Drive the rover next to the plants first.");
+  if (specimenCount(rover.specimens) >= ROVER_SPECIMEN_SLOTS) return fail("The rover's sample cases are full.");
+  if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
+  rover.energy -= SAMPLE_ENERGY;
+  advanceTime(state, SAMPLE_MINUTES * SHIFT_FACTOR);
+  rover.specimens ??= {};
+  const key = specimenKey(map.bodyId, site.species);
+  rover.specimens[key] = (rover.specimens[key] ?? 0) + 1;
+  know.floraSampled.push(siteId);
+  log(state, "discovery", `Collected a living sample of ${site.species}.`);
+  return ok(site);
+}
+
 /** Drive-free: the rover must already be at (or next to) the ship. Unloads, recharges, stows. */
 export function stowRover(state: GameState, world: World): Result<{ unloaded: number; jettisoned: number }> {
   const ctx = surfaceCtx(state, world);
@@ -543,6 +590,15 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
     unloaded += added;
     jettisoned += tonnes - added;
   }
+  let lostSamples = 0;
+  state.ship.specimens ??= {};
+  for (const [key, n] of Object.entries(rover.specimens ?? {})) {
+    const room = SHIP_SPECIMEN_SLOTS - specimenCount(state.ship.specimens);
+    const moved = Math.min(room, n);
+    if (moved > 0) state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + moved;
+    lostSamples += n - moved;
+  }
+  if (lostSamples > 0) log(state, "warning", `The containment racks are full. ${lostSamples} sample(s) had to be released.`);
   advanceTime(state, ROVER_STOW_MINUTES);
   state.ship.roverEnergy = rover.energy;
   (state.location as { rover: RoverState | null }).rover = null;
@@ -590,6 +646,33 @@ export function sellAll(state: GameState): Result<number> {
     if (r.ok) total += r.value;
   }
   return total > 0 ? ok(total) : fail("The hold is empty.");
+}
+
+export const SPECIMEN_PRICE = 300;
+export const NEW_SPECIES_BONUS = 900;
+
+/** Sell specimens to the Lyceum, keeping any that an active contract still needs. */
+export function sellSpecimens(state: GameState): Result<number> {
+  const docked = atIntrepid(state);
+  if (!docked.ok) return docked;
+  const reserved = new Set((state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId));
+  let total = 0;
+  let sold = 0;
+  const specimens = state.ship.specimens ?? {};
+  for (const [key, n] of Object.entries(specimens)) {
+    if (reserved.has(key.split("|")[0])) continue;
+    const bonus = state.catalogedSpecies.includes(key) ? 0 : NEW_SPECIES_BONUS;
+    if (bonus) state.catalogedSpecies.push(key);
+    total += n * SPECIMEN_PRICE + bonus;
+    sold += n;
+    delete specimens[key];
+  }
+  if (sold === 0) return fail("No specimens to sell (samples reserved for contracts are kept).");
+  state.credits += total;
+  state.stats.earned += total;
+  settlePayroll(state);
+  log(state, "trade", `The Lyceum bought ${sold} specimen(s) for ${total.toLocaleString()} cr.`);
+  return ok(total);
 }
 
 export function buyFuel(state: GameState, units: number): Result<number> {

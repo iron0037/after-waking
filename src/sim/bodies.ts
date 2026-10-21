@@ -54,6 +54,10 @@ export interface Body {
   resources: Partial<Record<CommodityId, number>>;
   life: boolean;
   moonIds: string[];
+  /** A calm home-system world tuned for new captains: shallow seams, mild hazards. */
+  easy?: boolean;
+  /** What the crews call it, e.g. "the Meadow". */
+  nickname?: string;
 }
 
 export interface SystemDetail {
@@ -126,6 +130,7 @@ export function generateSystem(galaxySeed: number, sys: StarSystem): SystemDetai
     a *= rng.range(1.45, 2.1);
   }
 
+  if (sys.home) makeHomely(ctx, galaxySeed);
   const outermost = Math.max(...ctx.bodies.filter((b) => b.parentId === null).map((b) => b.orbitAU));
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(1.5, outermost * 1.05), frostLineAU: frost };
 }
@@ -333,6 +338,72 @@ function finishBody(ctx: Ctx, core: BodyCore): Body {
     life,
     moonIds: [],
   };
+}
+
+const HOME_ORES: readonly CommodityId[] = ["ironNickel", "copper", "titanium", "rareEarths"];
+
+/**
+ * Home systems were the first scouts' proving ground. Tame two or three worlds into calm,
+ * landable mining grounds, and in the nearest home system, raise a garden world.
+ */
+function makeHomely(ctx: Ctx, galaxySeed: number): void {
+  const { rng, sys } = ctx;
+  const solid = ctx.bodies.filter((b) => b.surface === "solid" || b.surface === "ice");
+  // Prefer bodies that are already mild; moons and small worlds are easy to tame.
+  const score = (b: Body) => Math.abs(b.gravityG - 0.5) + Math.max(0, b.radiation - 1) + (b.kind === "hothouse" ? 3 : 0);
+  const picks = [...solid].sort((a, b) => score(a) - score(b)).slice(0, 3);
+  while (picks.length < 2) {
+    const n = ctx.bodies.filter((b) => b.parentId === null).length + 1;
+    const a = Math.max(0.4, Math.sqrt(sys.luminosity)) * rng.range(0.9, 1.4);
+    const extra = finishBody(ctx, {
+      id: `${sys.id}.p${n}`,
+      name: `${sys.name} ${roman(n)}`,
+      kind: "barren",
+      parentId: null,
+      orbitAU: a,
+      periodDays: orbitalPeriodDays(sys, a),
+      radiusEarth: 0.5,
+      gravityG: 0.45,
+      pressureAtm: 0,
+      tempC: equilibriumK(sys, a) - 273,
+    });
+    ctx.bodies.push(extra);
+    picks.push(extra);
+  }
+
+  for (const b of picks) {
+    if (b.kind === "hothouse" || b.kind === "volcanic") b.kind = b.tempC < -40 ? "ice" : "barren";
+    b.gravityG = Math.min(b.gravityG, 1.1);
+    b.pressureAtm = Math.min(b.pressureAtm, 1.2);
+    b.tempC = clamp(b.tempC, -140, 90);
+    b.chemistry = "inert";
+    b.radiation = Math.min(b.radiation, 1);
+    b.weather = Math.min(b.weather, 1);
+    b.tectonics = Math.min(b.tectonics, 1);
+    b.regions = Math.max(b.regions, 6);
+    b.easy = true;
+    for (const id of HOME_ORES) {
+      if ((b.resources[id] ?? 0) < 0.35 && rng.chance(0.75)) b.resources[id] = Math.round(rng.range(0.35, 0.8) * 100) / 100;
+    }
+  }
+
+  // The nearest home system holds the Meadow: a small living world the Lyceum studies.
+  const first = ctx.sys.id === "s0";
+  if (first) {
+    const garden = picks.find((b) => b.parentId === null) ?? (picks[0] as Body);
+    garden.kind = "terrestrial";
+    garden.surface = "solid";
+    garden.radiusEarth = 0.8;
+    garden.gravityG = 0.82;
+    garden.pressureAtm = 0.9;
+    garden.tempC = rngFor(galaxySeed, "meadow").range(8, 22);
+    garden.radiation = 0;
+    garden.weather = 1;
+    garden.tectonics = 1;
+    garden.life = true;
+    garden.regions = 26;
+    garden.nickname = "the Meadow";
+  }
 }
 
 export function findBody(detail: SystemDetail, id: string): Body {
