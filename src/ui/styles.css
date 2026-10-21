@@ -433,7 +433,17 @@ table.data th.num {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 50% 30%, #13203d 0%, var(--space) 70%);
+  background:
+    linear-gradient(180deg, #05070fcc 0%, #05070f55 40%, #05070fdd 100%),
+    url("/assets/title.png") center / cover no-repeat,
+    var(--space);
+  image-rendering: pixelated;
+}
+.title-card {
+  background: #05070fb0;
+  padding: 28px 32px;
+  border-radius: 8px;
+  backdrop-filter: blur(2px);
 }
 .title-card {
   width: min(640px, 92vw);
