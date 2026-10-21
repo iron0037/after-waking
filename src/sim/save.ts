@@ -19,5 +19,6 @@ export function deserialize(json: string): GameState {
   data.contracts ??= [];
   data.nextContractAt ??= data.time;
   data.catalogedSpecies ??= [];
+  data.compendium ??= {};
   return data;
 }

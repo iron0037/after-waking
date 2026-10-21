@@ -22,6 +22,8 @@ import {
   specimenCount,
 } from "./ship";
 import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverState } from "./state";
+import { FLORA_BY_NAME } from "../data/catalog";
+import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import {
   emptyKnowledge,
@@ -493,6 +495,11 @@ export function drill(state: GameState, world: World, depositId: number, maxHour
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
   log(state, "info", `Drilled ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
 
+  const where = placeName(world, ctx.value.map.bodyId);
+  if (tonnes > 0) recordFind(state, "mineral", d.commodity, where, COMMODITIES[d.commodity].name);
+  const gem = withRng(state, (rng) => rollMineralSpecimen(rng, d.commodity, hours));
+  if (gem) foundMineralSpecimen(state, gem, where);
+
   if (incident) {
     rover.energy = Math.max(0, rover.energy - incident.energy);
     advanceTime(state, incident.lostHours * HOUR);
@@ -505,6 +512,12 @@ export function drill(state: GameState, world: World, depositId: number, maxHour
     roverFull: stats.roverCargoT - cargoTonnes(rover.cargo) <= 0.05,
     incident: incident?.text ?? null,
   });
+}
+
+/** "Juniper IV (the Meadow)" */
+export function placeName(world: World, bodyId: string): string {
+  const { body } = world.body(bodyId);
+  return body.nickname ? `${body.name} (${body.nickname})` : body.name;
 }
 
 interface Incident {
@@ -571,6 +584,8 @@ export function collectSample(state: GameState, world: World, siteId: number): R
   rover.specimens[key] = (rover.specimens[key] ?? 0) + 1;
   know.floraSampled.push(siteId);
   log(state, "discovery", `Collected a living sample of ${site.species}.`);
+  const entry = FLORA_BY_NAME.get(site.species);
+  if (entry) recordFind(state, "flora", entry.id, placeName(world, map.bodyId), entry.name);
   return ok(site);
 }
 

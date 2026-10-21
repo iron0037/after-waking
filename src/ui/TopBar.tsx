@@ -1,8 +1,18 @@
-import { ageAt, formatDate, formatDuration, shipStats, type GameState, type World } from "../sim";
+import { ageAt, compendiumTotals, formatDate, formatDuration, shipStats, type GameState, type World } from "../sim";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
-export function TopBar({ session, onJournal, onQuit }: { session: GameSession; onJournal: () => void; onQuit: () => void }) {
+export function TopBar({
+  session,
+  onJournal,
+  onCompendium,
+  onQuit,
+}: {
+  session: GameSession;
+  onJournal: () => void;
+  onCompendium: () => void;
+  onQuit: () => void;
+}) {
   const { state, world } = session;
   const stats = shipStats(state.ship);
   const foldReady = state.time >= state.foldReadyAt;
@@ -47,6 +57,9 @@ export function TopBar({ session, onJournal, onQuit }: { session: GameSession; o
         </div>
       </div>
       <div class="tb-spacer" />
+      <button class="btn" onClick={onCompendium} title="Compendium (C)">
+        Compendium {compendiumTotals(state).all.found}/{compendiumTotals(state).all.total}
+      </button>
       <button class="btn" onClick={onJournal} title="Journal (J)">
         Journal
       </button>

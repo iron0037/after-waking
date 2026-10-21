@@ -86,6 +86,22 @@ def cutout(img: Image.Image, tolerance: float = 38.0) -> Image.Image:
     return out.crop(bbox) if bbox else out
 
 
+def hires_cutout_pixelate(img: Image.Image, factor: int, colors: int, tolerance: float = 14.0) -> Image.Image:
+    """For sprites whose hull nearly matches the background: cut out at full resolution with a tight
+    tolerance (outlines stop the flood fill), then downscale colour and alpha together."""
+    rgba = cutout(img.convert("RGBA"), tolerance=tolerance)
+    w, h = rgba.width // factor, rgba.height // factor
+    small = rgba.resize((w, h), Image.BOX)
+    arr = np.array(small)
+    opaque = arr[:, :, 3] >= 128
+    rgb = Image.fromarray(arr[:, :, :3], "RGB").quantize(colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    out = np.array(rgb.convert("RGBA"))
+    out[:, :, 3] = np.where(opaque, 255, 0)
+    result = Image.fromarray(out, "RGBA")
+    bbox = result.getbbox()
+    return result.crop(bbox) if bbox else result
+
+
 def drop_specks(arr: np.ndarray, min_pixels: int) -> None:
     """Clear opaque islands smaller than min_pixels (stray stars and noise around a sprite)."""
     h, w = arr.shape[:2]
@@ -110,6 +126,14 @@ def drop_specks(arr: np.ndarray, min_pixels: int) -> None:
                     arr[y, x, 3] = 0
 
 
+def process(raw: Image.Image, opts: dict) -> Image.Image:
+    """Pixel-snap and (optionally) cut out, per the asset's options."""
+    if opts["cutout"] and opts.get("cutout_mode") == "hires":
+        return hires_cutout_pixelate(raw, opts["pixel"], opts["colors"], opts.get("cutout_tolerance", 14))
+    img = pixelate(raw, opts["pixel"], opts["colors"])
+    return cutout(img) if opts["cutout"] else img
+
+
 def build(asset: dict, manifest: dict, seed: int) -> Path:
     opts = {**manifest["defaults"], **asset}
     prompt = f"{manifest['style']}, {asset['prompt']}"
@@ -117,9 +141,7 @@ def build(asset: dict, manifest: dict, seed: int) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     raw = txt2img(prompt, manifest["negative"], seed, opts)
     raw.save(folder / f"{seed}-raw.png")
-    img = pixelate(raw, opts["pixel"], opts["colors"])
-    if opts["cutout"]:
-        img = cutout(img)
+    img = process(raw, opts)
     path = folder / f"{seed}.png"
     img.save(path)
     return path

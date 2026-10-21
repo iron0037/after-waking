@@ -41,13 +41,6 @@ export function moonSuffix(index: number): string {
   return String.fromCharCode("a".charCodeAt(0) + index);
 }
 
-/** Common names the crews give alien flora: "glass reed", "lantern moss". */
-export const FLORA_PREFIX = [
-  "glass", "lantern", "bell", "thread", "velvet", "spiral", "hollow", "silver", "pale", "creeping",
-  "ember", "salt", "whisper", "copper", "cradle", "needle", "drift", "ghost", "amber", "coil",
-] as const;
-export const FLORA_SUFFIX = ["reed", "moss", "frond", "cap", "bloom", "fern", "lichen", "wort", "vine", "tuft"] as const;
-
 export function catalogName(index: number): string {
   return `IV-${String(410 + index * 7).padStart(4, "0")}`;
 }

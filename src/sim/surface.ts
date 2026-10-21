@@ -4,7 +4,7 @@
  * what the player has discovered or dug out is stored separately in RegionKnowledge.
  */
 import { COMMODITIES, type CommodityId } from "../data/commodities";
-import { FLORA_PREFIX, FLORA_SUFFIX } from "../data/names";
+import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
 import { hashSeed, rngFor } from "./rng";
 import { clamp, type Vec2 } from "./units";
@@ -146,13 +146,17 @@ export function exploredFraction(k: RegionKnowledge | undefined): number {
   return count / TILES;
 }
 
-/** The handful of plant species that grow on a living world; stable per body. */
+/** The handful of catalogued plant species that grow on a living world, by climate; stable per body. */
 export function bodySpecies(seed: number, body: Body): string[] {
   if (!body.life) return [];
   const rng = rngFor(seed, body.id, "species");
+  const climate = climateOf(body.tempC);
+  const pool = FLORA.filter((f) => f.climates.includes(climate));
   const names = new Set<string>();
-  const want = rng.int(3, 6);
-  while (names.size < want) names.add(`${rng.pick(FLORA_PREFIX)} ${rng.pick(FLORA_SUFFIX)}`);
+  const want = Math.min(pool.length, rng.int(3, 6));
+  for (let guard = 0; names.size < want && guard < 200; guard++) {
+    names.add(rng.weighted(pool.map((f) => [f.name, f.rarity === 1 ? 6 : f.rarity === 2 ? 3 : 1] as const)));
+  }
   return [...names];
 }
 

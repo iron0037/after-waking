@@ -3,6 +3,7 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
@@ -70,6 +71,8 @@ export interface GameState {
   nextContractAt: number;
   /** Species (by specimen key) already sold to the Lyceum; the first sale of each pays a bonus. */
   catalogedSpecies: string[];
+  /** Everything ever found, keyed "mineral:copper", "gem:plicite-geode", "flora:glass-reed". */
+  compendium: Record<string, CompendiumRecord>;
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];
@@ -108,6 +111,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     contracts: [],
     nextContractAt: GAME_START + 20 * DAY,
     catalogedSpecies: [],
+    compendium: {},
     regions: {},
     market: newMarket(Math.floor(GAME_START / DAY)),
     journal: [],

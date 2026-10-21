@@ -227,3 +227,21 @@ Some players love marking off what they've done, and everyone benefits from "hey
 - **World:** regions visited, surface explored %, scanned and surveyed status.
 - **System and star map:** progress arcs that fill as you scan, land and explore. Home systems and contract targets are marked.
 - **Revisit recap:** landing somewhere you've been shows what's known: explored %, deposits known, reachable tonnes left, unsampled flora, and a "looks worked out" warning.
+
+## Compendium **[DECIDED 2026-10-21, inspired by Stardew Valley's museum]**
+A permanent record of everything found, measured against the whole game catalog, so completionists always know what's left.
+- **The catalog is fixed and authored** (`src/data/catalog.ts`), not procedurally named, so the collection is finite and meaningful:
+  - 32 flora species, tied to climate bands (cold, temperate, warm), with rarities.
+  - 16 mineral specimens, each tied to a host ore and turned up while drilling. Two plicite specimens double as Awaken clues.
+  - The 8 ores themselves.
+  - Artifacts arrive with ruins (M5).
+- **Collecting:**
+  - Living worlds draw 3–6 species from the climate's pool, weighted by rarity.
+  - Drilling has about a 3.5% chance per hour to turn up a specimen from the host ore.
+  - A duplicate specimen sells to Exchange collectors (150–1,500 cr by rarity).
+- **UI:** an overlay (C key, or the top-bar button). Found entries show where and when; unfound entries show a silhouette, rarity and a hint.
+- **Next:**
+  - A unique pixel sprite per entry, batch-generated through the art pipeline.
+  - **[PROPOSED]** Lyceum milestone rewards at 10, 25 and 50 entries (research unlocks, rare gear), like Stardew's museum rewards.
+  - **[PROPOSED]** A display room aboard the Intrepid.
+  - Grow the catalog toward 150+ entries with fauna, more minerals and artifacts.

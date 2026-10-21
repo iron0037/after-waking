@@ -37,7 +37,8 @@
       "height": 832,
       "moss_prompt": "Pixel art game sprite of a colossal generation starship seen exactly from the side, isolated on a plain flat light gray background. The hull is immensely long and slender, about eight times longer than it is tall, shaped like a gently tapering whale. The bow is split horizontally like a slightly open jaw: a long upper hull and a shorter, sharper lower prow, with a recessed docking bay between them. The hull is built from large segmented plates in weathered white and cool gray, with thin faded orange stripes, rows of small amber window lights along the flank, a few hangar doors on the belly, and clustered engine bells at the blunt stern. Clean silhouette, limited palette, crisp pixel edges, no background scenery.",
       "pixel": 4,
-      "colors": 32
+      "colors": 32,
+      "cutout_mode": "hires"
     },
     {
       "id": "title",
@@ -48,7 +49,8 @@
       "pixel": 4,
       "colors": 48,
       "cutout": false,
-      "moss_prompt": "Pixel art title screen illustration. Deep space with a purple and teal nebula and scattered stars. In the middle distance floats a colossal, impossibly long whale-shaped generation starship in weathered white and gray, its flank dotted with amber window lights. In the foreground, a tiny boxy cargo freighter with orange stripes departs, leaving a faint blue engine trail. Wide cinematic composition, limited palette, crisp pixel edges, no text."
+      "moss_prompt": "Pixel art title screen illustration, wide cinematic composition. Deep space with a purple and teal nebula and scattered stars. Across the middle distance floats a colossal generation starship seen from the side: an immensely long, slender machine hull of weathered white and gray segmented plating, tapering to a point at each end, with a bow split horizontally like a slightly open jaw, a long row of tiny amber window lights, small hangar pods on its belly, and a cluster of engine bells at the blunt stern. It is purely a spacecraft: smooth plating, no fins, no tail, no flippers. In the lower right foreground, a tiny boxy cargo freighter with orange stripes flies away from the viewer toward the stars, very small compared with the giant ship, trailing a soft blue engine glow. Limited palette, crisp pixel edges, no text.",
+      "moss_negative": "whale, animal, fish, tail fin, flippers, organic creature"
     }
   ]
 }

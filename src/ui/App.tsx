@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { Compendium } from "./Compendium";
 import { Journal } from "./Journal";
 import { TitleScreen } from "./TitleScreen";
 import { TopBar } from "./TopBar";
@@ -16,12 +17,17 @@ export function App() {
 function Game({ session, onQuit }: { session: GameSession; onQuit: () => void }) {
   useSession(session);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [compendiumOpen, setCompendiumOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.target instanceof HTMLInputElement || session.busy) return;
       if (ev.key === "j" || ev.key === "J") setJournalOpen((o) => !o);
-      else if (ev.key === "Escape") setJournalOpen(false);
+      else if (ev.key === "c" || ev.key === "C") setCompendiumOpen((o) => !o);
+      else if (ev.key === "Escape") {
+        setJournalOpen(false);
+        setCompendiumOpen(false);
+      }
       else if (ev.key === "m" || ev.key === "M") session.go(session.view === "starmap" ? "system" : "starmap");
     };
     window.addEventListener("keydown", onKey);
@@ -32,7 +38,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
 
   return (
     <div class="game">
-      <TopBar session={session} onJournal={() => setJournalOpen(true)} onQuit={onQuit} />
+      <TopBar session={session} onJournal={() => setJournalOpen(true)} onCompendium={() => setCompendiumOpen(true)} onQuit={onQuit} />
       <main class="main">
         {session.view === "hub" && <Hub session={session} />}
         {session.view === "starmap" && <StarMap session={session} />}
@@ -47,6 +53,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
         ))}
       </footer>
       {journalOpen && <Journal session={session} onClose={() => setJournalOpen(false)} />}
+      {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       <div class="notices">
         {session.notices.map((n) => (
           <div key={n.id} class={`notice notice-${n.kind}`}>

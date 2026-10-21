@@ -472,3 +472,85 @@ table.data th.num {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* --- compendium ------------------------------------------------------------------------- */
+
+.compendium {
+  width: min(980px, 94vw);
+  height: min(720px, 88vh);
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.comp-total {
+  height: 8px;
+}
+.comp-total > span {
+  background: var(--good);
+}
+.comp-body {
+  overflow-y: auto;
+  flex: 1;
+}
+.comp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.comp-card {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.comp-card.unknown {
+  opacity: 0.55;
+}
+.comp-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: #1b2438;
+  box-shadow: inset 0 0 0 1px #0006;
+  image-rendering: pixelated;
+}
+.comp-card.unknown .comp-icon {
+  background: repeating-linear-gradient(45deg, #1b2438 0 4px, #222d45 4px 8px);
+}
+.comp-name {
+  text-transform: capitalize;
+  color: var(--text);
+}
+.comp-card.found .comp-name {
+  color: var(--cyan);
+}
+.comp-rarity {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.comp-rarity.r1 {
+  color: var(--muted);
+}
+.comp-rarity.r2 {
+  color: var(--good);
+}
+.comp-rarity.r3 {
+  color: var(--accent);
+}
+.comp-blurb {
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 3px 0;
+}
+.comp-where {
+  font-size: 11px;
+}

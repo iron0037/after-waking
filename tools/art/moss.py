@@ -21,7 +21,7 @@ sys.path.insert(0, str(MOSS_ROOT))
 sys.path.insert(0, str(ART))
 
 import torch  # noqa: E402
-from generate import cutout, pixelate  # noqa: E402
+from generate import process  # noqa: E402
 from run_lowvram import load_pipeline_nf4  # noqa: E402
 
 NEGATIVE = "worst quality, blurry, watermark, jpeg artifact, text, letters, logo, green hull"
@@ -51,7 +51,7 @@ def main() -> int:
     for seed in args.seeds:
         image = pipe(
             prompt,
-            negative_prompt=NEGATIVE,
+            negative_prompt=", ".join(filter(None, [NEGATIVE, asset.get("moss_negative")])),
             height=height,
             width=width,
             num_inference_steps=args.steps,
@@ -60,9 +60,7 @@ def main() -> int:
             generator=torch.Generator("cpu").manual_seed(seed),
         ).images[0].convert("RGB")
         image.save(folder / f"moss-{seed}-raw.png")
-        processed = pixelate(image, opts["pixel"], opts["colors"])
-        if opts["cutout"]:
-            processed = cutout(processed)
+        processed = process(image, opts)
         processed.save(folder / f"moss-{seed}.png")
         print(f"{args.asset} moss seed {seed} -> {folder / f'moss-{seed}.png'}", flush=True)
     return 0
