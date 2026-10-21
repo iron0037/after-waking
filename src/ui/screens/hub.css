@@ -1,0 +1,150 @@
+/* The Intrepid hub */
+
+.hub {
+  padding: 18px 24px 28px;
+}
+.hub-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.hub-title {
+  font-size: 26px;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+.hub-tabs {
+  display: flex;
+  gap: 4px;
+}
+.hub-tab {
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+.hub-tab:hover {
+  color: var(--text);
+  border-color: var(--border-bright);
+}
+.hub-tab.active {
+  color: var(--accent);
+  background: var(--panel);
+  border-color: var(--accent);
+}
+.hub-tab-key {
+  color: var(--muted);
+  font-size: 11px;
+  margin-right: 2px;
+}
+.hub-blurb {
+  margin: 10px 0 14px;
+  font-style: italic;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.hub-wide {
+  grid-column: span 2;
+}
+@media (max-width: 1000px) {
+  .hub-wide {
+    grid-column: auto;
+  }
+}
+.hub-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.hub-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.hub-gap {
+  margin-top: 16px;
+}
+.hub-name {
+  cursor: help;
+  border-bottom: 1px dotted var(--border-bright);
+}
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.hub-fuelbar {
+  height: 10px;
+  margin: 10px 0 12px;
+}
+
+.hub-upgrades {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (max-width: 1000px) {
+  .hub-upgrades {
+    grid-column: auto;
+  }
+}
+.hub-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: space-between;
+  background: var(--panel);
+}
+.hub-card.installed {
+  border-color: #2c5a3a;
+}
+.hub-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hub-card .btn {
+  align-self: flex-start;
+}
+.tag.good {
+  border-color: var(--good);
+}
+
+.hub-checklist {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hub-checklist .mark {
+  display: inline-block;
+  width: 20px;
+  font-weight: bold;
+}

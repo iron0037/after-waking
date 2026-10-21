@@ -1,0 +1,85 @@
+/* The star map */
+
+.starmap .map-canvas {
+  cursor: crosshair;
+}
+.starmap .map-canvas.pointer {
+  cursor: pointer;
+}
+.starmap.dragging .map-canvas {
+  cursor: grabbing;
+}
+.starmap .viewport-tools,
+.starmap .viewport-hint {
+  user-select: none;
+}
+
+.sm-top {
+  flex-shrink: 0;
+}
+.sm-uncharted {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.sm-blockers {
+  margin-top: 10px;
+}
+.sm-fold {
+  margin-top: 12px;
+}
+.sm-fold .btn {
+  width: 100%;
+}
+
+.sm-bodies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sm-bodies li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sm-bodies li.moon {
+  padding-left: 22px;
+}
+.sm-bodies li.moon::before {
+  content: "└";
+  color: var(--muted);
+  margin-left: -14px;
+  margin-right: -2px;
+}
+.sm-body-name {
+  flex: 1;
+}
+.sm-bodies .muted {
+  font-size: 12px;
+}
+.sm-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sm-list tr {
+  cursor: pointer;
+}
+.sm-list tr:hover,
+.sm-list tr.hov {
+  background: #1b2540;
+}
+.sm-list tr.sel {
+  background: #26334f;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.sm-list tr:focus-visible {
+  outline: 1px solid var(--cyan);
+}
+.sm-list td {
+  padding: 4px 6px;
+}

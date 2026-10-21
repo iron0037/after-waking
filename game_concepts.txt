@@ -1,0 +1,19 @@
+Main Game Loop
+* Travel to star systems
+* Explore planets, moons, asteroids, etc
+* Extract resources, artifacts, and specimins
+* Return to the Interepid and sell resources
+* Upgrade ship and crew
+
+Secondary Game Loops
+* Go on posted jobs (deliver cargo, shuttle passengers, scout uncharted worlds, attack something/someone)
+* Fight pirates and other freighters in space battles, earning a reputation unique amongst each clan
+* Establish outposts loyal to you that grow in strength and prosperity
+
+Paths to Victory
+* Locate the wormhole that brought the Intrepid to this galaxy and gather enough resources to have it fly back through
+* Find a suitable world for habitation, provide enough resources to the Intrepid to have it jump to the destination
+* Build an outpost of your own on a distant world and have it thrive
+* Find an advanced alien civilization and serve as an intermediary for negotiations for them to bestow a new home to the humans
+* Become the head of your clan on the Intrepid
+* A Matrix-like twist as you uncover clues revealing that you're all in a simulation built by AI

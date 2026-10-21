@@ -1,0 +1,25 @@
+{
+  "name": "after-waking",
+  "version": "0.1.0",
+  "private": true,
+  "description": "After Waking: a space exploration game in the spirit of Starflight",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bot": "vitest run tests/bot.test.ts"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.0",
+    "preact": "^10.25.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}

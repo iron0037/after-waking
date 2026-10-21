@@ -1,0 +1,122 @@
+/* Surface screen: survey map, rover and deposit panels. */
+
+.surface-legend {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60%;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.surface-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.surface-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #0008;
+  border-radius: 2px;
+}
+
+.surface-side h3 {
+  margin-bottom: 8px;
+}
+.surface-side .kv.spaced {
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+.surface-side .kv + .bar {
+  margin-top: 4px;
+}
+.surface-side .act-note {
+  margin: 8px 0 0;
+  line-height: 1.4;
+}
+
+.surface-side .swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  background: var(--muted);
+  border: 1px solid #fff8;
+  transform: rotate(45deg);
+  vertical-align: middle;
+}
+.surface-side .swatch.big {
+  width: 12px;
+  height: 12px;
+  margin-right: 10px;
+}
+
+.cargo-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cargo-chip {
+  display: block;
+}
+
+.dep-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  cursor: help;
+}
+.dep-title .tag {
+  margin-left: auto;
+}
+.deposit-panel .blurb {
+  margin: 6px 0 10px;
+  line-height: 1.4;
+}
+.deposit-panel .blockers {
+  margin: 10px 0 0;
+}
+.deposit-panel .dep-actions {
+  margin-top: 10px;
+}
+.tag.prospected {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+.tag.new {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tag.depleted {
+  color: var(--muted);
+}
+
+.deposit-table tbody tr {
+  cursor: pointer;
+}
+.deposit-table tbody tr:hover td {
+  background: #1d2a46;
+}
+.deposit-table tbody tr.sel td {
+  background: #243557;
+}
+.deposit-table tbody tr.dim {
+  opacity: 0.55;
+}
+.deposit-table + .tbl-note {
+  margin-top: 6px;
+}
+
+.surface-side .launch {
+  width: 100%;
+  margin-top: 12px;
+}

@@ -1,0 +1,50 @@
+{
+  "style": "pixel art, retro sci-fi game sprite, clean silhouette, limited palette, <lora:pixel-art-xl-v1.1:1>",
+  "negative": "3d render, photo, realistic, painting, blurry, smooth shading, text, letters, watermark, signature, frame, border, multiple objects",
+  "defaults": {
+    "steps": 6,
+    "cfg": 1.5,
+    "sampler": "DPM++ 2M SDE",
+    "scheduler": "Karras",
+    "width": 1024,
+    "height": 1024,
+    "pixel": 8,
+    "colors": 24,
+    "cutout": true
+  },
+  "assets": [
+    {
+      "id": "freighter",
+      "prompt": "small boxy cargo freighter starship, worn gray hull with faded orange stripes, cargo pods, top-down view, isolated on plain gray background",
+      "seed": 1556087656
+    },
+    {
+      "id": "rover",
+      "prompt": "six-wheeled planetary mining rover with a drill arm, top-down view, isolated on plain gray background",
+      "seed": 4101,
+      "colors": 20
+    },
+    {
+      "id": "lander",
+      "prompt": "squat cargo lander on four landing legs, side view, isolated on plain gray background",
+      "seed": 5150
+    },
+    {
+      "id": "intrepid",
+      "prompt": "enormous long cylindrical generation starship, rotating habitat rings, docking arms, side view, isolated on plain gray background",
+      "seed": 2077,
+      "width": 1216,
+      "height": 832
+    },
+    {
+      "id": "title",
+      "prompt": "a tiny freighter leaving a colossal cylindrical generation ship among unfamiliar stars, purple and teal nebula, wide cinematic scene",
+      "seed": 30,
+      "width": 1216,
+      "height": 832,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false
+    }
+  ]
+}
