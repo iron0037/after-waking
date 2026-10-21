@@ -204,3 +204,26 @@ Your starting clan shapes the early game. Every perk is small but felt, and each
 | **Freebooters** | Black-market fuel 10% cheaper; smuggling jobs open from day one | Helm and Exchange start out cool toward you |
 
 Clan choice isn't in V1. These perks plug into the same modifiers the balance pass uses (loan rate, prices, rates).
+
+## New-Player Experience **[DECIDED 2026-10-21]**
+"A single bad run shouldn't ruin you when you're starting out."
+- **Home systems:** the three charted stars nearest the Intrepid. In the lore, the first scouts explored them thoroughly.
+  - Gentle K/G stars, with no flare stars next door.
+  - At least two calm landable worlds each, with low weather and tectonics.
+  - Modest, mostly shallow seams.
+- **Scout records:** every body in the twelve charted systems starts scanned, and the home worlds start fully surveyed. You know what you're getting into.
+- **The Meadow:** a small living world in the nearest home system. It's the gentle first landing, with flora to sample.
+- **Starter contracts:**
+  - Exchange: deliver 60 t of iron-nickel ore (4,500 cr, about 2.5× market).
+  - Lyceum: 4 flora samples from the Meadow (5,000 cr).
+  - Helm: finish the scouts' charts with two detailed surveys (3,500 cr).
+- **Ongoing:** recurring delivery contracts at 1.3–1.6× market value, with deadlines.
+- **Safety net:** Exchange fuel credit, so a broke captain is never stranded.
+- **Measured:** a bare ship's first three trips are profitable 92% of the time, with a median of about 17k cr. Losses come from straying beyond home early.
+
+## Map Painting **[DECIDED 2026-10-21]**
+Some players love marking off what they've done, and everyone benefits from "hey, you already looked there."
+- **Surface:** every tile swept by rover sensors is remembered. Unswept tiles show as dim orbital imagery, and swept tiles in full color. Regions show an explored %.
+- **World:** regions visited, surface explored %, scanned and surveyed status.
+- **System and star map:** progress arcs that fill as you scan, land and explore. Home systems and contract targets are marked.
+- **Revisit recap:** landing somewhere you've been shows what's known: explored %, deposits known, reachable tonnes left, unsampled flora, and a "looks worked out" warning.
