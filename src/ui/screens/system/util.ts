@@ -24,19 +24,19 @@ export function roughCredits(n: number): string {
   return (Math.round(n / f) * f).toLocaleString();
 }
 
-function parse(hex: string): [number, number, number] {
+export function hexRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1, 7), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 export function rgba(hex: string, alpha: number): string {
-  const [r, g, b] = parse(hex);
+  const [r, g, b] = hexRgb(hex);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
 export function mix(a: string, b: string, t: number): string {
-  const [ar, ag, ab] = parse(a);
-  const [br, bg, bb] = parse(b);
+  const [ar, ag, ab] = hexRgb(a);
+  const [br, bg, bb] = hexRgb(b);
   const f = (x: number, y: number) => Math.round(x + (y - x) * t);
   return `rgb(${f(ar, br)},${f(ag, bg)},${f(ab, bb)})`;
 }

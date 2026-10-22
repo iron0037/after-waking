@@ -30,7 +30,7 @@ import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
 import { BodyList } from "./system/BodyList";
-import { HOME_VIEW, zoomAt, type ViewState } from "./system/projection";
+import { focusView, HOME_VIEW, zoomAt, zoomForBody, type ViewState } from "./system/projection";
 import { RegionPicker, bestRegion } from "./system/RegionPicker";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
@@ -173,6 +173,12 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const zoomBy = (factor: number, x = sizeRef.current.w / 2, y = sizeRef.current.h / 2) =>
     setView((v) => zoomAt(v, sizeRef.current.w, sizeRef.current.h, x, y, factor));
 
+  const zoomToSelected = () => {
+    if (!selected) return;
+    const { w, h } = sizeRef.current;
+    setView(focusView(w, h, detail, selected, state.time, zoomForBody(w, h, detail, selected)));
+  };
+
   // --- drawing ---------------------------------------------------------------------------
 
   const mkRoute = (target: FlightTarget, plan: Route["plan"]): Route => ({
@@ -250,6 +256,14 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           </button>
           <button class="btn" onClick={() => zoomBy(1 / 1.6)} title="Zoom out">
             −
+          </button>
+          <button
+            class="btn"
+            onClick={zoomToSelected}
+            disabled={!selected || busy}
+            title={selected ? `Center and zoom in on ${selected.name}${selected.moonIds.length > 0 ? " and its moons" : ""}` : "Select a body first"}
+          >
+            Zoom to body
           </button>
           <button class="btn" onClick={() => setView(HOME_VIEW)} disabled={view.zoom === 1} title="Reset view">
             Reset view
@@ -382,8 +396,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
             {orbitingSel && scanned && access && (
               <>
-                <h3>Landing</h3>
-                {!access.ok ? (
+                <h3>{access.ok ? "Landing" : "Surface"}</h3>
+                {!access.ok && (
                   <>
                     <div class="danger small">Can't land with the current ship:</div>
                     <ul class="blockers">
@@ -392,13 +406,15 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       ))}
                     </ul>
                   </>
-                ) : selected.regions > 0 ? (
+                )}
+                {selected.regions > 0 ? (
                   <>
                     {!state.surveyedBodies.includes(selected.id) && (
                       <div class="sys-survey">
                         <div class="muted small">
                           A detailed survey sharpens these readings and, with penetrating sensors, counts only seams your drill can
                           reach. Rover sensors also reach farther on this world.
+                          {!access.ok && " It needs no landing: the survey is flown from orbit."}
                         </div>
                         <button class="btn" disabled={busy} onClick={() => session.act((s, w) => surveyBody(s, w))}>
                           Detailed survey ({formatDuration(SURVEY_MINUTES)})
@@ -412,25 +428,28 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       sensorTier={sensorTierFor(state, selected.id)}
                       reachM={stats.drillMaxDepthM}
                       selected={region}
+                      landable={access.ok}
                       onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
                     />
-                    {landBlockers.length > 0 && (
+                    {access.ok && landBlockers.length > 0 && (
                       <ul class="blockers">
                         {landBlockers.map((r) => (
                           <li key={r}>{r}</li>
                         ))}
                       </ul>
                     )}
-                    <button
-                      class="btn primary big"
-                      disabled={busy || landBlockers.length > 0}
-                      onClick={() => session.act((s, w) => land(s, w, region))}
-                    >
-                      Land in region {region + 1}
-                    </button>
+                    {access.ok && (
+                      <button
+                        class="btn primary big"
+                        disabled={busy || landBlockers.length > 0}
+                        onClick={() => session.act((s, w) => land(s, w, region))}
+                      >
+                        Land in region {region + 1}
+                      </button>
+                    )}
                   </>
                 ) : (
-                  <div class="muted small">Nothing to set down on.</div>
+                  access.ok && <div class="muted small">Nothing to set down on.</div>
                 )}
               </>
             )}

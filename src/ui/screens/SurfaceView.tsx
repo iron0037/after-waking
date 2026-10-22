@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
+  canEnter,
   cargoTonnes,
   collectSample,
   currentRegion,
@@ -13,6 +14,8 @@ import {
   exploredFraction,
   formatDuration,
   formatPressure,
+  HOP_MINUTES,
+  hopFuel,
   HOUR,
   KIND_LABEL,
   knowledge,
@@ -24,11 +27,14 @@ import {
   prospect,
   RECALL_FUEL,
   recallRover,
+  relocateShip,
   remainingTonnes,
   ROVER_SPECIMEN_SLOTS,
   SAMPLE_ENERGY,
   SAMPLE_MINUTES,
+  sensorTierFor,
   shipStats,
+  shipTile,
   SHIP_SPECIMEN_SLOTS,
   SHIFT_FACTOR,
   specimenCount,
@@ -45,6 +51,7 @@ import {
   type RegionMap,
   type RoverState,
   type Vec2,
+  workDeposit,
 } from "../../sim";
 import { cargoList, pct, tonnes } from "../format";
 import { TERRAIN_COLORS, UI } from "../palette";
@@ -53,6 +60,7 @@ import { Canvas } from "../Canvas";
 import {
   computeLayout,
   drawBase,
+  drawBlockedTile,
   drawDeposits,
   drawFlora,
   drawHoverTile,
@@ -63,6 +71,7 @@ import {
   drawTooltip,
   tileAt,
   type Layout,
+  type Reveal,
   type TipLine,
 } from "./surface/mapDraw";
 import { affordablePrefix, chebyshev, energyHome, evaluate, planPath, type RoutePlan } from "./surface/routing";
@@ -85,6 +94,18 @@ interface Hover {
   py: number;
 }
 
+/** Keyboard driving: arrows and WASD, one tile per press. */
+const KEY_DIRS: Record<string, Vec2> = {
+  arrowup: { x: 0, y: -1 },
+  arrowdown: { x: 0, y: 1 },
+  arrowleft: { x: -1, y: 0 },
+  arrowright: { x: 1, y: 0 },
+  w: { x: 0, y: -1 },
+  s: { x: 0, y: 1 },
+  a: { x: -1, y: 0 },
+  d: { x: 1, y: 0 },
+};
+
 export function SurfaceView({ session }: { session: GameSession }) {
   useSession(session);
   const loc = session.state.location;
@@ -99,6 +120,19 @@ function depositStatus(know: RegionKnowledge, d: Deposit): "depleted" | "prospec
 
 function floraStatus(know: RegionKnowledge, f: FloraSite): "sampled" | "unsampled" {
   return know.floraSampled.includes(f.id) ? "sampled" : "unsampled";
+}
+
+/** Why the crew can't work this deposit right now (empty when they can). */
+function workBlockers(state: GameState, know: RegionKnowledge, dep: Deposit): string[] {
+  const stats = shipStats(state.ship);
+  const out: string[] = [];
+  if (!know.discovered.includes(dep.id)) out.push("This deposit hasn't been discovered yet.");
+  else if (depositStatus(know, dep) === "depleted") out.push("This deposit is worked out.");
+  else if (dep.depthM > stats.drillMaxDepthM) {
+    out.push(`The seam is ${dep.depthM} m down and the drill only reaches ${stats.drillMaxDepthM} m. A better drill would get it.`);
+  }
+  if (out.length === 0 && stats.cargoCapacityT - cargoTonnes(state.ship.cargo) <= 0.5) out.push("The ship's hold is full.");
+  return out;
 }
 
 function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
@@ -128,6 +162,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const facingRef = useRef(1);
   const routeRef = useRef<{ key: string; plan: RoutePlan | null }>({ key: "", plan: null });
   const aliveRef = useRef(true);
+  // "Move ship" targeting mode (only while the rover is stowed).
+  const [moveMode, setMoveMode] = useState(false);
+  const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
 
   useEffect(() => {
     aliveRef.current = true;
@@ -139,6 +176,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       }
     };
   }, [session]);
+
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => keyRef.current(ev);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const terrainImg = useMemo(() => buildTerrainImage(map, body.kind), [map, body.kind]);
   const foggedImg = useMemo(() => buildFoggedImage(terrainImg), [terrainImg]);
@@ -154,7 +197,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const selectedFlora = floraFound.find((f) => f.id === floraId) ?? null;
   const floraAt = (t: Vec2): FloraSite | undefined => floraFound.find((f) => f.x === t.x && f.y === t.y);
 
-  const homeEnergy = rover ? energyHome(map, rover, canClimb) : null;
+  const ship = shipTile(state, map);
+  const homeEnergy = rover ? energyHome(map, rover, ship, canClimb) : null;
   const stranded = rover !== null && (homeEnergy === null || homeEnergy > rover.energy);
 
   // --- driving ---------------------------------------------------------------------------
@@ -193,6 +237,16 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     void drive(path);
   };
 
+  // --- ship hop --------------------------------------------------------------------------
+
+  const hopCost = hopFuel(state, world);
+  const hopBlocker = (tile: Vec2): string | null => {
+    if (!canEnter(map, tile.x, tile.y, false)) return "The ship needs open, level ground to set down.";
+    if (tile.x === ship.x && tile.y === ship.y) return "The ship is already there.";
+    if (hopCost > state.ship.fuel) return `A hop needs ${hopCost.toFixed(1)} fuel.`;
+    return null;
+  };
+
   // --- map -------------------------------------------------------------------------------
 
   const hoverPlan = (tile: Vec2): RoutePlan | null => {
@@ -202,7 +256,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const site = depositAt(tile) !== undefined || floraAt(tile) !== undefined;
     const inRange = chebyshev(rover, tile) <= (site ? 1 : 0);
     const path = inRange ? null : planPath(map, rover, tile, canClimb, site);
-    const plan = path && path.length > 0 ? evaluate(map, path, rover, canClimb) : null;
+    const plan = path && path.length > 0 ? evaluate(map, path, rover, ship, canClimb) : null;
     routeRef.current = { key, plan };
     return plan;
   };
@@ -210,11 +264,26 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number, t: number): void => {
     const L = computeLayout(w, h, map.width, map.height);
     layoutRef.current = L;
-    drawBase(ctx, w, h, L, paintedImg);
+
+    // Mid-drive, the sensors sweep ahead of the sim: paint tiles in (and show finds) as the rover passes.
+    const anim = animRef.current;
+    const sweep = 2 + sensorTierFor(state, loc.bodyId);
+    let reveal: Reveal | null = null;
+    let seen = know;
+    if (anim) {
+      const passed = anim.pts.slice(0, Math.min(anim.pts.length - 1, Math.round((t - anim.t0) / STEP_MS)) + 1);
+      reveal = { terrain: terrainImg, pts: passed, radius: sweep };
+      const near = (o: Vec2): boolean => passed.some((p) => chebyshev(p, o) <= sweep);
+      const deps = map.deposits.filter((d) => !know.discovered.includes(d.id) && near(d)).map((d) => d.id);
+      const flora = map.flora.filter((f) => !know.floraFound.includes(f.id) && near(f)).map((f) => f.id);
+      if (deps.length > 0 || flora.length > 0) {
+        seen = { ...know, discovered: [...know.discovered, ...deps], floraFound: [...know.floraFound, ...flora] };
+      }
+    }
+    drawBase(ctx, w, h, L, paintedImg, reveal);
 
     // Where the rover is drawn: mid-drive it slides along the path.
     let pos: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
-    const anim = animRef.current;
     if (anim) {
       const p = Math.min(anim.pts.length - 1, Math.max(0, (t - anim.t0) / STEP_MS));
       const i = Math.floor(p);
@@ -224,13 +293,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       pos = { x: a.x + (b.x - a.x) * (p - i), y: a.y + (b.y - a.y) * (p - i) };
     }
 
-    if (pos) drawSensorRange(ctx, L, { x: Math.round(pos.x), y: Math.round(pos.y) }, 2 + stats.sensorTier);
-    drawShip(ctx, L, map.landing);
-    drawFlora(ctx, L, map, know, selectedFlora?.id ?? null, t);
-    drawDeposits(ctx, L, map, know, selected?.id ?? null, t);
+    if (pos) drawSensorRange(ctx, L, { x: Math.round(pos.x), y: Math.round(pos.y) }, sweep);
+    drawShip(ctx, L, ship);
+    drawFlora(ctx, L, map, seen, selectedFlora?.id ?? null, t);
+    drawDeposits(ctx, L, map, seen, selected?.id ?? null, t);
 
     // hover: route preview and tooltip
     const hover = anim ? null : hoverRef.current;
+    const hopping = moveMode && !rover;
     if (hover && rover) {
       const plan = hoverPlan(hover.tile);
       if (plan) {
@@ -243,23 +313,45 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       const rest = anim.pts.slice(1).map((p) => ({ ...p, minutes: 0, energy: 0 }));
       drawRoute(ctx, L, anim.pts[0] as Vec2, rest, "rgba(95, 212, 255, 0.8)", null);
     }
-    if (hover) drawHoverTile(ctx, L, hover.tile);
+    if (hover && hopping && hopBlocker(hover.tile) !== null && !isShipTile(hover.tile)) {
+      drawBlockedTile(ctx, L, hover.tile);
+    } else if (hover && hopping && !isShipTile(hover.tile)) {
+      // Ghost ship where it would set down.
+      ctx.globalAlpha = 0.55;
+      drawShip(ctx, L, hover.tile);
+      ctx.globalAlpha = 1;
+      drawHoverTile(ctx, L, hover.tile);
+    } else if (hover) drawHoverTile(ctx, L, hover.tile);
 
     if (pos && rover) {
-      const onPad = Math.round(pos.x) === map.landing.x && Math.round(pos.y) === map.landing.y;
+      const onPad = Math.round(pos.x) === ship.x && Math.round(pos.y) === ship.y;
       drawRover(ctx, L, pos, t, onPad, facingRef.current);
     }
 
-    if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, tooltipLines(hover.tile));
+    if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, hopping ? hopTooltip(hover.tile) : tooltipLines(hover.tile));
+  };
+
+  const isShipTile = (tile: Vec2): boolean => tile.x === ship.x && tile.y === ship.y;
+
+  const hopTooltip = (tile: Vec2): TipLine[] => {
+    const info = TERRAIN_INFO[map.terrain[tile.y * map.width + tile.x] as Terrain];
+    const lines: TipLine[] = [{ text: isShipTile(tile) ? `${info.name} · ship` : info.name, color: UI.text }];
+    const blocker = hopBlocker(tile);
+    if (blocker === null) {
+      lines.push({ text: `Hop: ${hopCost.toFixed(1)} fuel · ${formatDuration(HOP_MINUTES)}`, color: UI.good });
+    } else {
+      lines.push({ text: blocker, color: UI.danger });
+    }
+    return lines;
   };
 
   const tooltipLines = (tile: Vec2): TipLine[] => {
     const lines: TipLine[] = [];
     const terrain = map.terrain[tile.y * map.width + tile.x] as Terrain;
     const info = TERRAIN_INFO[terrain];
-    const isShip = tile.x === map.landing.x && tile.y === map.landing.y;
+    const isShip = tile.x === ship.x && tile.y === ship.y;
     const needsClimber = info.passable === "climb" && !canClimb;
-    lines.push({ text: isShip ? `${info.name} · landing pad` : info.name, color: UI.text });
+    lines.push({ text: isShip ? `${info.name} · ship` : info.name, color: UI.text });
     const dep = depositAt(tile);
     const flora = floraAt(tile);
     if (flora) {
@@ -309,11 +401,111 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const L = layoutRef.current;
     const tile = L ? tileAt(L, px, py) : null;
     if (!tile || session.busy) return;
+    if (moveMode && !rover) {
+      const blocker = hopBlocker(tile);
+      if (blocker) {
+        session.notify(blocker, "error");
+        return;
+      }
+      const r = session.act((s, w) => relocateShip(s, w, tile.x, tile.y));
+      if (r.ok) {
+        setMoveMode(false);
+        session.notify(`The ship set down at ${tile.x}, ${tile.y}.`);
+      }
+      return;
+    }
     const dep = depositAt(tile);
     const flora = floraAt(tile);
     if (dep) setSelectedId(dep.id);
     else if (flora) setFloraId(flora.id);
     driveTo(tile, dep !== undefined || flora !== undefined);
+  };
+
+  // --- rover and ship actions (buttons and hotkeys share these) ------------------------------------
+
+  const nearShip = rover !== null && chebyshev(rover, ship) <= 1;
+
+  const doDeploy = (): void => {
+    const r = session.act((s, w) => deployRover(s, w));
+    if (!r.ok) return;
+    setMoveMode(false);
+    if (r.value.chargedHours >= 0.5) {
+      session.notify(`Charged the rover's cells for ${formatDuration(r.value.chargedHours * HOUR)} before rolling out.`);
+    }
+  };
+
+  const doStow = (): void => {
+    const r = session.act((s, w) => stowRover(s, w));
+    if (!r.ok) return;
+    setSelectedId(null);
+    setFloraId(null);
+    const { unloaded, jettisoned } = r.value;
+    session.notify(`Unloaded ${tonnes(unloaded)} into the hold.${jettisoned > 0.05 ? ` ${tonnes(jettisoned)} left behind: hold full.` : ""}`);
+  };
+
+  const doWork = (dep: Deposit): void => {
+    const blockers = workBlockers(state, know, dep);
+    if (blockers[0]) {
+      session.notify(blockers[0], "error");
+      return;
+    }
+    const name = COMMODITIES[dep.commodity].name.toLowerCase();
+    const r = session.act((s, w) => workDeposit(s, w, dep.id));
+    if (!r.ok) return;
+    const rep = r.value;
+    const done = rep.stop === "deposit depleted";
+    const loads = `${rep.loads} load${rep.loads === 1 ? "" : "s"}`;
+    const head =
+      rep.tonnes > 0 || rep.loads > 0
+        ? `Crew hauled ${tonnes(rep.tonnes)} of ${name} in ${loads} over ${formatDuration(rep.minutes)}`
+        : `Crew spent ${formatDuration(rep.minutes)} on the ${name} deposit and hauled nothing`;
+    session.notify(`${head} — ${done ? "deposit worked out." : rep.detail}`, done || rep.stop === "hold full" ? "info" : "error");
+    if (rep.incidents.length > 0) session.notify(`Along the way: ${rep.incidents.join(" ")}`, "error");
+  };
+
+  const doLiftOff = (): void => {
+    session.act((s, w) => launch(s, w));
+  };
+
+  const toggleMoveMode = (): void => {
+    if (rover) return;
+    setMoveMode((m) => !m);
+  };
+
+  const stepRover = (dir: Vec2, repeat: boolean): void => {
+    if (!rover) return;
+    const to = { x: rover.x + dir.x, y: rover.y + dir.y };
+    if (!canEnter(map, to.x, to.y, canClimb)) {
+      if (!repeat) session.notify("The rover can't go that way.", "error");
+      return;
+    }
+    const path = planPath(map, rover, to, canClimb, false);
+    if (path) void drive(path);
+  };
+
+  keyRef.current = (ev: KeyboardEvent): void => {
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const el = ev.target;
+    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
+    const key = ev.key.toLowerCase();
+    if (key === "escape") {
+      if (moveMode) setMoveMode(false);
+      return;
+    }
+    if (session.busy) return;
+    const dir = KEY_DIRS[key];
+    if (dir) {
+      if (!rover) return;
+      ev.preventDefault();
+      stepRover(dir, ev.repeat);
+    } else if (key === "e") {
+      if (!rover) doDeploy();
+      else if (nearShip) doStow();
+      else session.notify("Drive the rover back to the ship first.", "error");
+    } else if (key === "f") {
+      if (selected) doWork(selected);
+      else session.notify("Select a deposit first.", "error");
+    }
   };
 
   const present = ([...new Set(map.terrain)] as Terrain[]).sort((a, b) => a - b);
@@ -322,7 +514,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     <>
       <div class="viewport">
         <Canvas draw={draw} onClick={onClick} onMove={onMove} onLeave={() => (hoverRef.current = null)} animate />
-        <div class="viewport-hint">{rover ? "Click to drive · Hover for route cost" : "Deploy the rover to explore · Hover for terrain"}</div>
+        <div class="viewport-hint">
+          {moveMode && !rover
+            ? "Click a clear tile to set the ship down · Esc to cancel"
+            : rover
+              ? "Click or WASD/arrows to drive · E stow at ship · F work selected deposit"
+              : "E deploy rover · Hover for terrain"}
+        </div>
         <div class="surface-legend">
           {present.map((t) => (
             <span key={t} class="legend-item">
@@ -334,6 +532,72 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         </div>
       </div>
       <aside class="side surface-side">
+        <div class="action-bar">
+          <div class="ab-group">
+            <span class="ab-label">Rover</span>
+            {!rover && (
+              <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (E)" onClick={doDeploy}>
+                Deploy rover
+              </button>
+            )}
+            {rover && (
+              <>
+                <button
+                  class="btn"
+                  disabled={busy || (rover.x === ship.x && rover.y === ship.y)}
+                  title="Drive back to the ship"
+                  onClick={() => driveTo(ship, false)}
+                >
+                  Return to ship
+                </button>
+                <button
+                  class="btn"
+                  disabled={busy || !nearShip}
+                  title={!nearShip ? "Drive the rover back to the ship first" : "Unloads the cargo bed and recharges, 30 min (E)"}
+                  onClick={doStow}
+                >
+                  Stow &amp; unload
+                </button>
+              </>
+            )}
+            {stranded && (
+              <button
+                class="btn danger"
+                disabled={busy || state.ship.fuel < RECALL_FUEL}
+                title={`The rover can't drive home on its remaining energy. The ship hops over and winches it aboard: ${RECALL_FUEL} fuel and 3 h`}
+                onClick={() => session.act((s, w) => recallRover(s, w))}
+              >
+                Recall rover
+              </button>
+            )}
+          </div>
+          <div class="ab-group ship">
+            <span class="ab-label">Ship</span>
+            <button
+              class={`btn ${moveMode && !rover ? "active" : ""}`}
+              disabled={busy || rover !== null || (!moveMode && hopCost > state.ship.fuel)}
+              title={
+                rover
+                  ? "Stow the rover before moving the ship"
+                  : hopCost > state.ship.fuel
+                    ? `A hop needs ${hopCost.toFixed(1)} fuel`
+                    : `Hop the ship to another open tile: ${hopCost.toFixed(1)} fuel, ${formatDuration(HOP_MINUTES)}`
+              }
+              onClick={toggleMoveMode}
+            >
+              {moveMode && !rover ? "Cancel move" : "Move ship"}
+            </button>
+            <button
+              class="btn liftoff"
+              disabled={busy || rover !== null}
+              title={rover ? "Take the ship back to orbit (stow the rover first)" : "Take the ship back to orbit"}
+              onClick={doLiftOff}
+            >
+              Lift off (ship)
+            </button>
+          </div>
+        </div>
+
         <div class="panel">
           <h2>{body.name}</h2>
           <div class="muted small">
@@ -366,6 +630,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             know={know}
             rover={rover}
             drive={() => driveTo(selected, true)}
+            work={() => doWork(selected)}
             busy={busy}
           />
         ) : (
@@ -391,7 +656,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </thead>
               <tbody>
                 {floraFound
-                  .map((f) => ({ f, dist: chebyshev(rover ?? map.landing, f) }))
+                  .map((f) => ({ f, dist: chebyshev(rover ?? ship, f) }))
                   .sort((a, b) => a.dist - b.dist)
                   .map(({ f, dist }) => {
                     const sampled = floraStatus(know, f) === "sampled";
@@ -425,7 +690,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </thead>
               <tbody>
                 {discovered
-                  .map((d) => ({ d, dist: chebyshev(rover ?? map.landing, d) }))
+                  .map((d) => ({ d, dist: chebyshev(rover ?? ship, d) }))
                   .sort((a, b) => a.dist - b.dist)
                   .map(({ d, dist }) => {
                     const status = depositStatus(know, d);
@@ -454,73 +719,6 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           </div>
         )}
 
-        <div class="panel">
-          <h3>Actions</h3>
-          <div class="btn-row">
-            {!rover && (
-              <button class="btn" disabled={busy} onClick={() => {
-                  const r = session.act((s, w) => deployRover(s, w));
-                  if (r.ok && r.value.chargedHours >= 0.5) {
-                    session.notify(`Charged the rover's cells for ${formatDuration(r.value.chargedHours * HOUR)} before rolling out.`);
-                  }
-                }}>
-                Deploy rover
-              </button>
-            )}
-            {rover && (
-              <>
-                <button
-                  class="btn"
-                  disabled={busy || (rover.x === map.landing.x && rover.y === map.landing.y)}
-                  onClick={() => driveTo(map.landing, false)}
-                >
-                  Return to ship
-                </button>
-                <button
-                  class="btn"
-                  disabled={busy || chebyshev(rover, map.landing) > 1}
-                  title={chebyshev(rover, map.landing) > 1 ? "Drive the rover back to the ship first" : "Unloads the cargo bed and recharges (30 min)"}
-                  onClick={() => {
-                    const r = session.act((s, w) => stowRover(s, w));
-                    if (r.ok) {
-                      setSelectedId(null);
-                      setFloraId(null);
-                      const { unloaded, jettisoned } = r.value;
-                      session.notify(
-                        `Unloaded ${tonnes(unloaded)} into the hold.${jettisoned > 0.05 ? ` ${tonnes(jettisoned)} left behind: hold full.` : ""}`,
-                      );
-                    }
-                  }}
-                >
-                  Stow rover &amp; unload
-                </button>
-              </>
-            )}
-            {stranded && (
-              <button
-                class="btn danger"
-                disabled={busy || state.ship.fuel < RECALL_FUEL}
-                title={`The ship hops over and winches the rover aboard: ${RECALL_FUEL} fuel and 3 h`}
-                onClick={() => session.act((s, w) => recallRover(s, w))}
-              >
-                Recall rover
-              </button>
-            )}
-          </div>
-          {stranded && (
-            <p class="muted small act-note">
-              The rover can't drive home on its remaining energy. Recall costs {RECALL_FUEL} fuel and 3 h.
-            </p>
-          )}
-          <button
-            class="btn primary big launch"
-            disabled={busy || rover !== null}
-            onClick={() => session.act((s, w) => launch(s, w))}
-          >
-            Launch
-          </button>
-          {rover && <p class="muted small act-note">Stow the rover before launching.</p>}
-        </div>
       </aside>
     </>
   );
@@ -634,7 +832,7 @@ function RoverPanel({
             <span class="muted">
               ({inRover} in the rover, {aboard} aboard)
             </span>
-            {have >= need && <div class="good">Enough collected. Stow the rover, launch, and hand it in at the Intrepid.</div>}
+            {have >= need && <div class="good">Enough collected. Stow the rover, lift off, and hand it in at the Intrepid.</div>}
           </div>
         );
       })}
@@ -758,6 +956,7 @@ function DepositPanel({
   know,
   rover,
   drive,
+  work,
   busy,
 }: {
   session: GameSession;
@@ -765,6 +964,7 @@ function DepositPanel({
   know: RegionKnowledge;
   rover: RoverState | null;
   drive: () => void;
+  work: () => void;
   busy: boolean;
 }) {
   const stats = shipStats(session.state.ship);
@@ -778,6 +978,8 @@ function DepositPanel({
   const tooDeep = dep.depthM > stats.drillMaxDepthM;
   const rate = stats.drillRateTph * (0.4 + dep.grade);
   const room = rover ? stats.roverCargoT - cargoTonnes(rover.cargo) : 0;
+
+  const workBlock = workBlockers(session.state, know, dep);
 
   const placement: string[] = [];
   if (!rover) placement.push("Deploy the rover first.");
@@ -850,6 +1052,25 @@ function DepositPanel({
         )}
       </dl>
 
+      <div class="work-block">
+        <button
+          class="btn primary big work-btn"
+          disabled={busy || workBlock.length > 0}
+          title={workBlock[0] ?? "Crew prospects, drills and hauls loads home until the deposit is worked out or the hold is full (F)"}
+          onClick={work}
+        >
+          Work this deposit
+        </button>
+        {workBlock.length > 0 ? (
+          <p class="danger small act-note">{workBlock[0]}</p>
+        ) : (
+          <p class="muted small act-note">
+            The crew deploys the rover, prospects, drills and hauls loads home until the deposit is worked out or the hold is full.
+          </p>
+        )}
+      </div>
+      <div class="manual-label">Or do it by hand</div>
+
       {!prospected ? (
         <>
           <ul class="blockers">{prospectBlockers.map((b) => <li key={b}>{b}</li>)}</ul>
@@ -860,7 +1081,7 @@ function DepositPanel({
               </button>
             )}
             <button
-              class="btn primary"
+              class="btn"
               disabled={busy || prospectBlockers.length > 0}
               onClick={() => session.act((s, w) => prospect(s, w, dep.id))}
             >
@@ -877,7 +1098,7 @@ function DepositPanel({
                 Drive there
               </button>
             )}
-            <button class="btn primary" disabled={busy || drillBlockers.length > 0} onClick={() => runDrill(Infinity)}>
+            <button class="btn" disabled={busy || drillBlockers.length > 0} onClick={() => runDrill(Infinity)}>
               Drill until full
             </button>
             <button class="btn" disabled={busy || drillBlockers.length > 0} onClick={() => runDrill(4)}>

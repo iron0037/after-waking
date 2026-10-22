@@ -2,6 +2,7 @@
 import { COMMODITIES } from "../../../data/commodities";
 import { remainingTonnes, TILE_KM, type Deposit, type PathStep, type RegionKnowledge, type RegionMap, type Vec2 } from "../../../sim";
 import { UI } from "../../palette";
+import { SUB } from "./terrainImage";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace';
 const MARGIN = 26;
@@ -36,11 +37,46 @@ export function tileAt(L: Layout, px: number, py: number): Vec2 | null {
 const cx = (L: Layout, x: number) => L.ox + (x + 0.5) * L.ts;
 const cy = (L: Layout, y: number) => L.oy + (y + 0.5) * L.ts;
 
-export function drawBase(ctx: CanvasRenderingContext2D, w: number, h: number, L: Layout, terrain: HTMLCanvasElement): void {
+/** Tiles the rover's sensors are sweeping right now (mid-drive), painted in before the sim catches up. */
+export interface Reveal {
+  /** The full-color terrain image (not the fogged one). */
+  terrain: HTMLCanvasElement;
+  /** Rover positions passed so far, in order. */
+  pts: Vec2[];
+  radius: number;
+}
+
+export function drawBase(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  L: Layout,
+  terrain: HTMLCanvasElement,
+  reveal: Reveal | null = null,
+): void {
   ctx.fillStyle = UI.space;
   ctx.fillRect(0, 0, w, h);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(terrain, L.ox, L.oy, L.ts * L.cols, L.ts * L.rows);
+  if (reveal) {
+    for (const p of reveal.pts) {
+      const x0 = Math.max(0, p.x - reveal.radius);
+      const y0 = Math.max(0, p.y - reveal.radius);
+      const x1 = Math.min(L.cols - 1, p.x + reveal.radius);
+      const y1 = Math.min(L.rows - 1, p.y + reveal.radius);
+      ctx.drawImage(
+        reveal.terrain,
+        x0 * SUB,
+        y0 * SUB,
+        (x1 - x0 + 1) * SUB,
+        (y1 - y0 + 1) * SUB,
+        L.ox + x0 * L.ts,
+        L.oy + y0 * L.ts,
+        (x1 - x0 + 1) * L.ts,
+        (y1 - y0 + 1) * L.ts,
+      );
+    }
+  }
 
   // Survey grid: faint per tile, brighter every 8 tiles (16 km).
   ctx.lineWidth = 1;
@@ -120,6 +156,23 @@ export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): vo
   ctx.arc(x, y - s * 0.15, s * 0.14, 0, Math.PI * 2);
   ctx.fill();
   ctx.lineCap = "butt";
+}
+
+/** Marks a tile where the ship can't set down (move-ship targeting). */
+export function drawBlockedTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Vec2): void {
+  const x = L.ox + tile.x * L.ts;
+  const y = L.oy + tile.y * L.ts;
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(255, 90, 90, 0.35)";
+  ctx.fillRect(x, y, L.ts, L.ts);
+  ctx.strokeStyle = UI.danger;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x + L.ts * 0.2, y + L.ts * 0.2);
+  ctx.lineTo(x + L.ts * 0.8, y + L.ts * 0.8);
+  ctx.moveTo(x + L.ts * 0.8, y + L.ts * 0.2);
+  ctx.lineTo(x + L.ts * 0.2, y + L.ts * 0.8);
+  ctx.stroke();
 }
 
 export function drawSensorRange(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, radius: number): void {

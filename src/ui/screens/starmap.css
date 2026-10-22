@@ -130,3 +130,13 @@
 .sm-list td {
   padding: 4px 6px;
 }
+
+.sm-depart {
+  border-color: var(--accent);
+}
+.sm-depart h3 {
+  margin-top: 0;
+}
+.sm-auto-note {
+  margin: 8px 0 0;
+}

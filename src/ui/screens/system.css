@@ -186,27 +186,36 @@
   flex-direction: column;
   gap: 6px;
 }
-.sys-region-grid {
-  display: grid;
-  gap: 2px;
+.sys-region-title {
+  margin: 0;
 }
-.sys-region {
-  aspect-ratio: 1;
-  min-width: 0;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  cursor: pointer;
+.sys-map {
+  position: relative;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: #05070f;
+  outline-offset: 2px;
 }
-.sys-region:hover {
-  border-color: var(--text);
+.sys-map-canvas {
+  cursor: crosshair;
+  border-radius: 3px;
 }
-.sys-region.visited {
-  border-color: var(--cyan);
+.sys-map-pole {
+  position: absolute;
+  left: 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  opacity: 0.55;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+  pointer-events: none;
 }
-.sys-region.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+.sys-map-n {
+  top: 4px;
+}
+.sys-map-s {
+  bottom: 4px;
 }
 .sys-region-readout {
   min-height: 1.4em;
@@ -228,9 +237,12 @@
   align-items: center;
   gap: 4px;
 }
-.sys-region-key .sys-region {
+.sys-region-swatch {
   width: 10px;
+  height: 10px;
   display: inline-block;
+  border: 1px solid var(--cyan);
+  border-radius: 2px;
   background: #15213b;
 }
 .sys-recap {

@@ -1,9 +1,11 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
+  autoFold,
   clamp,
   currentSystemId,
   distanceLy,
+  flightPlan,
   fold,
   foldPlan,
   formatDuration,
@@ -51,7 +53,15 @@ interface ViewState {
   userMoved: boolean;
 }
 
-const INTREPID_HIT = 16;
+const INTREPID_HIT = 22;
+/** Drawn width of the Intrepid sprite on the chart, in pixels (sprite is 307x41). */
+const INTREPID_W = 78;
+
+/** Blockers a one-click departure can resolve itself (fly to the edge, wait out the recharge). */
+const isSoftBlocker = (b: string): boolean => b.startsWith("Fold drive recharging") || b.startsWith("Folds can't start inside");
+
+const intrepidImg = typeof Image === "undefined" ? null : new Image();
+if (intrepidImg) intrepidImg.src = "./assets/intrepid.png";
 
 /** Star dot radius in pixels: luminosity on a log scale, in a small range. */
 function starRadius(s: StarSystem): number {
@@ -121,6 +131,29 @@ export function StarMap({ session }: { session: GameSession }) {
   const here = positionOf(world.galaxy, fromId);
   const target = selected ? (byId.get(selected) ?? null) : null;
   const plan = target ? foldPlan(state, world, target.id) : null;
+
+  // Departure: what a one-click "fold when ready" would do, and whether it can.
+  const hardBlockers = plan ? plan.blockers.filter((b) => !isSoftBlocker(b)) : [];
+  const softBlockers = plan ? plan.blockers.filter(isSoftBlocker) : [];
+  const needsEdge = softBlockers.some((b) => b.startsWith("Folds can't start inside"));
+  const rechargeLeft = Math.max(0, state.foldReadyAt - state.time);
+  const edgeFlight = needsEdge ? flightPlan(state, world, { edge: true }) : null;
+  const flightMinutes = edgeFlight?.ok ? edgeFlight.value.minutes : 0;
+  const flightFuel = edgeFlight?.ok ? edgeFlight.value.fuel : 0;
+  const waitMinutes = Math.max(0, rechargeLeft - flightMinutes);
+  const edgeProblem =
+    edgeFlight && !edgeFlight.ok
+      ? edgeFlight.reason
+      : plan && needsEdge && flightFuel + plan.fuel > state.ship.fuel
+        ? `Not enough fuel to reach the edge (${flightFuel}) and fold (${plan.fuel}); tanks hold ${state.ship.fuel.toFixed(1)}.`
+        : null;
+  const canDepart = !!plan && hardBlockers.length === 0 && !edgeProblem && target?.id !== fromId;
+  const autoLabel = (() => {
+    const steps: string[] = [];
+    if (needsEdge) steps.push("flies to edge");
+    if (waitMinutes > 0) steps.push(`waits ${formatDuration(waitMinutes)}`);
+    return steps.join(" · ");
+  })();
 
   const known = (n: Node): boolean => n.id === "intrepid" || !!n.star?.charted || state.visitedSystems.includes(n.id);
 
@@ -256,15 +289,15 @@ export function StarMap({ session }: { session: GameSession }) {
 
   const back = () => session.go(docked ? "hub" : "system");
 
-  const doFold = () => {
-    if (!target || session.busy || !plan || plan.blockers.length > 0) return;
+  const doFold = (auto: boolean) => {
+    if (!target || session.busy || !plan || !canDepart || (!auto && plan.blockers.length > 0)) return;
     const id = target.id;
     flash.current = performance.now();
     session.setBusy(true);
     timer.current = window.setTimeout(() => {
       timer.current = 0;
       flash.current = 0;
-      const result = session.act((s, w) => fold(s, w, id));
+      const result = auto ? session.act((s, w) => autoFold(s, w, id)) : session.act((s, w) => fold(s, w, id));
       session.setBusy(false);
       if (result.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
     }, FLASH_MS);
@@ -335,7 +368,7 @@ export function StarMap({ session }: { session: GameSession }) {
     drawIntrepid(ctx);
 
     // you are here
-    const base = fromId === "intrepid" ? 24 : starRadius(byId.get(fromId)?.star as StarSystem) + 9;
+    const base = fromId === "intrepid" ? INTREPID_W / 2 + 6 : starRadius(byId.get(fromId)?.star as StarSystem) + 9;
     const phase = (t / 1700) % 1;
     ctx.save();
     ctx.strokeStyle = UI.ship;
@@ -366,15 +399,16 @@ export function StarMap({ session }: { session: GameSession }) {
     if (target) {
       const [x, y] = toScreen(target.pos);
       const half = target.star ? starRadius(target.star) + 10 : 20;
+      const halfW = target.star ? half : INTREPID_W / 2 + 6;
       const len = 6;
       ctx.save();
       ctx.strokeStyle = UI.accent;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-        ctx.moveTo(x + sx * half, y + sy * (half - len));
-        ctx.lineTo(x + sx * half, y + sy * half);
-        ctx.lineTo(x + sx * (half - len), y + sy * half);
+        ctx.moveTo(x + sx * halfW, y + sy * (half - len));
+        ctx.lineTo(x + sx * halfW, y + sy * half);
+        ctx.lineTo(x + sx * (halfW - len), y + sy * half);
       }
       ctx.stroke();
       ctx.restore();
@@ -528,28 +562,32 @@ export function StarMap({ session }: { session: GameSession }) {
     const isHover = hovered === "intrepid";
     ctx.save();
     ctx.translate(x, y);
-    // engine glow
-    const glow = ctx.createRadialGradient(-13, 0, 0, -13, 0, 14);
-    glow.addColorStop(0, "rgba(95, 212, 255, 0.55)");
-    glow.addColorStop(1, "rgba(95, 212, 255, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(-28, -14, 30, 28);
-    // hull: a long spindle with a blunt nose
-    ctx.beginPath();
-    ctx.moveTo(-13, -3.5);
-    ctx.lineTo(8, -3.5);
-    ctx.lineTo(15, 0);
-    ctx.lineTo(8, 3.5);
-    ctx.lineTo(-13, 3.5);
-    ctx.closePath();
-    ctx.fillStyle = "#12303f";
-    ctx.fill();
-    ctx.strokeStyle = UI.intrepid;
-    ctx.lineWidth = isHover ? 2 : 1.25;
-    ctx.stroke();
-    // spine lights
-    ctx.fillStyle = UI.intrepid;
-    for (let i = -9; i <= 5; i += 4) ctx.fillRect(i, -0.5, 2, 1);
+    const img = intrepidImg && intrepidImg.complete && intrepidImg.naturalWidth > 0 ? intrepidImg : null;
+    if (img) {
+      const w = INTREPID_W;
+      const h = (img.naturalHeight / img.naturalWidth) * w;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      if (isHover) {
+        ctx.strokeStyle = UI.intrepid;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-w / 2 - 3, -h / 2 - 3, w + 6, h + 6);
+      }
+    } else {
+      // fallback until the sprite loads: a long spindle with a blunt nose
+      ctx.beginPath();
+      ctx.moveTo(-13, -3.5);
+      ctx.lineTo(8, -3.5);
+      ctx.lineTo(15, 0);
+      ctx.lineTo(8, 3.5);
+      ctx.lineTo(-13, 3.5);
+      ctx.closePath();
+      ctx.fillStyle = "#12303f";
+      ctx.fill();
+      ctx.strokeStyle = UI.intrepid;
+      ctx.lineWidth = isHover ? 2 : 1.25;
+      ctx.stroke();
+    }
     ctx.restore();
     ctx.font = `${isHover ? "bold " : ""}11px ${FONT}`;
     ctx.fillStyle = UI.intrepid;
@@ -623,6 +661,56 @@ export function StarMap({ session }: { session: GameSession }) {
       </div>
 
       <aside class="side">
+        {target && plan && target.id !== fromId && (
+          <section class="panel sm-depart">
+            <h3>Fold plan: {target.name}</h3>
+            <dl class="kv">
+              <dt>Distance</dt>
+              <dd class={plan.ly > stats.foldRangeLy ? "danger" : ""}>
+                {plan.ly.toFixed(1)} / {stats.foldRangeLy} ly range
+              </dd>
+              <dt>Fuel</dt>
+              <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
+                {plan.fuel} of {state.ship.fuel.toFixed(1)}
+              </dd>
+              <dt>Recharge after</dt>
+              <dd>{formatDuration(plan.rechargeMinutes)}</dd>
+              <dt>Drive now</dt>
+              <dd class={rechargeLeft > 0 ? "accent" : "good"}>{rechargeLeft > 0 ? `Charging, ${formatDuration(rechargeLeft)}` : "Ready"}</dd>
+            </dl>
+            {(hardBlockers.length > 0 || edgeProblem) && (
+              <ul class="blockers sm-blockers">
+                {hardBlockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+                {edgeProblem && hardBlockers.length === 0 && <li>{edgeProblem}</li>}
+              </ul>
+            )}
+            <div class="btn-row sm-fold">
+              {plan.blockers.length === 0 ? (
+                <button class="btn primary big" disabled={session.busy} onClick={() => doFold(false)}>
+                  Fold now
+                </button>
+              ) : canDepart ? (
+                <button class="btn primary big" disabled={session.busy} onClick={() => doFold(true)}>
+                  Fold when ready{autoLabel ? ` (${autoLabel})` : ""}
+                </button>
+              ) : (
+                <button class="btn primary big" disabled>
+                  Can't fold yet
+                </button>
+              )}
+            </div>
+            {softBlockers.length > 0 && canDepart && (
+              <p class="muted small sm-auto-note">
+                {needsEdge ? "Folds start at the system edge, so the ship flies out first. " : ""}
+                {waitMinutes > 0 ? "Then it holds position until the drive is charged. " : ""}
+                Same time and fuel as doing it by hand.
+              </p>
+            )}
+          </section>
+        )}
+
         <div class="btn-row sm-top">
           <button class="btn" onClick={back} disabled={session.busy}>
             ◂ Back to {docked ? "the Intrepid" : "the system"}
@@ -666,36 +754,6 @@ export function StarMap({ session }: { session: GameSession }) {
                 paint={paint.get(target.id)}
                 contracts={targets.get(target.id) ?? []}
               />
-            )}
-
-            {plan && target.id !== fromId && (
-              <section class="panel">
-                <h3>Fold plan</h3>
-                <dl class="kv">
-                  <dt>Fuel</dt>
-                  <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
-                    {plan.fuel} of {state.ship.fuel.toFixed(1)}
-                  </dd>
-                  <dt>Drive recharge</dt>
-                  <dd>{formatDuration(plan.rechargeMinutes)}</dd>
-                  <dt>Range</dt>
-                  <dd class={plan.ly > stats.foldRangeLy ? "danger" : ""}>
-                    {plan.ly.toFixed(1)} / {stats.foldRangeLy} ly
-                  </dd>
-                </dl>
-                {plan.blockers.length > 0 && (
-                  <ul class="blockers sm-blockers">
-                    {plan.blockers.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                )}
-                <div class="btn-row sm-fold">
-                  <button class="btn primary big" disabled={plan.blockers.length > 0 || session.busy} onClick={doFold}>
-                    Fold to {target.name}
-                  </button>
-                </div>
-              </section>
             )}
 
             {target.star && (

@@ -1,7 +1,7 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS } from "../../data/commodities";
-import { CLAN_NAMES, UPGRADES, type ClanId } from "../../data/ship";
+import { CLAN_NAMES, UPGRADE_CATEGORY_NAMES, UPGRADES, type UpgradeCategory } from "../../data/ship";
 import {
   acceptContract,
   buyFuel,
@@ -71,9 +71,14 @@ export function Hub({ session }: { session: GameSession }) {
     <div class="full hub">
       <header class="hub-head">
         <div class="hub-id">
-          <img class="hub-ship" src="./assets/freighter.png" alt={state.ship.name} title={state.ship.name} />
+          <img class="hub-ship" src="./assets/intrepid.png" alt="The Intrepid" title="The Intrepid" />
           <div>
-            <h1 class="hub-title">The Intrepid</h1>
+            <div class="hub-title-row">
+              <h1 class="hub-title">The Intrepid</h1>
+              <button class="btn primary hub-depart" onClick={() => session.go("starmap")} title="Open the star map and plot a course (M)">
+                Depart ▸ Star map
+              </button>
+            </div>
             <div class="muted">Five miles of hull, two million voices, and a berth with your name on the lease.</div>
             <div class="muted small">
               Your ship: <span class="accent">{state.ship.name}</span>
@@ -443,7 +448,7 @@ function Shipyard({ session }: { session: GameSession }) {
   const { state } = session;
   const stats = shipStats(state.ship);
   const r = stats.ratings;
-  const vendors = (Object.keys(CLAN_NAMES) as ClanId[]).filter((c) => UPGRADES.some((u) => u.vendor === c));
+  const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => UPGRADES.some((u) => u.category === c));
 
   return (
     <div class="hub-grid">
@@ -495,25 +500,40 @@ function Shipyard({ session }: { session: GameSession }) {
       </section>
 
       <section class="hub-upgrades">
-        {vendors.map((clan) => (
-          <div key={clan} class="hub-vendor">
-            <h3>{CLAN_NAMES[clan]}</h3>
+        {categories.map((cat) => (
+          <div key={cat} class="hub-vendor">
+            <h3>{UPGRADE_CATEGORY_NAMES[cat]}</h3>
             <div class="hub-cards">
-              {UPGRADES.filter((u) => u.vendor === clan).map((u) => {
+              {UPGRADES.filter((u) => u.category === cat).map((u) => {
                 const installed = state.ship.upgrades.includes(u.id);
                 const short = u.price - state.credits;
+                const req = u.requires ? UPGRADES.find((x) => x.id === u.requires) : undefined;
+                const missing = !!u.requires && !state.ship.upgrades.includes(u.requires);
+                const reqName = req?.name ?? u.requires ?? "";
                 return (
                   <div key={u.id} class={`panel hub-card ${installed ? "installed" : ""}`}>
                     <div class="hub-card-head">
                       <strong>{u.name}</strong>
                       {installed ? <span class="tag good">Installed</span> : <span class="accent">{cr(u.price)}</span>}
                     </div>
+                    <div class="hub-card-tags">
+                      <span class="tag" title={`Sold by the ${CLAN_NAMES[u.vendor]} clan`}>
+                        {CLAN_NAMES[u.vendor]}
+                      </span>
+                      {missing && <span class="tag accent-tag">Requires {reqName}</span>}
+                    </div>
                     <div class="muted small">{u.description}</div>
                     {!installed && (
                       <button
                         class="btn"
-                        disabled={short > 0}
-                        title={short > 0 ? `You need ${cr(short)} more.` : `Install for ${cr(u.price)}. Two days in the yard.`}
+                        disabled={short > 0 || missing}
+                        title={
+                          missing
+                            ? `Requires ${reqName} first.`
+                            : short > 0
+                              ? `You need ${cr(short)} more.`
+                              : `Install for ${cr(u.price)}. Two days in the yard.`
+                        }
                         onClick={() => session.act((s) => buyUpgrade(s, u.id))}
                       >
                         Buy
@@ -539,7 +559,8 @@ function Exchange({ session }: { session: GameSession }) {
   const next = Math.min(loan.payment, loan.balance);
   const ten = Math.min(10_000, loan.balance);
   const pay = (n: number) => session.act((s) => payLoan(s, n));
-  const chargeMinutes = state.foldReadyAt - state.time;
+  const prepaid = loan.prepaid ?? 0;
+  const covered = loan.payment > 0 ? Math.floor(prepaid / loan.payment) : 0;
 
   const why = (n: number): string =>
     !owed ? "Nothing owed." : state.credits < n ? `You need ${cr(n - state.credits)} more.` : `Pay ${cr(n)}`;
@@ -552,12 +573,22 @@ function Exchange({ session }: { session: GameSession }) {
           <dl class="kv">
             <dt>Balance</dt>
             <dd class="accent">{cr(loan.balance)}</dd>
-            <dt>Payment</dt>
+            <dt>Installment</dt>
             <dd>{cr(loan.payment)}</dd>
             <dt>Every</dt>
             <dd>{loan.intervalDays} days</dd>
             <dt>Next due</dt>
             <dd>{formatDate(loan.nextDue)}</dd>
+            <dt>Prepaid</dt>
+            <dd class={prepaid > 0 ? "good" : "muted"}>
+              {cr(prepaid)}
+              {prepaid > 0 && (
+                <span class="muted">
+                  {" "}
+                  (covers {covered >= 1 ? `${covered} upcoming installment${covered === 1 ? "" : "s"}` : "part of the next installment"})
+                </span>
+              )}
+            </dd>
             <dt>Missed payments</dt>
             <dd class={loan.missed > 0 ? "danger" : ""}>{loan.missed}</dd>
             <dt>Annual rate</dt>
@@ -568,12 +599,23 @@ function Exchange({ session }: { session: GameSession }) {
         ) : (
           <p class="good">Paid in full. The ship is yours, and the clerks look at you differently.</p>
         )}
-        <p class="muted small">
-          Payments are collected automatically when due. Miss one and the Exchange adds a late fee, and remembers.
-        </p>
+        <h3 class="hub-gap">How the note works</h3>
+        <ul class="hub-notes small muted">
+          <li>
+            Each installment is taken from your credits automatically on its due date. You never have to be aboard to pay it.
+          </li>
+          <li>
+            Pay early and the money is banked as <strong>prepaid</strong>. It also cuts the balance, and it covers upcoming
+            installments first, so your credits stay untouched until it runs out.
+          </li>
+          <li>
+            If the installment is due and your credits are short, it counts as a <strong>missed payment</strong>: the Exchange
+            adds a 10% late fee to the balance, and remembers.
+          </li>
+        </ul>
         <div class="btn-row">
           <button class="btn" disabled={!owed || state.credits < next} title={why(next)} onClick={() => pay(next)}>
-            Pay next installment {owed && <span class="muted">({cr(next)})</span>}
+            Pay an installment early {owed && <span class="muted">({cr(next)})</span>}
           </button>
           <button class="btn" disabled={!owed || state.credits < ten} title={why(ten)} onClick={() => pay(ten)}>
             Pay {cr(ten)}
@@ -588,24 +630,6 @@ function Exchange({ session }: { session: GameSession }) {
           </button>
         </div>
       </section>
-
-      <section class="panel">
-        <h2>Wait aboard the Intrepid</h2>
-        <p class="muted small">Let the days turn. Prices drift, the fold drive charges, and the note keeps counting.</p>
-        <div class="btn-row">
-          <button class="btn" onClick={() => session.act((s) => wait(s, DAY))}>
-            1 day
-          </button>
-          <button class="btn" onClick={() => session.act((s) => wait(s, 7 * DAY))}>
-            7 days
-          </button>
-          {chargeMinutes > 0 && (
-            <button class="btn" onClick={() => session.act((s) => wait(s, Math.ceil(s.foldReadyAt - s.time)))}>
-              Until the fold drive is charged ({formatDuration(chargeMinutes)})
-            </button>
-          )}
-        </div>
-      </section>
     </div>
   );
 }
@@ -617,7 +641,8 @@ function Depart({ session }: { session: GameSession }) {
   const stats = shipStats(state.ship);
   const held = cargoTonnes(state.ship.cargo);
   const fuelOk = state.ship.fuel >= stats.fuelCapacity * 0.5;
-  const foldReady = state.time >= state.foldReadyAt;
+  const chargeMinutes = state.foldReadyAt - state.time;
+  const foldReady = chargeMinutes <= 0;
 
   return (
     <div class="hub-grid">
@@ -636,13 +661,36 @@ function Depart({ session }: { session: GameSession }) {
           </li>
           <li class={foldReady ? "good" : "danger"}>
             <span class="mark">{foldReady ? "✔" : "✘"}</span>
-            {foldReady ? "Fold drive charged" : `Fold drive charging: ${formatDuration(state.foldReadyAt - state.time)}`}
+            {foldReady ? "Fold drive charged" : `Fold drive charging: ${formatDuration(chargeMinutes)}`}
           </li>
         </ul>
         <button class="btn primary big" onClick={() => session.go("starmap")}>
           Open star map
         </button>
         <p class="muted small">You can plot a course now and fold when the drive is ready.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Wait aboard the Intrepid</h2>
+        <p class="muted small">
+          Let the days turn. Prices drift, the fold drive charges, and the note keeps counting.{" "}
+          <span class={foldReady ? "good" : "accent"}>
+            {foldReady ? "The fold drive is charged." : `Fold drive ready in ${formatDuration(chargeMinutes)}.`}
+          </span>
+        </p>
+        <div class="btn-row">
+          <button class="btn" onClick={() => session.act((s) => wait(s, DAY))}>
+            1 day
+          </button>
+          <button class="btn" onClick={() => session.act((s) => wait(s, 7 * DAY))}>
+            7 days
+          </button>
+          {!foldReady && (
+            <button class="btn primary" onClick={() => session.act((s) => wait(s, Math.ceil(s.foldReadyAt - s.time)))}>
+              Until the fold drive is charged ({formatDuration(chargeMinutes)})
+            </button>
+          )}
+        </div>
       </section>
     </div>
   );

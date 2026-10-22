@@ -77,7 +77,7 @@ export class GameSession {
     setTimeout(() => {
       this.notices = this.notices.filter((n) => n.id !== id);
       this.emit();
-    }, kind === "error" ? 6000 : 3500);
+    }, Math.min(12_000, (kind === "error" ? 6000 : 3500) + text.length * 40)); // long reports stay up longer
   }
 
   save(): void {

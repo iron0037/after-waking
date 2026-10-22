@@ -16,6 +16,7 @@ import {
   type World,
 } from "../../../sim";
 import { BODY_COLOR, UI } from "../../palette";
+import { bodySprite, SPRITE_MIN_RADIUS, spriteSize } from "./planetArt";
 import { discRadius, makeProjection, moonOrbitPx, type Projection, type ViewState } from "./projection";
 import { FONT, fmtAU, rgba, shade, shortKind } from "./util";
 
@@ -97,11 +98,12 @@ export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, 
   for (const b of ordered) {
     const p = pos.get(b.id) as Vec2;
     const r = discRadius(b, proj.zoom);
-    drawBodyDisc(ctx, b, p, r, proj, state.scannedBodies.includes(b.id));
+    drawBodyDisc(ctx, b, p, r, proj, state.seed, state.scannedBodies.includes(b.id));
     const prog = scene.progress.get(b.id);
     if (prog && prog.regionsVisited > 0) drawProgressRing(ctx, p, r, prog.explored);
     if (scene.targets.has(b.id)) drawContractMark(ctx, p, r);
-    hits.push({ id: b.id, x: p.x, y: p.y, r });
+    // Moons are small and crowd their parent, so give them a generous click target.
+    hits.push({ id: b.id, x: p.x, y: p.y, r: b.parentId ? Math.max(r + 5, 13) : Math.max(r, 6) });
   }
 
   // Route, then ship, then labels and highlights on top.
@@ -227,39 +229,88 @@ function drawStar(ctx: CanvasRenderingContext2D, proj: Projection, detail: Syste
 
 // --- bodies ------------------------------------------------------------------------------
 
-function drawBodyDisc(ctx: CanvasRenderingContext2D, body: Body, p: Vec2, r: number, proj: Projection, scanned: boolean): void {
+function drawBodyDisc(
+  ctx: CanvasRenderingContext2D,
+  body: Body,
+  p: Vec2,
+  r: number,
+  proj: Projection,
+  seed: number,
+  scanned: boolean,
+): void {
   const base = BODY_COLOR[body.kind];
-  // Light from the star: highlight on the side facing the center.
+  // Light from the star: toward the center of the orrery.
   const dx = proj.cx - p.x;
   const dy = proj.cy - p.y;
   const len = Math.hypot(dx, dy) || 1;
-  const lx = p.x + (dx / len) * r * 0.45;
-  const ly = p.y + (dy / len) * r * 0.45;
-  const g = ctx.createRadialGradient(lx, ly, r * 0.08, p.x, p.y, r * 1.1);
-  g.addColorStop(0, shade(base, 0.5));
-  g.addColorStop(0.5, base);
-  g.addColorStop(1, shade(base, -0.65));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-  ctx.fill();
+  const ux = dx / len;
+  const uy = dy / len;
 
-  if (body.kind === "gasGiant" || body.kind === "iceGiant") {
-    ctx.save();
+  if (r >= SPRITE_MIN_RADIUS) {
+    drawSphere(ctx, body, p, r, ux, uy, seed);
+  } else {
+    const g = ctx.createRadialGradient(p.x + ux * r * 0.45, p.y + uy * r * 0.45, r * 0.08, p.x, p.y, r * 1.1);
+    g.addColorStop(0, shade(base, 0.5));
+    g.addColorStop(0.5, base);
+    g.addColorStop(1, shade(base, -0.65));
+    ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-    ctx.clip();
-    for (let i = -2; i <= 2; i++) {
-      ctx.fillStyle = i % 2 === 0 ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.09)";
-      ctx.fillRect(p.x - r, p.y + i * r * 0.36 - r * 0.09, r * 2, r * 0.2);
+    ctx.fill();
+
+    if (body.kind === "gasGiant" || body.kind === "iceGiant") {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.clip();
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillStyle = i % 2 === 0 ? "rgba(0,0,0,0.14)" : "rgba(255,255,255,0.09)";
+        ctx.fillRect(p.x - r, p.y + i * r * 0.36 - r * 0.09, r * 2, r * 0.2);
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
   if (scanned) {
     ctx.fillStyle = UI.cyan;
     ctx.beginPath();
     ctx.arc(p.x + r * 0.78, p.y - r * 0.78, 1.8, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+/** A textured globe (cached sprite) with the star-facing terminator laid over it. */
+function drawSphere(ctx: CanvasRenderingContext2D, body: Body, p: Vec2, r: number, ux: number, uy: number, seed: number): void {
+  const sprite = bodySprite(seed, body, spriteSize(r));
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(sprite, p.x - r, p.y - r, r * 2, r * 2);
+
+  // Day side fades smoothly into night; a hint of limb darkening comes with the same gradient.
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.clip();
+  const cx = p.x + ux * r * 0.4;
+  const cy = p.y + uy * r * 0.4;
+  const shadow = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.7);
+  shadow.addColorStop(0, "rgba(3,5,12,0)");
+  shadow.addColorStop(0.5, "rgba(3,5,12,0.35)");
+  shadow.addColorStop(0.8, "rgba(3,5,12,0.82)");
+  shadow.addColorStop(1, "rgba(3,5,12,0.92)");
+  ctx.fillStyle = shadow;
+  ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+  ctx.restore();
+
+  // Thin atmosphere on the lit limb.
+  if (body.pressureAtm > 0.05 || body.kind === "gasGiant" || body.kind === "iceGiant") {
+    ctx.save();
+    ctx.lineWidth = Math.max(1, r * 0.04);
+    ctx.strokeStyle = rgba(shade(BODY_COLOR[body.kind], 0.45), 0.35);
+    ctx.beginPath();
+    const a = Math.atan2(uy, ux);
+    ctx.arc(p.x, p.y, r - ctx.lineWidth / 2, a - 1.0, a + 1.0);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -310,8 +361,10 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string
   ctx.lineJoin = "round";
   for (const b of detail.bodies) {
     const focus = b.id === scene.selectedId || b.id === scene.hoverId || b.id === orbitingId;
-    const quiet = b.parentId !== null || b.kind === "asteroid";
-    if (quiet && !focus && proj.zoom < 1.8) continue;
+    // Moons announce themselves once you zoom in, or whenever their parent is in focus.
+    const parentFocus = b.parentId !== null && (b.parentId === scene.selectedId || b.parentId === scene.hoverId || b.parentId === orbitingId);
+    const quiet = b.kind === "asteroid" || (b.parentId !== null && !parentFocus);
+    if (quiet && !focus && proj.zoom < 1.6) continue;
     const p = pos.get(b.id) as Vec2;
     const r = discRadius(b, proj.zoom);
     const flip = p.x + r + 8 + b.name.length * 6.6 > w - 6;

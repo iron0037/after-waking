@@ -34,19 +34,19 @@ export interface RoutePlan {
   back: number | null;
 }
 
-export function evaluate(map: RegionMap, path: PathStep[], start: Vec2, canClimb: boolean): RoutePlan {
+export function evaluate(map: RegionMap, path: PathStep[], start: Vec2, home: Vec2, canClimb: boolean): RoutePlan {
   const end = path.length > 0 ? (path[path.length - 1] as Vec2) : start;
   return {
     path,
     minutes: path.reduce((s, p) => s + p.minutes, 0),
     energy: path.reduce((s, p) => s + p.energy, 0),
-    back: energyHome(map, end, canClimb),
+    back: energyHome(map, end, home, canClimb),
   };
 }
 
 /** Energy to drive from `from` to the ship, or null if there is no route. */
-export function energyHome(map: RegionMap, from: Vec2, canClimb: boolean): number | null {
-  const path = findPath(map, from, map.landing, canClimb);
+export function energyHome(map: RegionMap, from: Vec2, home: Vec2, canClimb: boolean): number | null {
+  const path = findPath(map, from, home, canClimb);
   return path ? path.reduce((s, p) => s + p.energy, 0) : null;
 }
 

@@ -564,3 +564,56 @@ table.data th.num {
 .comp-where {
   font-size: 11px;
 }
+
+/* --- contracts overlay ------------------------------------------------------------------ */
+
+.contracts {
+  width: min(920px, 94vw);
+  height: min(720px, 88vh);
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.con-body {
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.con-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 10px;
+}
+.con-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.con-card.active {
+  border-color: var(--accent);
+}
+.con-targets {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.con-targets li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.con-targets li.done strong {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted);
+}

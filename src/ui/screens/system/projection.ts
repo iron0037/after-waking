@@ -13,21 +13,66 @@ export interface ViewState {
 
 export const HOME_VIEW: ViewState = { zoom: 1, panX: 0, panY: 0 };
 export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 16;
+export const MAX_ZOOM = 64;
 
 /** Knee of the log scale, in AU. Smaller packs the inner system tighter. */
 const A0 = 0.15;
 /** Fraction of the half-viewport the fold-limit circle fills at zoom 1. */
 const FILL = 0.84;
 
+/**
+ * How much the world around a body grows with zoom: discs, moon orbits and moon discs all share
+ * it, so zooming in magnifies a planet and pushes its moons out together. Capped so a gas giant
+ * stays inside the viewport at full zoom.
+ */
+export function bodyScale(zoom: number): number {
+  return Math.min(12, Math.pow(zoom, 0.6));
+}
+
+/** Smallest a moon is ever drawn (px radius at zoom 1): small enough to be a moon, big enough to click. */
+const MOON_MIN_R = 3.6;
+
+/** Radius in px before zoom scaling. */
+function baseRadius(body: Body): number {
+  const r = 2 + 3 * Math.sqrt(body.radiusEarth);
+  return body.parentId ? Math.max(MOON_MIN_R, r) : r;
+}
+
 /** On-screen disc radius in px: compressed so a gas giant is big, an asteroid still visible. */
 export function discRadius(body: Body, zoom: number): number {
-  return (2 + 3 * Math.sqrt(body.radiusEarth)) * Math.min(2.2, Math.pow(zoom, 0.3));
+  const scale = bodyScale(zoom);
+  // Moons grow a little more slowly than planets so they never swallow their parent.
+  return baseRadius(body) * (body.parentId ? Math.pow(scale, 0.8) : scale);
 }
 
 /** Distance in px from a parent to its index-th moon. */
 export function moonOrbitPx(parent: Body, index: number, zoom: number): number {
-  return discRadius(parent, zoom) + 11 + index * 7;
+  return discRadius(parent, zoom) + (11 + index * 7) * bodyScale(zoom);
+}
+
+/**
+ * A view with `body` dead center at `zoom`. The planet's screen offset from the star is linear in
+ * zoom, so evaluating at pan 0 and negating gives the pan directly.
+ */
+export function focusView(w: number, h: number, detail: SystemDetail, body: Body, t: number, zoom: number): ViewState {
+  const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+  const p = makeProjection(w, h, { zoom: z, panX: 0, panY: 0 }, detail).bodyPos(body, t);
+  const limit = (Math.min(w, h) / 2) * z;
+  const clampPan = (v: number) => Math.max(-limit, Math.min(limit, v));
+  return { zoom: z, panX: clampPan(w / 2 - p.x), panY: clampPan(h / 2 - p.y) };
+}
+
+/** The zoom at which `body` fills about `targetPx` of radius, leaving room for all of its family's moons. */
+export function zoomForBody(w: number, h: number, detail: SystemDetail, body: Body): number {
+  const root = body.parentId ? findBody(detail, body.parentId) : body;
+  const half = Math.min(w, h) / 2;
+  let scale = Math.min(12, 70 / baseRadius(body));
+  if (root.moonIds.length > 0) {
+    // Outermost moon orbit (parent radius + gap) must fit inside ~80% of the half-viewport.
+    const reach = baseRadius(root) + 11 + (root.moonIds.length - 1) * 7;
+    scale = Math.min(scale, (half * 0.8) / reach);
+  }
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.pow(Math.max(1, scale), 1 / 0.6)));
 }
 
 export interface Projection {

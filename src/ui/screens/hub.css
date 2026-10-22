@@ -216,3 +216,40 @@
   width: 20px;
   font-weight: bold;
 }
+
+/* header: Intrepid sprite + depart button */
+.hub-ship {
+  /* 307x41 side view: ~1x keeps it long and crisp */
+  width: 230px;
+  height: auto;
+}
+.hub-title-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.hub-title-row .hub-title {
+  margin: 0;
+}
+.hub-depart {
+  font-size: 15px;
+  padding: 8px 18px;
+  font-weight: bold;
+}
+.hub-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hub-notes {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hub-notes strong {
+  color: var(--text);
+}
