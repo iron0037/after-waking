@@ -685,6 +685,23 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   return ok({ unloaded, jettisoned });
 }
 
+/** Plug the rover into the ship's reactor without stowing it: tops up the cells, takes time. */
+export function rechargeRover(state: GameState, world: World): Result<{ hours: number }> {
+  const ctx = surfaceCtx(state, world);
+  if (!ctx.ok) return ctx;
+  const { map, rover } = ctx.value;
+  const home = shipTile(state, map);
+  if (Math.max(Math.abs(rover.x - home.x), Math.abs(rover.y - home.y)) > 1) {
+    return fail("Drive the rover back to the ship to recharge.");
+  }
+  const full = shipStats(state.ship).roverEnergy;
+  if (rover.energy >= full - 0.5) return fail("The rover's cells are already full.");
+  const hours = (full - rover.energy) / ROVER_CHARGE_PER_HOUR;
+  advanceTime(state, hours * HOUR);
+  rover.energy = full;
+  return ok({ hours });
+}
+
 /** Rescue a rover that can't make it home: the ship hops over and picks it up. */
 export function recallRover(state: GameState, world: World): Result {
   const ctx = surfaceCtx(state, world);

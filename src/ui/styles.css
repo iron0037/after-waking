@@ -617,3 +617,62 @@ table.data th.num {
   text-decoration: line-through;
   text-decoration-color: var(--muted);
 }
+
+/* --- time-lapse clock (long actions) ---------------------------------------------------- */
+
+.timelapse {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 26px;
+  background: #0a0e1aee;
+  border: 1px solid var(--border-bright);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px #000a;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+.timelapse.done {
+  opacity: 0;
+}
+.timelapse-face {
+  width: 120px;
+  height: 120px;
+}
+.tl-rim {
+  fill: #0f1729;
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+.tl-tick {
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+.tl-hour {
+  stroke: var(--text);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.tl-minute {
+  stroke: var(--cyan);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.tl-hub {
+  fill: var(--accent);
+}
+.tl-date {
+  font-size: 16px;
+  color: var(--text);
+}
+.tl-span {
+  margin-top: 4px;
+  font-size: 22px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}

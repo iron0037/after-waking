@@ -402,6 +402,8 @@ export function drawHoverTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Ve
 }
 
 let roverImg: HTMLImageElement | null = null;
+let roverTopImg: HTMLImageElement | null = null;
+let roverTopFailed = false;
 
 /** The rover sprite once it has loaded; null until then (callers fall back to a plain marker). */
 function roverSprite(): HTMLImageElement | null {
@@ -412,16 +414,61 @@ function roverSprite(): HTMLImageElement | null {
   return roverImg && roverImg.complete && roverImg.naturalWidth > 0 ? roverImg : null;
 }
 
-/**
- * The rover at a (possibly fractional) tile position. `shift` nudges it off the ship's pad;
- * `facing` is +1 or -1 and mirrors the sprite to the direction of travel.
- */
-export function drawRover(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, timeMs: number, shift: boolean, facing = 1): void {
+/** The optional top-down rover sprite (nose pointing up); null if it is missing, broken or still loading. */
+function roverTopSprite(): HTMLImageElement | null {
+  if (roverTopFailed) return null;
+  if (!roverTopImg && typeof Image !== "undefined") {
+    const img = new Image();
+    img.onerror = () => {
+      roverTopFailed = true;
+    };
+    img.src = "./assets/rover-top.png";
+    roverTopImg = img;
+  }
+  return roverTopImg && roverTopImg.complete && roverTopImg.naturalWidth > 0 ? roverTopImg : null;
+}
+
+/** Where the rover is drawn: `shift` nudges it off the ship's pad. */
+function roverPoint(L: Layout, at: Vec2, shift: boolean): { x: number; y: number } {
   const off = shift ? L.ts * 0.26 : 0;
-  const x = cx(L, at.x) + off;
-  const y = cy(L, at.y) + off;
+  return { x: cx(L, at.x) + off, y: cy(L, at.y) + off };
+}
+
+/**
+ * The rover at a (possibly fractional) tile position. `shift` nudges it off the ship's pad.
+ * With the top-down sprite, `heading` (degrees, 0 = north, clockwise) rotates it; otherwise
+ * `facing` is +1 or -1 and mirrors the side-view sprite to the direction of travel.
+ */
+export function drawRover(
+  ctx: CanvasRenderingContext2D,
+  L: Layout,
+  at: Vec2,
+  timeMs: number,
+  shift: boolean,
+  facing = 1,
+  heading = 0,
+): void {
+  const { x, y } = roverPoint(L, at, shift);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 350);
   ctx.setLineDash([]);
+  const top = roverTopSprite();
+  if (top) {
+    const h = L.ts * 1.7;
+    const w = h * (top.naturalWidth / top.naturalHeight);
+    ctx.fillStyle = `rgba(95, 212, 255, ${0.1 + pulse * 0.1})`;
+    ctx.beginPath();
+    ctx.arc(x, y, h * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((heading * Math.PI) / 180);
+    ctx.drawImage(top, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    ctx.imageSmoothingEnabled = prev;
+    return;
+  }
   const sprite = roverSprite();
   if (sprite) {
     const w = L.ts * 2;
@@ -451,6 +498,90 @@ export function drawRover(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, ti
   ctx.fillRect(x - r, y - r * 0.75, r * 2, r * 1.5);
   ctx.fillStyle = UI.cyan;
   ctx.fillRect(x - r * 0.55, y - r * 0.4, r * 1.1, r * 0.8);
+}
+
+/** What a hovered route would do to the rover's cells. */
+export interface EnergyPreview {
+  /** Energy the move would use. */
+  cost: number;
+  /** Energy needed to drive home from the route's end; null if there is no way home. */
+  back: number | null;
+}
+
+function energyColor(frac: number): string {
+  return frac > 0.5 ? UI.good : frac > 0.25 ? UI.accent : UI.danger;
+}
+
+/**
+ * A small energy gauge under the rover: green → amber → red as it drops. With a `preview`, the energy a
+ * move would burn is a striped segment at the end of the fill, and a tick marks the reserve needed to get
+ * home afterwards. The gauge is outlined red when the trip can't be afforded.
+ */
+export function drawEnergyBar(
+  ctx: CanvasRenderingContext2D,
+  L: Layout,
+  at: Vec2,
+  shift: boolean,
+  energy: number,
+  max: number,
+  preview: EnergyPreview | null,
+): void {
+  if (max <= 0) return;
+  const { x, y } = roverPoint(L, at, shift);
+  const bw = Math.round(Math.min(64, Math.max(26, L.ts * 1.6)));
+  const bh = L.ts >= 14 ? 6 : 5;
+  const bx = Math.round(x - bw / 2);
+  const by = Math.round(y + L.ts * 0.58);
+  const frac = Math.max(0, Math.min(1, energy / max));
+  const fillW = Math.round(bw * frac);
+  const cost = preview ? Math.max(0, preview.cost) : 0;
+  const afterFrac = Math.max(0, Math.min(1, (energy - cost) / max));
+  const keepW = preview ? Math.round(bw * afterFrac) : fillW;
+  const short = preview !== null && cost > energy;
+  const strands = preview !== null && (preview.back === null || cost + preview.back > energy);
+
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(5, 7, 15, 0.88)";
+  ctx.fillRect(bx - 1.5, by - 1.5, bw + 3, bh + 3);
+  // remaining fill
+  ctx.fillStyle = energyColor(preview ? afterFrac : frac);
+  ctx.fillRect(bx, by, keepW, bh);
+  if (preview && fillW > keepW) {
+    // the segment the move would burn: striped
+    const sx = bx + keepW;
+    const sw = fillW - keepW;
+    const col = short || strands ? UI.danger : "#e8fbff";
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(sx, by, sw, bh);
+    ctx.clip();
+    ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.fillRect(sx, by, sw, bh);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = -bh; i < sw + bh; i += 4) {
+      ctx.moveTo(sx + i, by + bh);
+      ctx.lineTo(sx + i + bh, by);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (preview && preview.back !== null) {
+    // reserve marker: the energy the trip home needs
+    const mx = Math.round(bx + bw * Math.min(1, preview.back / max)) + 0.5;
+    ctx.strokeStyle = strands ? UI.danger : UI.text;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(mx, by - 3);
+    ctx.lineTo(mx, by + bh + 3);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = short || strands ? UI.danger : "rgba(215, 227, 244, 0.55)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bx - 0.5, by - 0.5, bw + 1, bh + 1);
+  ctx.restore();
 }
 
 export interface TipLine {

@@ -268,3 +268,18 @@
   border: 1px dashed var(--border-bright);
   border-radius: 4px;
 }
+
+/* drag-to-pan: grab on idle, grabbing while a drag is in progress */
+.sys-viewport .map-canvas {
+  cursor: grab;
+}
+.sys-viewport .map-canvas.sys-pointer {
+  cursor: pointer;
+}
+.sys-viewport.dragging .map-canvas {
+  cursor: grabbing;
+}
+.sys-viewport .viewport-tools,
+.sys-viewport .viewport-hint {
+  user-select: none;
+}

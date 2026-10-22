@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
 import { Journal } from "./Journal";
+import { TimeLapseClock } from "./TimeLapseClock";
 import { TitleScreen } from "./TitleScreen";
 import { TopBar } from "./TopBar";
 import { defaultView, GameSession, useSession } from "./session";
@@ -61,6 +62,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {journalOpen && <Journal session={session} onClose={() => setJournalOpen(false)} />}
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
+      {session.timelapse && <TimeLapseClock lapse={session.timelapse} />}
       <div class="notices">
         {session.notices.map((n) => (
           <div key={n.id} class={`notice notice-${n.kind}`}>

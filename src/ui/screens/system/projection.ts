@@ -137,3 +137,52 @@ export function zoomAt(view: ViewState, w: number, h: number, mx: number, my: nu
     panY: clampPan(dy - (dy - view.panY) * ratio),
   };
 }
+
+/**
+ * Pan is a screen offset from the star, but bodies orbit: after any time passes (a 12-hour survey,
+ * a scan, a wait) a zoomed view's pan points at empty space. A ViewAnchor ties the view to a body:
+ * `view` was set at game time `t`, and the camera since then rides along with the body's motion.
+ * `follow` anchors (Zoom to body) track the body continuously, even through a flight animation;
+ * other anchors only absorb time that passes outside flights (the caller rebases them after one).
+ */
+export interface ViewAnchor {
+  bodyId: string;
+  t: number;
+  follow: boolean;
+}
+
+/** The view to draw at game time `t`: `view` carried along with its anchor body's motion since `anchor.t`. */
+export function resolveView(w: number, h: number, detail: SystemDetail, view: ViewState, anchor: ViewAnchor | null, t: number): ViewState {
+  if (!anchor || t === anchor.t) return view;
+  const body = detail.bodies.find((b) => b.id === anchor.bodyId);
+  if (!body) return view;
+  // At pan 0 the body's screen position is linear in zoom, so the difference is its drift since anchor.t.
+  const p0 = makeProjection(w, h, { zoom: view.zoom, panX: 0, panY: 0 }, detail);
+  const now = p0.bodyPos(body, t);
+  const then = p0.bodyPos(body, anchor.t);
+  return { zoom: view.zoom, panX: view.panX - (now.x - then.x), panY: view.panY - (now.y - then.y) };
+}
+
+/** The body drawn nearest the viewport center, if one is reasonably close; the natural thing to hold the view to. */
+export function nearestBodyId(w: number, h: number, detail: SystemDetail, view: ViewState, t: number): string | null {
+  const proj = makeProjection(w, h, view, detail);
+  let best: string | null = null;
+  let bestD = Math.min(w, h) * 0.5;
+  for (const b of detail.bodies) {
+    const p = proj.bodyPos(b, t);
+    const d = Math.hypot(p.x - w / 2, p.y - h / 2);
+    if (d < bestD) [best, bestD] = [b.id, d];
+  }
+  return best;
+}
+
+export function isHomeView(view: ViewState): boolean {
+  return view.zoom <= MIN_ZOOM && view.panX === 0 && view.panY === 0;
+}
+
+/** Shift the view by a screen-space drag, keeping it within the same bounds zoomAt uses. */
+export function panView(view: ViewState, w: number, h: number, dx: number, dy: number): ViewState {
+  const limit = (Math.min(w, h) / 2) * view.zoom;
+  const clampPan = (v: number) => Math.max(-limit, Math.min(limit, v));
+  return { zoom: view.zoom, panX: clampPan(view.panX + dx), panY: clampPan(view.panY + dy) };
+}

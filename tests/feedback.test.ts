@@ -15,6 +15,7 @@ import {
   moveRoverTo,
   newGame,
   payLoan,
+  rechargeRover,
   relocateShip,
   shipStats,
   shipTile,
@@ -141,5 +142,21 @@ describe("work this deposit (SCRUM-32)", () => {
     expect(workDeposit(state, world, deep.id).ok).toBe(false);
     void moveRoverTo;
     void stowRover;
+  });
+});
+
+describe("recharge at the ship (playtest 2026-10-22)", () => {
+  it("tops up the rover beside the ship without stowing it", () => {
+    const { state, world } = landOnEasyWorld(42);
+    expect(deployRover(state, world).ok).toBe(true);
+    const loc = state.location;
+    if (loc.kind !== "surface" || !loc.rover) throw new Error("rover not out");
+    loc.rover.energy = 40;
+    const t0 = state.time;
+    const r = rechargeRover(state, world);
+    expect(r.ok).toBe(true);
+    expect(loc.rover.energy).toBe(shipStats(state.ship).roverEnergy);
+    expect(state.time).toBeGreaterThan(t0);
+    expect(rechargeRover(state, world).ok).toBe(false); // already full
   });
 });

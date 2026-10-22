@@ -12,6 +12,22 @@ export const SAVE_KEY = "after-waking/save";
 /** UI-only navigation; not saved. Which views are valid depends on state.location. */
 export type View = "hub" | "starmap" | "system" | "surface";
 
+/** A long action is playing back as a time-lapse clock. */
+export interface TimeLapse {
+  from: number;
+  to: number;
+  startMs: number;
+  durMs: number;
+}
+
+/** Actions that pass at least this many game minutes play a time-lapse (unless opted out). */
+const TIMELAPSE_MIN_MINUTES = 4 * 60;
+
+export interface ActOptions {
+  /** Skip the time-lapse clock, for actions the screen already animates (flights, rover drives). */
+  timelapse?: boolean;
+}
+
 export interface Notice {
   id: number;
   text: string;
@@ -21,6 +37,7 @@ export interface Notice {
 export class GameSession {
   view: View;
   notices: Notice[] = [];
+  timelapse: TimeLapse | null = null;
   /** Set while an animation (flight, rover drive) is playing; input should be ignored. */
   busy = false;
   private listeners = new Set<() => void>();
@@ -49,14 +66,31 @@ export class GameSession {
   }
 
   /** Run a sim action. Failures become an on-screen notice. Always re-renders and autosaves. */
-  act<T>(fn: (state: GameState, world: World) => Result<T>): Result<T> {
+  act<T>(fn: (state: GameState, world: World) => Result<T>, options: ActOptions = {}): Result<T> {
+    const before = this.state.time;
     const result = fn(this.state, this.world);
+    const passed = this.state.time - before;
+    if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
     if (!result.ok) this.notify(result.reason, "error");
     const valid = validViews(this.state);
     if (!valid.includes(this.view)) this.view = defaultView(this.state);
     this.save();
     this.emit();
     return result;
+  }
+
+  /** Show the clock sweeping from `from` to `to`: longer stretches play a little longer (1–3.5 s). */
+  playTimelapse(from: number, to: number): void {
+    const hours = (to - from) / 60;
+    const durMs = Math.min(3500, Math.max(1200, 900 + Math.log2(hours) * 420));
+    const lapse: TimeLapse = { from, to, startMs: performance.now(), durMs };
+    this.timelapse = lapse;
+    setTimeout(() => {
+      if (this.timelapse === lapse) {
+        this.timelapse = null;
+        this.emit();
+      }
+    }, durMs + 700);
   }
 
   go(view: View): void {

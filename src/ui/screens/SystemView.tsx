@@ -30,10 +30,29 @@ import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
 import { BodyList } from "./system/BodyList";
-import { focusView, HOME_VIEW, zoomAt, zoomForBody, type ViewState } from "./system/projection";
+import {
+  focusView,
+  HOME_VIEW,
+  isHomeView,
+  nearestBodyId,
+  panView,
+  resolveView,
+  zoomAt,
+  zoomForBody,
+  type ViewAnchor,
+  type ViewState,
+} from "./system/projection";
 import { RegionPicker, bestRegion } from "./system/RegionPicker";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
+
+/** The camera: a view plus the body it rides along with as game time passes (see ViewAnchor). */
+interface Camera {
+  view: ViewState;
+  anchor: ViewAnchor | null;
+}
+
+const HOME_CAMERA: Camera = { view: HOME_VIEW, anchor: null };
 
 interface Flight {
   route: Route;
@@ -46,7 +65,7 @@ export function SystemView({ session }: { session: GameSession }) {
   useSession(session);
   const loc = session.state.location;
   if (loc.kind !== "space") return <div class="full panel">Not in a star system.</div>;
-  return <SystemScreen session={session} systemId={loc.systemId} />;
+  return <SystemScreen key={loc.systemId} session={session} systemId={loc.systemId} />;
 }
 
 function SystemScreen({ session, systemId }: { session: GameSession; systemId: string }) {
@@ -60,7 +79,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const [selectedId, setSelectedId] = useState<string | null>(orbitingId);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [hoverEdge, setHoverEdge] = useState(false);
-  const [view, setView] = useState<ViewState>(HOME_VIEW);
+  const [camera, setCameraState] = useState<Camera>(HOME_CAMERA);
   const [flying, setFlying] = useState(false);
   const [regionPick, setRegionPick] = useState<{ bodyId: string; region: number } | null>(null);
 
@@ -69,6 +88,12 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const sizeRef = useRef({ w: 800, h: 600 });
   const hitsRef = useRef<HitTarget[]>([]);
   const headingRef = useRef(-Math.PI / 2);
+  const cameraRef = useRef<Camera>(HOME_CAMERA);
+  /** Game time as last drawn (animated during a flight), for camera math between frames. */
+  const drawTimeRef = useRef(state.time);
+  const dragRef = useRef<{ sx: number; sy: number; lx: number; ly: number; moved: boolean } | null>(null);
+  const stopDragRef = useRef<(() => void) | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   const busy = session.busy || flying;
   const shipReal = shipPosition(state, world) as Vec2;
@@ -102,7 +127,11 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     window.clearTimeout(timerRef.current);
     flightRef.current = null;
     setFlying(false);
-    session.act((s, w) => flyTo(s, w, f.route.target));
+    session.act((s, w) => flyTo(s, w, f.route.target), { timelapse: false }); // the flight itself was animated
+    // The view keeps its zoom and pan through a burn: rebase a plain anchor onto the arrival time so
+    // the bodies' flight-long drift isn't applied as a jump. A followed body is already continuous.
+    const cam = cameraRef.current;
+    if (cam.anchor && !cam.anchor.follow) setCamera({ view: cam.view, anchor: { ...cam.anchor, t: session.state.time } });
     session.setBusy(false);
   };
 
@@ -142,6 +171,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   // Leaving mid-burn cancels it; the sim was never advanced, so nothing is lost.
   useEffect(
     () => () => {
+      stopDragRef.current?.();
       if (flightRef.current) {
         window.clearTimeout(timerRef.current);
         flightRef.current = null;
@@ -170,13 +200,74 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     if (!busy) setSelectedId(id);
   };
 
+  const setCamera = (c: Camera) => {
+    cameraRef.current = c;
+    setCameraState(c);
+  };
+
+  /** The time the camera's anchor is measured against right now. */
+  const cameraTime = (anchor: ViewAnchor | null) => (anchor?.follow ? drawTimeRef.current : session.state.time);
+
+  /** The view as it is on screen right now, with the anchor's drift applied. */
+  const currentView = (): ViewState => {
+    const { anchor, view } = cameraRef.current;
+    return resolveView(sizeRef.current.w, sizeRef.current.h, detail, view, anchor, cameraTime(anchor));
+  };
+
+  /** Adopt `next` (derived from currentView) as the new view, anchored to what's under the center. */
+  const commitView = (next: ViewState) => {
+    const { w, h } = sizeRef.current;
+    const prev = cameraRef.current.anchor;
+    if (isHomeView(next)) return setCamera(HOME_CAMERA);
+    if (prev?.follow) return setCamera({ view: next, anchor: { bodyId: prev.bodyId, t: drawTimeRef.current, follow: true } });
+    const t = session.state.time;
+    const id = nearestBodyId(w, h, detail, next, t);
+    setCamera({ view: next, anchor: id ? { bodyId: id, t, follow: false } : null });
+  };
+
   const zoomBy = (factor: number, x = sizeRef.current.w / 2, y = sizeRef.current.h / 2) =>
-    setView((v) => zoomAt(v, sizeRef.current.w, sizeRef.current.h, x, y, factor));
+    commitView(zoomAt(currentView(), sizeRef.current.w, sizeRef.current.h, x, y, factor));
 
   const zoomToSelected = () => {
     if (!selected) return;
     const { w, h } = sizeRef.current;
-    setView(focusView(w, h, detail, selected, state.time, zoomForBody(w, h, detail, selected)));
+    const t = drawTimeRef.current;
+    setCamera({
+      view: focusView(w, h, detail, selected, t, zoomForBody(w, h, detail, selected)),
+      anchor: { bodyId: selected.id, t, follow: true },
+    });
+  };
+
+  // Left or middle button drag pans; a press that barely moves is still a click and selects.
+  const onMouseDown = (ev: MouseEvent) => {
+    if ((ev.button !== 0 && ev.button !== 1) || !(ev.target instanceof HTMLCanvasElement)) return;
+    if (ev.button === 1) ev.preventDefault(); // no browser autoscroll
+    const d = { sx: ev.clientX, sy: ev.clientY, lx: ev.clientX, ly: ev.clientY, moved: false };
+    dragRef.current = d;
+    const move = (e: MouseEvent) => {
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
+      if (!d.moved) wrapRef.current?.classList.add("dragging");
+      d.moved = true;
+      commitView(panView(currentView(), sizeRef.current.w, sizeRef.current.h, e.clientX - d.lx, e.clientY - d.ly));
+      d.lx = e.clientX;
+      d.ly = e.clientY;
+    };
+    const stop = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      wrapRef.current?.classList.remove("dragging");
+      stopDragRef.current = null;
+    };
+    const up = () => {
+      stop();
+      // the click event fires right after mouseup; let it see `moved` before clearing
+      setTimeout(() => {
+        if (dragRef.current === d) dragRef.current = null;
+      }, 0);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    stopDragRef.current = stop;
   };
 
   // --- drawing ---------------------------------------------------------------------------
@@ -208,11 +299,12 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       flight = { progress: eased, raw, rate: ((plan.minutes * 60) / (f.durMs / 1000)) * 6 * raw * (1 - raw), label: f.label };
       route = f.route;
     }
+    drawTimeRef.current = time;
     const result = drawOrrery(ctx, w, h, {
       state,
       world,
       detail,
-      view,
+      view: resolveView(w, h, detail, camera.view, camera.anchor, camera.anchor?.follow ? time : state.time),
       time,
       timeMs,
       selectedId: selected?.id ?? null,
@@ -237,13 +329,17 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
   return (
     <>
-      <div class="viewport sys-viewport">
+      <div class="viewport sys-viewport" ref={wrapRef} onMouseDown={onMouseDown}>
         <Canvas
           draw={draw}
           animate={flying}
           class={hoverId && !busy ? "sys-pointer" : ""}
-          onClick={(x, y) => select(pick(x, y))}
+          onClick={(x, y) => {
+            if (dragRef.current?.moved) return;
+            select(pick(x, y));
+          }}
           onMove={(x, y) => {
+            if (dragRef.current?.moved) return;
             const id = busy ? null : pick(x, y);
             if (id !== hoverId) setHoverId(id);
           }}
@@ -265,7 +361,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           >
             Zoom to body
           </button>
-          <button class="btn" onClick={() => setView(HOME_VIEW)} disabled={view.zoom === 1} title="Reset view">
+          <button class="btn" onClick={() => setCamera(HOME_CAMERA)} disabled={isHomeView(camera.view)} title="Reset view (zoom and pan)">
             Reset view
           </button>
         </div>
@@ -275,7 +371,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           </button>
         )}
         <div class="viewport-hint">
-          Click a world to select · scroll to zoom · radial scale is logarithmic, moon orbits are exaggerated
+          Drag to pan · scroll to zoom · click to select · radial scale is logarithmic, moon orbits are exaggerated
         </div>
       </div>
 
