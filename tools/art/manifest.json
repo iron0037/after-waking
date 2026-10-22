@@ -51,6 +51,12 @@
       "cutout": false,
       "moss_prompt": "Pixel art title screen illustration, wide cinematic composition. Deep space with a purple and teal nebula and scattered stars. Across the middle distance floats a colossal generation starship seen from the side: an immensely long, slender machine hull of weathered white and gray segmented plating, tapering to a point at each end, with a bow split horizontally like a slightly open jaw, a long row of tiny amber window lights, small hangar pods on its belly, and a cluster of engine bells at the blunt stern. It is purely a spacecraft: smooth plating, no fins, no tail, no flippers. In the lower right foreground, a tiny boxy cargo freighter with orange stripes flies away from the viewer toward the stars, very small compared with the giant ship, trailing a soft blue engine glow. Limited palette, crisp pixel edges, no text.",
       "moss_negative": "whale, animal, fish, tail fin, flippers, organic creature"
+    },
+    {
+      "id": "rover-top",
+      "prompt": "top-down view looking straight down at a six-wheeled planetary mining rover, rust orange and weathered gray armored body, drill arm extending forward at the top, sensor mast, symmetrical, front of the rover pointing toward the top of the image, isolated on plain gray background",
+      "seed": 7700,
+      "colors": 20
     }
   ]
 }
