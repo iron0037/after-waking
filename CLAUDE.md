@@ -22,7 +22,7 @@ Node is at `C:\Program Files\nodejs`. In Git Bash, prefix commands with `export 
 - `docs/`: design docs. Settled decisions are marked **[DECIDED]**; read them before design work.
 
 ## Issue tracking (Jira)
-- Site: https://afterwaking.atlassian.net (cloudId `8f6f89c0-15e1-4b75-bd28-2a35fe229b8e`), project "The Waking Team". The key is being renamed SCRUM → AW; old keys redirect.
+- Site: https://afterwaking.atlassian.net (cloudId `8f6f89c0-15e1-4b75-bd28-2a35fe229b8e`), project "The Waking Team", key **AW** (formerly SCRUM; old keys redirect).
 - Epics: M2 Crew & Research, M3 Combat, M4 Clans & Outposts, M5 Story & Endings, M6 Aliens, Art & Audio, UX & Polish, Balance & Economy, Tech & Tooling.
 - Every bug gets an issue (type Bug), even when it's fixed in the same session; it's the audit trail.
 - Commit messages cite the issue key. After a fix: comment with the commit hash, then move the issue to Done.
