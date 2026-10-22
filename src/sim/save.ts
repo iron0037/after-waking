@@ -1,4 +1,5 @@
 /** Save files are the GameState as JSON. The universe regenerates from the seed. */
+import { ensureCrew } from "./crew";
 import { SAVE_VERSION, type GameState } from "./state";
 
 export function serialize(state: GameState): string {
@@ -21,5 +22,6 @@ export function deserialize(json: string): GameState {
   data.catalogedSpecies ??= [];
   data.compendium ??= {};
   data.loan.prepaid ??= 0;
+  ensureCrew(data);
   return data;
 }

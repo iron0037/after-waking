@@ -7,12 +7,14 @@ export function TopBar({
   onJournal,
   onCompendium,
   onContracts,
+  onCrew,
   onQuit,
 }: {
   session: GameSession;
   onJournal: () => void;
   onCompendium: () => void;
   onContracts: () => void;
+  onCrew: () => void;
   onQuit: () => void;
 }) {
   const { state, world } = session;
@@ -62,6 +64,9 @@ export function TopBar({
       <div class="tb-spacer" />
       <button class="btn" onClick={onContracts} title="Contracts (K)">
         Contracts ({activeContracts})
+      </button>
+      <button class="btn" onClick={onCrew} title="Crew (O)">
+        Crew
       </button>
       <button class="btn" onClick={onCompendium} title="Compendium (B)">
         Compendium {compendiumTotals(state).all.found}/{compendiumTotals(state).all.total}

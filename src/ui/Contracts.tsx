@@ -1,7 +1,7 @@
 /** Contracts overlay: every active job with its targets, plus the postings on offer. Viewable from anywhere. */
 import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
-import { contractProgress, DAY, formatDuration, type Contract } from "../sim";
+import { contractPayout, contractProgress, DAY, formatDuration, type Contract } from "../sim";
 import { cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -48,6 +48,7 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
   const progress = contractProgress(state, c);
   const left = c.deadline !== null ? c.deadline - state.time : 0;
   const targets = targetsOf(session, c);
+  const payout = contractPayout(state, c);
 
   return (
     <div class={`panel con-card ${active ? "active" : ""}`}>
@@ -55,7 +56,9 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
         <div>
           <span class="tag">{CLAN_NAMES[c.clan]}</span> <strong>{c.title}</strong>
         </div>
-        <span class="accent">{cr(c.reward)}</span>
+        <span class="accent" title={payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer` : undefined}>
+          {cr(payout)}
+        </span>
       </div>
       <div class="muted small">{c.text}</div>
       {active ? (

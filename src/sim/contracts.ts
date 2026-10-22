@@ -7,6 +7,7 @@
  */
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
+import { awardXp, crewBonuses } from "./crew";
 import { fail, ok, type Result } from "./result";
 import { Rng } from "./rng";
 import { removeCargo } from "./ship";
@@ -38,6 +39,8 @@ export interface Contract {
   count?: number;
   // survey
   surveyBodyIds?: string[];
+  /** What was actually paid on completion (reward plus the comms officer's bonus). */
+  paid?: number;
 }
 
 /** Specimens are keyed "bodyId|species". */
@@ -219,7 +222,13 @@ export function acceptContract(state: GameState, id: string): Result<Contract> {
   c.status = "active";
   c.deadline = state.time + c.durationDays * DAY;
   state.journal.push({ t: state.time, kind: "trade", text: `Signed with ${CLAN_NAMES[c.clan]}: "${c.title}". ${c.durationDays} days to deliver.` });
+  awardXp(state, "comms", 8);
   return ok(c);
+}
+
+/** What a contract pays on completion: its reward, plus the comms officer's haggling. */
+export function contractPayout(state: GameState, c: Contract): number {
+  return Math.round((c.reward * crewBonuses(state).contractPay) / 10) * 10;
 }
 
 export function completeContract(state: GameState, id: string): Result<number> {
@@ -242,8 +251,12 @@ export function completeContract(state: GameState, id: string): Result<number> {
     }
   }
   c.status = "done";
-  state.credits += c.reward;
-  state.stats.earned += c.reward;
-  state.journal.push({ t: state.time, kind: "trade", text: `Contract fulfilled: "${c.title}". ${CLAN_NAMES[c.clan]} paid ${c.reward.toLocaleString()} cr.` });
-  return ok(c.reward);
+  const pay = contractPayout(state, c);
+  c.paid = pay;
+  state.credits += pay;
+  state.stats.earned += pay;
+  state.journal.push({ t: state.time, kind: "trade", text: `Contract fulfilled: "${c.title}". ${CLAN_NAMES[c.clan]} paid ${pay.toLocaleString()} cr.` });
+  awardXp(state, "comms", 25);
+  awardXp(state, "captain", 25);
+  return ok(pay);
 }

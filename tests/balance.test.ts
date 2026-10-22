@@ -50,5 +50,5 @@ describe.skipIf(!env.BALANCE)("balance report", () => {
         if (errs.length) console.log(name, seed, errs);
       }
     }
-  });
+  }, 300_000); // a full report runs many bot careers
 });

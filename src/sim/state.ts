@@ -5,6 +5,7 @@
  */
 import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
+import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
 import type { ShipState, Cargo } from "./ship";
@@ -66,7 +67,13 @@ export interface GameState {
   time: number;
   /** Gameplay RNG state (not world generation). */
   rngState: number;
-  captain: { name: string; born: number };
+  /** The player. `xp` is their experience at the captain's station. */
+  captain: { name: string; born: number; xp?: number };
+  /** The five officers, one per station. */
+  crew?: CrewMember[];
+  /** The hiring hall aboard the Intrepid, and when its pool next turns over. */
+  recruits?: Recruit[];
+  nextRecruitsAt?: number;
   credits: number;
   loan: Loan;
   ship: ShipState;
@@ -103,7 +110,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     seed,
     time: GAME_START + 8 * 60,
     rngState: seed ^ 0x5eed,
-    captain: { name: captainName, born: GAME_START - 28 * YEAR - 117 * DAY },
+    captain: { name: captainName, born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0 },
     credits: 6_000,
     loan: {
       balance: 48_000,
@@ -140,6 +147,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     }
   }
   state.contracts = starterContracts(world, state.surveyedBodies);
+  ensureCrew(state);
 
   log(
     state,
@@ -153,10 +161,6 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
   );
   return state;
 }
-
-/** Six crew at 25 cr a day each. (Crew become individuals with skills in M2.) */
-export const CREW_SIZE = 6;
-export const WAGE_PER_DAY = 25;
 
 export function log(state: GameState, kind: JournalKind, text: string): void {
   state.journal.push({ t: state.time, kind, text });
@@ -174,9 +178,10 @@ export function withRng<T>(state: GameState, fn: (rng: Rng) => T): T {
 export function advanceTime(state: GameState, minutes: number): void {
   if (minutes < 0) throw new Error("Time cannot run backwards");
   state.time += minutes;
-  state.payrollOwed += (minutes / DAY) * CREW_SIZE * WAGE_PER_DAY;
+  state.payrollOwed += (minutes / DAY) * dailyWages(state);
   if (state.location.kind === "intrepid") settlePayroll(state);
   tickContracts(state);
+  tickRecruits(state);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);

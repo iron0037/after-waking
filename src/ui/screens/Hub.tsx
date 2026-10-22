@@ -8,7 +8,10 @@ import {
   buyUpgrade,
   cargoTonnes,
   completeContract,
+  contractPayout,
   contractProgress,
+  crewBonuses,
+  dailyWages,
   DAY,
   formatDate,
   formatDuration,
@@ -31,15 +34,17 @@ import {
   type Contract,
 } from "../../sim";
 import { cr, pct, tonnes } from "../format";
+import { HiringHall, Roster } from "../Crew";
 import { Section } from "../Section";
 import { useSession, type GameSession } from "../session";
 import "./hub.css";
 
-type Tab = "market" | "jobs" | "shipyard" | "exchange" | "depart";
+type Tab = "market" | "jobs" | "shipyard" | "crew" | "exchange" | "depart";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "market", label: "Market" },
   { id: "shipyard", label: "Shipyard" },
+  { id: "crew", label: "Crew" },
   { id: "exchange", label: "Exchange" },
   // Jobs come last before departure: a contract's clock starts when it's accepted.
   { id: "jobs", label: "Jobs" },
@@ -50,6 +55,7 @@ const TAB_BLURB: Record<Tab, string> = {
   market: "The Exchange clan runs the Concourse scales. Everything is weighed, nothing is free.",
   jobs: "The clan boards by the Concourse gate. Paper contracts, wet signatures, and a deadline on every one.",
   shipyard: "Gantries, sparks and clan salesmen. Every part on the shelf was pulled from somebody's grandmother's engine room.",
+  crew: "The crew bunks are a long walk from the Concourse, but the hiring hall is always open. Everyone has a clan, a price and an opinion about your last fold.",
   exchange: "Brass counters under dim lamps. The note on your ship is older than most of the clerks.",
   depart: "Last checks at the airlock. The Verge is out there, and it doesn't care about your schedule.",
 };
@@ -112,6 +118,7 @@ export function Hub({ session }: { session: GameSession }) {
         {tab === "market" && <Market session={session} />}
         {tab === "jobs" && <Jobs session={session} />}
         {tab === "shipyard" && <Shipyard session={session} />}
+        {tab === "crew" && <Crew session={session} />}
         {tab === "exchange" && <Exchange session={session} />}
         {tab === "depart" && <Depart session={session} />}
       </div>
@@ -133,9 +140,10 @@ function Market({ session }: { session: GameSession }) {
   const cargo = state.ship.cargo;
   const held = cargoTonnes(cargo);
   const reserved = reservedCargo(state);
+  const salePrice = crewBonuses(state).salePrice;
   const sellable = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id), 0);
   const heldBack = held - sellable;
-  const estimate = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id) * sellPrice(state.market, id), 0);
+  const estimate = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id) * sellPrice(state.market, id) * salePrice, 0);
   const price = fuelPrice(state.market);
   const room = Math.floor(stats.fuelCapacity - state.ship.fuel);
   const affordable = Math.floor(state.credits / price);
@@ -166,7 +174,7 @@ function Market({ session }: { session: GameSession }) {
             {COMMODITY_IDS.map((id) => {
               const have = cargo[id] ?? 0;
               const aboard = have > 0.05;
-              const p = sellPrice(state.market, id);
+              const p = sellPrice(state.market, id) * salePrice;
               const free = sellableTonnes(state, id);
               const kept = Math.min(have, reserved[id] ?? 0);
               return (
@@ -294,7 +302,8 @@ function SpecimenDesk({ session }: { session: GameSession }) {
     })
     .sort((a, b) => a.bodyName.localeCompare(b.bodyName) || a.species.localeCompare(b.species));
   const sellable = rows.filter((r) => !r.reserved);
-  const estimate = sellable.reduce((sum, r) => sum + r.count * SPECIMEN_PRICE + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
+  const specimenPrice = Math.round(SPECIMEN_PRICE * crewBonuses(state).specimenPrice);
+  const estimate = sellable.reduce((sum, r) => sum + r.count * specimenPrice + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
 
   return (
     <>
@@ -347,7 +356,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         </button>
         <span class="muted small">
           {sellable.length > 0 ? `about ${cr(estimate)}. ` : ""}
-          {cr(SPECIMEN_PRICE)} each; the first sale of a new species pays a bonus of {cr(NEW_SPECIES_BONUS)}.
+          {cr(specimenPrice)} each; the first sale of a new species pays a bonus of {cr(NEW_SPECIES_BONUS)}.
         </span>
       </div>
     </>
@@ -363,6 +372,8 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
   const left = c.deadline !== null ? c.deadline - state.time : 0;
   const urgent = active && left < 14 * DAY;
   const activeCount = (state.contracts ?? []).filter((x) => x.status === "active").length;
+  const payout = contractPayout(state, c);
+  const payTitle = payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer` : undefined;
 
   return (
     <div class={`panel hub-contract ${active ? "active" : ""}`}>
@@ -378,7 +389,7 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
             </>
           )}
         </div>
-        <span class="accent">{cr(c.reward)}</span>
+        <span class="accent" title={payTitle}>{cr(payout)}</span>
       </div>
       <div class="muted small">{c.text}</div>
       {active ? (
@@ -393,7 +404,7 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
           <button
             class="btn primary"
             disabled={!progress.ready}
-            title={progress.ready ? `Turn in for ${cr(c.reward)}` : `Not yet: ${progress.label}`}
+            title={progress.ready ? `Turn in for ${cr(payout)}` : `Not yet: ${progress.label}`}
             onClick={() => session.act((s) => completeContract(s, c.id))}
           >
             Turn in
@@ -462,7 +473,7 @@ function Jobs({ session }: { session: GameSession }) {
                   </td>
                   <td>{c.title}</td>
                   <td class="muted">{CLAN_NAMES[c.clan]}</td>
-                  <td class="num">{c.status === "done" ? cr(c.reward) : <span class="muted">-</span>}</td>
+                  <td class="num">{c.status === "done" ? cr(c.paid ?? c.reward) : <span class="muted">-</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -586,6 +597,24 @@ function Shipyard({ session }: { session: GameSession }) {
           );
         })}
       </section>
+    </div>
+  );
+}
+
+// --- crew --------------------------------------------------------------------------------
+
+function Crew({ session }: { session: GameSession }) {
+  const { state } = session;
+  const wages = dailyWages(state);
+  const recruits = (state.recruits ?? []).length;
+  return (
+    <div class="hub-crew">
+      <Section id="crew-roster" title="Your crew" level={2} summary={`${cr(wages)} a day in wages`}>
+        <Roster session={session} />
+      </Section>
+      <Section id="crew-hall" title="Hiring hall" level={2} summary={`${recruits} looking for a berth`}>
+        <HiringHall session={session} />
+      </Section>
     </div>
   );
 }

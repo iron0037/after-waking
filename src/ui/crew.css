@@ -1,0 +1,55 @@
+/* Crew roster, hiring hall and the read-only crew overlay */
+.crew-payroll {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.crew-note {
+  margin: 0 0 10px;
+}
+.crew-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 10px;
+}
+.crew-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  min-width: 0;
+}
+.crew-card.recruit .crew-sign {
+  align-self: flex-start;
+  margin-top: auto;
+}
+.crew-clan {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.crew-level-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+.crew-bar.full > span {
+  background: var(--good);
+}
+.kv.crew-kv dd {
+  text-align: left;
+}
+.crew-compare {
+  font-size: 13px;
+}
+.crew-compare td,
+.crew-compare th {
+  vertical-align: top;
+}
+.contracts.crew-overlay {
+  width: min(1180px, 96vw);
+}

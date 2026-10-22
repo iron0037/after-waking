@@ -10,6 +10,7 @@ import {
   deployRover,
   DRILL_ENERGY_PER_HOUR,
   drill,
+  drillRate,
   moveRoverTo,
   prospect,
   remainingTonnes,
@@ -147,7 +148,7 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
     const bedRoom = stats.roverCargoT - cargoTonnes((rover(state) as RoverState).cargo);
     const loadCap = Math.min(bedRoom, holdRoom());
     if (budget > 0.5 && loadCap > 0.5) {
-      const rate = stats.drillRateTph * (0.4 + deposit.grade);
+      const rate = drillRate(state, deposit);
       const drilled = drill(state, world, key, Math.min(budget, loadCap / rate));
       if (!drilled.ok) return fail(drilled.reason);
       // The crew deals with storms and jams themselves; they only cost time (and the haul home

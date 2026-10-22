@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
+import { CrewOverlay } from "./Crew";
 import { Journal } from "./Journal";
 import { TimeLapseClock } from "./TimeLapseClock";
 import { TitleScreen } from "./TitleScreen";
@@ -21,6 +22,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const [journalOpen, setJournalOpen] = useState(false);
   const [compendiumOpen, setCompendiumOpen] = useState(false);
   const [contractsOpen, setContractsOpen] = useState(false);
+  const [crewOpen, setCrewOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -29,7 +31,9 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       // C is a hex movement key on the surface (down-right), so the compendium lives on B ("book").
       else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
+      else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
       else if (ev.key === "Escape") {
+        setCrewOpen(false);
         setJournalOpen(false);
         setCompendiumOpen(false);
         setContractsOpen(false);
@@ -45,7 +49,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   return (
     <div class="game">
       <TopBar session={session} onJournal={() => setJournalOpen(true)} onCompendium={() => setCompendiumOpen(true)}
-        onContracts={() => setContractsOpen(true)}
+        onContracts={() => setContractsOpen(true)} onCrew={() => setCrewOpen(true)}
         onQuit={onQuit} />
       <main class="main">
         {session.view === "hub" && <Hub session={session} />}
@@ -63,6 +67,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {journalOpen && <Journal session={session} onClose={() => setJournalOpen(false)} />}
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
+      {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
       {session.timelapse && <TimeLapseClock lapse={session.timelapse} />}
       <div class="notices">
         {session.notices.map((n) => (

@@ -138,6 +138,28 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
   - Comms: Linguistics / Diplomacy / Signals.
 - **Perks change what's possible, not just numbers.** "Deep Diver" lets probes go 30% deeper; "Xenolinguist" reveals hidden dialogue options; "Jury-Rig" allows one field repair per expedition.
 - **Background traits** come from clan and upbringing: a Midshipman-trained engineer, a Covenant-raised medic who distrusts Archive tech.
+
+### Slice 1: roster, XP, levels, hiring hall **[DECIDED 2026-10-22]** (AW-14)
+- **The roster.** The captain is the player. Five officers (Science, Navigation, Engineering, Comms, Medical) hold one station each. Code lives in `src/sim/crew.ts`, content in `src/data/crew.ts`.
+- **Levels 1–10 from XP.** Experience comes from the work, and a clan's trained stations earn +25%. The curve is set so a busy station reaches level 3–4 in the first ten trips and the cap takes most of a career (80+ trips).
+- **Levels give small, steady bonuses:**
+
+  | Station | Bonus per level above 1 |
+  |---|---|
+  | Science | +1 hex of sensor sweep at levels 4, 7 and 10 |
+  | Engineering | +4% drill rate; −5% incident chance |
+  | Navigation | −3% flight fuel; −2% fold fuel; −4% fold recharge |
+  | Captain | +1% sale prices |
+  | Comms | +3% contract pay |
+  | Medical | −5% time lost to incidents; +3% specimen prices |
+
+  Perks that change what's possible come in slice 2.
+- **Wages rise with level.** The base is 30 cr/day at level 1, plus 7% per level. Clans adjust it: Freebooters ×0.8, Exchange ×1.1, Covenant ×0.95. Veterans cost more, which gives the economy a long-term money sink.
+- **Hiring hall** aboard the Intrepid:
+  - Five recruits, and the pool turns over every 30 days.
+  - About half come from a clan that trains for their post; they start a level higher and learn faster.
+  - Signing costs 15 days' wages. The new officer replaces the current one, who goes ashore.
+- **Later slices:** perk trees with three branches per station; aging, retirement and mentoring; injuries.
 - **The captain's own tree:** Trader / Explorer / Diplomat / Commander. This shapes playstyle and endings.
 - **Scope target:** 6 stations × 3 branches × about 5 perks, plus traits.
 

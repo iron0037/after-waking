@@ -19,3 +19,4 @@ export * from "./compendium";
 export * from "./automation";
 export * from "./hex";
 export * from "./bodysurface";
+export * from "./crew";

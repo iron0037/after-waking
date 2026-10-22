@@ -18,6 +18,7 @@ import {
   DRILL_SETUP_ENERGY,
   DRILL_SETUP_MINUTES,
   drill,
+  drillRate,
   emptyKnowledge,
   exploredFraction,
   formatDuration,
@@ -49,6 +50,7 @@ import {
   ROVER_SPECIMEN_SLOTS,
   SAMPLE_ENERGY,
   SAMPLE_MINUTES,
+  sensorRadius,
   sensorTierFor,
   shipStats,
   shipTile,
@@ -583,7 +585,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
 
     // Mid-drive, the sensors sweep ahead of the sim: paint tiles in (and show finds) as the rover passes.
-    const sweep = 2 + sensorTierFor(state, loc.bodyId);
+    const sweep = sensorRadius(state, loc.bodyId);
     let reveal: Reveal | null = null;
     let rc = revealRef.current;
     if (anim) {
@@ -1458,7 +1460,7 @@ function DepositPanel({
   const near = dist !== null && dist <= 1;
   const remaining = remainingTonnes(know, dep);
   const tooDeep = dep.depthM > stats.drillMaxDepthM;
-  const rate = stats.drillRateTph * (0.4 + dep.grade);
+  const rate = drillRate(session.state, dep);
   const room = rover ? stats.roverCargoT - cargoTonnes(rover.cargo) : 0;
 
   const workBlock = workBlockers(session.state, know, dep);

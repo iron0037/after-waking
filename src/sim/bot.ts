@@ -11,6 +11,7 @@ import {
   buyUpgrade,
   deployRover,
   drill,
+  drillRate,
   flyTo,
   fold,
   foldPlan,
@@ -221,7 +222,7 @@ function workRegion(
 
     // Rank by credits per hour of work: drilling time at this grade plus the drive there.
     const valuePerHour = (d: Deposit, steps: number) => {
-      const rate = stats.drillRateTph * (0.4 + d.grade);
+      const rate = drillRate(state, d);
       const tonnes = Math.min(remainingTonnes(know, d), stats.roverCargoT);
       return (COMMODITIES[d.commodity].basePrice * tonnes) / (tonnes / rate + steps * 0.3 + 4);
     };
