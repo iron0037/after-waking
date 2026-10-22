@@ -21,6 +21,12 @@ Node is at `C:\Program Files\nodejs`. In Git Bash, prefix commands with `export 
   - Maps draw with the `Canvas` component (2D canvas).
 - `docs/`: design docs. Settled decisions are marked **[DECIDED]**; read them before design work.
 
+## Issue tracking (Jira)
+- Site: https://afterwaking.atlassian.net (cloudId `8f6f89c0-15e1-4b75-bd28-2a35fe229b8e`), project "The Waking Team". The key is being renamed SCRUM → AW; old keys redirect.
+- Epics: M2 Crew & Research, M3 Combat, M4 Clans & Outposts, M5 Story & Endings, M6 Aliens, Art & Audio, UX & Polish, Balance & Economy, Tech & Tooling.
+- Every bug gets an issue (type Bug), even when it's fixed in the same session; it's the audit trail.
+- Commit messages cite the issue key. After a fix: comment with the commit hash, then move the issue to Done.
+
 ## Rules
 - Lore constraints: humans only at the start; **no androids or AI crew, ever**; probes are remote-piloted by people.
 - Keep sim logic out of the UI. If a screen needs a computed value, add a function to `src/sim`.
