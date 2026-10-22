@@ -25,6 +25,7 @@ import {
   type GameState,
 } from "../src/sim";
 import { BASE_STATS } from "../src/data/ship";
+import { hexDistance } from "../src/sim/hex";
 
 describe("loan prepayment (SCRUM-41)", () => {
   it("an early installment covers the next due date instead of triggering a miss", () => {
@@ -84,7 +85,7 @@ function landOnEasyWorld(seed: number): { state: GameState; world: World; deposi
     if (!flyTo(state, world, { bodyId: body.id }).ok) continue;
     for (let region = 0; region < body.regions; region++) {
       const map = world.region(body.id, region);
-      const d = map.deposits.find((x) => x.depthM <= BASE_STATS.drillMaxDepthM && Math.abs(x.x - map.landing.x) + Math.abs(x.y - map.landing.y) < 14);
+      const d = map.deposits.find((x) => x.depthM <= BASE_STATS.drillMaxDepthM && hexDistance(x, map.landing) < 14);
       if (!d) continue;
       expect(land(state, world, region).ok).toBe(true);
       knowledge(state, body.id, region).discovered.push(d.id);

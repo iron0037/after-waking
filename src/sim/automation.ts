@@ -18,6 +18,7 @@ import {
   stowRover,
 } from "./actions";
 import { findPath, type PathStep } from "./pathfinding";
+import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
 import { cargoTonnes, shipStats } from "./ship";
 import type { GameState, RoverState } from "./state";
@@ -97,7 +98,7 @@ export function workDeposit(state: GameState, world: World, depositId: number): 
     const r = rover(state);
     if (!r) return true;
     const home = shipTile(state, map);
-    if (Math.max(Math.abs(r.x - home.x), Math.abs(r.y - home.y)) > 1) {
+    if (hexDistance(r, home) > 1) {
       const moved = moveRoverTo(state, world, home.x, home.y);
       if (!moved.ok || moved.value.stopped) return false;
     }
@@ -123,7 +124,7 @@ export function workDeposit(state: GameState, world: World, depositId: number): 
     const r = rover(state) as RoverState;
 
     // Drive to the deposit if we're not already beside it.
-    if (Math.max(Math.abs(r.x - deposit.x), Math.abs(r.y - deposit.y)) > 1) {
+    if (hexDistance(r, deposit) > 1) {
       const out = findPath(map, r, deposit, stats.roverCanClimb);
       const back = findPath(map, deposit, shipTile(state, map), stats.roverCanClimb);
       if (!out || !back) return finish("unreachable", "The rover has no route to that deposit and back.");

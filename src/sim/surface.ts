@@ -7,6 +7,7 @@ import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
 import { hashSeed, rngFor } from "./rng";
+import { disk, hexDistance, hexWorldPos, ring } from "./hex";
 import { clamp, type Vec2 } from "./units";
 
 export const REGION_SIZE = 48;
@@ -115,11 +116,12 @@ export function isExplored(k: RegionKnowledge, x: number, y: number): boolean {
   return (((k.explored[i >> 5] ?? 0) >>> (i & 31)) & 1) === 1;
 }
 
-/** Mark every tile within `radius` (Chebyshev) of (cx, cy) as swept. Returns how many were new. */
+/** Mark every tile within `radius` hex steps of (cx, cy) as swept. Returns how many were new. */
 export function markExplored(k: RegionKnowledge, cx: number, cy: number, radius: number): number {
   let fresh = 0;
-  for (let y = Math.max(0, cy - radius); y <= Math.min(REGION_SIZE - 1, cy + radius); y++) {
-    for (let x = Math.max(0, cx - radius); x <= Math.min(REGION_SIZE - 1, cx + radius); x++) {
+  for (const { x, y } of disk({ x: cx, y: cy }, radius)) {
+    if (x < 0 || y < 0 || x >= REGION_SIZE || y >= REGION_SIZE) continue;
+    {
       const i = y * REGION_SIZE + x;
       const word = k.explored[i >> 5] ?? 0;
       const bit = 1 << (i & 31);
@@ -222,8 +224,10 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   const terrain = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const e = fbm(noiseSeed, x / 14, y / 14, 4);
-      const rough = fbm(noiseSeed ^ 0x9e3779b9, x / 5, y / 5, 2);
+      // Sample noise at each hex's true centre so odd rows don't skew the terrain.
+      const p = hexWorldPos(x, y);
+      const e = fbm(noiseSeed, p.x / 14, p.y / 14, 4);
+      const rough = fbm(noiseSeed ^ 0x9e3779b9, p.x / 5, p.y / 5, 2);
       const i = y * w + x;
       elevation[i] = e;
       terrain[i] = classify(body, e, rough, seaLevel, ruggedness);
@@ -238,7 +242,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       const y = placeRng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
       if (TERRAIN_INFO[t].passable === "no") continue;
-      if (Math.abs(x - landing.x) + Math.abs(y - landing.y) < 4) continue;
+      if (hexDistance({ x, y }, landing) < 4) continue;
       return { ...spec, x, y };
     }
     return { ...spec, x: landing.x + 3, y: landing.y };
@@ -250,7 +254,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       const y = placeRng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
       if (TERRAIN_INFO[t].passable !== "yes") continue;
-      if (Math.abs(x - landing.x) + Math.abs(y - landing.y) < 3) continue;
+      if (hexDistance({ x, y }, landing) < 3) continue;
       return { ...spec, x, y };
     }
     return { ...spec, x: landing.x, y: landing.y + 2 };
@@ -275,21 +279,15 @@ function classify(body: Body, e: number, rough: number, seaLevel: number, rugged
 }
 
 function findLanding(terrain: Uint8Array, w: number, h: number): Vec2 {
-  const cx = Math.floor(w / 2);
-  const cy = Math.floor(h / 2);
+  const center = { x: Math.floor(w / 2), y: Math.floor(h / 2) };
   for (let r = 0; r < Math.max(w, h); r++) {
-    for (let dy = -r; dy <= r; dy++) {
-      for (let dx = -r; dx <= r; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        const x = cx + dx;
-        const y = cy + dy;
-        if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
-        const t = terrain[y * w + x];
-        if (t === Terrain.plain || t === Terrain.ice) return { x, y };
-      }
+    for (const { x, y } of ring(center, r)) {
+      if (x < 1 || y < 1 || x >= w - 1 || y >= h - 1) continue;
+      const t = terrain[y * w + x];
+      if (t === Terrain.plain || t === Terrain.ice) return { x, y };
     }
   }
-  return { x: cx, y: cy };
+  return center;
 }
 
 export function terrainAt(map: RegionMap, x: number, y: number): Terrain | null {

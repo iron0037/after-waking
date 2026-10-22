@@ -1,16 +1,38 @@
-/** Canvas drawing for the surface map. Pure functions: everything they need is passed in. */
+/** Canvas drawing for the surface map (pointy-top hexes, odd-r layout). Pure functions: everything they need is passed in. */
 import { COMMODITIES } from "../../../data/commodities";
-import { remainingTonnes, TILE_KM, type Deposit, type PathStep, type RegionKnowledge, type RegionMap, type Vec2 } from "../../../sim";
+import {
+  disk,
+  hexCorners,
+  hexDistance,
+  hexToPixel,
+  mapPixelSize,
+  pixelToHex,
+  remainingTonnes,
+  step,
+  type Deposit,
+  type HexDir,
+  type PathStep,
+  type RegionKnowledge,
+  type RegionMap,
+  type Vec2,
+} from "../../../sim";
 import { UI } from "../../palette";
-import { SUB } from "./terrainImage";
+import { HEX, hexPath } from "./terrainImage";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace';
-const MARGIN = 26;
+const MARGIN_X = 14;
+const MARGIN_TOP = 14;
+/** Room under the map for the hint line and terrain legend. */
+const MARGIN_BOTTOM = 42;
 const DEPLETED = "#5b6472";
 
 export interface Layout {
-  /** Pixels per tile (integer). */
-  ts: number;
+  /** Hex circumradius in pixels (largest that fits the viewport). */
+  size: number;
+  /** Hex width in pixels: the stand-in for "tile size" when scaling icons and sprites. */
+  tw: number;
+  /** Scale from the offscreen terrain images (drawn at HEX) to the screen. */
+  k: number;
   ox: number;
   oy: number;
   cols: number;
@@ -18,32 +40,67 @@ export interface Layout {
 }
 
 export function computeLayout(w: number, h: number, cols: number, rows: number): Layout {
-  const ts = Math.max(4, Math.floor(Math.min((w - MARGIN * 2) / cols, (h - MARGIN * 2) / rows)));
+  const unit = mapPixelSize(cols, rows, 1);
+  const size = Math.max(3, Math.min((w - MARGIN_X * 2) / unit.w, (h - MARGIN_TOP - MARGIN_BOTTOM) / unit.h));
+  const px = mapPixelSize(cols, rows, size);
   return {
-    ts,
-    ox: Math.round((w - ts * cols) / 2),
-    oy: Math.round((h - ts * rows) / 2),
+    size,
+    tw: Math.sqrt(3) * size,
+    k: size / HEX,
+    ox: Math.round((w - px.w) / 2),
+    oy: Math.round(MARGIN_TOP + (h - MARGIN_TOP - MARGIN_BOTTOM - px.h) / 2),
     cols,
     rows,
   };
 }
 
+/** The tile under a canvas pixel, or null if it is off the map. */
 export function tileAt(L: Layout, px: number, py: number): Vec2 | null {
-  const x = Math.floor((px - L.ox) / L.ts);
-  const y = Math.floor((py - L.oy) / L.ts);
-  return x < 0 || y < 0 || x >= L.cols || y >= L.rows ? null : { x, y };
+  const t = pixelToHex(px - L.ox, py - L.oy, L.size);
+  return t.x < 0 || t.y < 0 || t.x >= L.cols || t.y >= L.rows ? null : t;
 }
 
-const cx = (L: Layout, x: number) => L.ox + (x + 0.5) * L.ts;
-const cy = (L: Layout, y: number) => L.oy + (y + 0.5) * L.ts;
+/** Canvas pixel position of a tile's centre. */
+export function tileCenter(L: Layout, t: Vec2): Vec2 {
+  const c = hexToPixel(t.x, t.y, L.size);
+  return { x: L.ox + c.x, y: L.oy + c.y };
+}
+
+const cx = (L: Layout, x: number, y: number) => L.ox + hexToPixel(x, y, L.size).x;
+const cy = (L: Layout, x: number, y: number) => L.oy + hexToPixel(x, y, L.size).y;
+
+/** Adds the hex tile (as a closed subpath, screen space) to the current path. */
+function tilePath(ctx: CanvasRenderingContext2D, L: Layout, t: Vec2, grow = 0): void {
+  hexPath(ctx, cx(L, t.x, t.y), cy(L, t.x, t.y), L.size + grow);
+}
 
 /** Tiles the rover's sensors are sweeping right now (mid-drive), painted in before the sim catches up. */
 export interface Reveal {
   /** The full-color terrain image (not the fogged one). */
   terrain: HTMLCanvasElement;
-  /** Rover positions passed so far, in order. */
-  pts: Vec2[];
-  radius: number;
+  /** Every tile swept so far on this drive. */
+  tiles: Vec2[];
+}
+
+let gridCache: { key: string; path: Path2D } | null = null;
+
+/** All hex outlines of the map as one path, relative to the map origin; rebuilt only when the size changes. */
+function gridPath(L: Layout): Path2D {
+  const key = `${L.cols}x${L.rows}@${L.size.toFixed(3)}`;
+  if (gridCache && gridCache.key === key) return gridCache.path;
+  const path = new Path2D();
+  for (let y = 0; y < L.rows; y++) {
+    for (let x = 0; x < L.cols; x++) {
+      const c = hexToPixel(x, y, L.size);
+      const pts = hexCorners(c.x, c.y, L.size);
+      const first = pts[0] as Vec2;
+      path.moveTo(first.x, first.y);
+      for (let i = 1; i < 6; i++) path.lineTo((pts[i] as Vec2).x, (pts[i] as Vec2).y);
+      path.closePath();
+    }
+  }
+  gridCache = { key, path };
+  return path;
 }
 
 export function drawBase(
@@ -56,75 +113,42 @@ export function drawBase(
 ): void {
   ctx.fillStyle = UI.space;
   ctx.fillRect(0, 0, w, h);
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(terrain, L.ox, L.oy, L.ts * L.cols, L.ts * L.rows);
-  if (reveal) {
-    for (const p of reveal.pts) {
-      const x0 = Math.max(0, p.x - reveal.radius);
-      const y0 = Math.max(0, p.y - reveal.radius);
-      const x1 = Math.min(L.cols - 1, p.x + reveal.radius);
-      const y1 = Math.min(L.rows - 1, p.y + reveal.radius);
-      ctx.drawImage(
-        reveal.terrain,
-        x0 * SUB,
-        y0 * SUB,
-        (x1 - x0 + 1) * SUB,
-        (y1 - y0 + 1) * SUB,
-        L.ox + x0 * L.ts,
-        L.oy + y0 * L.ts,
-        (x1 - x0 + 1) * L.ts,
-        (y1 - y0 + 1) * L.ts,
-      );
-    }
-  }
-
-  // Survey grid: faint per tile, brighter every 8 tiles (16 km).
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
-  if (L.ts >= 7) {
-    ctx.strokeStyle = "rgba(10, 14, 26, 0.16)";
+  const smoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(terrain, L.ox, L.oy, terrain.width * L.k, terrain.height * L.k);
+  if (reveal && reveal.tiles.length > 0) {
+    ctx.save();
+    ctx.translate(L.ox, L.oy);
+    ctx.scale(L.k, L.k);
     ctx.beginPath();
-    for (let i = 0; i <= L.cols; i++) {
-      ctx.moveTo(L.ox + i * L.ts + 0.5, L.oy);
-      ctx.lineTo(L.ox + i * L.ts + 0.5, L.oy + L.rows * L.ts);
+    for (const t of reveal.tiles) {
+      const c = hexToPixel(t.x, t.y, HEX);
+      hexPath(ctx, c.x, c.y, HEX + 0.6);
     }
-    for (let j = 0; j <= L.rows; j++) {
-      ctx.moveTo(L.ox, L.oy + j * L.ts + 0.5);
-      ctx.lineTo(L.ox + L.cols * L.ts, L.oy + j * L.ts + 0.5);
-    }
-    ctx.stroke();
+    ctx.clip();
+    ctx.drawImage(reveal.terrain, 0, 0);
+    ctx.restore();
   }
-  ctx.strokeStyle = "rgba(215, 227, 244, 0.22)";
-  ctx.beginPath();
-  for (let i = 0; i <= L.cols; i += 8) {
-    ctx.moveTo(L.ox + i * L.ts + 0.5, L.oy);
-    ctx.lineTo(L.ox + i * L.ts + 0.5, L.oy + L.rows * L.ts);
-  }
-  for (let j = 0; j <= L.rows; j += 8) {
-    ctx.moveTo(L.ox, L.oy + j * L.ts + 0.5);
-    ctx.lineTo(L.ox + L.cols * L.ts, L.oy + j * L.ts + 0.5);
-  }
-  ctx.stroke();
+  ctx.imageSmoothingEnabled = smoothing;
 
-  // Frame and kilometre ticks.
-  ctx.strokeStyle = UI.gridBright;
-  ctx.strokeRect(L.ox - 0.5, L.oy - 0.5, L.cols * L.ts + 1, L.rows * L.ts + 1);
-  ctx.fillStyle = UI.muted;
-  ctx.font = `10px ${FONT}`;
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "center";
-  for (let i = 0; i <= L.cols; i += 8) ctx.fillText(String(i * TILE_KM), L.ox + i * L.ts, L.oy - 8);
-  ctx.textAlign = "right";
-  for (let j = 0; j <= L.rows; j += 8) ctx.fillText(String(j * TILE_KM), L.ox - 7, L.oy + j * L.ts + 3);
-  ctx.textAlign = "left";
-  ctx.fillText("km", L.ox + L.cols * L.ts + 6, L.oy - 8);
+  // Subtle hex outlines.
+  if (L.tw >= 7 && typeof Path2D !== "undefined") {
+    ctx.save();
+    ctx.translate(L.ox, L.oy);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = "rgba(10, 14, 26, 0.2)";
+    ctx.stroke(gridPath(L));
+    ctx.restore();
+  }
 }
 
 /** A little lander on its pad. */
 export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): void {
-  const x = cx(L, at.x);
-  const y = cy(L, at.y);
-  const s = L.ts * 0.5;
+  const x = cx(L, at.x, at.y);
+  const y = cy(L, at.x, at.y);
+  const s = L.tw * 0.5;
   ctx.setLineDash([]);
   ctx.fillStyle = "rgba(5, 7, 15, 0.45)";
   ctx.beginPath();
@@ -132,7 +156,7 @@ export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): vo
   ctx.fill();
   ctx.strokeStyle = UI.ship;
   ctx.fillStyle = UI.ship;
-  ctx.lineWidth = Math.max(1.5, L.ts * 0.09);
+  ctx.lineWidth = Math.max(1.5, L.tw * 0.09);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   // legs
@@ -160,35 +184,52 @@ export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): vo
 
 /** Marks a tile where the ship can't set down (move-ship targeting). */
 export function drawBlockedTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Vec2): void {
-  const x = L.ox + tile.x * L.ts;
-  const y = L.oy + tile.y * L.ts;
+  const x = cx(L, tile.x, tile.y);
+  const y = cy(L, tile.x, tile.y);
+  const d = L.size * 0.5;
   ctx.setLineDash([]);
   ctx.fillStyle = "rgba(255, 90, 90, 0.35)";
-  ctx.fillRect(x, y, L.ts, L.ts);
+  ctx.beginPath();
+  tilePath(ctx, L, tile);
+  ctx.fill();
   ctx.strokeStyle = UI.danger;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(x + L.ts * 0.2, y + L.ts * 0.2);
-  ctx.lineTo(x + L.ts * 0.8, y + L.ts * 0.8);
-  ctx.moveTo(x + L.ts * 0.8, y + L.ts * 0.2);
-  ctx.lineTo(x + L.ts * 0.2, y + L.ts * 0.8);
+  ctx.moveTo(x - d, y - d);
+  ctx.lineTo(x + d, y + d);
+  ctx.moveTo(x + d, y - d);
+  ctx.lineTo(x - d, y + d);
   ctx.stroke();
 }
 
+/** Edge i of a hex (corner i to corner i+1) faces these directions, in order. */
+const EDGE_DIRS: readonly HexDir[] = ["e", "se", "sw", "w", "nw", "ne"];
+
+/** The sensor sweep: a hex disk of `radius` around `at`, tinted, with a dashed outline around its rim. */
 export function drawSensorRange(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, radius: number): void {
+  const tiles = disk(at, radius).filter((t) => t.x >= 0 && t.y >= 0 && t.x < L.cols && t.y < L.rows);
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(L.ox, L.oy, L.cols * L.ts, L.rows * L.ts);
-  ctx.clip();
-  const x = L.ox + (at.x - radius) * L.ts;
-  const y = L.oy + (at.y - radius) * L.ts;
-  const size = (radius * 2 + 1) * L.ts;
   ctx.fillStyle = "rgba(95, 212, 255, 0.07)";
-  ctx.fillRect(x, y, size, size);
+  ctx.beginPath();
+  for (const t of tiles) tilePath(ctx, L, t);
+  ctx.fill();
   ctx.strokeStyle = "rgba(95, 212, 255, 0.55)";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([5, 4]);
-  ctx.strokeRect(x, y, size, size);
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (const t of tiles) {
+    const pts = hexCorners(cx(L, t.x, t.y), cy(L, t.x, t.y), L.size);
+    EDGE_DIRS.forEach((dir, i) => {
+      const n = step(t.x, t.y, dir);
+      if (hexDistance(n, at) <= radius) return;
+      const p = pts[i] as Vec2;
+      const q = pts[(i + 1) % 6] as Vec2;
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+    });
+  }
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -209,12 +250,12 @@ export function drawDeposits(
   selectedId: number | null,
   timeMs: number,
 ): void {
-  const r = Math.max(5, L.ts * 0.38);
+  const r = Math.max(5, L.tw * 0.38);
   ctx.setLineDash([]);
   for (const d of map.deposits) {
     if (!know.discovered.includes(d.id)) continue;
-    const x = cx(L, d.x);
-    const y = cy(L, d.y);
+    const x = cx(L, d.x, d.y);
+    const y = cy(L, d.x, d.y);
     const depleted = remainingTonnes(know, d) <= 0.05;
     const prospected = know.prospected.includes(d.id);
 
@@ -245,7 +286,9 @@ export function drawDeposits(
       const grow = pulse * 2;
       ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 + pulse * 0.4})`;
       ctx.lineWidth = 2;
-      ctx.strokeRect(x - L.ts / 2 - 2 - grow, y - L.ts / 2 - 2 - grow, L.ts + 4 + grow * 2, L.ts + 4 + grow * 2);
+      ctx.beginPath();
+      tilePath(ctx, L, d, 1 + grow);
+      ctx.stroke();
     }
   }
 }
@@ -262,12 +305,12 @@ export function drawFlora(
   selectedId: number | null,
   timeMs: number,
 ): void {
-  const u = Math.max(5, L.ts * 0.36);
+  const u = Math.max(5, L.tw * 0.36);
   ctx.setLineDash([]);
   for (const f of map.flora) {
     if (!know.floraFound.includes(f.id)) continue;
-    const x = cx(L, f.x);
-    const y = cy(L, f.y);
+    const x = cx(L, f.x, f.y);
+    const y = cy(L, f.x, f.y);
     const sampled = know.floraSampled.includes(f.id);
     const color = sampled ? LEAF_DIM : LEAF;
 
@@ -307,7 +350,9 @@ export function drawFlora(
       const grow = pulse * 2;
       ctx.strokeStyle = `rgba(126, 231, 135, ${0.55 + pulse * 0.4})`;
       ctx.lineWidth = 2;
-      ctx.strokeRect(x - L.ts / 2 - 2 - grow, y - L.ts / 2 - 2 - grow, L.ts + 4 + grow * 2, L.ts + 4 + grow * 2);
+      ctx.beginPath();
+      tilePath(ctx, L, f, 1 + grow);
+      ctx.stroke();
     }
   }
 }
@@ -321,24 +366,21 @@ function leaf(ctx: CanvasRenderingContext2D, x: number, y: number, dir: number, 
   ctx.fill();
 }
 
-/** Corner brackets around a tile with a drill rig set up. */
+/** Corner brackets around a hex with a drill rig set up. */
 function drillMark(ctx: CanvasRenderingContext2D, L: Layout, d: Deposit, depleted: boolean): void {
-  const x0 = L.ox + d.x * L.ts + 1;
-  const y0 = L.oy + d.y * L.ts + 1;
-  const s = L.ts - 2;
-  const k = Math.max(3, s * 0.3);
+  const pts = hexCorners(cx(L, d.x, d.y), cy(L, d.x, d.y), L.size - 1);
+  const f = 0.35;
   ctx.strokeStyle = depleted ? "#8a93a0" : UI.accent;
   ctx.lineWidth = 2;
+  ctx.lineJoin = "miter";
   ctx.beginPath();
-  for (const [ax, ay, sx, sy] of [
-    [x0, y0, 1, 1],
-    [x0 + s, y0, -1, 1],
-    [x0, y0 + s, 1, -1],
-    [x0 + s, y0 + s, -1, -1],
-  ] as const) {
-    ctx.moveTo(ax + sx * k, ay);
-    ctx.lineTo(ax, ay);
-    ctx.lineTo(ax, ay + sy * k);
+  for (let i = 0; i < 6; i++) {
+    const p = pts[i] as Vec2;
+    const a = pts[(i + 5) % 6] as Vec2;
+    const b = pts[(i + 1) % 6] as Vec2;
+    ctx.moveTo(p.x + (a.x - p.x) * f, p.y + (a.y - p.y) * f);
+    ctx.lineTo(p.x, p.y);
+    ctx.lineTo(p.x + (b.x - p.x) * f, p.y + (b.y - p.y) * f);
   }
   ctx.stroke();
 }
@@ -376,21 +418,23 @@ export function drawRoute(
     ctx.fillStyle = color;
     for (const p of path) {
       ctx.beginPath();
-      ctx.arc(cx(L, p.x), cy(L, p.y), 2, 0, Math.PI * 2);
+      ctx.arc(cx(L, p.x, p.y), cy(L, p.x, p.y), 2, 0, Math.PI * 2);
       ctx.fill();
     }
   }
   if (target) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
-    ctx.strokeRect(L.ox + target.x * L.ts + 1, L.oy + target.y * L.ts + 1, L.ts - 2, L.ts - 2);
+    ctx.beginPath();
+    tilePath(ctx, L, target, -1);
+    ctx.stroke();
   }
 }
 
 function trace(ctx: CanvasRenderingContext2D, L: Layout, from: Vec2, path: readonly PathStep[]): void {
   ctx.beginPath();
-  ctx.moveTo(cx(L, from.x), cy(L, from.y));
-  for (const p of path) ctx.lineTo(cx(L, p.x), cy(L, p.y));
+  ctx.moveTo(cx(L, from.x, from.y), cy(L, from.x, from.y));
+  for (const p of path) ctx.lineTo(cx(L, p.x, p.y), cy(L, p.x, p.y));
   ctx.stroke();
 }
 
@@ -398,7 +442,9 @@ export function drawHoverTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Ve
   ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
   ctx.lineWidth = 1.5;
   ctx.setLineDash([]);
-  ctx.strokeRect(L.ox + tile.x * L.ts + 0.5, L.oy + tile.y * L.ts + 0.5, L.ts - 1, L.ts - 1);
+  ctx.beginPath();
+  tilePath(ctx, L, tile, -0.5);
+  ctx.stroke();
 }
 
 let roverImg: HTMLImageElement | null = null;
@@ -428,14 +474,15 @@ function roverTopSprite(): HTMLImageElement | null {
   return roverTopImg && roverTopImg.complete && roverTopImg.naturalWidth > 0 ? roverTopImg : null;
 }
 
-/** Where the rover is drawn: `shift` nudges it off the ship's pad. */
+/** Where the rover is drawn: `shift` nudges it off the ship's pad. `at` is a canvas pixel position. */
 function roverPoint(L: Layout, at: Vec2, shift: boolean): { x: number; y: number } {
-  const off = shift ? L.ts * 0.26 : 0;
-  return { x: cx(L, at.x) + off, y: cy(L, at.y) + off };
+  const off = shift ? L.tw * 0.26 : 0;
+  return { x: at.x + off, y: at.y + off };
 }
 
 /**
- * The rover at a (possibly fractional) tile position. `shift` nudges it off the ship's pad.
+ * The rover at a canvas pixel position (a tile centre, or in between mid-drive; see `tileCenter`). `shift` nudges
+ * it off the ship's pad.
  * With the top-down sprite, `heading` (degrees, 0 = north, clockwise) rotates it; otherwise
  * `facing` is +1 or -1 and mirrors the side-view sprite to the direction of travel.
  */
@@ -453,7 +500,7 @@ export function drawRover(
   ctx.setLineDash([]);
   const top = roverTopSprite();
   if (top) {
-    const h = L.ts * 1.7;
+    const h = L.tw * 1.7;
     const w = h * (top.naturalWidth / top.naturalHeight);
     ctx.fillStyle = `rgba(95, 212, 255, ${0.1 + pulse * 0.1})`;
     ctx.beginPath();
@@ -471,7 +518,7 @@ export function drawRover(
   }
   const sprite = roverSprite();
   if (sprite) {
-    const w = L.ts * 2;
+    const w = L.tw * 2;
     const h = w * (sprite.naturalHeight / sprite.naturalWidth);
     ctx.fillStyle = `rgba(95, 212, 255, ${0.1 + pulse * 0.1})`;
     ctx.beginPath();
@@ -487,7 +534,7 @@ export function drawRover(
     ctx.imageSmoothingEnabled = prev;
     return;
   }
-  const r = Math.max(4, L.ts * 0.3);
+  const r = Math.max(4, L.tw * 0.3);
   ctx.fillStyle = `rgba(95, 212, 255, ${0.12 + pulse * 0.15})`;
   ctx.beginPath();
   ctx.arc(x, y, r * (1.5 + pulse * 0.5), 0, Math.PI * 2);
@@ -513,7 +560,7 @@ function energyColor(frac: number): string {
 }
 
 /**
- * A small energy gauge under the rover: green → amber → red as it drops. With a `preview`, the energy a
+ * A small energy gauge under the rover (`at` is a canvas pixel position): green → amber → red as it drops. With a `preview`, the energy a
  * move would burn is a striped segment at the end of the fill, and a tick marks the reserve needed to get
  * home afterwards. The gauge is outlined red when the trip can't be afforded.
  */
@@ -528,10 +575,11 @@ export function drawEnergyBar(
 ): void {
   if (max <= 0) return;
   const { x, y } = roverPoint(L, at, shift);
-  const bw = Math.round(Math.min(64, Math.max(26, L.ts * 1.6)));
-  const bh = L.ts >= 14 ? 6 : 5;
+  const bw = Math.round(Math.min(64, Math.max(26, L.tw * 1.6)));
+  const bh = L.tw >= 14 ? 6 : 5;
   const bx = Math.round(x - bw / 2);
-  const by = Math.round(y + L.ts * 0.58);
+  // Just under the hex's lower corner.
+  const by = Math.round(y + L.size * 0.85);
   const frac = Math.max(0, Math.min(1, energy / max));
   const fillW = Math.round(bw * frac);
   const cost = preview ? Math.max(0, preview.cost) : 0;

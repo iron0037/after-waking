@@ -9,6 +9,7 @@ import { fuelPrice, sellCommodity } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
 import { canEnter, findPath } from "./pathfinding";
+import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
 import type { Rng } from "./rng";
 import {
@@ -464,7 +465,7 @@ function revealAround(state: GameState, world: World): void {
   const { map, know, rover } = ctx.value;
   const radius = 2 + sensorTierFor(state, map.bodyId);
   markExplored(know, rover.x, rover.y, radius);
-  const near = (p: { x: number; y: number }) => Math.max(Math.abs(p.x - rover.x), Math.abs(p.y - rover.y)) <= radius;
+  const near = (p: { x: number; y: number }) => hexDistance(p, rover) <= radius;
   const found = map.deposits.filter((d) => !know.discovered.includes(d.id) && near(d));
   for (const d of found) know.discovered.push(d.id);
   if (found.length > 0) {
@@ -481,7 +482,7 @@ function revealAround(state: GameState, world: World): void {
 function depositNearRover(ctx: SurfaceCtx, depositId: number): Result<Deposit> {
   const d = ctx.map.deposits.find((dep) => dep.id === depositId);
   if (!d || !ctx.know.discovered.includes(depositId)) return fail("Unknown deposit.");
-  if (Math.max(Math.abs(d.x - ctx.rover.x), Math.abs(d.y - ctx.rover.y)) > 1) return fail("Drive the rover next to the deposit first.");
+  if (hexDistance(d, ctx.rover) > 1) return fail("Drive the rover next to the deposit first.");
   return ok(d);
 }
 
@@ -637,7 +638,7 @@ export function collectSample(state: GameState, world: World, siteId: number): R
   const site = map.flora.find((f) => f.id === siteId);
   if (!site || !know.floraFound.includes(siteId)) return fail("Unknown flora site.");
   if (know.floraSampled.includes(siteId)) return fail("Already sampled here.");
-  if (Math.max(Math.abs(site.x - rover.x), Math.abs(site.y - rover.y)) > 1) return fail("Drive the rover next to the plants first.");
+  if (hexDistance(site, rover) > 1) return fail("Drive the rover next to the plants first.");
   if (specimenCount(rover.specimens) >= ROVER_SPECIMEN_SLOTS) return fail("The rover's sample cases are full.");
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;
@@ -658,7 +659,7 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   if (!ctx.ok) return ctx;
   const { map, rover } = ctx.value;
   const home = shipTile(state, map);
-  if (Math.max(Math.abs(rover.x - home.x), Math.abs(rover.y - home.y)) > 1) {
+  if (hexDistance(rover, home) > 1) {
     return fail("Drive the rover back to the ship first.");
   }
   const capacity = shipStats(state.ship).cargoCapacityT;
@@ -691,7 +692,7 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   if (!ctx.ok) return ctx;
   const { map, rover } = ctx.value;
   const home = shipTile(state, map);
-  if (Math.max(Math.abs(rover.x - home.x), Math.abs(rover.y - home.y)) > 1) {
+  if (hexDistance(rover, home) > 1) {
     return fail("Drive the rover back to the ship to recharge.");
   }
   const full = shipStats(state.ship).roverEnergy;

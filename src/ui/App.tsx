@@ -26,7 +26,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
     const onKey = (ev: KeyboardEvent) => {
       if (ev.target instanceof HTMLInputElement || session.busy) return;
       if (ev.key === "j" || ev.key === "J") setJournalOpen((o) => !o);
-      else if (ev.key === "c" || ev.key === "C") setCompendiumOpen((o) => !o);
+      // C is a hex movement key on the surface (down-right), so the compendium lives on B ("book").
+      else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
       else if (ev.key === "Escape") {
         setJournalOpen(false);

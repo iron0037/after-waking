@@ -7,6 +7,9 @@ import {
   collectSample,
   currentRegion,
   deployRover,
+  dirBetween,
+  DIR_ANGLE,
+  disk,
   DRILL_ENERGY_PER_HOUR,
   DRILL_SETUP_ENERGY,
   DRILL_SETUP_MINUTES,
@@ -14,9 +17,11 @@ import {
   exploredFraction,
   formatDuration,
   formatPressure,
+  hexDistance,
   HOP_MINUTES,
   hopFuel,
   HOUR,
+  KEY_TO_DIR,
   KIND_LABEL,
   knowledge,
   launch,
@@ -41,12 +46,14 @@ import {
   SHIFT_FACTOR,
   specimenCount,
   specimensFrom,
+  step,
   stowRover,
   Terrain,
   TERRAIN_INFO,
   type Deposit,
   type FloraSite,
   type GameState,
+  type HexDir,
   type Location,
   type PathStep,
   type RegionKnowledge,
@@ -73,12 +80,13 @@ import {
   drawShip,
   drawTooltip,
   tileAt,
+  tileCenter,
   type EnergyPreview,
   type Layout,
   type Reveal,
   type TipLine,
 } from "./surface/mapDraw";
-import { affordablePrefix, chebyshev, energyHome, evaluate, planPath, type RoutePlan } from "./surface/routing";
+import { affordablePrefix, energyHome, evaluate, planPath, type RoutePlan } from "./surface/routing";
 import { Section } from "./surface/Section";
 import { buildFoggedImage, buildTerrainImage, composePainted } from "./surface/terrainImage";
 import "./surface.css";
@@ -100,9 +108,11 @@ const TURN_DEG_PER_S = 900;
 /** Below this share of full charge, a rover that pulls up beside the ship is offered a recharge. */
 const RECHARGE_HINT_BELOW = 0.6;
 
-/** Compass heading (0 = north, clockwise) of a unit step. */
-function headingOf(dx: number, dy: number): number {
-  return dx > 0 ? 90 : dx < 0 ? 270 : dy > 0 ? 180 : 0;
+/** Compass heading (0 = north, clockwise) of a single hex step; null if the tiles aren't adjacent. */
+function headingOf(from: Vec2, to: Vec2): number | null {
+  const dir = dirBetween(from, to);
+  // DIR_ANGLE is 0 = east, clockwise; the sprite's nose points north.
+  return dir ? (DIR_ANGLE[dir] + 90) % 360 : null;
 }
 
 interface Hover {
@@ -111,17 +121,8 @@ interface Hover {
   py: number;
 }
 
-/** Keyboard driving: arrows and WASD, one tile per press. */
-const KEY_DIRS: Record<string, Vec2> = {
-  arrowup: { x: 0, y: -1 },
-  arrowdown: { x: 0, y: 1 },
-  arrowleft: { x: -1, y: 0 },
-  arrowright: { x: 1, y: 0 },
-  w: { x: 0, y: -1 },
-  s: { x: 0, y: 1 },
-  a: { x: -1, y: 0 },
-  d: { x: 1, y: 0 },
-};
+/** Keyboard driving, one hex per press: Q/E/A/D/Z/C (nw/ne/w/e/sw/se), plus Left/Right arrows for w/e. */
+const KEY_DIRS: Record<string, HexDir> = { ...KEY_TO_DIR, arrowleft: "w", arrowright: "e" };
 
 export function SurfaceView({ session }: { session: GameSession }) {
   useSession(session);
@@ -179,6 +180,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const facingRef = useRef(1);
   const headingRef = useRef({ cur: 0, target: 0, lastT: 0 });
   const routeRef = useRef<{ key: string; plan: RoutePlan | null }>({ key: "", plan: null });
+  // Tiles swept so far on the current drive, grown incrementally as the rover passes points.
+  const revealRef = useRef<{ anim: Anim; n: number; seen: Set<number>; tiles: Vec2[] } | null>(null);
   const aliveRef = useRef(true);
   // "Move ship" targeting mode (only while the rover is stowed).
   const [moveMode, setMoveMode] = useState(false);
@@ -230,7 +233,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       session.notify("Rover energy is too low to move.", "error");
       return false;
     }
-    const startedNearShip = chebyshev(rover, ship) <= 1;
+    const startedNearShip = hexDistance(rover, ship) <= 1;
     const pts: Vec2[] = [{ x: rover.x, y: rover.y }, ...steps];
     const cum = [0];
     for (const step of steps) cum.push((cum[cum.length - 1] as number) + step.energy);
@@ -253,7 +256,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
     const now = session.state.location;
     if (!quiet && !startedNearShip && now.kind === "surface" && now.rover) {
-      if (chebyshev(now.rover, ship) <= 1 && now.rover.energy < stats.roverEnergy * RECHARGE_HINT_BELOW) setRechargeHint(true);
+      if (hexDistance(now.rover, ship) <= 1 && now.rover.energy < stats.roverEnergy * RECHARGE_HINT_BELOW) setRechargeHint(true);
     }
     return true;
   };
@@ -261,7 +264,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   /** True when the rover is already at the site: on its tile, or beside it if the tile can't be entered. */
   const atSite = (site: Vec2): boolean =>
     rover !== null &&
-    ((rover.x === site.x && rover.y === site.y) || (!canEnter(map, site.x, site.y, canClimb) && chebyshev(rover, site) <= 1));
+    ((rover.x === site.x && rover.y === site.y) || (!canEnter(map, site.x, site.y, canClimb) && hexDistance(rover, site) <= 1));
 
   /**
    * Drive to a tile. With `approach` (deposits and plants) the rover goes onto the site itself, even when
@@ -314,31 +317,49 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     let reveal: Reveal | null = null;
     let seen = know;
     if (anim) {
-      const passed = anim.pts.slice(0, Math.min(anim.pts.length - 1, Math.round((t - anim.t0) / STEP_MS)) + 1);
-      reveal = { terrain: terrainImg, pts: passed, radius: sweep };
-      const near = (o: Vec2): boolean => passed.some((p) => chebyshev(p, o) <= sweep);
+      const n = Math.min(anim.pts.length - 1, Math.max(0, Math.round((t - anim.t0) / STEP_MS))) + 1;
+      let rc = revealRef.current;
+      if (!rc || rc.anim !== anim) rc = revealRef.current = { anim, n: 0, seen: new Set(), tiles: [] };
+      for (; rc.n < n; rc.n++) {
+        for (const tile of disk(anim.pts[rc.n] as Vec2, sweep)) {
+          if (tile.x < 0 || tile.y < 0 || tile.x >= map.width || tile.y >= map.height) continue;
+          const i = tile.y * map.width + tile.x;
+          if (rc.seen.has(i)) continue;
+          rc.seen.add(i);
+          rc.tiles.push(tile);
+        }
+      }
+      reveal = { terrain: terrainImg, tiles: rc.tiles };
+      const passed = anim.pts.slice(0, n);
+      const near = (o: Vec2): boolean => passed.some((p) => hexDistance(p, o) <= sweep);
       const deps = map.deposits.filter((d) => !know.discovered.includes(d.id) && near(d)).map((d) => d.id);
       const flora = map.flora.filter((f) => !know.floraFound.includes(f.id) && near(f)).map((f) => f.id);
       if (deps.length > 0 || flora.length > 0) {
         seen = { ...know, discovered: [...know.discovered, ...deps], floraFound: [...know.floraFound, ...flora] };
       }
-    }
+    } else revealRef.current = null;
     drawBase(ctx, w, h, L, paintedImg, reveal);
 
-    // Where the rover is drawn: mid-drive it slides along the path.
-    let pos: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
+    // Where the rover is drawn (canvas pixels): mid-drive it slides between hex centres along the path.
+    let tile: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
+    let pos: Vec2 | null = tile ? tileCenter(L, tile) : null;
     let spent = 0;
     const hd = headingRef.current;
     if (anim) {
       const p = Math.min(anim.pts.length - 1, Math.max(0, (t - anim.t0) / STEP_MS));
       const i = Math.floor(p);
+      const f = p - i;
       const a = anim.pts[i] as Vec2;
       const b = anim.pts[Math.min(anim.pts.length - 1, i + 1)] as Vec2;
-      if (Math.abs(b.x - a.x) > 0.01) facingRef.current = b.x > a.x ? 1 : -1;
-      if (b.x !== a.x || b.y !== a.y) hd.target = headingOf(b.x - a.x, b.y - a.y);
+      const ca = tileCenter(L, a);
+      const cb = tileCenter(L, b);
+      if (Math.abs(cb.x - ca.x) > 0.01) facingRef.current = cb.x > ca.x ? 1 : -1;
+      const heading = headingOf(a, b);
+      if (heading !== null) hd.target = heading;
       const e0 = anim.cum[i] ?? 0;
-      spent = e0 + ((anim.cum[Math.min(anim.cum.length - 1, i + 1)] ?? e0) - e0) * (p - i);
-      pos = { x: a.x + (b.x - a.x) * (p - i), y: a.y + (b.y - a.y) * (p - i) };
+      spent = e0 + ((anim.cum[Math.min(anim.cum.length - 1, i + 1)] ?? e0) - e0) * f;
+      pos = { x: ca.x + (cb.x - ca.x) * f, y: ca.y + (cb.y - ca.y) * f };
+      tile = f < 0.5 ? a : b;
     }
 
     // Turn the (top-down) sprite smoothly toward the direction of travel.
@@ -348,7 +369,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const turn = (TURN_DEG_PER_S * dt) / 1000;
     hd.cur = Math.abs(diff) <= turn ? hd.target : (hd.cur + Math.sign(diff) * turn + 360) % 360;
 
-    if (pos) drawSensorRange(ctx, L, { x: Math.round(pos.x), y: Math.round(pos.y) }, sweep);
+    if (tile) drawSensorRange(ctx, L, tile, sweep);
     drawShip(ctx, L, ship);
     drawFlora(ctx, L, map, seen, selectedFlora?.id ?? null, t);
     drawDeposits(ctx, L, map, seen, selected?.id ?? null, t);
@@ -380,8 +401,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       drawHoverTile(ctx, L, hover.tile);
     } else if (hover) drawHoverTile(ctx, L, hover.tile);
 
-    if (pos && rover) {
-      const onPad = Math.round(pos.x) === ship.x && Math.round(pos.y) === ship.y;
+    if (pos && tile && rover) {
+      const onPad = tile.x === ship.x && tile.y === ship.y;
       drawRover(ctx, L, pos, t, onPad, facingRef.current, hd.cur);
       drawEnergyBar(ctx, L, pos, onPad, Math.max(0, rover.energy - spent), stats.roverEnergy, preview);
     }
@@ -481,7 +502,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   // --- rover and ship actions (buttons and hotkeys share these) ------------------------------------
 
-  const nearShip = rover !== null && chebyshev(rover, ship) <= 1;
+  const nearShip = rover !== null && hexDistance(rover, ship) <= 1;
 
   const doDeploy = (): void => {
     const r = session.act((s, w) => deployRover(s, w));
@@ -515,7 +536,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       return;
     }
     // A rover already beside the deposit rolls onto it first, where you can see it.
-    if (rover && chebyshev(rover, dep) <= 1 && !(await driveTo(dep, true, true))) return;
+    if (rover && hexDistance(rover, dep) <= 1 && !(await driveTo(dep, true, true))) return;
     const name = COMMODITIES[dep.commodity].name.toLowerCase();
     const r = session.act((s, w) => workDeposit(s, w, dep.id));
     if (!r.ok) return;
@@ -539,9 +560,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     setMoveMode((m) => !m);
   };
 
-  const stepRover = (dir: Vec2, repeat: boolean): void => {
+  const stepRover = (dir: HexDir, repeat: boolean): void => {
     if (!rover) return;
-    const to = { x: rover.x + dir.x, y: rover.y + dir.y };
+    const to = step(rover.x, rover.y, dir);
     if (!canEnter(map, to.x, to.y, canClimb)) {
       if (!repeat) session.notify("The rover can't go that way.", "error");
       return;
@@ -568,7 +589,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       if (!rover) return;
       ev.preventDefault();
       stepRover(dir, ev.repeat);
-    } else if (key === "e") {
+    } else if (key === "r") {
       if (!rover) doDeploy();
       else if (nearShip) doStow();
       else session.notify("Drive the rover back to the ship first.", "error");
@@ -584,12 +605,23 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     <>
       <div class="viewport">
         <Canvas draw={draw} onClick={onClick} onMove={onMove} onLeave={() => (hoverRef.current = null)} animate />
-        <div class="viewport-hint">
-          {moveMode && !rover
-            ? "Click a clear tile to set the ship down · Esc to cancel"
-            : rover
-              ? "Click or WASD/arrows to drive · E stow at ship · F work selected deposit"
-              : "E deploy rover · Hover for terrain"}
+        <div class="surface-footer">
+          <div class="viewport-hint">
+            {moveMode && !rover
+              ? "Click a clear tile to set the ship down · Esc to cancel"
+              : rover
+                ? "Click or Q/E/A/D/Z/C to drive · R stow at ship · F work selected deposit"
+                : "R deploy rover · Hover for terrain"}
+          </div>
+          <div class="surface-legend">
+            {present.map((t) => (
+              <span key={t} class="legend-item">
+                <i style={{ background: TERRAIN_COLORS[body.kind][t] }} />
+                {TERRAIN_INFO[t].name}
+                {TERRAIN_INFO[t].passable === "climb" && !canClimb ? " ✕" : ""}
+              </span>
+            ))}
+          </div>
         </div>
         {rechargeHint && rover && nearShip && canRecharge && !busy && (
           <div class="recharge-hint" role="status">
@@ -605,22 +637,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             </button>
           </div>
         )}
-        <div class="surface-legend">
-          {present.map((t) => (
-            <span key={t} class="legend-item">
-              <i style={{ background: TERRAIN_COLORS[body.kind][t] }} />
-              {TERRAIN_INFO[t].name}
-              {TERRAIN_INFO[t].passable === "climb" && !canClimb ? " ✕" : ""}
-            </span>
-          ))}
-        </div>
       </div>
       <aside class="side surface-side">
         <div class="action-bar">
           <div class="ab-group">
             <span class="ab-label">Rover</span>
             {!rover && (
-              <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (E)" onClick={doDeploy}>
+              <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (R)" onClick={doDeploy}>
                 Deploy rover
               </button>
             )}
@@ -637,7 +660,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 <button
                   class="btn"
                   disabled={busy || !nearShip}
-                  title={!nearShip ? "Drive the rover back to the ship first" : "Unloads the cargo bed and recharges, 30 min (E)"}
+                  title={!nearShip ? "Drive the rover back to the ship first" : "Unloads the cargo bed and recharges, 30 min (R)"}
                   onClick={doStow}
                 >
                   Stow &amp; unload
@@ -757,7 +780,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </thead>
               <tbody>
                 {floraFound
-                  .map((f) => ({ f, dist: chebyshev(rover ?? ship, f) }))
+                  .map((f) => ({ f, dist: hexDistance(rover ?? ship, f) }))
                   .sort((a, b) => a.dist - b.dist)
                   .map(({ f, dist }) => {
                     const sampled = floraStatus(know, f) === "sampled";
@@ -790,7 +813,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </thead>
               <tbody>
                 {discovered
-                  .map((d) => ({ d, dist: chebyshev(rover ?? ship, d) }))
+                  .map((d) => ({ d, dist: hexDistance(rover ?? ship, d) }))
                   .sort((a, b) => a.dist - b.dist)
                   .map(({ d, dist }) => {
                     const status = depositStatus(know, d);
@@ -1013,7 +1036,7 @@ function FloraPanel({
   busy: boolean;
 }) {
   const sampled = floraStatus(know, site) === "sampled";
-  const dist = rover ? chebyshev(rover, site) : null;
+  const dist = rover ? hexDistance(rover, site) : null;
   const near = dist !== null && dist <= 1;
   const blockers: string[] = [];
   if (sampled) blockers.push("Already sampled here.");
@@ -1095,7 +1118,7 @@ function DepositPanel({
   const status = depositStatus(know, dep);
   const prospected = know.prospected.includes(dep.id);
   const isSite = know.drillSites.includes(dep.id);
-  const dist = rover ? chebyshev(rover, dep) : null;
+  const dist = rover ? hexDistance(rover, dep) : null;
   const near = dist !== null && dist <= 1;
   const remaining = remainingTonnes(know, dep);
   const tooDeep = dep.depthM > stats.drillMaxDepthM;

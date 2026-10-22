@@ -1,17 +1,28 @@
-/* Surface screen: survey map, rover and deposit panels. */
-
-.surface-legend {
+/* Bottom bar over the map: key hint on the left, terrain legend on the right, never overlapping. */
+.surface-footer {
   position: absolute;
+  left: 12px;
   right: 12px;
   bottom: 10px;
   display: flex;
-  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+.surface-footer .viewport-hint {
+  position: static;
+  flex: 0 1 auto;
+}
+.surface-legend {
+  display: flex;
+  gap: 4px 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 60%;
+  margin-left: auto;
   font-size: 11px;
   color: var(--muted);
-  pointer-events: none;
 }
 .surface-legend .legend-item {
   display: inline-flex;
@@ -20,10 +31,10 @@
 }
 .surface-legend i {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border: 1px solid #0008;
-  border-radius: 2px;
+  width: 11px;
+  height: 12px;
+  /* pointy-top hex, like the map tiles */
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
 .surface-side h3 {

@@ -63,7 +63,7 @@ export function TopBar({
       <button class="btn" onClick={onContracts} title="Contracts (K)">
         Contracts ({activeContracts})
       </button>
-      <button class="btn" onClick={onCompendium} title="Compendium (C)">
+      <button class="btn" onClick={onCompendium} title="Compendium (B)">
         Compendium {compendiumTotals(state).all.found}/{compendiumTotals(state).all.total}
       </button>
       <button class="btn" onClick={onJournal} title="Journal (J)">

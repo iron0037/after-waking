@@ -239,7 +239,7 @@ A permanent record of everything found, measured against the whole game catalog,
   - Living worlds draw 3–6 species from the climate's pool, weighted by rarity.
   - Drilling has about a 3.5% chance per hour to turn up a specimen from the host ore.
   - A duplicate specimen sells to Exchange collectors (150–1,500 cr by rarity).
-- **UI:** an overlay (C key, or the top-bar button). Found entries show where and when; unfound entries show a silhouette, rarity and a hint.
+- **UI:** an overlay (B key, or the top-bar button). Found entries show where and when; unfound entries show a silhouette, rarity and a hint.
 - **Next:**
   - A unique pixel sprite per entry, batch-generated through the art pipeline.
   - **[PROPOSED]** Lyceum milestone rewards at 10, 25 and 50 entries (research unlocks, rare gear), like Stardew's museum rewards.

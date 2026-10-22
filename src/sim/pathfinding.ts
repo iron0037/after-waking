@@ -1,4 +1,5 @@
-/** Rover routing on a region map: cheapest path by travel time (Dijkstra, 4-way). */
+/** Rover routing on a hex region map: cheapest path by travel time (Dijkstra over six neighbours). */
+import { neighbors } from "./hex";
 import { TERRAIN_INFO, type RegionMap, type Terrain } from "./surface";
 import type { Vec2 } from "./units";
 
@@ -37,9 +38,7 @@ export function findPath(map: RegionMap, from: Vec2, to: Vec2, canClimb: boolean
     if (c > (cost[node] as number)) continue;
     const x = node % w;
     const y = (node - x) / w;
-    for (const [dx, dy] of DIRS) {
-      const nx = x + dx;
-      const ny = y + dy;
+    for (const { x: nx, y: ny } of neighbors(x, y)) {
       if (!canEnter(map, nx, ny, canClimb)) continue;
       const next = ny * w + nx;
       const nc = c + stepCost(map, nx, ny).minutes;
@@ -61,12 +60,6 @@ export function findPath(map: RegionMap, from: Vec2, to: Vec2, canClimb: boolean
   return steps.reverse();
 }
 
-const DIRS = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-] as const;
 
 class MinHeap {
   private nodes: number[] = [];
