@@ -106,7 +106,7 @@ import {
   type TipLine,
 } from "./surface/mapDraw";
 import { affordablePrefix, energyHome, evaluate, planPath, type RoutePlan } from "./surface/routing";
-import { Section } from "./surface/Section";
+import { Section } from "../Section";
 import { terrainCache, type RegionImage } from "./surface/terrainImage";
 import "./surface.css";
 
@@ -638,7 +638,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (tile) drawSensorRange(ctx, L, tile, sweep);
     drawShip(ctx, L, ship);
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
-    drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t);
+    drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM);
 
     // hover: route preview and tooltip
     const hover = anim || dragRef.current?.moved ? null : hoverRef.current;
@@ -1161,6 +1161,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                           {status === "new" && <span class="tag new">new</span>}
                           {status === "prospected" && <span class="tag">{Math.round(d.grade * 100)}%</span>}
                           {status === "depleted" && <span class="muted">depleted</span>}
+                          {status !== "depleted" && d.depthM > stats.drillMaxDepthM && (
+                            <span class="danger small" title={`${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m`}>
+                              {" "}
+                              too deep
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );

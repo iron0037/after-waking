@@ -48,7 +48,8 @@ export type { Result } from "./result";
 // --- tuning ------------------------------------------------------------------------------
 
 export const FOLD_FUEL_PER_T_LY = 0.001;
-export const FOLD_TRANSIT_MINUTES = 30;
+/** Docking with the Intrepid after folding home (the fold itself is instant). */
+export const DOCKING_MINUTES = 30;
 export const IN_SYSTEM_FUEL_PER_AU_PER_KT = 0.01;
 export const MANEUVER_MINUTES = 20;
 export const DESCENT_MINUTES = 2 * HOUR;
@@ -138,11 +139,14 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   const fromId = currentSystemId(state);
   state.ship.fuel = Math.max(0, state.ship.fuel - plan.fuel);
   state.stats.folds++;
-  advanceTime(state, FOLD_TRANSIT_MINUTES);
+  // Folding is instant (lore). The drive's recharge clock starts now.
   state.foldReadyAt = state.time + plan.rechargeMinutes;
+  // The crew tops up the rover's cells from the reactor during the pre-fold checks.
+  state.ship.roverEnergy = shipStats(state.ship).roverEnergy;
 
   if (targetId === "intrepid") {
     state.location = { kind: "intrepid" };
+    advanceTime(state, DOCKING_MINUTES);
     log(state, "travel", `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
     return ok(undefined);
   }
@@ -358,6 +362,7 @@ export function land(state: GameState, world: World, region: number): Result {
   };
   knowledge(state, body.id, region).visits++;
   state.stats.landings++;
+  revealAt(state, world, body.id, state.location.ship as Vec2);
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
   return ok(undefined);
 }
@@ -444,6 +449,7 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   advanceTime(state, HOP_MINUTES);
   loc.ship = { x, y };
   visitRegion(state, world, loc.bodyId, x, y);
+  revealAt(state, world, loc.bodyId, loc.ship);
   log(state, "travel", `Hopped the ship ${Math.round(hexDistance(here, { x, y }) * TILE_KM)} km to a new landing site.`);
   return ok(undefined);
 }
@@ -501,16 +507,20 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
 
 function revealAround(state: GameState, world: World): void {
   const ctx = surfaceCtx(state, world);
-  if (!ctx.ok) return;
-  const { surface, rover, bodyId } = ctx.value;
+  if (ctx.ok) revealAt(state, world, ctx.value.bodyId, ctx.value.rover);
+}
+
+/** Sweep the sensors (the rover's, or the ship's on the pad) around `center`, across region borders. */
+function revealAt(state: GameState, world: World, bodyId: string, center: Vec2): void {
+  const surface = world.surface(bodyId);
   const radius = 2 + sensorTierFor(state, bodyId);
-  const near = (p: Vec2) => hexDistance(p, rover) <= radius;
+  const near = (p: Vec2) => hexDistance(p, center) <= radius;
   const foundDeposits: SurfaceDeposit[] = [];
   const foundFlora: SurfaceFlora[] = [];
-  for (const region of surface.regionsNear(rover, radius)) {
+  for (const region of surface.regionsNear(center, radius)) {
     const know = knowledge(state, bodyId, region);
     const o = surface.origin(region);
-    markExplored(know, rover.x - o.x, rover.y - o.y, radius);
+    markExplored(know, center.x - o.x, center.y - o.y, radius);
     for (const d of surface.deposits(region)) {
       if (!know.discovered.includes(d.id) && near(d)) {
         know.discovered.push(d.id);
@@ -529,7 +539,7 @@ function revealAround(state: GameState, world: World): void {
     log(
       state,
       "discovery",
-      `Rover sensors picked up ${foundDeposits.length === 1 ? "a deposit" : `${foundDeposits.length} deposits`}: ${names.join(", ")}.`,
+      `Sensors picked up ${foundDeposits.length === 1 ? "a deposit" : `${foundDeposits.length} deposits`}: ${names.join(", ")}.`,
     );
   }
   if (foundFlora.length > 0) {
@@ -835,13 +845,35 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   return ok(credits);
 }
 
+/** Tonnes of each commodity that active delivery contracts still need (kept back by sellAll). */
+export function reservedCargo(state: GameState): Partial<Record<CommodityId, number>> {
+  const out: Partial<Record<CommodityId, number>> = {};
+  for (const c of state.contracts ?? []) {
+    if (c.status !== "active" || c.kind !== "deliver" || !c.commodity) continue;
+    out[c.commodity] = (out[c.commodity] ?? 0) + (c.tonnes ?? 0);
+  }
+  return out;
+}
+
+/** How much of a commodity can be sold without dipping into tonnage held for contracts. */
+export function sellableTonnes(state: GameState, id: CommodityId): number {
+  return Math.max(0, (state.ship.cargo[id] ?? 0) - (reservedCargo(state)[id] ?? 0));
+}
+
+/** Sell the hold, keeping back whatever active delivery contracts need. */
 export function sellAll(state: GameState): Result<number> {
   let total = 0;
+  let held = 0;
   for (const id of Object.keys(state.ship.cargo) as CommodityId[]) {
-    const r = sell(state, id);
+    const amount = sellableTonnes(state, id);
+    held += (state.ship.cargo[id] ?? 0) - amount;
+    if (amount <= 0.05) continue;
+    const r = sell(state, id, amount);
     if (r.ok) total += r.value;
   }
-  return total > 0 ? ok(total) : fail("The hold is empty.");
+  if (held > 0.05) log(state, "trade", `Kept ${held.toFixed(1)} t aboard for your delivery contracts.`);
+  if (total > 0) return ok(total);
+  return fail(held > 0.05 ? "Everything aboard is held for delivery contracts. Turn them in under Jobs." : "The hold is empty.");
 }
 
 export const SPECIMEN_PRICE = 300;
@@ -909,6 +941,9 @@ export function buyFuelOnCredit(state: GameState, units: number): Result<number>
   return ok(n);
 }
 
+/** Yard time to fit any upgrade. */
+export const UPGRADE_INSTALL_DAYS = 2;
+
 export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
@@ -921,8 +956,8 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   if (state.credits < upgrade.price) return fail(`Costs ${upgrade.price.toLocaleString()} cr.`);
   state.credits -= upgrade.price;
   state.ship.upgrades.push(upgradeId);
-  advanceTime(state, 2 * DAY);
-  log(state, "trade", `Installed ${upgrade.name}. Two days in the yard.`);
+  advanceTime(state, UPGRADE_INSTALL_DAYS * DAY);
+  log(state, "trade", `Installed ${upgrade.name}. ${UPGRADE_INSTALL_DAYS} days in the yard.`);
   return ok(undefined);
 }
 

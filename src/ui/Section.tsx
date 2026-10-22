@@ -1,7 +1,9 @@
 /** A side-panel section with a clickable header that folds it. Folded state is remembered per section. */
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
+import "./fold.css";
 
+/** Kept under its original key so folds made before the Shipyard used it carry over. */
 const FOLD_KEY = "after-waking/ui/surface-folded";
 
 let folded: Record<string, boolean> | null = null;

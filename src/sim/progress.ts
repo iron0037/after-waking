@@ -7,7 +7,8 @@ import type { Contract } from "./contracts";
 import type { Body } from "./bodies";
 import { shipStats } from "./ship";
 import type { GameState } from "./state";
-import { exploredFraction, regionKey } from "./surface";
+import { siteKey } from "./bodysurface";
+import { exploredFraction, regionKey, type Deposit } from "./surface";
 import type { World } from "./world";
 
 export interface BodyProgress {
@@ -131,4 +132,47 @@ export function regionRecap(state: GameState, world: World, bodyId: string, regi
     reachableTonnes,
     floraUnsampled: (k.floraFound ?? []).filter((id) => !(k.floraSampled ?? []).includes(id)).length,
   };
+}
+
+export interface KnownDeposit {
+  region: number;
+  /** Site key "region:id" (see bodysurface.ts). */
+  key: string;
+  commodity: Deposit["commodity"];
+  remainingT: number;
+  depthM: number;
+  grade: number;
+  prospected: boolean;
+  /** Within the current drill's reach. */
+  reachable: boolean;
+}
+
+/**
+ * Untapped deposits the rover has already found on a world, across every region, for planning a
+ * return trip from orbit. Richest (by tonnes within reach) first.
+ */
+export function knownDeposits(state: GameState, world: World, bodyId: string): KnownDeposit[] {
+  const { body } = world.body(bodyId);
+  const reach = shipStats(state.ship).drillMaxDepthM;
+  const out: KnownDeposit[] = [];
+  for (let r = 0; r < body.regions; r++) {
+    const know = state.regions[regionKey(bodyId, r)];
+    if (!know || know.discovered.length === 0) continue;
+    for (const d of world.region(bodyId, r).deposits) {
+      if (!know.discovered.includes(d.id)) continue;
+      const remainingT = remainingTonnes(know, d);
+      if (remainingT <= 0.05) continue;
+      out.push({
+        region: r,
+        key: siteKey(r, d.id),
+        commodity: d.commodity,
+        remainingT,
+        depthM: d.depthM,
+        grade: d.grade,
+        prospected: know.prospected.includes(d.id),
+        reachable: d.depthM <= reach,
+      });
+    }
+  }
+  return out.sort((a, b) => Number(b.reachable) - Number(a.reachable) || b.remainingT - a.remainingT);
 }

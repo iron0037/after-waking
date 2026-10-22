@@ -13,6 +13,10 @@ import {
   formatDate,
   formatDuration,
   fuelPrice,
+  loanOutlook,
+  reservedCargo,
+  sellableTonnes,
+  UPGRADE_INSTALL_DAYS,
   NEW_SPECIES_BONUS,
   payLoan,
   sell,
@@ -27,6 +31,7 @@ import {
   type Contract,
 } from "../../sim";
 import { cr, pct, tonnes } from "../format";
+import { Section } from "../Section";
 import { useSession, type GameSession } from "../session";
 import "./hub.css";
 
@@ -34,9 +39,10 @@ type Tab = "market" | "jobs" | "shipyard" | "exchange" | "depart";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "market", label: "Market" },
-  { id: "jobs", label: "Jobs" },
   { id: "shipyard", label: "Shipyard" },
   { id: "exchange", label: "Exchange" },
+  // Jobs come last before departure: a contract's clock starts when it's accepted.
+  { id: "jobs", label: "Jobs" },
   { id: "depart", label: "Depart" },
 ];
 
@@ -126,7 +132,10 @@ function Market({ session }: { session: GameSession }) {
   const stats = shipStats(state.ship);
   const cargo = state.ship.cargo;
   const held = cargoTonnes(cargo);
-  const estimate = COMMODITY_IDS.reduce((sum, id) => sum + (cargo[id] ?? 0) * sellPrice(state.market, id), 0);
+  const reserved = reservedCargo(state);
+  const sellable = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id), 0);
+  const heldBack = held - sellable;
+  const estimate = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id) * sellPrice(state.market, id), 0);
   const price = fuelPrice(state.market);
   const room = Math.floor(stats.fuelCapacity - state.ship.fuel);
   const affordable = Math.floor(state.credits / price);
@@ -158,6 +167,8 @@ function Market({ session }: { session: GameSession }) {
               const have = cargo[id] ?? 0;
               const aboard = have > 0.05;
               const p = sellPrice(state.market, id);
+              const free = sellableTonnes(state, id);
+              const kept = Math.min(have, reserved[id] ?? 0);
               return (
                 <tr key={id}>
                   <td>
@@ -166,7 +177,14 @@ function Market({ session }: { session: GameSession }) {
                       {COMMODITIES[id].name}
                     </span>
                   </td>
-                  <td class="num">{aboard ? tonnes(have) : <span class="muted">-</span>}</td>
+                  <td class="num">
+                    {aboard ? tonnes(have) : <span class="muted">-</span>}
+                    {aboard && kept > 0.05 && (
+                      <div class="accent small" title="Held back for an active delivery contract. Turn it in under Jobs.">
+                        {tonnes(kept)} for contract
+                      </div>
+                    )}
+                  </td>
                   <td class="num">{cr(p)}</td>
                   <td class="num">
                     <Trend mult={state.market.mult[id]} />
@@ -175,9 +193,17 @@ function Market({ session }: { session: GameSession }) {
                   <td class="num">
                     <button
                       class="btn"
-                      disabled={!aboard}
-                      title={aboard ? `Sell all ${COMMODITIES[id].name.toLowerCase()}` : "None aboard"}
-                      onClick={() => session.act((s) => sell(s, id))}
+                      disabled={free <= 0.05}
+                      title={
+                        !aboard
+                          ? "None aboard"
+                          : free <= 0.05
+                            ? "All of it is held for a delivery contract. Turn it in under Jobs."
+                            : kept > 0.05
+                              ? `Sell ${tonnes(free)}, keeping ${tonnes(kept)} for your contract`
+                              : `Sell all ${COMMODITIES[id].name.toLowerCase()}`
+                      }
+                      onClick={() => session.act((s) => sell(s, id, sellableTonnes(s, id)))}
                     >
                       Sell
                     </button>
@@ -188,11 +214,16 @@ function Market({ session }: { session: GameSession }) {
           </tbody>
         </table>
         <div class="hub-actions">
-          <button class="btn primary" disabled={held <= 0.05} onClick={() => session.act((s) => sellAll(s))}>
+          <button class="btn primary" disabled={sellable <= 0.05} onClick={() => session.act((s) => sellAll(s))}>
             Sell entire hold
           </button>
           <span class="muted">
-            {held > 0.05 ? `about ${cr(estimate)} (big lots push the price down as they sell)` : "The hold is empty."}
+            {sellable > 0.05
+              ? `about ${cr(estimate)} (big lots push the price down as they sell)`
+              : held > 0.05
+                ? "Everything aboard is held for delivery contracts."
+                : "The hold is empty."}
+            {sellable > 0.05 && heldBack > 0.05 && <span class="accent"> · keeps {tonnes(heldBack)} for your contracts</span>}
           </span>
         </div>
       </section>
@@ -452,8 +483,7 @@ function Shipyard({ session }: { session: GameSession }) {
 
   return (
     <div class="hub-grid">
-      <section class="panel">
-        <h2>{state.ship.name}</h2>
+      <Section id="yard-ship" title={state.ship.name} level={2} summary={`${tonnes(stats.cargoCapacityT)} hold · drill ${stats.drillMaxDepthM} m`}>
         <h3>Ship</h3>
         <dl class="kv">
           <dt>Hull mass</dt>
@@ -497,12 +527,14 @@ function Shipyard({ session }: { session: GameSession }) {
           <dt>Radiation</dt>
           <dd>up to level {r.maxRadiation}</dd>
         </dl>
-      </section>
+      </Section>
 
       <section class="hub-upgrades">
-        {categories.map((cat) => (
-          <div key={cat} class="hub-vendor">
-            <h3>{UPGRADE_CATEGORY_NAMES[cat]}</h3>
+        {categories.map((cat) => {
+          const inCat = UPGRADES.filter((u) => u.category === cat);
+          const owned = inCat.filter((u) => state.ship.upgrades.includes(u.id)).length;
+          return (
+          <Section key={cat} id={`yard-${cat}`} title={UPGRADE_CATEGORY_NAMES[cat]} class="hub-vendor" summary={`${owned} of ${inCat.length} installed`}>
             <div class="hub-cards">
               {UPGRADES.filter((u) => u.category === cat).map((u) => {
                 const installed = state.ship.upgrades.includes(u.id);
@@ -514,7 +546,14 @@ function Shipyard({ session }: { session: GameSession }) {
                   <div key={u.id} class={`panel hub-card ${installed ? "installed" : ""}`}>
                     <div class="hub-card-head">
                       <strong>{u.name}</strong>
-                      {installed ? <span class="tag good">Installed</span> : <span class="accent">{cr(u.price)}</span>}
+                      {installed ? (
+                        <span class="tag good">Installed</span>
+                      ) : (
+                        <span class="hub-price">
+                          <span class="accent">{cr(u.price)}</span>
+                          <span class="muted small">+ {UPGRADE_INSTALL_DAYS} days in the yard</span>
+                        </span>
+                      )}
                     </div>
                     <div class="hub-card-tags">
                       <span class="tag" title={`Sold by the ${CLAN_NAMES[u.vendor]} clan`}>
@@ -532,7 +571,7 @@ function Shipyard({ session }: { session: GameSession }) {
                             ? `Requires ${reqName} first.`
                             : short > 0
                               ? `You need ${cr(short)} more.`
-                              : `Install for ${cr(u.price)}. Two days in the yard.`
+                              : `Install for ${cr(u.price)}. ${UPGRADE_INSTALL_DAYS} days in the yard.`
                         }
                         onClick={() => session.act((s) => buyUpgrade(s, u.id))}
                       >
@@ -543,8 +582,9 @@ function Shipyard({ session }: { session: GameSession }) {
                 );
               })}
             </div>
-          </div>
-        ))}
+          </Section>
+          );
+        })}
       </section>
     </div>
   );
@@ -561,6 +601,7 @@ function Exchange({ session }: { session: GameSession }) {
   const pay = (n: number) => session.act((s) => payLoan(s, n));
   const prepaid = loan.prepaid ?? 0;
   const covered = loan.payment > 0 ? Math.floor(prepaid / loan.payment) : 0;
+  const outlook = loanOutlook(loan);
 
   const why = (n: number): string =>
     !owed ? "Nothing owed." : state.credits < n ? `You need ${cr(n - state.credits)} more.` : `Pay ${cr(n)}`;
@@ -593,6 +634,20 @@ function Exchange({ session }: { session: GameSession }) {
             <dd class={loan.missed > 0 ? "danger" : ""}>{loan.missed}</dd>
             <dt>Annual rate</dt>
             <dd>{(loan.annualRate * 100).toFixed(1)}%</dd>
+            <dt>Next installment</dt>
+            <dd>
+              {cr(outlook.nextInterest)} interest
+              <div class="muted small">{cr(Math.max(0, next - outlook.nextInterest))} off the principal</div>
+            </dd>
+            <dt>Paid off</dt>
+            <dd>
+              {formatDate(outlook.payoffAt)}
+              <div class="muted small">
+                {outlook.installments} more installment{outlook.installments === 1 ? "" : "s"}, if paid on time
+              </div>
+            </dd>
+            <dt>Interest to come</dt>
+            <dd>{cr(outlook.totalInterest)}</dd>
             <dt>Credits on hand</dt>
             <dd>{cr(state.credits)}</dd>
           </dl>
@@ -601,6 +656,11 @@ function Exchange({ session }: { session: GameSession }) {
         )}
         <h3 class="hub-gap">How the note works</h3>
         <ul class="hub-notes small muted">
+          <li>
+            The note pays itself down. On each due date the Exchange adds that period's interest to the balance, then takes
+            the installment. Whatever the installment covers beyond the interest reduces the principal, so the interest
+            shrinks over time. There's no fixed term: the note ends when the balance reaches zero.
+          </li>
           <li>
             Each installment is taken from your credits automatically on its due date. You never have to be aboard to pay it.
           </li>

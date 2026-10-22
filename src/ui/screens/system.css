@@ -252,6 +252,24 @@
   background: #0f1d30;
   line-height: 1.45;
 }
+.sys-known h3 {
+  margin: 4px 0 6px;
+}
+.sys-known-table {
+  margin-bottom: 4px;
+}
+.sys-known-table tbody tr {
+  cursor: pointer;
+}
+.sys-known-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.sys-known-table tbody tr.sel {
+  background: rgba(255, 200, 80, 0.12);
+}
+.sys-known-table tbody tr.dim {
+  opacity: 0.6;
+}
 .sys-recap-warn {
   margin-top: 4px;
 }

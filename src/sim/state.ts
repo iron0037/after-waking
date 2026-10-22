@@ -195,6 +195,44 @@ export function settlePayroll(state: GameState): void {
   }
 }
 
+export interface LoanOutlook {
+  /** Installments left at the current payment, counting those covered by prepayments. */
+  installments: number;
+  /** When the last one falls due. */
+  payoffAt: number;
+  /** Interest the next installment adds to the balance. */
+  nextInterest: number;
+  /** Interest still to come over the life of the note (if every installment is paid on time). */
+  totalInterest: number;
+}
+
+/**
+ * The note amortizes: at each due date interest for the period is added to the balance, then the
+ * installment comes off it, so whatever exceeds the interest pays down principal. There's no
+ * fixed term; it ends when the balance reaches zero. This projects that, assuming on-time payments.
+ */
+export function loanOutlook(loan: Loan): LoanOutlook {
+  const periodRate = loan.annualRate * (loan.intervalDays / 365);
+  let balance = loan.balance;
+  let prepaid = loan.prepaid ?? 0;
+  let due = loan.nextDue;
+  let installments = 0;
+  let totalInterest = 0;
+  const nextInterest = Math.round(balance * periodRate);
+  while (balance > 0 && installments < 1000) {
+    const grown = Math.round(balance * (1 + periodRate));
+    totalInterest += grown - balance;
+    balance = grown;
+    const installment = Math.min(loan.payment, balance + prepaid);
+    const fromPrepaid = Math.min(prepaid, installment);
+    prepaid -= fromPrepaid;
+    balance -= Math.min(installment - fromPrepaid, balance);
+    installments++;
+    if (balance > 0) due += loan.intervalDays * DAY;
+  }
+  return { installments, payoffAt: due, nextInterest, totalInterest };
+}
+
 function settleLoan(state: GameState): void {
   const loan = state.loan;
   while (loan.balance > 0 && state.time >= loan.nextDue) {

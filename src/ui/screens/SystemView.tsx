@@ -148,7 +148,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       return;
     }
     const label = "bodyId" in target ? session.world.body(target.bodyId).body.name : "the system edge";
-    const durMs = clamp(plan.minutes / 60, 1.2, 12) * 1000;
+    // 0.8 s of real time per game hour (min ~1 s, max ~10 s). The camera eases, so outer legs look slower.
+    const durMs = clamp(plan.minutes / 60, 1.2, 12) * 800;
     flightRef.current = {
       route: {
         target,

@@ -58,6 +58,9 @@
   gap: 16px;
   align-items: start;
 }
+.hub-grid > * {
+  min-width: 0;
+}
 .hub-wide {
   grid-column: span 2;
 }
@@ -127,6 +130,13 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
+}
+.hub-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  white-space: nowrap;
 }
 .hub-card .btn {
   align-self: flex-start;

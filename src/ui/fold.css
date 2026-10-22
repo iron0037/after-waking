@@ -1,0 +1,35 @@
+/* Foldable panel sections (Section.tsx) */
+.fold-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.fold:not(.folded) > .fold-head {
+  margin-bottom: 8px;
+}
+.fold-head h2,
+.fold-head h3,
+.surface-side .fold-head h3 {
+  margin: 0;
+}
+.fold-head:hover h2,
+.fold-head:hover h3 {
+  filter: brightness(1.25);
+}
+.fold-head:focus-visible {
+  outline: 1px solid var(--cyan);
+  outline-offset: 3px;
+}
+.fold-head .chev {
+  flex: none;
+  width: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.fold-head .fold-summary {
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: 0;
+}

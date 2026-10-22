@@ -372,13 +372,17 @@ export interface DepositMark {
   know: RegionKnowledge;
 }
 
-/** Every deposit in `deposits` (the caller picks which are known). */
+/**
+ * Every deposit in `deposits` (the caller picks which are known). Seams deeper than `drillReachM`
+ * are drawn faded, with a dashed red outline and a strike, so they read as "not with this drill".
+ */
 export function drawDeposits(
   ctx: CanvasRenderingContext2D,
   L: Layout,
   deposits: readonly DepositMark[],
   selectedKey: string | null,
   timeMs: number,
+  drillReachM: number,
 ): void {
   const r = Math.max(5, L.tw * 0.38);
   ctx.setLineDash([]);
@@ -387,6 +391,7 @@ export function drawDeposits(
     const y = cy(L, d.x, d.y);
     const depleted = remainingTonnes(know, d) <= 0.05;
     const prospected = know.prospected.includes(d.id);
+    const tooDeep = !depleted && d.depthM > drillReachM;
 
     if (know.drillSites.includes(d.id)) drillMark(ctx, L, d, depleted);
 
@@ -395,11 +400,24 @@ export function drawDeposits(
     ctx.fill();
     diamond(ctx, x, y, r);
     ctx.fillStyle = depleted ? DEPLETED : COMMODITIES[d.commodity].color;
+    ctx.globalAlpha = tooDeep ? 0.4 : 1;
     ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.lineWidth = 1.2;
-    ctx.strokeStyle = depleted ? "#8a93a0" : "rgba(255, 255, 255, 0.85)";
+    ctx.strokeStyle = depleted ? "#8a93a0" : tooDeep ? UI.danger : "rgba(255, 255, 255, 0.85)";
+    if (tooDeep) ctx.setLineDash([2.5, 2]);
     ctx.stroke();
-    if (!prospected) {
+    ctx.setLineDash([]);
+    if (tooDeep) {
+      // Struck through: out of this drill's reach.
+      ctx.strokeStyle = UI.danger;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.75, y + r * 0.75);
+      ctx.lineTo(x + r * 0.75, y - r * 0.75);
+      ctx.stroke();
+      label(ctx, `${d.depthM} m`, x, y + r + 12, UI.danger);
+    } else if (!prospected) {
       // unsurveyed: a "?" in the middle
       ctx.fillStyle = "rgba(5, 7, 15, 0.8)";
       ctx.font = `bold ${Math.round(r * 1.15)}px ${FONT}`;

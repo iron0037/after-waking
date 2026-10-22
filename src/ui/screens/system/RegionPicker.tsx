@@ -4,7 +4,19 @@
  * noise as the planet art; the orbital scan's signal is the amber glow over each region.
  */
 import { useMemo, useRef, useState } from "preact/hooks";
-import { exploredFraction, regionKey, regionRecap, regionSignal, surfaceLayout, type Body, type GameState, type World } from "../../../sim";
+import { COMMODITIES } from "../../../data/commodities";
+import {
+  exploredFraction,
+  knownDeposits,
+  regionKey,
+  regionRecap,
+  regionSignal,
+  surfaceLayout,
+  type Body,
+  type GameState,
+  type KnownDeposit,
+  type World,
+} from "../../../sim";
 import { Canvas } from "../../Canvas";
 import { UI } from "../../palette";
 import { surfaceMap } from "./planetArt";
@@ -74,6 +86,7 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     [seed, body, sensorTier, reachM],
   );
   const layout = useMemo(() => regionLayout(body), [body]);
+  const known = knownDeposits(state, world, body.id);
   const max = Math.max(...signals, 0);
   const min = Math.min(...signals);
   const norm = (s: number) => (max - min < 1e-6 ? 0 : (s - min) / (max - min));
@@ -142,6 +155,28 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         ctx.fillRect(x + 3, y + ch - 3 - barH, (cw - 6) * Math.max(0.08, explored), barH);
       }
     });
+
+    // Known, untapped deposits: a row of commodity-coloured dots along the top of their region.
+    const byRegion = new Map<number, KnownDeposit[]>();
+    for (const k of known) byRegion.set(k.region, [...(byRegion.get(k.region) ?? []), k]);
+    for (const [r, list] of byRegion) {
+      const cell = layout.cells[r];
+      if (!cell) continue;
+      const dot = Math.max(2, Math.min(4, ((cell.x1 - cell.x0) * w) / 14));
+      list.slice(0, 5).forEach((k, i) => {
+        const x = cell.x0 * w + 5 + dot + i * (dot * 2 + 2);
+        const y = cell.y0 * h + 5 + dot;
+        ctx.beginPath();
+        ctx.arc(x, y, dot, 0, Math.PI * 2);
+        ctx.fillStyle = COMMODITIES[k.commodity].color;
+        ctx.globalAlpha = k.reachable ? 1 : 0.45;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#05070f";
+        ctx.stroke();
+      });
+    }
 
     const hc = hover !== null && hover !== selected ? layout.cells[hover] : undefined;
     if (hc) {
@@ -252,6 +287,7 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         </span>
       </div>
       <RegionRecapBox state={state} world={world} bodyId={body.id} region={selected} />
+      <KnownDepositsBox known={known} selected={selected} onSelect={onSelect} />
     </div>
   );
 }
@@ -272,6 +308,44 @@ function RegionRecapBox({ state, world, bodyId, region }: { state: GameState; wo
         </>
       )}
       {worked && <div class="accent sys-recap-warn">Looks worked out — try a fresh region.</div>}
+    </div>
+  );
+}
+
+/** Untapped deposits found on earlier landings, anywhere on this world: pick one to land near it. */
+function KnownDepositsBox({ known, selected, onSelect }: { known: KnownDeposit[]; selected: number; onSelect: (region: number) => void }) {
+  if (known.length === 0) return null;
+  return (
+    <div class="sys-known">
+      <h3>Known deposits</h3>
+      <table class="data sys-known-table">
+        <thead>
+          <tr>
+            <th>Commodity</th>
+            <th class="num">Left</th>
+            <th class="num">Region</th>
+          </tr>
+        </thead>
+        <tbody>
+          {known.map((k) => (
+            <tr
+              key={k.key}
+              class={`${k.region === selected ? "sel" : ""} ${k.reachable ? "" : "dim"}`}
+              onClick={() => onSelect(k.region)}
+              title={`${k.depthM} m down${k.reachable ? "" : " (beyond your drill)"}${k.prospected ? `, grade ${Math.round(k.grade * 100)}%` : ", not yet prospected"}. Click to pick region ${k.region + 1}.`}
+            >
+              <td>
+                <i class="swatch" style={{ background: COMMODITIES[k.commodity].color }} />
+                {COMMODITIES[k.commodity].name}
+                {!k.reachable && <span class="danger small"> too deep</span>}
+              </td>
+              <td class="num">{Math.round(k.remainingT).toLocaleString()} t</td>
+              <td class="num">{k.region + 1}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div class="muted small">Found by your rover on earlier landings. Dots on the chart mark where they are.</div>
     </div>
   );
 }
