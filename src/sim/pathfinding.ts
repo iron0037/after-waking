@@ -1,5 +1,9 @@
-/** Rover routing on a hex region map: cheapest path by travel time (Dijkstra over six neighbours). */
-import { neighbors } from "./hex";
+/**
+ * Rover routing on hex terrain: cheapest path by travel time (A* over six neighbours). Works on
+ * any TileSource, so routes run across region borders on the planet-wide surface.
+ */
+import type { TileSource } from "./bodysurface";
+import { hexDistance, neighbors } from "./hex";
 import { TERRAIN_INFO, type RegionMap, type Terrain } from "./surface";
 import type { Vec2 } from "./units";
 
@@ -8,58 +12,79 @@ export interface PathStep extends Vec2 {
   energy: number;
 }
 
-export function canEnter(map: RegionMap, x: number, y: number, canClimb: boolean): boolean {
-  if (x < 0 || y < 0 || x >= map.width || y >= map.height) return false;
-  const passable = TERRAIN_INFO[map.terrain[y * map.width + x] as Terrain].passable;
+/** Cheapest possible step (plain ground), for an admissible A* heuristic. */
+const MIN_STEP_MINUTES = Math.min(...Object.values(TERRAIN_INFO).filter((t) => t.minutes > 0).map((t) => t.minutes));
+/** Stop searching after this many expansions: far beyond any rover's range. */
+const MAX_EXPANSIONS = 60_000;
+
+/** A single region's map as a tile source (its own local coordinates). */
+export function regionSource(map: RegionMap): TileSource {
+  return {
+    width: map.width,
+    height: map.height,
+    terrainAt: (x, y) => (x < 0 || y < 0 || x >= map.width || y >= map.height ? null : (map.terrain[y * map.width + x] as Terrain)),
+  };
+}
+
+function source(tiles: TileSource | RegionMap): TileSource {
+  return "terrainAt" in tiles ? tiles : regionSource(tiles);
+}
+
+export function canEnter(tiles: TileSource | RegionMap, x: number, y: number, canClimb: boolean): boolean {
+  const t = source(tiles).terrainAt(x, y);
+  if (t === null) return false;
+  const passable = TERRAIN_INFO[t].passable;
   return passable === "yes" || (passable === "climb" && canClimb);
 }
 
-export function stepCost(map: RegionMap, x: number, y: number): { minutes: number; energy: number } {
-  const info = TERRAIN_INFO[map.terrain[y * map.width + x] as Terrain];
+export function stepCost(tiles: TileSource | RegionMap, x: number, y: number): { minutes: number; energy: number } {
+  const t = source(tiles).terrainAt(x, y);
+  const info = TERRAIN_INFO[(t ?? 0) as Terrain];
   return { minutes: info.minutes, energy: info.energy };
 }
 
 /** Path from `from` (exclusive) to `to` (inclusive), or null if unreachable. */
-export function findPath(map: RegionMap, from: Vec2, to: Vec2, canClimb: boolean): PathStep[] | null {
-  if (!canEnter(map, to.x, to.y, canClimb)) return null;
-  const w = map.width;
-  const n = w * map.height;
-  const cost = new Float64Array(n).fill(Infinity);
-  const prev = new Int32Array(n).fill(-1);
-  const start = from.y * w + from.x;
-  const goal = to.y * w + to.x;
-  cost[start] = 0;
+export function findPath(tiles: TileSource | RegionMap, from: Vec2, to: Vec2, canClimb: boolean): PathStep[] | null {
+  const src = source(tiles);
+  if (!canEnter(src, to.x, to.y, canClimb)) return null;
+  if (from.x === to.x && from.y === to.y) return [];
+  const w = src.width;
+  const keyOf = (x: number, y: number) => y * w + x;
+  const start = keyOf(from.x, from.y);
+  const goal = keyOf(to.x, to.y);
+  const cost = new Map<number, number>([[start, 0]]);
+  const prev = new Map<number, number>();
   const heap = new MinHeap();
-  heap.push(start, 0);
+  heap.push(start, hexDistance(from, to) * MIN_STEP_MINUTES);
 
-  while (heap.size > 0) {
-    const [node, c] = heap.pop();
+  let expansions = 0;
+  while (heap.size > 0 && expansions++ < MAX_EXPANSIONS) {
+    const [node] = heap.pop();
     if (node === goal) break;
-    if (c > (cost[node] as number)) continue;
+    const c = cost.get(node) as number;
     const x = node % w;
     const y = (node - x) / w;
-    for (const { x: nx, y: ny } of neighbors(x, y)) {
-      if (!canEnter(map, nx, ny, canClimb)) continue;
-      const next = ny * w + nx;
-      const nc = c + stepCost(map, nx, ny).minutes;
-      if (nc < (cost[next] as number)) {
-        cost[next] = nc;
-        prev[next] = node;
-        heap.push(next, nc);
+    for (const n of neighbors(x, y)) {
+      if (!canEnter(src, n.x, n.y, canClimb)) continue;
+      const next = keyOf(n.x, n.y);
+      const nc = c + stepCost(src, n.x, n.y).minutes;
+      if (nc < (cost.get(next) ?? Infinity)) {
+        cost.set(next, nc);
+        prev.set(next, node);
+        heap.push(next, nc + hexDistance(n, to) * MIN_STEP_MINUTES);
       }
     }
   }
 
-  if (goal !== start && prev[goal] === -1) return null;
+  if (!prev.has(goal)) return null;
   const steps: PathStep[] = [];
-  for (let node = goal; node !== start; node = prev[node] as number) {
+  for (let node = goal; node !== start; node = prev.get(node) as number) {
     const x = node % w;
     const y = (node - x) / w;
-    steps.push({ x, y, ...stepCost(map, x, y) });
+    steps.push({ x, y, ...stepCost(src, x, y) });
   }
   return steps.reverse();
 }
-
 
 class MinHeap {
   private nodes: number[] = [];

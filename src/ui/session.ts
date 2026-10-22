@@ -5,7 +5,7 @@
  * Components never mutate GameState directly: they call session.act(...) with a sim action.
  */
 import { useEffect, useReducer } from "preact/hooks";
-import { deserialize, newGame, serialize, World, type GameState, type Result } from "../sim";
+import { deserialize, migrateSurfaceCoords, newGame, serialize, World, type GameState, type Result } from "../sim";
 
 export const SAVE_KEY = "after-waking/save";
 
@@ -47,6 +47,7 @@ export class GameSession {
     public state: GameState,
     public world: World = new World(state.seed),
   ) {
+    migrateSurfaceCoords(state, this.world);
     this.view = defaultView(state);
   }
 

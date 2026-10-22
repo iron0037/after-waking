@@ -259,7 +259,7 @@
 /* Offer to recharge when the rover pulls up beside the ship low on energy */
 .recharge-hint {
   position: absolute;
-  top: 12px;
+  top: 52px; /* below the zoom buttons */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -276,4 +276,16 @@
 .recharge-hint .btn {
   padding: 4px 10px;
   white-space: nowrap;
+}
+
+/* The map pans by dragging (like the system view). */
+.surface-viewport .map-canvas {
+  cursor: grab;
+}
+.surface-viewport.dragging .map-canvas {
+  cursor: grabbing;
+}
+.surface-viewport .viewport-tools {
+  z-index: 2;
+  user-select: none;
 }

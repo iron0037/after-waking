@@ -2,16 +2,19 @@
  * Everything derivable from the galaxy seed, cached. Nothing in here is saved: a World is
  * rebuilt from GameState.seed on load.
  */
+import { BodySurface } from "./bodysurface";
 import { findBody, generateSystem, type Body, type SystemDetail } from "./bodies";
 import { generateGalaxy, type Galaxy } from "./galaxy";
 import { generateRegion, type RegionMap } from "./surface";
 
-const REGION_CACHE_LIMIT = 24;
+/** Rover routes and the surface camera span several regions; keep plenty cached (each is small). */
+const REGION_CACHE_LIMIT = 96;
 
 export class World {
   readonly galaxy: Galaxy;
   private readonly systems = new Map<string, SystemDetail>();
   private readonly regions = new Map<string, RegionMap>();
+  private readonly surfaces = new Map<string, BodySurface>();
 
   constructor(readonly seed: number) {
     this.galaxy = generateGalaxy(seed);
@@ -32,6 +35,16 @@ export class World {
   body(bodyId: string): { detail: SystemDetail; body: Body } {
     const detail = this.system(bodyId.split(".")[0] as string);
     return { detail, body: findBody(detail, bodyId) };
+  }
+
+  /** The whole surface of a world in planet-wide coordinates, stitched from its regions. */
+  surface(bodyId: string): BodySurface {
+    let surface = this.surfaces.get(bodyId);
+    if (!surface) {
+      surface = new BodySurface(this.body(bodyId).body, (r) => this.region(bodyId, r));
+      this.surfaces.set(bodyId, surface);
+    }
+    return surface;
   }
 
   region(bodyId: string, region: number): RegionMap {

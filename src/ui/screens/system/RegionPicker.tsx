@@ -1,10 +1,10 @@
 /**
- * Landing-region chart: the body's surface unrolled into an equirectangular map, regions laid
- * out in latitude bands (fewer, wider cells toward the poles). Terrain tint comes from the same
+ * Landing-region chart: the body's surface unrolled into an equirectangular map, divided into the
+ * same grid of regions the rover drives across. Terrain tint comes from the same
  * noise as the planet art; the orbital scan's signal is the amber glow over each region.
  */
 import { useMemo, useRef, useState } from "preact/hooks";
-import { exploredFraction, regionKey, regionRecap, regionSignal, type Body, type GameState, type World } from "../../../sim";
+import { exploredFraction, regionKey, regionRecap, regionSignal, surfaceLayout, type Body, type GameState, type World } from "../../../sim";
 import { Canvas } from "../../Canvas";
 import { UI } from "../../palette";
 import { surfaceMap } from "./planetArt";
@@ -34,69 +34,32 @@ interface Cell {
 }
 
 interface Layout {
+  cols: number;
+  rows: number;
+  /** One per region, in region order. Cells past the last region (end of the last row) stay empty. */
   cells: Cell[];
-  /** Per latitude band: index of its first cell and how many it holds. */
-  bands: { first: number; count: number; y0: number; y1: number }[];
 }
 
-const layoutCache = new Map<number, Layout>();
-
-/** Rows of roughly square cells on a 2:1 map, with fewer cells in the (stretched) polar bands. */
-export function regionLayout(n: number): Layout {
-  const cached = layoutCache.get(n);
-  if (cached) return cached;
-  const rows = Math.max(1, Math.min(n, Math.round(Math.sqrt(n / 2))));
-  const weights = Array.from({ length: rows }, (_, i) => Math.max(0.3, Math.cos((0.5 - (i + 0.5) / rows) * Math.PI)));
-  const sum = weights.reduce((a, b) => a + b, 0);
-  const ideal = weights.map((w) => (n * w) / sum);
-  const counts = ideal.map((v) => Math.max(1, Math.floor(v)));
-  let total = counts.reduce((a, b) => a + b, 0);
-  while (total !== n) {
-    const grow = total < n;
-    let pick = -1;
-    let bestScore = -Infinity;
-    for (let i = 0; i < rows; i++) {
-      const c = counts[i] as number;
-      if (!grow && c <= 1) continue;
-      const score = grow ? (ideal[i] as number) - c : c - (ideal[i] as number);
-      if (score > bestScore) {
-        bestScore = score;
-        pick = i;
-      }
-    }
-    if (pick < 0) break;
-    counts[pick] = (counts[pick] as number) + (grow ? 1 : -1);
-    total += grow ? 1 : -1;
-  }
-
+/**
+ * The same cols × rows grid the rover drives across (sim surfaceLayout), so a region's
+ * neighbours on this chart are the ones the rover reaches by driving over the border.
+ */
+export function regionLayout(body: Body): Layout {
+  const { cols, rows, regions } = surfaceLayout(body);
   const cells: Cell[] = [];
-  const bands: Layout["bands"] = [];
-  counts.forEach((count, i) => {
-    const y0 = i / rows;
-    const y1 = (i + 1) / rows;
-    bands.push({ first: cells.length, count, y0, y1 });
-    for (let k = 0; k < count; k++) cells.push({ x0: k / count, x1: (k + 1) / count, y0, y1 });
-  });
-  const layout = { cells, bands };
-  layoutCache.set(n, layout);
-  return layout;
+  for (let r = 0; r < regions; r++) {
+    const c = r % cols;
+    const row = Math.floor(r / cols);
+    cells.push({ x0: c / cols, x1: (c + 1) / cols, y0: row / rows, y1: (row + 1) / rows });
+  }
+  return { cols, rows, cells };
 }
 
-/** Region under a point given in 0..1 map coordinates. */
+/** Region under a point given in 0..1 map coordinates (clamped to the last region in the empty corner). */
 function regionAt(layout: Layout, u: number, v: number): number {
-  const band = layout.bands.find((b) => v < b.y1) ?? layout.bands[layout.bands.length - 1];
-  if (!band) return 0;
-  return band.first + Math.min(band.count - 1, Math.max(0, Math.floor(u * band.count)));
-}
-
-/** The region above or below `r`, found by sampling the adjacent band at the same x. */
-function verticalNeighbor(layout: Layout, r: number, dir: -1 | 1): number {
-  const cell = layout.cells[r];
-  if (!cell) return r;
-  const bandIndex = layout.bands.findIndex((b) => r >= b.first && r < b.first + b.count);
-  const target = layout.bands[bandIndex + dir];
-  if (!target) return r;
-  return regionAt(layout, (cell.x0 + cell.x1) / 2, (target.y0 + target.y1) / 2);
+  const c = Math.min(layout.cols - 1, Math.max(0, Math.floor(u * layout.cols)));
+  const row = Math.min(layout.rows - 1, Math.max(0, Math.floor(v * layout.rows)));
+  return Math.min(layout.cells.length - 1, row * layout.cols + c);
 }
 
 // --- component ---------------------------------------------------------------------------
@@ -110,7 +73,7 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     () => Array.from({ length: body.regions }, (_, r) => regionSignal(seed, body, r, sensorTier, reachM)),
     [seed, body, sensorTier, reachM],
   );
-  const layout = useMemo(() => regionLayout(body.regions), [body.regions]);
+  const layout = useMemo(() => regionLayout(body), [body]);
   const max = Math.max(...signals, 0);
   const min = Math.min(...signals);
   const norm = (s: number) => (max - min < 1e-6 ? 0 : (s - min) / (max - min));
@@ -133,6 +96,13 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(surfaceMap(seed, body, 192, 96), 0, 0, w, h);
     ctx.restore();
+
+    // The end of the last row holds no regions: uncharted.
+    const last = layout.cells[layout.cells.length - 1];
+    if (last && last.x1 < 0.9999) {
+      ctx.fillStyle = rgba("#05070f", 0.85);
+      ctx.fillRect(last.x1 * w, last.y0 * h, w - last.x1 * w, (last.y1 - last.y0) * h);
+    }
 
     layout.cells.forEach((cell, r) => {
       const x = cell.x0 * w;
@@ -235,8 +205,8 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     let next: number | undefined;
     if (ev.key === "ArrowLeft") next = Math.max(0, selected - 1);
     else if (ev.key === "ArrowRight") next = Math.min(body.regions - 1, selected + 1);
-    else if (ev.key === "ArrowUp") next = verticalNeighbor(layout, selected, -1);
-    else if (ev.key === "ArrowDown") next = verticalNeighbor(layout, selected, 1);
+    else if (ev.key === "ArrowUp") next = selected - layout.cols >= 0 ? selected - layout.cols : selected;
+    else if (ev.key === "ArrowDown") next = selected + layout.cols < body.regions ? selected + layout.cols : selected;
     if (next === undefined) return;
     ev.preventDefault();
     onSelect(next);
@@ -293,7 +263,7 @@ function RegionRecapBox({ state, world, bodyId, region }: { state: GameState; wo
   const worked = recap.reachableTonnes <= 0 && recap.floraUnsampled === 0 && recap.explored > 0.5;
   return (
     <div class="sys-recap small">
-      You've landed here before ({recap.visits}×): {Math.round(recap.explored * 100)}% explored · {recap.depositsKnown}{" "}
+      You've been here before ({recap.visits}×): {Math.round(recap.explored * 100)}% explored · {recap.depositsKnown}{" "}
       {recap.depositsKnown === 1 ? "deposit" : "deposits"} known · {Math.round(recap.reachableTonnes).toLocaleString()} t reachable left
       {recap.floraUnsampled > 0 && (
         <>

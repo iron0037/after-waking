@@ -35,8 +35,10 @@ export type Location =
       bodyId: string;
       region: number;
       rover: RoverState | null;
-      /** Where the ship sits now, if it has hopped from the region's original landing site. */
+      /** Where the ship stands, in planet-wide hex coordinates (rover too). */
       ship?: Vec2;
+      /** Set once positions are planet-wide; older saves stored region-local coordinates. */
+      globalCoords?: boolean;
     };
 
 export interface Loan {

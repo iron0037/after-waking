@@ -59,6 +59,8 @@ export interface FloraSite extends FloraSpec {
 export interface RegionMap {
   bodyId: string;
   region: number;
+  /** Planet-wide hex coordinates of this region's (0, 0) tile. */
+  origin: Vec2;
   width: number;
   height: number;
   terrain: Uint8Array;
@@ -212,22 +214,59 @@ export function regionSignal(seed: number, body: Body, region: number, sensorTie
   return Math.max(0, truth * (1 + noise));
 }
 
+/**
+ * How a world's regions tile its surface: a grid of `cols` × `rows` regions, numbered row by
+ * row from the north-west. Region n sits at column n % cols, row floor(n / cols); the last row
+ * may be partly empty. Planet-wide hex coordinates run 0..width-1 by 0..height-1.
+ */
+export interface SurfaceLayout {
+  cols: number;
+  rows: number;
+  regions: number;
+  width: number;
+  height: number;
+}
+
+export function surfaceLayout(body: Body): SurfaceLayout {
+  const regions = Math.max(1, body.regions);
+  const rows = Math.max(1, Math.round(Math.sqrt(regions / 2)));
+  const cols = Math.ceil(regions / rows);
+  return { cols, rows, regions, width: cols * REGION_SIZE, height: rows * REGION_SIZE };
+}
+
+export function regionOrigin(layout: SurfaceLayout, region: number): Vec2 {
+  return { x: (region % layout.cols) * REGION_SIZE, y: Math.floor(region / layout.cols) * REGION_SIZE };
+}
+
+/** The region containing planet-wide tile (gx, gy), or null off the surface. */
+export function regionAt(layout: SurfaceLayout, gx: number, gy: number): number | null {
+  if (gx < 0 || gy < 0 || gx >= layout.width || gy >= layout.height) return null;
+  const region = Math.floor(gy / REGION_SIZE) * layout.cols + Math.floor(gx / REGION_SIZE);
+  return region < layout.regions ? region : null;
+}
+
+/**
+ * Terrain is one continuous field across the whole planet, so neighboring regions meet
+ * seamlessly. (Regions are 48 rows tall, an even number, so hex row parity is preserved.)
+ */
 export function generateRegion(seed: number, body: Body, region: number): RegionMap {
   const w = REGION_SIZE;
   const h = REGION_SIZE;
-  const noiseSeed = hashSeed(seed, body.id, region, "terrain");
-  const regionRng = rngFor(seed, body.id, region, "layout");
-  const seaLevel = regionRng.range(-0.15, 0.15);
+  const origin = regionOrigin(surfaceLayout(body), region);
+  const noiseSeed = hashSeed(seed, body.id, "terrain");
+  const seaSeed = hashSeed(seed, body.id, "sea");
   const ruggedness = 0.15 * body.tectonics + (body.kind === "asteroid" ? 0.3 : 0);
 
   const elevation = new Float32Array(w * h);
   const terrain = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      // Sample noise at each hex's true centre so odd rows don't skew the terrain.
-      const p = hexWorldPos(x, y);
+      // Sample at each hex's true centre in planet-wide space: no row skew, no seams.
+      const p = hexWorldPos(origin.x + x, origin.y + y);
       const e = fbm(noiseSeed, p.x / 14, p.y / 14, 4);
       const rough = fbm(noiseSeed ^ 0x9e3779b9, p.x / 5, p.y / 5, 2);
+      // Sea level drifts slowly across the planet: wetter basins, drier highlands.
+      const seaLevel = (fbm(seaSeed, p.x / 140, p.y / 140, 2) - 0.5) * 0.3;
       const i = y * w + x;
       elevation[i] = e;
       terrain[i] = classify(body, e, rough, seaLevel, ruggedness);
@@ -260,7 +299,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
     return { ...spec, x: landing.x, y: landing.y + 2 };
   });
 
-  return { bodyId: body.id, region, width: w, height: h, terrain, elevation, deposits, flora, landing };
+  return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };
 }
 
 function classify(body: Body, e: number, rough: number, seaLevel: number, ruggedness: number): Terrain {

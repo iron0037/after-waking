@@ -37,7 +37,7 @@ import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
 import { cargoTonnes, shipStats } from "./ship";
 import { newGame, type GameState } from "./state";
-import { regionKey, regionSignal } from "./surface";
+import { REGION_SIZE, regionKey, regionSignal } from "./surface";
 import { DAY } from "./units";
 import { World } from "./world";
 
@@ -205,7 +205,8 @@ function workRegion(
   rng: Rng,
   must: <T>(label: string, r: Result<T>) => T | null,
 ): void {
-  const map = world.region(body.id, region);
+  const surface = world.surface(body.id);
+  const origin = surface.origin(region);
   const know = knowledge(state, body.id, region);
   const stats = shipStats(state.ship);
   const holdRoom = () => stats.cargoCapacityT - cargoTonnes(state.ship.cargo);
@@ -224,9 +225,10 @@ function workRegion(
       const tonnes = Math.min(remainingTonnes(know, d), stats.roverCargoT);
       return (COMMODITIES[d.commodity].basePrice * tonnes) / (tonnes / rate + steps * 0.3 + 4);
     };
-    const candidates = map.deposits
+    const candidates = surface
+      .deposits(region)
       .filter((d) => know.discovered.includes(d.id) && remainingTonnes(know, d) > 0.5 && d.depthM <= stats.drillMaxDepthM)
-      .map((d) => ({ d, path: findPath(map, rover, d, stats.roverCanClimb) }))
+      .map((d) => ({ d, path: findPath(surface, rover, d, stats.roverCanClimb) }))
       .filter((c) => c.path !== null)
       .map((c) => ({ ...c, score: valuePerHour(c.d, c.path!.length) }))
       // Not worth the crew's wages (25 cr/h for six on shift) unless the bed is nearly full anyway.
@@ -234,7 +236,7 @@ function workRegion(
       .sort((a, b) => b.score - a.score);
 
     const homeCost = (from: { x: number; y: number }) =>
-      (findPath(map, from, shipTile(state, map), stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
+      (findPath(surface, from, shipTile(state, world), stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
 
     const next = candidates[0];
     if (next) {
@@ -245,17 +247,18 @@ function workRegion(
         continue;
       }
       must("drive to deposit", moveRoverTo(state, world, next.d.x, next.d.y));
-      must("prospect", prospect(state, world, next.d.id));
+      must("prospect", prospect(state, world, next.d.key));
       const budget = (rover.energy - homeCost(rover) - 15) / 1.5;
-      if (budget > 0.5) must("drill", drill(state, world, next.d.id, budget));
+      if (budget > 0.5) must("drill", drill(state, world, next.d.key, budget));
       continue;
     }
 
     if (explores >= 8) break;
     explores++;
-    const tx = clampTo(rover.x + rng.int(-12, 12), map.width);
-    const ty = clampTo(rover.y + rng.int(-12, 12), map.height);
-    const path = findPath(map, rover, { x: tx, y: ty }, stats.roverCanClimb);
+    // Explore within the landing region (its deposits are the ones the bot ranks).
+    const tx = origin.x + clampTo(rover.x - origin.x + rng.int(-12, 12), REGION_SIZE);
+    const ty = origin.y + clampTo(rover.y - origin.y + rng.int(-12, 12), REGION_SIZE);
+    const path = findPath(surface, rover, { x: tx, y: ty }, stats.roverCanClimb);
     if (!path) continue;
     const go = path.reduce((s, p) => s + p.energy, 0);
     if (rover.energy - go - homeCost({ x: tx, y: ty }) < 15) {
@@ -271,8 +274,7 @@ function workRegion(
 function returnAndUnload(state: GameState, world: World, must: <T>(label: string, r: Result<T>) => T | null): boolean {
   const loc = state.location;
   if (loc.kind !== "surface" || !loc.rover) return true;
-  const map = world.region(loc.bodyId, loc.region);
-  const home = shipTile(state, map);
+  const home = shipTile(state, world);
   const moved = must("return to ship", moveRoverTo(state, world, home.x, home.y));
   if (!moved || moved.stopped) must("recall rover", recallRover(state, world));
   return must("stow rover", stowRover(state, world)) !== null;

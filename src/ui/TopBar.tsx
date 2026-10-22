@@ -1,4 +1,4 @@
-import { ageAt, compendiumTotals, formatDate, formatDuration, shipStats, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, compendiumTotals, formatDate, formatDuration, shipStats, type GameState, type World } from "../sim";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -80,7 +80,7 @@ function locationLabel(state: GameState, world: World): string {
   const loc = state.location;
   if (loc.kind === "intrepid") return "Docked at the Intrepid";
   const sys = world.system(loc.systemId).system;
-  if (loc.kind === "surface") return `${world.body(loc.bodyId).body.name}, region ${loc.region + 1}`;
+  if (loc.kind === "surface") return `${world.body(loc.bodyId).body.name}, region ${activeRegion(state, world) + 1}`;
   if (loc.orbiting) return `Orbiting ${world.body(loc.orbiting).body.name}`;
   return `${sys.name} system`;
 }

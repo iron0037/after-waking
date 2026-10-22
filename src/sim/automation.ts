@@ -10,13 +10,14 @@ import {
   deployRover,
   DRILL_ENERGY_PER_HOUR,
   drill,
-  knowledge,
   moveRoverTo,
   prospect,
   remainingTonnes,
   shipTile,
   stowRover,
+  surfaceDeposit,
 } from "./actions";
+import type { SiteKey } from "./bodysurface";
 import { findPath, type PathStep } from "./pathfinding";
 import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
@@ -63,13 +64,13 @@ function rover(state: GameState): RoverState | null {
  * home, haul back, unload, repeat. Storms, quakes and breakdowns cost time and are reported,
  * but only stop the run if they leave the rover unable to get home safely.
  */
-export function workDeposit(state: GameState, world: World, depositId: number): Result<WorkReport> {
+export function workDeposit(state: GameState, world: World, key: SiteKey): Result<WorkReport> {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
-  const map = world.region(loc.bodyId, loc.region);
-  const know = knowledge(state, loc.bodyId, loc.region);
-  const deposit = map.deposits.find((d) => d.id === depositId);
-  if (!deposit || !know.discovered.includes(depositId)) return fail("Unknown deposit.");
+  const surface = world.surface(loc.bodyId);
+  const found = surfaceDeposit(state, world, key);
+  if (!found) return fail("Unknown deposit.");
+  const { deposit, know } = found;
   const stats = shipStats(state.ship);
   if (deposit.depthM > stats.drillMaxDepthM) {
     return fail(`The seam is ${deposit.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
@@ -97,7 +98,7 @@ export function workDeposit(state: GameState, world: World, depositId: number): 
   const haulHome = (): boolean => {
     const r = rover(state);
     if (!r) return true;
-    const home = shipTile(state, map);
+    const home = shipTile(state, world);
     if (hexDistance(r, home) > 1) {
       const moved = moveRoverTo(state, world, home.x, home.y);
       if (!moved.ok || moved.value.stopped) return false;
@@ -125,8 +126,8 @@ export function workDeposit(state: GameState, world: World, depositId: number): 
 
     // Drive to the deposit if we're not already beside it.
     if (hexDistance(r, deposit) > 1) {
-      const out = findPath(map, r, deposit, stats.roverCanClimb);
-      const back = findPath(map, deposit, shipTile(state, map), stats.roverCanClimb);
+      const out = findPath(surface, r, deposit, stats.roverCanClimb);
+      const back = findPath(surface, deposit, shipTile(state, world), stats.roverCanClimb);
       if (!out || !back) return finish("unreachable", "The rover has no route to that deposit and back.");
       if (energyOf(out) + energyOf(back) + ENERGY_MARGIN >= stats.roverEnergy) {
         return finish("unreachable", "Too far for one charge there and back. Move the ship closer, or upgrade the rover's cells.");
@@ -135,19 +136,19 @@ export function workDeposit(state: GameState, world: World, depositId: number): 
       if (!moved.ok || moved.value.stopped) return finish("low energy", "The rover ran short of energy on the way out.");
     }
 
-    if (!know.prospected.includes(depositId)) {
-      const sampled = prospect(state, world, depositId);
+    if (!know.prospected.includes(deposit.id)) {
+      const sampled = prospect(state, world, key);
       if (!sampled.ok) return fail(sampled.reason);
     }
 
     // Drill as long as the cells can still bring the rover home.
-    const homePath = findPath(map, rover(state) as RoverState, shipTile(state, map), stats.roverCanClimb);
+    const homePath = findPath(surface, rover(state) as RoverState, shipTile(state, world), stats.roverCanClimb);
     const budget = ((rover(state) as RoverState).energy - energyOf(homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
     const bedRoom = stats.roverCargoT - cargoTonnes((rover(state) as RoverState).cargo);
     const loadCap = Math.min(bedRoom, holdRoom());
     if (budget > 0.5 && loadCap > 0.5) {
       const rate = stats.drillRateTph * (0.4 + deposit.grade);
-      const drilled = drill(state, world, depositId, Math.min(budget, loadCap / rate));
+      const drilled = drill(state, world, key, Math.min(budget, loadCap / rate));
       if (!drilled.ok) return fail(drilled.reason);
       // The crew deals with storms and jams themselves; they only cost time (and the haul home
       // below still checks energy). Stopping for each would bring the tedium back.

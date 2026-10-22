@@ -1,23 +1,29 @@
-/** Canvas drawing for the surface map (pointy-top hexes, odd-r layout). Pure functions: everything they need is passed in. */
+/**
+ * Canvas drawing for the surface map (pointy-top hexes, odd-r layout). The map is a camera over the whole
+ * planet in planet-wide hex coordinates; only the regions in view are drawn. Pure functions: everything they
+ * need is passed in.
+ */
 import { COMMODITIES } from "../../../data/commodities";
 import {
   disk,
   hexCorners,
   hexDistance,
   hexToPixel,
-  mapPixelSize,
   pixelToHex,
+  REGION_SIZE,
   remainingTonnes,
   step,
   type Deposit,
   type HexDir,
   type PathStep,
   type RegionKnowledge,
-  type RegionMap,
+  type SurfaceDeposit,
+  type SurfaceFlora,
+  type SurfaceLayout,
   type Vec2,
 } from "../../../sim";
 import { UI } from "../../palette";
-import { HEX, hexPath } from "./terrainImage";
+import { HEX, hexPath, type RegionImage } from "./terrainImage";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace';
 const MARGIN_X = 14;
@@ -25,32 +31,54 @@ const MARGIN_TOP = 14;
 /** Room under the map for the hint line and terrain legend. */
 const MARGIN_BOTTOM = 42;
 const DEPLETED = "#5b6472";
+const SQRT3 = Math.sqrt(3);
 
 export interface Layout {
-  /** Hex circumradius in pixels (largest that fits the viewport). */
+  /** Hex circumradius in pixels. */
   size: number;
   /** Hex width in pixels: the stand-in for "tile size" when scaling icons and sprites. */
   tw: number;
   /** Scale from the offscreen terrain images (drawn at HEX) to the screen. */
   k: number;
+  /** Screen position of the planet-wide pixel origin (hexToPixel space). */
   ox: number;
   oy: number;
+  /** The whole surface, in tiles. */
   cols: number;
   rows: number;
+  /** Viewport size in CSS pixels. */
+  w: number;
+  h: number;
 }
 
-export function computeLayout(w: number, h: number, cols: number, rows: number): Layout {
-  const unit = mapPixelSize(cols, rows, 1);
-  const size = Math.max(3, Math.min((w - MARGIN_X * 2) / unit.w, (h - MARGIN_TOP - MARGIN_BOTTOM) / unit.h));
-  const px = mapPixelSize(cols, rows, size);
+/** Hex size at which one region fills the viewport (the default zoom). */
+export function fitSize(w: number, h: number): number {
+  const unitW = SQRT3 * (REGION_SIZE + 0.5);
+  const unitH = 1.5 * (REGION_SIZE - 1) + 2;
+  return Math.max(3, Math.min((w - MARGIN_X * 2) / unitW, (h - MARGIN_TOP - MARGIN_BOTTOM) / unitH));
+}
+
+/** Where the map's centre sits on screen: the middle of the area above the footer. */
+export function viewCenter(w: number, h: number): Vec2 {
+  return { x: w / 2, y: MARGIN_TOP + (h - MARGIN_TOP - MARGIN_BOTTOM) / 2 };
+}
+
+/**
+ * A camera layout: hexes of `size` px, with the point `center` (in unit hex-pixel space, i.e.
+ * hexToPixel(x, y, 1)) at the middle of the view.
+ */
+export function cameraLayout(w: number, h: number, cols: number, rows: number, size: number, center: Vec2): Layout {
+  const c = viewCenter(w, h);
   return {
     size,
-    tw: Math.sqrt(3) * size,
+    tw: SQRT3 * size,
     k: size / HEX,
-    ox: Math.round((w - px.w) / 2),
-    oy: Math.round(MARGIN_TOP + (h - MARGIN_TOP - MARGIN_BOTTOM - px.h) / 2),
+    ox: c.x - center.x * size,
+    oy: c.y - center.y * size,
     cols,
     rows,
+    w,
+    h,
   };
 }
 
@@ -74,50 +102,113 @@ function tilePath(ctx: CanvasRenderingContext2D, L: Layout, t: Vec2, grow = 0): 
   hexPath(ctx, cx(L, t.x, t.y), cy(L, t.x, t.y), L.size + grow);
 }
 
+/** Screen position of a region's pixel origin (its tiles sit at that plus hexToPixel(local x, local y)). */
+function regionScreenOrigin(L: Layout, origin: Vec2): Vec2 {
+  // Region origins sit on even rows, so local hex parity matches planet-wide parity.
+  return { x: L.ox + SQRT3 * origin.x * L.size, y: L.oy + 1.5 * origin.y * L.size };
+}
+
+/** A region on screen: its number and planet-wide origin tile. */
+export interface ViewRegion {
+  region: number;
+  origin: Vec2;
+}
+
+/** Regions that overlap the viewport. */
+export function visibleRegions(L: Layout, layout: SurfaceLayout): ViewRegion[] {
+  // Unit hex-pixel bounds of the view, then the tile range (a tile of slack on every side).
+  const ux0 = -L.ox / L.size;
+  const uy0 = -L.oy / L.size;
+  const ux1 = (L.w - L.ox) / L.size;
+  const uy1 = (L.h - L.oy) / L.size;
+  const tx0 = Math.floor(ux0 / SQRT3) - 1;
+  const tx1 = Math.ceil(ux1 / SQRT3) + 1;
+  const ty0 = Math.floor((uy0 - 1) / 1.5) - 1;
+  const ty1 = Math.ceil((uy1 - 1) / 1.5) + 1;
+  const c0 = Math.max(0, Math.floor(tx0 / REGION_SIZE));
+  const c1 = Math.min(layout.cols - 1, Math.floor(tx1 / REGION_SIZE));
+  const r0 = Math.max(0, Math.floor(ty0 / REGION_SIZE));
+  const r1 = Math.min(layout.rows - 1, Math.floor(ty1 / REGION_SIZE));
+  const out: ViewRegion[] = [];
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      const region = r * layout.cols + c;
+      if (region < layout.regions) out.push({ region, origin: { x: c * REGION_SIZE, y: r * REGION_SIZE } });
+    }
+  }
+  return out;
+}
+
 /** Tiles the rover's sensors are sweeping right now (mid-drive), painted in before the sim catches up. */
 export interface Reveal {
-  /** The full-color terrain image (not the fogged one). */
-  terrain: HTMLCanvasElement;
-  /** Every tile swept so far on this drive. */
+  /** Full-color terrain images (not the fogged ones) of the regions the sweep touches. */
+  terrain: RegionImage[];
+  /** Every tile swept so far on this drive (planet-wide). */
   tiles: Vec2[];
 }
 
-let gridCache: { key: string; path: Path2D } | null = null;
+let gridCache: { size: number; grid: Path2D; border: Path2D } | null = null;
 
-/** All hex outlines of the map as one path, relative to the map origin; rebuilt only when the size changes. */
-function gridPath(L: Layout): Path2D {
-  const key = `${L.cols}x${L.rows}@${L.size.toFixed(3)}`;
-  if (gridCache && gridCache.key === key) return gridCache.path;
-  const path = new Path2D();
-  for (let y = 0; y < L.rows; y++) {
-    for (let x = 0; x < L.cols; x++) {
-      const c = hexToPixel(x, y, L.size);
-      const pts = hexCorners(c.x, c.y, L.size);
+/**
+ * Hex outlines of one region, and its outer border, relative to the region's screen origin. Every region has
+ * the same shape, so one pair of paths serves them all; rebuilt only when the hex size changes.
+ */
+function regionPaths(size: number): { grid: Path2D; border: Path2D } {
+  if (gridCache && gridCache.size === size) return gridCache;
+  const grid = new Path2D();
+  const border = new Path2D();
+  for (let y = 0; y < REGION_SIZE; y++) {
+    for (let x = 0; x < REGION_SIZE; x++) {
+      const c = hexToPixel(x, y, size);
+      const pts = hexCorners(c.x, c.y, size);
       const first = pts[0] as Vec2;
-      path.moveTo(first.x, first.y);
-      for (let i = 1; i < 6; i++) path.lineTo((pts[i] as Vec2).x, (pts[i] as Vec2).y);
-      path.closePath();
+      grid.moveTo(first.x, first.y);
+      for (let i = 1; i < 6; i++) grid.lineTo((pts[i] as Vec2).x, (pts[i] as Vec2).y);
+      grid.closePath();
+      if (x > 0 && y > 0 && x < REGION_SIZE - 1 && y < REGION_SIZE - 1) continue;
+      EDGE_DIRS.forEach((dir, i) => {
+        const n = step(x, y, dir);
+        if (n.x >= 0 && n.y >= 0 && n.x < REGION_SIZE && n.y < REGION_SIZE) return;
+        const p = pts[i] as Vec2;
+        const q = pts[(i + 1) % 6] as Vec2;
+        border.moveTo(p.x, p.y);
+        border.lineTo(q.x, q.y);
+      });
     }
   }
-  gridCache = { key, path };
-  return path;
+  gridCache = { size, grid, border };
+  return gridCache;
 }
 
+function blit(ctx: CanvasRenderingContext2D, L: Layout, img: RegionImage): void {
+  ctx.drawImage(img.canvas, L.ox + img.x * L.k, L.oy + img.y * L.k, img.canvas.width * L.k, img.canvas.height * L.k);
+}
+
+/** Strokes `path` (relative to a region's origin) once for each region in `regions`. */
+function strokeEachRegion(ctx: CanvasRenderingContext2D, L: Layout, path: Path2D, regions: readonly ViewRegion[]): void {
+  for (const r of regions) {
+    const o = regionScreenOrigin(L, r.origin);
+    ctx.translate(o.x, o.y);
+    ctx.stroke(path);
+    ctx.translate(-o.x, -o.y);
+  }
+}
+
+/** The terrain of every region in view (`painted` images), the mid-drive sensor reveal, and the hex grid. */
 export function drawBase(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
   L: Layout,
-  terrain: HTMLCanvasElement,
+  painted: readonly RegionImage[],
+  regions: readonly ViewRegion[],
   reveal: Reveal | null = null,
 ): void {
   ctx.fillStyle = UI.space;
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, L.w, L.h);
   const smoothing = ctx.imageSmoothingEnabled;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(terrain, L.ox, L.oy, terrain.width * L.k, terrain.height * L.k);
-  if (reveal && reveal.tiles.length > 0) {
+  for (const img of painted) blit(ctx, L, img);
+  if (reveal && reveal.tiles.length > 0 && reveal.terrain.length > 0) {
     ctx.save();
     ctx.translate(L.ox, L.oy);
     ctx.scale(L.k, L.k);
@@ -127,7 +218,7 @@ export function drawBase(
       hexPath(ctx, c.x, c.y, HEX + 0.6);
     }
     ctx.clip();
-    ctx.drawImage(reveal.terrain, 0, 0);
+    for (const img of reveal.terrain) ctx.drawImage(img.canvas, img.x, img.y);
     ctx.restore();
   }
   ctx.imageSmoothingEnabled = smoothing;
@@ -135,13 +226,46 @@ export function drawBase(
   // Subtle hex outlines.
   if (L.tw >= 7 && typeof Path2D !== "undefined") {
     ctx.save();
-    ctx.translate(L.ox, L.oy);
     ctx.lineWidth = 1;
     ctx.setLineDash([]);
     ctx.strokeStyle = "rgba(10, 14, 26, 0.2)";
-    ctx.stroke(gridPath(L));
+    strokeEachRegion(ctx, L, regionPaths(L.size).grid, regions);
     ctx.restore();
   }
+}
+
+/**
+ * Faint dashed outlines where regions meet, and a small "Region N" label in each region's top-left corner
+ * (kept on screen while any of the region is). The `active` region is labelled a little brighter.
+ */
+export function drawRegionBorders(ctx: CanvasRenderingContext2D, L: Layout, regions: readonly ViewRegion[], active: number): void {
+  if (typeof Path2D === "undefined") return;
+  ctx.save();
+  ctx.lineWidth = 1.25;
+  ctx.setLineDash([6, 5]);
+  ctx.strokeStyle = "rgba(215, 227, 244, 0.3)";
+  strokeEachRegion(ctx, L, regionPaths(L.size).border, regions);
+  ctx.setLineDash([]);
+  ctx.font = `bold 11px ${FONT}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3;
+  const regionW = SQRT3 * (REGION_SIZE + 0.5) * L.size;
+  const regionH = (1.5 * (REGION_SIZE - 1) + 2) * L.size;
+  for (const r of regions) {
+    const o = regionScreenOrigin(L, r.origin);
+    const text = `Region ${r.region + 1}`;
+    const tw = ctx.measureText(text).width;
+    // Clamp into the view (clear of the zoom buttons), but never outside the region itself.
+    const x = Math.min(Math.max(o.x + 8, 12), o.x + regionW - tw - 8);
+    const y = Math.min(Math.max(o.y + 8, 48), o.y + regionH - 22);
+    ctx.strokeStyle = "rgba(5, 7, 15, 0.85)";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = r.region === active ? "rgba(215, 227, 244, 0.9)" : "rgba(215, 227, 244, 0.5)";
+    ctx.fillText(text, x, y);
+  }
+  ctx.restore();
 }
 
 /** A little lander on its pad. */
@@ -242,18 +366,23 @@ function diamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: number)
   ctx.closePath();
 }
 
+/** A deposit to draw, with its own region's knowledge. */
+export interface DepositMark {
+  d: SurfaceDeposit;
+  know: RegionKnowledge;
+}
+
+/** Every deposit in `deposits` (the caller picks which are known). */
 export function drawDeposits(
   ctx: CanvasRenderingContext2D,
   L: Layout,
-  map: RegionMap,
-  know: RegionKnowledge,
-  selectedId: number | null,
+  deposits: readonly DepositMark[],
+  selectedKey: string | null,
   timeMs: number,
 ): void {
   const r = Math.max(5, L.tw * 0.38);
   ctx.setLineDash([]);
-  for (const d of map.deposits) {
-    if (!know.discovered.includes(d.id)) continue;
+  for (const { d, know } of deposits) {
     const x = cx(L, d.x, d.y);
     const y = cy(L, d.x, d.y);
     const depleted = remainingTonnes(know, d) <= 0.05;
@@ -281,7 +410,7 @@ export function drawDeposits(
       label(ctx, `${Math.round(d.grade * 100)}%`, x, y + r + 12, UI.text);
     }
 
-    if (d.id === selectedId) {
+    if (d.key === selectedKey) {
       const pulse = 0.5 + 0.5 * Math.sin(timeMs / 260);
       const grow = pulse * 2;
       ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 + pulse * 0.4})`;
@@ -296,19 +425,23 @@ export function drawDeposits(
 const LEAF = "#5fd47a";
 const LEAF_DIM = "#4f7a5a";
 
-/** A little sprout on every flora site the rover has spotted; sampled ones are dimmed and ticked. */
+/** A flora site to draw, with its own region's knowledge. */
+export interface FloraMark {
+  f: SurfaceFlora;
+  know: RegionKnowledge;
+}
+
+/** A little sprout on each flora site given (the ones the rover has spotted); sampled ones are dimmed and ticked. */
 export function drawFlora(
   ctx: CanvasRenderingContext2D,
   L: Layout,
-  map: RegionMap,
-  know: RegionKnowledge,
-  selectedId: number | null,
+  flora: readonly FloraMark[],
+  selectedKey: string | null,
   timeMs: number,
 ): void {
   const u = Math.max(5, L.tw * 0.36);
   ctx.setLineDash([]);
-  for (const f of map.flora) {
-    if (!know.floraFound.includes(f.id)) continue;
+  for (const { f, know } of flora) {
     const x = cx(L, f.x, f.y);
     const y = cy(L, f.x, f.y);
     const sampled = know.floraSampled.includes(f.id);
@@ -345,7 +478,7 @@ export function drawFlora(
       ctx.stroke();
     }
 
-    if (f.id === selectedId) {
+    if (f.key === selectedKey) {
       const pulse = 0.5 + 0.5 * Math.sin(timeMs / 260);
       const grow = pulse * 2;
       ctx.strokeStyle = `rgba(126, 231, 135, ${0.55 + pulse * 0.4})`;

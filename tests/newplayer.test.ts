@@ -87,23 +87,25 @@ describe("starter contracts", () => {
       if (loc.kind === "space" && region > 0 && Object.values(state.ship.specimens ?? {}).reduce((a, b) => a + b, 0) >= 5) break;
       expect(land(state, world, region).ok).toBe(true);
       expect(deployRover(state, world).ok).toBe(true);
-      const map = world.region(meadow.id, region);
-      for (const site of map.flora) {
-        const path = findPath(map, map.landing, site, false);
+      const surface = world.surface(meadow.id);
+      const landing = surface.landing(region);
+      for (const site of surface.flora(region)) {
+        const path = findPath(surface, landing, site, false);
         if (!path) continue;
         if (!moveRoverTo(state, world, site.x, site.y).ok) continue;
-        collectSample(state, world, site.id);
-        moveRoverTo(state, world, map.landing.x, map.landing.y);
+        collectSample(state, world, site.key);
+        moveRoverTo(state, world, landing.x, landing.y);
       }
       const loc2 = state.location;
       if (loc2.kind === "surface" && loc2.rover) {
-        const back = moveRoverTo(state, world, map.landing.x, map.landing.y);
+        const back = moveRoverTo(state, world, landing.x, landing.y);
         if (!back.ok || back.value.stopped) expect(recallRover(state, world).ok).toBe(true);
         expect(stowRover(state, world).ok).toBe(true);
       }
       expect(knowledge(state, meadow.id, region).explored.length).toBeGreaterThan(0);
       expect(exploredFraction(knowledge(state, meadow.id, region))).toBeGreaterThan(0);
-      expect(regionRecap(state, world, meadow.id, region)?.visits).toBe(1);
+      // At least the landing; the rover may also have driven in from a neighbouring region.
+      expect(regionRecap(state, world, meadow.id, region)?.visits).toBeGreaterThanOrEqual(1);
       expect(launch(state, world).ok).toBe(true);
     }
 

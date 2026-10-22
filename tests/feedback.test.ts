@@ -77,19 +77,20 @@ describe("rover upgrade tiers (SCRUM-51)", () => {
 });
 
 /** Land on the first calm home world with a reachable, drillable deposit. */
-function landOnEasyWorld(seed: number): { state: GameState; world: World; depositId: number } {
+function landOnEasyWorld(seed: number): { state: GameState; world: World; depositId: string } {
   const world = new World(seed);
   const state = newGame({ seed });
   expect(fold(state, world, "s0").ok).toBe(true);
   for (const body of world.system("s0").bodies.filter((b) => b.easy && landingAccess(b, BASE_STATS.ratings).ok)) {
     if (!flyTo(state, world, { bodyId: body.id }).ok) continue;
     for (let region = 0; region < body.regions; region++) {
-      const map = world.region(body.id, region);
-      const d = map.deposits.find((x) => x.depthM <= BASE_STATS.drillMaxDepthM && hexDistance(x, map.landing) < 14);
+      const surface = world.surface(body.id);
+      const landing = surface.landing(region);
+      const d = surface.deposits(region).find((x) => x.depthM <= BASE_STATS.drillMaxDepthM && hexDistance(x, landing) < 14);
       if (!d) continue;
       expect(land(state, world, region).ok).toBe(true);
       knowledge(state, body.id, region).discovered.push(d.id);
-      return { state, world, depositId: d.id };
+      return { state, world, depositId: d.key };
     }
   }
   throw new Error("no suitable deposit");
@@ -100,12 +101,12 @@ describe("relocating the ship (SCRUM-52)", () => {
     const { state, world } = landOnEasyWorld(42);
     const loc = state.location;
     if (loc.kind !== "surface") throw new Error("not landed");
-    const map = world.region(loc.bodyId, loc.region);
-    const spot = { x: map.landing.x + 3, y: map.landing.y };
+    const landing = world.surface(loc.bodyId).landing(loc.region);
+    const spot = { x: landing.x + 3, y: landing.y };
     const fuel = state.ship.fuel;
     const r = relocateShip(state, world, spot.x, spot.y);
     if (!r.ok) return; // terrain there may be rough; the rule itself is covered below
-    expect(shipTile(state, map)).toEqual(spot);
+    expect(shipTile(state, world)).toEqual(spot);
     expect(state.ship.fuel).toBeLessThan(fuel);
     expect(deployRover(state, world).ok).toBe(true);
     const rover = (state.location as { rover: { x: number; y: number } }).rover;
@@ -136,11 +137,10 @@ describe("work this deposit (SCRUM-32)", () => {
     const { state, world } = landOnEasyWorld(42);
     const loc = state.location;
     if (loc.kind !== "surface") throw new Error("not landed");
-    const map = world.region(loc.bodyId, loc.region);
-    const deep = map.deposits.find((d) => d.depthM > BASE_STATS.drillMaxDepthM);
+    const deep = world.surface(loc.bodyId).deposits(loc.region).find((d) => d.depthM > BASE_STATS.drillMaxDepthM);
     if (!deep) return;
     knowledge(state, loc.bodyId, loc.region).discovered.push(deep.id);
-    expect(workDeposit(state, world, deep.id).ok).toBe(false);
+    expect(workDeposit(state, world, deep.key).ok).toBe(false);
     void moveRoverTo;
     void stowRover;
   });

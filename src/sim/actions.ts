@@ -9,6 +9,7 @@ import { fuelPrice, sellCommodity } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
 import { canEnter, findPath } from "./pathfinding";
+import type { BodySurface, SiteKey, SurfaceDeposit, SurfaceFlora } from "./bodysurface";
 import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
 import type { Rng } from "./rng";
@@ -32,6 +33,7 @@ import {
   normalizeKnowledge,
   regionKey,
   type Deposit,
+  REGION_SIZE,
   TILE_KM,
   type FloraSite,
   type RegionKnowledge,
@@ -345,7 +347,15 @@ export function land(state: GameState, world: World, region: number): Result {
   if (loc.kind !== "space") return fail("Not in orbit.");
   state.ship.fuel -= surfaceBurnFuel(state, body);
   advanceTime(state, DESCENT_MINUTES);
-  state.location = { kind: "surface", systemId: loc.systemId, bodyId: body.id, region, rover: null };
+  state.location = {
+    kind: "surface",
+    systemId: loc.systemId,
+    bodyId: body.id,
+    region,
+    rover: null,
+    ship: world.surface(body.id).landing(region),
+    globalCoords: true,
+  };
   knowledge(state, body.id, region).visits++;
   state.stats.landings++;
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
@@ -367,10 +377,13 @@ export function launch(state: GameState, world: World): Result {
 }
 
 // --- rover -------------------------------------------------------------------------------
+//
+// On the surface, the rover and ship use planet-wide hex coordinates (see bodysurface.ts).
+// Regions are storage: each keeps its own RegionKnowledge, and sites are keyed "region:id".
 
 interface SurfaceCtx {
-  map: RegionMap;
-  know: RegionKnowledge;
+  surface: BodySurface;
+  bodyId: string;
   rover: RoverState;
 }
 
@@ -378,48 +391,75 @@ function surfaceCtx(state: GameState, world: World): Result<SurfaceCtx> {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
   if (!loc.rover) return fail("Deploy the rover first.");
-  return ok({ map: world.region(loc.bodyId, loc.region), know: knowledge(state, loc.bodyId, loc.region), rover: loc.rover });
+  return ok({ surface: world.surface(loc.bodyId), bodyId: loc.bodyId, rover: loc.rover });
 }
 
-/** Where the ship stands in the current region: the landing site, unless it has hopped since. */
-export function shipTile(state: GameState, map: RegionMap): Vec2 {
+/** Where the ship stands, in planet-wide coordinates. */
+export function shipTile(state: GameState, world: World): Vec2 {
   const loc = state.location;
-  return loc.kind === "surface" && loc.ship ? loc.ship : map.landing;
+  if (loc.kind !== "surface") return { x: 0, y: 0 };
+  return loc.ship ?? world.surface(loc.bodyId).landing(loc.region);
+}
+
+/** The region the rover is in (or the ship, while the rover is stowed). */
+export function activeRegion(state: GameState, world: World): number {
+  const loc = state.location;
+  if (loc.kind !== "surface") return 0;
+  const p = loc.rover ?? shipTile(state, world);
+  return world.surface(loc.bodyId).regionAt(p.x, p.y) ?? loc.region;
+}
+
+export function currentRegion(state: GameState, world: World): RegionMap | null {
+  const loc = state.location;
+  return loc.kind === "surface" ? world.region(loc.bodyId, activeRegion(state, world)) : null;
 }
 
 export const HOP_MINUTES = 90;
 
-/** Fuel for a short hop to a new landing spot in the same region: half a descent. */
+/** Fuel for a short hop to a new landing spot nearby: half a descent. */
 export function hopFuel(state: GameState, world: World): number {
   const loc = state.location;
   if (loc.kind !== "surface") return 0;
   return Math.max(0.3, Math.round(surfaceBurnFuel(state, world.body(loc.bodyId).body) * 5) / 10);
 }
 
-/** Lift off and set down elsewhere in the region, so far deposits come within rover range. */
+/** Fuel to hop to (x, y): the base hop, plus more the farther it goes (a region's width doubles it). */
+export function hopFuelTo(state: GameState, world: World, x: number, y: number): number {
+  const d = hexDistance(shipTile(state, world), { x, y });
+  return Math.round(hopFuel(state, world) * (1 + d / REGION_SIZE) * 10) / 10;
+}
+
+/** Lift off and set down elsewhere (any region), so far deposits come within rover range. */
 export function relocateShip(state: GameState, world: World, x: number, y: number): Result {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
   if (loc.rover) return fail("Stow the rover before moving the ship.");
-  const map = world.region(loc.bodyId, loc.region);
-  if (!canEnter(map, x, y, false)) return fail("The ship can't set down there: it needs open, level ground.");
-  const here = shipTile(state, map);
+  const surface = world.surface(loc.bodyId);
+  if (!canEnter(surface, x, y, false)) return fail("The ship can't set down there: it needs open, level ground.");
+  const here = shipTile(state, world);
   if (here.x === x && here.y === y) return fail("The ship is already there.");
-  const fuel = hopFuel(state, world);
-  if (fuel > state.ship.fuel) return fail(`A hop needs ${fuel} fuel.`);
+  const fuel = hopFuelTo(state, world, x, y);
+  if (fuel > state.ship.fuel) return fail(`That hop needs ${fuel} fuel.`);
   state.ship.fuel -= fuel;
   advanceTime(state, HOP_MINUTES);
   loc.ship = { x, y };
-  log(state, "travel", `Hopped the ship ${Math.round(Math.hypot(x - here.x, y - here.y) * TILE_KM)} km to a new landing site.`);
+  visitRegion(state, world, loc.bodyId, x, y);
+  log(state, "travel", `Hopped the ship ${Math.round(hexDistance(here, { x, y }) * TILE_KM)} km to a new landing site.`);
   return ok(undefined);
 }
 
-export function currentRegion(state: GameState, world: World): RegionMap | null {
-  const loc = state.location;
-  return loc.kind === "surface" ? world.region(loc.bodyId, loc.region) : null;
+/** First arrival in a region (by rover or ship hop) counts as a visit, for map painting. */
+function visitRegion(state: GameState, world: World, bodyId: string, x: number, y: number): void {
+  const region = world.surface(bodyId).regionAt(x, y);
+  if (region === null) return;
+  const know = knowledge(state, bodyId, region);
+  if (know.visits === 0) {
+    know.visits = 1;
+    log(state, "travel", `Entered region ${region + 1} of ${world.body(bodyId).body.regions}.`);
+  }
 }
 
-/** Charge the rover's cells to full (taking time), then roll it out at the landing site. */
+/** Charge the rover's cells to full (taking time), then roll it out beside the ship. */
 export function deployRover(state: GameState, world: World): Result<{ chargedHours: number }> {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
@@ -429,20 +469,19 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   const chargedHours = (full - stored) / ROVER_CHARGE_PER_HOUR;
   advanceTime(state, 15 + chargedHours * HOUR);
   state.ship.roverEnergy = full;
-  const map = world.region(loc.bodyId, loc.region);
-  const home = shipTile(state, map);
+  const home = shipTile(state, world);
   loc.rover = { x: home.x, y: home.y, energy: full, cargo: {} };
   revealAround(state, world);
   return ok({ chargedHours });
 }
 
-/** Drive toward (x, y). Stops early if energy runs short; reports how far it got. */
+/** Drive toward (x, y), across region borders if needed. Stops early if energy runs short. */
 export function moveRoverTo(state: GameState, world: World, x: number, y: number): Result<{ steps: number; stopped: string | null }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const { map, rover } = ctx.value;
+  const { surface, rover, bodyId } = ctx.value;
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
-  const path = findPath(map, rover, { x, y }, shipStats(state.ship).roverCanClimb);
+  const path = findPath(surface, rover, { x, y }, shipStats(state.ship).roverCanClimb);
   if (!path) return fail("No route there for this rover.");
   let steps = 0;
   for (const step of path) {
@@ -454,6 +493,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
     rover.y = step.y;
     advanceTime(state, step.minutes * SHIFT_FACTOR);
     steps++;
+    visitRegion(state, world, bodyId, step.x, step.y);
     revealAround(state, world);
   }
   return ok({ steps, stopped: null });
@@ -462,41 +502,73 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
 function revealAround(state: GameState, world: World): void {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return;
-  const { map, know, rover } = ctx.value;
-  const radius = 2 + sensorTierFor(state, map.bodyId);
-  markExplored(know, rover.x, rover.y, radius);
-  const near = (p: { x: number; y: number }) => hexDistance(p, rover) <= radius;
-  const found = map.deposits.filter((d) => !know.discovered.includes(d.id) && near(d));
-  for (const d of found) know.discovered.push(d.id);
-  if (found.length > 0) {
-    const names = found.map((d) => COMMODITIES[d.commodity].name.toLowerCase());
-    log(state, "discovery", `Rover sensors picked up ${found.length === 1 ? "a deposit" : `${found.length} deposits`}: ${names.join(", ")}.`);
+  const { surface, rover, bodyId } = ctx.value;
+  const radius = 2 + sensorTierFor(state, bodyId);
+  const near = (p: Vec2) => hexDistance(p, rover) <= radius;
+  const foundDeposits: SurfaceDeposit[] = [];
+  const foundFlora: SurfaceFlora[] = [];
+  for (const region of surface.regionsNear(rover, radius)) {
+    const know = knowledge(state, bodyId, region);
+    const o = surface.origin(region);
+    markExplored(know, rover.x - o.x, rover.y - o.y, radius);
+    for (const d of surface.deposits(region)) {
+      if (!know.discovered.includes(d.id) && near(d)) {
+        know.discovered.push(d.id);
+        foundDeposits.push(d);
+      }
+    }
+    for (const f of surface.flora(region)) {
+      if (!know.floraFound.includes(f.id) && near(f)) {
+        know.floraFound.push(f.id);
+        foundFlora.push(f);
+      }
+    }
   }
-  const flora = map.flora.filter((f) => !know.floraFound.includes(f.id) && near(f));
-  for (const f of flora) know.floraFound.push(f.id);
-  if (flora.length > 0) {
-    log(state, "discovery", `Plant life spotted: ${[...new Set(flora.map((f) => f.species))].join(", ")}.`);
+  if (foundDeposits.length > 0) {
+    const names = foundDeposits.map((d) => COMMODITIES[d.commodity].name.toLowerCase());
+    log(
+      state,
+      "discovery",
+      `Rover sensors picked up ${foundDeposits.length === 1 ? "a deposit" : `${foundDeposits.length} deposits`}: ${names.join(", ")}.`,
+    );
+  }
+  if (foundFlora.length > 0) {
+    log(state, "discovery", `Plant life spotted: ${[...new Set(foundFlora.map((f) => f.species))].join(", ")}.`);
   }
 }
 
-function depositNearRover(ctx: SurfaceCtx, depositId: number): Result<Deposit> {
-  const d = ctx.map.deposits.find((dep) => dep.id === depositId);
-  if (!d || !ctx.know.discovered.includes(depositId)) return fail("Unknown deposit.");
-  if (hexDistance(d, ctx.rover) > 1) return fail("Drive the rover next to the deposit first.");
-  return ok(d);
+/** A known deposit, by key, with its region's knowledge. */
+export function surfaceDeposit(
+  state: GameState,
+  world: World,
+  key: SiteKey,
+): { deposit: SurfaceDeposit; know: RegionKnowledge } | null {
+  const loc = state.location;
+  if (loc.kind !== "surface") return null;
+  const deposit = world.surface(loc.bodyId).deposit(key);
+  if (!deposit) return null;
+  const know = knowledge(state, loc.bodyId, deposit.region);
+  return know.discovered.includes(deposit.id) ? { deposit, know } : null;
+}
+
+function depositNearRover(state: GameState, world: World, ctx: SurfaceCtx, key: SiteKey): Result<{ d: SurfaceDeposit; know: RegionKnowledge }> {
+  const found = surfaceDeposit(state, world, key);
+  if (!found) return fail("Unknown deposit.");
+  if (hexDistance(found.deposit, ctx.rover) > 1) return fail("Drive the rover next to the deposit first.");
+  return ok({ d: found.deposit, know: found.know });
 }
 
 export function remainingTonnes(know: RegionKnowledge, d: Deposit): number {
   return Math.max(0, d.tonnes - (know.extracted[d.id] ?? 0));
 }
 
-export function prospect(state: GameState, world: World, depositId: number): Result<Deposit> {
+export function prospect(state: GameState, world: World, key: SiteKey): Result<SurfaceDeposit> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const found = depositNearRover(ctx.value, depositId);
+  const found = depositNearRover(state, world, ctx.value, key);
   if (!found.ok) return found;
-  const d = found.value;
-  const { know, rover } = ctx.value;
+  const { d, know } = found.value;
+  const { rover } = ctx.value;
   if (know.prospected.includes(d.id)) return ok(d);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
@@ -521,13 +593,13 @@ export interface DrillResult {
 }
 
 /** Set up (once) and extract until the rover is full, the deposit runs out, energy fails, or maxHours pass. */
-export function drill(state: GameState, world: World, depositId: number, maxHours = Infinity): Result<DrillResult> {
+export function drill(state: GameState, world: World, key: SiteKey, maxHours = Infinity): Result<DrillResult> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const found = depositNearRover(ctx.value, depositId);
+  const found = depositNearRover(state, world, ctx.value, key);
   if (!found.ok) return found;
-  const d = found.value;
-  const { know, rover } = ctx.value;
+  const { d, know } = found.value;
+  const { rover, bodyId } = ctx.value;
   const stats = shipStats(state.ship);
   if (!know.prospected.includes(d.id)) return fail("Prospect the deposit before drilling.");
   if (d.depthM > stats.drillMaxDepthM) return fail(`The seam is ${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
@@ -547,7 +619,7 @@ export function drill(state: GameState, world: World, depositId: number, maxHour
   let hours = Math.min(remaining / rate, room / rate, maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
   if (hours <= 0.01) return fail("Not enough rover energy to run the drill.");
 
-  const { body } = world.body(ctx.value.map.bodyId);
+  const { body } = world.body(bodyId);
   const incident = withRng(state, (rng) => rollIncident(rng, body, hours));
   if (incident) hours *= incident.atFraction;
 
@@ -559,7 +631,7 @@ export function drill(state: GameState, world: World, depositId: number, maxHour
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
   log(state, "info", `Drilled ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
 
-  const where = placeName(world, ctx.value.map.bodyId);
+  const where = placeName(world, bodyId);
   if (tonnes > 0) recordFind(state, "mineral", d.commodity, where, COMMODITIES[d.commodity].name);
   const gem = withRng(state, (rng) => rollMineralSpecimen(rng, d.commodity, hours));
   if (gem) foundMineralSpecimen(state, gem, where);
@@ -630,26 +702,37 @@ function rollIncident(rng: Rng, body: Body, hours: number): Incident | null {
 export const SAMPLE_MINUTES = 60;
 export const SAMPLE_ENERGY = 3;
 
+/** A spotted flora site, by key, with its region's knowledge. */
+export function surfaceFlora(state: GameState, world: World, key: SiteKey): { site: SurfaceFlora; know: RegionKnowledge } | null {
+  const loc = state.location;
+  if (loc.kind !== "surface") return null;
+  const site = world.surface(loc.bodyId).floraSite(key);
+  if (!site) return null;
+  const know = knowledge(state, loc.bodyId, site.region);
+  return know.floraFound.includes(site.id) ? { site, know } : null;
+}
+
 /** Take a living sample from a flora site next to the rover. */
-export function collectSample(state: GameState, world: World, siteId: number): Result<FloraSite> {
+export function collectSample(state: GameState, world: World, key: SiteKey): Result<SurfaceFlora> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const { map, know, rover } = ctx.value;
-  const site = map.flora.find((f) => f.id === siteId);
-  if (!site || !know.floraFound.includes(siteId)) return fail("Unknown flora site.");
-  if (know.floraSampled.includes(siteId)) return fail("Already sampled here.");
+  const { rover, bodyId } = ctx.value;
+  const found = surfaceFlora(state, world, key);
+  if (!found) return fail("Unknown flora site.");
+  const { site, know } = found;
+  if (know.floraSampled.includes(site.id)) return fail("Already sampled here.");
   if (hexDistance(site, rover) > 1) return fail("Drive the rover next to the plants first.");
   if (specimenCount(rover.specimens) >= ROVER_SPECIMEN_SLOTS) return fail("The rover's sample cases are full.");
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;
   advanceTime(state, SAMPLE_MINUTES * SHIFT_FACTOR);
   rover.specimens ??= {};
-  const key = specimenKey(map.bodyId, site.species);
-  rover.specimens[key] = (rover.specimens[key] ?? 0) + 1;
-  know.floraSampled.push(siteId);
+  const specimen = specimenKey(bodyId, site.species);
+  rover.specimens[specimen] = (rover.specimens[specimen] ?? 0) + 1;
+  know.floraSampled.push(site.id);
   log(state, "discovery", `Collected a living sample of ${site.species}.`);
   const entry = FLORA_BY_NAME.get(site.species);
-  if (entry) recordFind(state, "flora", entry.id, placeName(world, map.bodyId), entry.name);
+  if (entry) recordFind(state, "flora", entry.id, placeName(world, bodyId), entry.name);
   return ok(site);
 }
 
@@ -657,9 +740,8 @@ export function collectSample(state: GameState, world: World, siteId: number): R
 export function stowRover(state: GameState, world: World): Result<{ unloaded: number; jettisoned: number }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const { map, rover } = ctx.value;
-  const home = shipTile(state, map);
-  if (hexDistance(rover, home) > 1) {
+  const { rover } = ctx.value;
+  if (hexDistance(rover, shipTile(state, world)) > 1) {
     return fail("Drive the rover back to the ship first.");
   }
   const capacity = shipStats(state.ship).cargoCapacityT;
@@ -690,9 +772,8 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
 export function rechargeRover(state: GameState, world: World): Result<{ hours: number }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const { map, rover } = ctx.value;
-  const home = shipTile(state, map);
-  if (hexDistance(rover, home) > 1) {
+  const { rover } = ctx.value;
+  if (hexDistance(rover, shipTile(state, world)) > 1) {
     return fail("Drive the rover back to the ship to recharge.");
   }
   const full = shipStats(state.ship).roverEnergy;
@@ -707,15 +788,32 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
 export function recallRover(state: GameState, world: World): Result {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const { map, rover } = ctx.value;
+  const { rover } = ctx.value;
   if (state.ship.fuel < RECALL_FUEL) return fail("Not enough fuel to hop the ship over to the rover.");
   state.ship.fuel -= RECALL_FUEL;
   advanceTime(state, RECALL_MINUTES);
-  const home = shipTile(state, map);
+  const home = shipTile(state, world);
   rover.x = home.x;
   rover.y = home.y;
   log(state, "warning", "Hopped the ship over to the rover and winched it aboard. It cost fuel and three hours.");
   return ok(undefined);
+}
+
+/**
+ * Saves from before seamless terrain stored rover/ship positions in the landing region's local
+ * coordinates. Convert them to planet-wide coordinates (idempotent).
+ */
+export function migrateSurfaceCoords(state: GameState, world: World): void {
+  const loc = state.location;
+  if (loc.kind !== "surface" || loc.globalCoords) return;
+  const surface = world.surface(loc.bodyId);
+  const o = surface.origin(loc.region);
+  loc.ship = loc.ship ? { x: loc.ship.x + o.x, y: loc.ship.y + o.y } : surface.landing(loc.region);
+  if (loc.rover) {
+    loc.rover.x += o.x;
+    loc.rover.y += o.y;
+  }
+  loc.globalCoords = true;
 }
 
 // --- the Intrepid ------------------------------------------------------------------------

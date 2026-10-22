@@ -11,6 +11,7 @@ Node is at `C:\Program Files\nodejs`. In Git Bash, prefix commands with `export 
 ## Architecture
 - `src/sim/`: game rules. Pure TypeScript, with **no DOM or rendering imports**, and deterministic.
   - The universe (galaxy, systems, bodies, surface regions) is regenerated from `GameState.seed` via `World`; it is never saved.
+  - A planet's surface is one hex map in planet-wide coordinates (`World.surface()` returns `BodySurface`). Regions are 48×48 storage chunks, each with its own `RegionKnowledge` (local coordinates). Sites are keyed `"region:id"`.
   - `GameState` is plain JSON and is the save file.
   - All time passes through `advanceTime` (`state.ts`).
   - Player verbs live in `actions.ts`. They return `Result` with a human-readable `reason` on failure and never throw for gameplay errors.
