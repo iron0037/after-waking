@@ -29,7 +29,15 @@ export type Location =
   /** In a star system. While orbiting, the ship's position follows the body. */
   | { kind: "space"; systemId: string; pos: Vec2; orbiting: string | null }
   /** Landed. `rover` is null while the rover is stowed aboard. */
-  | { kind: "surface"; systemId: string; bodyId: string; region: number; rover: RoverState | null };
+  | {
+      kind: "surface";
+      systemId: string;
+      bodyId: string;
+      region: number;
+      rover: RoverState | null;
+      /** Where the ship sits now, if it has hopped from the region's original landing site. */
+      ship?: Vec2;
+    };
 
 export interface Loan {
   balance: number;
@@ -38,6 +46,8 @@ export interface Loan {
   nextDue: number;
   missed: number;
   annualRate: number;
+  /** Early payments not yet applied to an installment; the auto-debit draws on this first. */
+  prepaid?: number;
 }
 
 export type JournalKind = "info" | "travel" | "discovery" | "trade" | "warning";
@@ -187,14 +197,24 @@ function settleLoan(state: GameState): void {
   const loan = state.loan;
   while (loan.balance > 0 && state.time >= loan.nextDue) {
     loan.balance = Math.round(loan.balance * (1 + loan.annualRate * (loan.intervalDays / 365)));
-    const due = Math.min(loan.payment, loan.balance);
     const when = loan.nextDue;
     loan.nextDue += loan.intervalDays * DAY;
-    if (state.credits >= due) {
+    // Early payments already reduced the balance; they cover this installment first.
+    const installment = Math.min(loan.payment, loan.balance + (loan.prepaid ?? 0));
+    const fromPrepaid = Math.min(loan.prepaid ?? 0, installment);
+    loan.prepaid = (loan.prepaid ?? 0) - fromPrepaid;
+    const due = Math.min(installment - fromPrepaid, loan.balance);
+    if (due <= 0) {
+      log(state, "trade", `Exchange installment covered by your early payments. Balance: ${loan.balance.toLocaleString()} cr.`);
+    } else if (state.credits >= due) {
       state.credits -= due;
       state.stats.loanPaid = (state.stats.loanPaid ?? 0) + due;
       loan.balance -= due;
-      log(state, "trade", `Exchange loan payment of ${due.toLocaleString()} cr collected. Balance: ${loan.balance.toLocaleString()} cr.`);
+      log(
+        state,
+        "trade",
+        `Exchange auto-debited ${due.toLocaleString()} cr${fromPrepaid > 0 ? ` (plus ${fromPrepaid.toLocaleString()} cr from early payments)` : ""}. Balance: ${loan.balance.toLocaleString()} cr.`,
+      );
     } else {
       loan.missed++;
       const fee = Math.round(due * 0.1);

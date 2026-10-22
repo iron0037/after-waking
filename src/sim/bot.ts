@@ -22,6 +22,7 @@ import {
   remainingTonnes,
   scanBody,
   sellAll,
+  shipTile,
   sensorTierFor,
   surveyBody,
   stowRover,
@@ -233,7 +234,7 @@ function workRegion(
       .sort((a, b) => b.score - a.score);
 
     const homeCost = (from: { x: number; y: number }) =>
-      (findPath(map, from, map.landing, stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
+      (findPath(map, from, shipTile(state, map), stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
 
     const next = candidates[0];
     if (next) {
@@ -271,7 +272,8 @@ function returnAndUnload(state: GameState, world: World, must: <T>(label: string
   const loc = state.location;
   if (loc.kind !== "surface" || !loc.rover) return true;
   const map = world.region(loc.bodyId, loc.region);
-  const moved = must("return to ship", moveRoverTo(state, world, map.landing.x, map.landing.y));
+  const home = shipTile(state, map);
+  const moved = must("return to ship", moveRoverTo(state, world, home.x, home.y));
   if (!moved || moved.stopped) must("recall rover", recallRover(state, world));
   return must("stow rover", stowRover(state, world)) !== null;
 }

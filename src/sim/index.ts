@@ -16,3 +16,4 @@ export * from "./contracts";
 export * from "./progress";
 export * from "./result";
 export * from "./compendium";
+export * from "./automation";

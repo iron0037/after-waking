@@ -66,9 +66,21 @@ export const BASE_STATS: ShipStats = {
 
 export type UpgradeEffect = (stats: ShipStats) => void;
 
+export type UpgradeCategory = "ship" | "rover" | "mining" | "sensors";
+
+export const UPGRADE_CATEGORY_NAMES: Record<UpgradeCategory, string> = {
+  ship: "Ship",
+  rover: "Rover",
+  mining: "Mining",
+  sensors: "Sensors",
+};
+
 export interface Upgrade {
   id: string;
   name: string;
+  category: UpgradeCategory;
+  /** An upgrade that must be installed first. */
+  requires?: string;
   vendor: ClanId;
   price: number;
   description: string;
@@ -78,6 +90,7 @@ export interface Upgrade {
 export const UPGRADES: readonly Upgrade[] = [
   {
     id: "expandedHold",
+    category: "ship",
     name: "Expanded hold",
     vendor: "exchange",
     price: 22_000,
@@ -89,6 +102,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "auxTanks",
+    category: "ship",
     name: "Auxiliary plicite tanks",
     vendor: "midshipmen",
     price: 14_000,
@@ -100,6 +114,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "driveCoil2",
+    category: "ship",
     name: "Fold coil Mk II",
     vendor: "midshipmen",
     price: 55_000,
@@ -110,6 +125,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "landingStruts",
+    category: "ship",
     name: "Heavy struts & lift thrusters",
     vendor: "midshipmen",
     price: 28_000,
@@ -121,6 +137,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "pressureHull2",
+    category: "ship",
     name: "Pressure hull Mk II",
     vendor: "midshipmen",
     price: 38_000,
@@ -134,6 +151,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "radShielding",
+    category: "ship",
     name: "Radiation baffles",
     vendor: "lyceum",
     price: 18_000,
@@ -145,6 +163,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "surveyArray",
+    category: "sensors",
     name: "Helm survey array",
     vendor: "helm",
     price: 16_000,
@@ -155,6 +174,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "deepDrill",
+    category: "mining",
     name: "Deep-core drill",
     vendor: "diggers",
     price: 24_000,
@@ -166,6 +186,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "roverSled",
+    category: "rover",
     name: "Rover cargo sled",
     vendor: "diggers",
     price: 6_000,
@@ -176,6 +197,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "roverCells",
+    category: "rover",
     name: "Rover power cells",
     vendor: "diggers",
     price: 5_000,
@@ -186,12 +208,62 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "allTerrain",
+    category: "rover",
     name: "All-terrain treads",
     vendor: "diggers",
     price: 8_000,
     description: "The rover can climb mountainous terrain.",
     apply: (s) => {
       s.roverCanClimb = true;
+    },
+  },
+  {
+    id: "roverSled2",
+    category: "rover",
+    requires: "roverSled",
+    name: "Heavy cargo trailer",
+    vendor: "diggers",
+    price: 18_000,
+    description: "+40 t rover cargo (on top of the sled).",
+    apply: (s) => {
+      s.roverCargoT += 40;
+    },
+  },
+  {
+    id: "roverCells2",
+    category: "rover",
+    requires: "roverCells",
+    name: "Fusion cell pack",
+    vendor: "midshipmen",
+    price: 20_000,
+    description: "+150 rover energy (on top of the power cells).",
+    apply: (s) => {
+      s.roverEnergy += 150;
+    },
+  },
+  {
+    id: "coreDrill",
+    category: "mining",
+    requires: "deepDrill",
+    name: "Plicite-bit core drill",
+    vendor: "diggers",
+    price: 48_000,
+    description: "Drill to 1,200 m at 1.5x the deep-core rate.",
+    apply: (s) => {
+      s.drillMaxDepthM = Math.max(s.drillMaxDepthM, 1200);
+      s.drillRateTph *= 1.5;
+    },
+  },
+  {
+    id: "surveyArray2",
+    category: "sensors",
+    requires: "surveyArray",
+    name: "Deep-crust sounding array",
+    vendor: "helm",
+    price: 45_000,
+    description: "Sensor tier 3: exact region readings and the widest rover detection.",
+    apply: (s) => {
+      s.sensorTier = Math.max(s.sensorTier, 3);
     },
   },
 ];

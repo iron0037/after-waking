@@ -8,7 +8,7 @@ import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { fuelPrice, sellCommodity } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
-import { findPath } from "./pathfinding";
+import { canEnter, findPath } from "./pathfinding";
 import { fail, ok, type Result } from "./result";
 import type { Rng } from "./rng";
 import {
@@ -31,6 +31,7 @@ import {
   normalizeKnowledge,
   regionKey,
   type Deposit,
+  TILE_KM,
   type FloraSite,
   type RegionKnowledge,
   type RegionMap,
@@ -163,6 +164,34 @@ export function fold(state: GameState, world: World, targetId: string): Result {
       `Arrived at the system edge, ${detail.edgeAU.toFixed(1)} AU out. ${detail.bodies.length} bodies on sensors.`,
   );
   return ok(undefined);
+}
+
+/**
+ * One-click departure: fly out to the system edge if needed, wait for the fold drive to finish
+ * charging, then fold. Costs exactly the same time and fuel as doing it by hand.
+ */
+export function autoFold(state: GameState, world: World, targetId: string): Result<{ waited: number; flewToEdge: boolean }> {
+  const plan = foldPlan(state, world, targetId);
+  const hard = plan.blockers.filter((b) => !b.startsWith("Fold drive recharging") && !b.startsWith("Folds can't start inside"));
+  if (hard.length > 0) return fail(hard[0] as string);
+
+  let flewToEdge = false;
+  if (plan.blockers.some((b) => b.startsWith("Folds can't start inside"))) {
+    const edge = flightPlan(state, world, { edge: true });
+    if (!edge.ok) return edge;
+    if (edge.value.fuel + plan.fuel > state.ship.fuel) return fail("Not enough fuel to reach the edge and fold.");
+    const flown = flyTo(state, world, { edge: true });
+    if (!flown.ok) return flown;
+    flewToEdge = true;
+  }
+  const waited = Math.max(0, state.foldReadyAt - state.time);
+  if (waited > 0) {
+    advanceTime(state, waited);
+    log(state, "travel", `Held position ${formatDuration(waited)} while the fold drive charged.`);
+  }
+  const folded = fold(state, world, targetId);
+  if (!folded.ok) return folded;
+  return ok({ waited, flewToEdge });
 }
 
 // --- in-system flight --------------------------------------------------------------------
@@ -351,6 +380,39 @@ function surfaceCtx(state: GameState, world: World): Result<SurfaceCtx> {
   return ok({ map: world.region(loc.bodyId, loc.region), know: knowledge(state, loc.bodyId, loc.region), rover: loc.rover });
 }
 
+/** Where the ship stands in the current region: the landing site, unless it has hopped since. */
+export function shipTile(state: GameState, map: RegionMap): Vec2 {
+  const loc = state.location;
+  return loc.kind === "surface" && loc.ship ? loc.ship : map.landing;
+}
+
+export const HOP_MINUTES = 90;
+
+/** Fuel for a short hop to a new landing spot in the same region: half a descent. */
+export function hopFuel(state: GameState, world: World): number {
+  const loc = state.location;
+  if (loc.kind !== "surface") return 0;
+  return Math.max(0.3, Math.round(surfaceBurnFuel(state, world.body(loc.bodyId).body) * 5) / 10);
+}
+
+/** Lift off and set down elsewhere in the region, so far deposits come within rover range. */
+export function relocateShip(state: GameState, world: World, x: number, y: number): Result {
+  const loc = state.location;
+  if (loc.kind !== "surface") return fail("Not on a surface.");
+  if (loc.rover) return fail("Stow the rover before moving the ship.");
+  const map = world.region(loc.bodyId, loc.region);
+  if (!canEnter(map, x, y, false)) return fail("The ship can't set down there: it needs open, level ground.");
+  const here = shipTile(state, map);
+  if (here.x === x && here.y === y) return fail("The ship is already there.");
+  const fuel = hopFuel(state, world);
+  if (fuel > state.ship.fuel) return fail(`A hop needs ${fuel} fuel.`);
+  state.ship.fuel -= fuel;
+  advanceTime(state, HOP_MINUTES);
+  loc.ship = { x, y };
+  log(state, "travel", `Hopped the ship ${Math.round(Math.hypot(x - here.x, y - here.y) * TILE_KM)} km to a new landing site.`);
+  return ok(undefined);
+}
+
 export function currentRegion(state: GameState, world: World): RegionMap | null {
   const loc = state.location;
   return loc.kind === "surface" ? world.region(loc.bodyId, loc.region) : null;
@@ -367,7 +429,8 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   advanceTime(state, 15 + chargedHours * HOUR);
   state.ship.roverEnergy = full;
   const map = world.region(loc.bodyId, loc.region);
-  loc.rover = { x: map.landing.x, y: map.landing.y, energy: full, cargo: {} };
+  const home = shipTile(state, map);
+  loc.rover = { x: home.x, y: home.y, energy: full, cargo: {} };
   revealAround(state, world);
   return ok({ chargedHours });
 }
@@ -594,7 +657,8 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { map, rover } = ctx.value;
-  if (Math.max(Math.abs(rover.x - map.landing.x), Math.abs(rover.y - map.landing.y)) > 1) {
+  const home = shipTile(state, map);
+  if (Math.max(Math.abs(rover.x - home.x), Math.abs(rover.y - home.y)) > 1) {
     return fail("Drive the rover back to the ship first.");
   }
   const capacity = shipStats(state.ship).cargoCapacityT;
@@ -629,8 +693,9 @@ export function recallRover(state: GameState, world: World): Result {
   if (state.ship.fuel < RECALL_FUEL) return fail("Not enough fuel to hop the ship over to the rover.");
   state.ship.fuel -= RECALL_FUEL;
   advanceTime(state, RECALL_MINUTES);
-  rover.x = map.landing.x;
-  rover.y = map.landing.y;
+  const home = shipTile(state, map);
+  rover.x = home.x;
+  rover.y = home.y;
   log(state, "warning", "Hopped the ship over to the rover and winched it aboard. It cost fuel and three hours.");
   return ok(undefined);
 }
@@ -734,6 +799,9 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const upgrade = UPGRADES_BY_ID.get(upgradeId);
   if (!upgrade) return fail("Unknown upgrade.");
   if (state.ship.upgrades.includes(upgradeId)) return fail("Already installed.");
+  if (upgrade.requires && !state.ship.upgrades.includes(upgrade.requires)) {
+    return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);
+  }
   if (state.credits < upgrade.price) return fail(`Costs ${upgrade.price.toLocaleString()} cr.`);
   state.credits -= upgrade.price;
   state.ship.upgrades.push(upgradeId);
@@ -750,6 +818,8 @@ export function payLoan(state: GameState, amount: number): Result<number> {
   state.credits -= pay;
   state.stats.loanPaid = (state.stats.loanPaid ?? 0) + pay;
   state.loan.balance -= pay;
+  // Counts toward upcoming installments, so the next auto-debit draws on it first.
+  state.loan.prepaid = (state.loan.prepaid ?? 0) + pay;
   log(state, "trade", `Paid ${pay.toLocaleString()} cr toward the Exchange note. Balance: ${state.loan.balance.toLocaleString()} cr.`);
   return ok(pay);
 }

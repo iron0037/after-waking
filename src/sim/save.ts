@@ -20,5 +20,6 @@ export function deserialize(json: string): GameState {
   data.nextContractAt ??= data.time;
   data.catalogedSpecies ??= [];
   data.compendium ??= {};
+  data.loan.prepaid ??= 0;
   return data;
 }
