@@ -14,11 +14,13 @@ export interface BodyListProps {
   hoverId: string | null;
   progress: Map<string, BodyProgress>;
   targets: Map<string, Contract[]>;
+  /** Scanned bodies the current ship can land on and mine. */
+  landable: Set<string>;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
 
-export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedId, hoverId, progress, targets, onSelect, onHover }: BodyListProps) {
+export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedId, hoverId, progress, targets, landable, onSelect, onHover }: BodyListProps) {
   const box = useRef<HTMLDivElement>(null);
 
   // Keep the selected row visible when the selection came from the map.
@@ -57,6 +59,12 @@ export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedI
                   {b.name}
                   {b.nickname && <span class="muted"> · {b.nickname}</span>}
                   {scanned.includes(b.id) && <span class="sys-scanned" title="Scanned" />}
+                  {scanned.includes(b.id) && landable.has(b.id) && (
+                    <span class="good" title="Your ship can land here and mine">
+                      {" "}
+                      ▼
+                    </span>
+                  )}
                   {b.easy && (
                     <span class="sys-calm" title="A calm home world: mild conditions and forgiving terrain">
                       calm

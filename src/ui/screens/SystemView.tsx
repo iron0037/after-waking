@@ -11,6 +11,7 @@ import {
   formatDuration,
   land,
   landingAccess,
+  landableBodies,
   landingBlockers,
   scanBody,
   effectiveStats,
@@ -444,6 +445,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             hoverId={hoverId}
             progress={progress}
             targets={targets}
+            landable={new Set(landableBodies(state, session.world, detail.system.id).map((b) => b.id))}
             onSelect={select}
             onHover={(id) => !busy && setHoverId(id)}
           />
@@ -496,6 +498,17 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                   Scan ({formatDuration(SCAN_MINUTES)})
                 </button>
               </>
+            )}
+
+            {!orbitingSel && scanned && access && !access.ok && (
+              <div class="sys-noland">
+                <div class="danger small">Your ship can't land here:</div>
+                <ul class="blockers">
+                  {access.reasons.map((r) => (
+                    <li key={r}>{r}</li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {orbitingSel && scanned && access && (
@@ -559,7 +572,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             )}
 
             {scanned ? (
-              <Environment body={selected} />
+              <Environment body={selected} ratings={stats.ratings} />
             ) : (
               <div class="sys-unscanned muted small">
                 Unscanned: {orbitingSel ? "scan to reveal its environment and resources." : "enter orbit and scan to reveal its environment and resources."}

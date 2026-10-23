@@ -8,7 +8,7 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
-import { hasPerk } from "./perks";
+import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { Rng } from "./rng";
 import { removeCargo } from "./ship";
@@ -200,10 +200,14 @@ export function standingSurvey(state: GameState, rng: Rng, serial: number): Cont
   const world = worldFor(state.seed);
   const surveyed = new Set(state.surveyedBodies ?? []);
   const claimed = new Set((state.contracts ?? []).filter((c) => c.status === "active" || c.status === "offered").flatMap((c) => c.surveyBodyIds ?? []));
-  const options = world.galaxy.systems
+  const all = world.galaxy.systems
     .filter((s) => s.charted)
     .map((s) => ({ s, bodies: world.system(s.id).bodies.filter((b) => b.regions > 0 && !surveyed.has(b.id) && !claimed.has(b.id)) }))
     .filter((o) => o.bodies.length >= 2);
+  // Prefer systems one fold from the Intrepid; farther ones only when nothing nearer is left.
+  const range = effectiveStats(state).foldRangeLy;
+  const near = all.filter((o) => distanceLy(world.galaxy, "intrepid", o.s.id) <= range);
+  const options = near.length > 0 ? near : all;
   if (options.length === 0) return null;
   const { s, bodies } = rng.pick(options);
   const targets = bodies.slice(0, 2);

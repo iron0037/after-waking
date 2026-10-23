@@ -48,3 +48,29 @@ describe("life signs from orbit", () => {
     }
   });
 });
+
+describe("playtest 6", () => {
+  it("Helm's standing surveys stay within one fold of the Intrepid", async () => {
+    const { standingSurvey, distanceLy, Rng } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    for (let i = 0; i < 20; i++) {
+      const c = standingSurvey(state, new Rng(i + 1), 100 + i);
+      if (!c) continue;
+      const systemId = c.surveyBodyIds![0]!.split(".")[0]!;
+      expect(distanceLy(world.galaxy, "intrepid", systemId)).toBeLessThanOrEqual(effectiveStats(state).foldRangeLy);
+    }
+  });
+
+  it("estimates what a scanned world is worth from orbit", async () => {
+    const { bodyValueEstimate } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    const body = world.system("s0").bodies.find((b) => b.regions > 0 && state.scannedBodies.includes(b.id) && Object.keys(b.resources).length > 0)!;
+    const v = bodyValueEstimate(state, body)!;
+    expect(v.best).toBeGreaterThan(0);
+    expect(v.best).toBeGreaterThanOrEqual(v.average);
+    const unscanned = { ...state, scannedBodies: [] };
+    expect(bodyValueEstimate(unscanned, body)).toBeNull();
+  });
+});

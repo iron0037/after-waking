@@ -326,6 +326,25 @@ export function orbitalSensorTier(state: GameState, bodyId: string): number {
   return sensorTierFor(state, bodyId) + (hasPerk(state, "sensor-calibration") ? 1 : 0) + (hasPerk(state, "long-ears") ? 1 : 0);
 }
 
+/**
+ * What a world looks worth from orbit: the estimated value of its richest region (and the average),
+ * read the way the landing chart reads it (orbital sensor tier, drill reach). Null if unscanned or
+ * without a surface.
+ */
+export function bodyValueEstimate(state: GameState, body: Body): { best: number; average: number } | null {
+  if (body.regions === 0 || !state.scannedBodies.includes(body.id)) return null;
+  const tier = orbitalSensorTier(state, body.id);
+  const reach = effectiveStats(state).drillMaxDepthM;
+  let best = 0;
+  let sum = 0;
+  for (let r = 0; r < body.regions; r++) {
+    const v = regionSignal(state.seed, body, r, tier, reach);
+    sum += v;
+    if (v > best) best = v;
+  }
+  return { best, average: sum / body.regions };
+}
+
 /** Hunch (captain): the region a gut feeling points to, read as if the sensors were perfect. Null without the perk. */
 export function hunchRegion(state: GameState, body: Body): number | null {
   if (!hasPerk(state, "hunch") || body.regions === 0) return null;

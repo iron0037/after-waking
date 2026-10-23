@@ -4,6 +4,8 @@ import {
   autoFold,
   clamp,
   currentSystemId,
+  orbitalSensorTier,
+  bodyValueEstimate,
   isWaitBlocker,
   departureReadyAt,
   yardReadyAt,
@@ -953,11 +955,30 @@ function ExplorationBlock({ star, paint, contracts }: { star: StarSystem; paint:
   );
 }
 
+/** Estimated worth of a world's richest region, cached per sensor tier and drill reach (it's not cheap). */
+const valueCache = new Map<string, { best: number; average: number } | null>();
+function worldValue(session: GameSession, body: Body): { best: number; average: number } | null {
+  const { state } = session;
+  const key = `${state.seed}|${body.id}|${orbitalSensorTier(state, body.id)}|${effectiveStats(state).drillMaxDepthM}|${state.scannedBodies.includes(body.id)}`;
+  if (!valueCache.has(key)) valueCache.set(key, bodyValueEstimate(state, body));
+  return valueCache.get(key) ?? null;
+}
+
+const kcr = (v: number): string => (v >= 1000 ? `~${Math.round(v / 1000).toLocaleString()}k cr` : `~${Math.round(v / 100) * 100} cr`);
+
 function LandableSummary({ session, systemId }: { session: GameSession; systemId: string }) {
-  const n = landableBodies(session.state, session.world, systemId).length;
+  const bodies = landableBodies(session.state, session.world, systemId);
+  const n = bodies.length;
+  const best = Math.max(0, ...bodies.map((b) => worldValue(session, b)?.best ?? 0));
   return n > 0 ? (
     <div class="good small">
       {n} world{n === 1 ? "" : "s"} your ship can land on and mine (marked ▼)
+      {best > 0 && (
+        <span class="muted" title="Estimated ore value of the richest region on any world you can land on here, as your sensors read it">
+          {" "}
+          · richest landing {kcr(best)}
+        </span>
+      )}
     </div>
   ) : (
     <div class="danger small">No worlds here your ship can land on yet. Check gravity, heat and radiation ratings in the shipyard.</div>
@@ -996,7 +1017,16 @@ function BodyList({ session, systemId }: { session: GameSession; systemId: strin
             )}
             {landable.has(body.id) && <span class="good" title="Landable with your current ship"> ▼</span>}
           </span>
-          <span class="muted">{KIND_LABEL[body.kind]}</span>
+          {landable.has(body.id) && worldValue(session, body) ? (
+            <span
+              class="accent small"
+              title={`Estimated ore value of the richest region (average region ${kcr(worldValue(session, body)!.average)}), as your sensors read it`}
+            >
+              {kcr(worldValue(session, body)!.best)}
+            </span>
+          ) : (
+            <span class="muted">{KIND_LABEL[body.kind]}</span>
+          )}
         </li>
       ))}
     </ul>

@@ -1,7 +1,7 @@
 /** Contracts overlay: every active job with its targets, plus the postings on offer. Viewable from anywhere. */
 import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
-import { contractPayout, contractProgress, DAY, formatDuration, type Contract } from "../sim";
+import { completeContract, contractPayout, contractProgress, DAY, formatDuration, type Contract } from "../sim";
 import { cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -78,6 +78,14 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
           <div class="bar hub-contract-bar">
             <span style={{ width: `${pct(progress.have, progress.need)}%` }} />
           </div>
+          {progress.ready &&
+            (state.location.kind === "intrepid" ? (
+              <button class="btn primary" onClick={() => session.act((s) => completeContract(s, c.id))}>
+                Turn in for {cr(payout)}
+              </button>
+            ) : (
+              <div class="good small">Ready: turn it in aboard the Intrepid (Jobs tab).</div>
+            ))}
         </>
       ) : (
         <div class="muted small">{c.durationDays} days to complete once signed</div>

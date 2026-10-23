@@ -1,5 +1,6 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
+import type { Ratings } from "../../../data/ship";
 import {
   contractProgress,
   DAY,
@@ -90,25 +91,56 @@ export function Exploration({
   );
 }
 
-export function Environment({ body }: { body: Body }) {
+/**
+ * The body's conditions. Red marks exactly what stops your current ship landing (with the reason on
+ * hover), so a glance tells you whether a trip there is worth it.
+ */
+export function Environment({ body, ratings }: { body: Body; ratings: Ratings }) {
   const resources = (Object.entries(body.resources) as [CommodityId, number][]).sort((a, b) => b[1] - a[1]);
   const regionText = body.regions > 0 ? `${body.regions}` : "None";
+  const over = {
+    gravity: body.gravityG > ratings.maxGravityG ? `Your thrusters lift off from up to ${ratings.maxGravityG.toFixed(1)} g.` : null,
+    pressure: body.pressureAtm > ratings.maxPressureAtm ? `Your hull is rated to ${ratings.maxPressureAtm} atm.` : null,
+    temp:
+      body.tempC > ratings.maxTempC
+        ? `Your hull is rated to ${ratings.maxTempC} °C.`
+        : body.tempC < ratings.minTempC
+          ? `Your hull is rated down to ${ratings.minTempC} °C.`
+          : null,
+    surface: body.surface === "liquid" ? "No solid ground: needs a boat." : body.surface === "none" ? "No surface to land on." : null,
+    chemistry: body.chemistry === "corrosive" && !ratings.corrosionProof ? "Needs a corrosion-proof hull." : null,
+    radiation: body.radiation > ratings.maxRadiation ? `Your shielding is rated to ${RADIATION_LABEL[ratings.maxRadiation]}.` : null,
+  };
+  const cls = (why: string | null) => (why ? "danger" : "");
   return (
     <>
       <h3>Environment</h3>
       <dl class="kv sys-env">
         <dt>Gravity</dt>
-        <dd>{body.gravityG.toFixed(2)} g</dd>
+        <dd class={cls(over.gravity)} title={over.gravity ?? undefined}>
+          {body.gravityG.toFixed(2)} g
+        </dd>
         <dt>Pressure</dt>
-        <dd>{formatPressure(body.pressureAtm)}</dd>
+        <dd class={cls(over.pressure)} title={over.pressure ?? undefined}>
+          {formatPressure(body.pressureAtm)}
+        </dd>
         <dt>Temperature</dt>
-        <dd>{Math.round(body.tempC)} °C</dd>
+        <dd class={cls(over.temp)} title={over.temp ?? undefined}>
+          {Math.round(body.tempC)} °C
+        </dd>
         <dt>Surface</dt>
-        <dd>{SURFACE_LABEL[body.surface]}</dd>
+        <dd class={cls(over.surface)} title={over.surface ?? undefined}>
+          {SURFACE_LABEL[body.surface]}
+        </dd>
         <dt>Chemistry</dt>
-        <dd class={body.chemistry === "inert" ? "" : "danger"}>{body.chemistry[0]?.toUpperCase()}{body.chemistry.slice(1)}</dd>
+        <dd class={cls(over.chemistry)} title={over.chemistry ?? undefined}>
+          {body.chemistry[0]?.toUpperCase()}
+          {body.chemistry.slice(1)}
+        </dd>
         <dt>Radiation</dt>
-        <dd class={body.radiation >= 3 ? "danger" : ""}>{RADIATION_LABEL[body.radiation]}</dd>
+        <dd class={cls(over.radiation)} title={over.radiation ?? undefined}>
+          {RADIATION_LABEL[body.radiation]}
+        </dd>
         <dt>Weather</dt>
         <dd>{WEATHER_LABEL[body.weather]}</dd>
         <dt>Tectonics</dt>

@@ -86,7 +86,8 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
   const t = TERRAIN_COLORS[body.kind];
   const rnd = stream(h("art"));
   const liquidWorld = body.surface === "liquid";
-  const sea = liquidWorld ? 0.57 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
+  // A global ocean has no dry land at all: sea level above every peak (depth still shades the water).
+  const sea = liquidWorld ? 1.05 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
   const capLat = body.tempC > 45 ? 9 : Math.max(0.3, Math.min(1.42, 1.45 - (15 - body.tempC) * 0.025));
   const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
   return {
