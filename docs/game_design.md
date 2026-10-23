@@ -163,6 +163,25 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
 - **The captain's own tree:** Trader / Explorer / Diplomat / Commander. This shapes playstyle and endings.
 - **Scope target:** 6 stations × 3 branches × about 5 perks, plus traits.
 
+## Ship Classes **[PROPOSED 2026-10-23]**
+Your third-rate freighter can only be improved so far. Later in a career, captains buy a different hull.
+
+- **Classes trade off cargo, speed, combat, landing ability and crew size.** Examples:
+  - Big, slow bulk haulers.
+  - Sleek, nimble corvettes for fighting.
+  - Survey ships with strong sensors and small holds.
+  - Heavy landers rated for harsh worlds.
+- **Each class has its own upgrade list** (some shared, many class-specific) and its own enlisted-crew minimum and maximum (see docs/crew_perks.md).
+- **Clans build different ships:**
+  - Midshipmen: warships and fast hulls.
+  - Diggers: heavy landers and mining tenders.
+  - Exchange: bulk freighters.
+  - Lyceum: survey ships.
+  - Freebooters: secondhand ships at a discount, with "history".
+- **Expensive.** A new hull usually means a new Exchange note. The old ship can be traded in or sold.
+- **One ship at a time.** Spare ships can be laid up at the Intrepid for a monthly berthing fee.
+- **Upgrades:** decide whether they transfer, partially refund on sale, or are lost with the hull.
+
 ## Combat **[DECIDED: turn-based, inspired by ships of the line]**
 **The model.** Age-of-sail fleet battles: hours of maneuvering and long-range fire, decided by positioning, endurance and nerve. Shots traded at extreme range, damage that cripples before it kills, and ships that strike their colors rather than die.
 
