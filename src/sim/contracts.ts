@@ -44,6 +44,8 @@ export interface Contract {
   surveyBodyIds?: string[];
   /** A Preferred Captain's private offer. */
   exclusive?: boolean;
+  /** Helm's survey asked in return for its fund's help; skipping it costs Helm's goodwill. */
+  obligation?: boolean;
   /** What was actually paid on completion (reward plus the comms officer's bonus). */
   paid?: number;
 }
@@ -240,7 +242,7 @@ export function tickContracts(state: GameState): void {
       state.contracts.push(deliveryContract(rng, state.time, serial));
     }
     // Helm's standing survey work: one on the board at all times, so there's always a way to earn.
-    const hasSurvey = state.contracts.some((c) => c.kind === "survey" && !c.starter && (c.status === "offered" || c.status === "active"));
+    const hasSurvey = state.contracts.some((c) => c.kind === "survey" && !c.starter && !c.obligation && (c.status === "offered" || c.status === "active"));
     if (!hasSurvey) {
       const survey = standingSurvey(state, rng, state.contracts.length + 1);
       if (survey) state.contracts.push(survey);

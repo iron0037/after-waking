@@ -8,6 +8,7 @@ import { starterContracts, tickContracts, type Contract } from "./contracts";
 import type { Station } from "../data/crew";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { tickYard } from "./actions";
+import type { HelmRecord } from "./helm";
 import { hasPerk } from "./perks";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
@@ -94,6 +95,8 @@ export interface GameState {
   levelUps?: LevelUp[];
   /** Work in progress aboard the Intrepid (installs, Lyceum courses); the ship leaves when it's all done. */
   yard?: YardJob[];
+  /** Helm's Small Operators' Fund: trip scoring, assists given, obligations. */
+  helm?: HelmRecord;
   credits: number;
   loan: Loan;
   ship: ShipState;

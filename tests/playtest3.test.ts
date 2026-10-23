@@ -101,6 +101,7 @@ describe("stranded without fuel (playtest 4)", () => {
     expect(foldTo(state, world, "s0").ok).toBe(true);
     expect(rescueQuote(state, world)).toBeNull(); // plenty of fuel
     state.ship.fuel = 0.5;
+    state.helm = { streak: 0, assists: [], rescueCovered: true }; // Helm's free first rescue is used up
     const quote = rescueQuote(state, world)!;
     expect(quote.fuel).toBeGreaterThan(0);
     const balance = state.loan.balance;
@@ -121,6 +122,7 @@ describe("stranded without fuel (playtest 4)", () => {
     expect(foldTo(state, world, "s0").ok).toBe(true);
     state.ship.fuel = 0;
     state.credits = 0;
+    state.helm = { streak: 0, assists: [], rescueCovered: true };
     expect(callForRescue(state, world).ok).toBe(true);
     expect(state.loan.missed).toBe(0);
     expect(state.loan.nextDue).toBeGreaterThan(state.time);

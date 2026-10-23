@@ -62,6 +62,18 @@ The 15-trip strategy report now shows the investment payoff clearly. Late-trip p
   - **Lifeline fuel.** The Exchange always tops the tanks up to 20 units on credit, even past the note's limit. This fixed a soft-lock seen in testing.
   - **Standing survey work.** Helm always has a survey contract on the board that needs no mining, paying the fuel cost ×1.5 + 2,000 cr.
   - **Distress call** (AW-99) and **fuel on credit** (AW-104), from earlier.
+  - **Helm's Small Operators' Fund** (`src/sim/helm.ts`). Helm wants many small captains flying, so it props up struggling ones:
+    - **Who qualifies:** net worth under 60k cr.
+    - **When it steps in:** after 2 losing trips in a row (measured by net worth from departure to docking), or when you dock unable to cover wages and upkeep.
+    - **What it gives:** a month of wages and upkeep, a full tank and an immediate refit. It also pays a small operator's first distress call.
+    - **The catch:**
+      - Each assist adds a Helm survey to fly within 150 days, paying only its costs.
+      - Skipping it means Helm shuns you for 2 years.
+      - Help is capped at 2 assists a year.
+    - **Effect in the career report:**
+      - Novice missed loan payments fell from 4 to 2 on average, and their debt runs lower.
+      - The competent captain is barely affected; their early-to-late growth fell to about 1.8×.
+  - **Exchange insurance** is deferred to combat (M3), when there are real losses to insure.
 
 ## Still open
 

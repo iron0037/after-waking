@@ -28,6 +28,7 @@ import { FLORA_BY_NAME } from "../data/catalog";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses } from "./crew";
+import { helmCoversRescue, helmOnDeparture, helmOnDocked } from "./helm";
 import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
@@ -170,10 +171,12 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   state.ship.roverEnergy = effectiveStats(state).roverEnergy;
   awardXp(state, "navigation", 15 + 3 * plan.ly);
 
+  if (fromId === "intrepid") helmOnDeparture(state);
   if (targetId === "intrepid") {
     state.location = { kind: "intrepid" };
     advanceTime(state, DOCKING_MINUTES);
     log(state, "travel", `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
+    helmOnDocked(state);
     return ok(undefined);
   }
 
@@ -1185,14 +1188,15 @@ export function callForRescue(state: GameState, world: World): Result<RescueQuot
   if (!quote) return fail("You have the fuel to get home. Save the distress call for when you need it.");
   advanceTime(state, quote.days * DAY);
   state.ship.fuel += quote.fuel;
-  chargeToNote(state, quote.cost);
+  const helmPays = helmCoversRescue(state);
+  if (!helmPays) chargeToNote(state, quote.cost);
   log(
     state,
     "warning",
     `An Exchange tender answered the distress call after ${quote.days} days and pumped ${quote.fuel} units of plicite aboard. ` +
-      `${quote.cost.toLocaleString()} cr added to your note.`,
+      (helmPays ? "Helm's fund paid the bill." : `${quote.cost.toLocaleString()} cr added to your note.`),
   );
-  return ok(quote);
+  return ok({ ...quote, cost: helmPays ? 0 : quote.cost });
 }
 
 // --- the yard: work that runs in parallel while docked -------------------------------------

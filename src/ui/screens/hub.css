@@ -278,3 +278,14 @@
   flex-wrap: wrap;
   margin-top: 8px;
 }
+
+/* Helm's Small Operators' Fund */
+.hub-helm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.hub-helm h3 {
+  margin: 0;
+}

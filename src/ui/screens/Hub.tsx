@@ -30,6 +30,8 @@ import {
   formatDate,
   formatDuration,
   fuelPrice,
+  HELM_LOSING_STREAK,
+  helmStatus,
   loanOutlook,
   loanRate,
   marketForecast,
@@ -502,6 +504,40 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
   );
 }
 
+/** Helm's Small Operators' Fund: where a struggling captain stands with it. */
+function HelmFund({ session }: { session: GameSession }) {
+  const { state } = session;
+  const status = helmStatus(state);
+  const h = state.helm;
+  const asks = (state.contracts ?? []).filter((c) => c.obligation && c.status === "active");
+  return (
+    <section class="panel hub-helm">
+      <h3>Helm's Small Operators' Fund</h3>
+      <p class="muted small">
+        Helm wants plenty of small captains flying. After {HELM_LOSING_STREAK} losing trips in a row, or if you dock unable to cover
+        wages and upkeep, it pays a month of wages and upkeep, fills your tanks and refits the drive. It also pays a small
+        operator's first distress call. In return it asks you to fly one of its surveys, and it remembers if you don't.
+      </p>
+      <div class="small">
+        {status.eligible ? (
+          <span class="good">
+            You qualify: {status.assistsLeft} {status.assistsLeft === 1 ? "assist" : "assists"} left this year
+            {h?.rescueCovered ? "" : ", plus your first distress call"}.
+          </span>
+        ) : (
+          <span class="muted">{status.reason}</span>
+        )}
+        {h && h.streak > 0 && <span class="muted"> Losing trips in a row: {h.streak}.</span>}
+      </div>
+      {asks.length > 0 && (
+        <div class="small accent">
+          Helm is waiting on: {asks.map((c) => `"${c.title}" (${formatDuration(Math.max(0, (c.deadline ?? state.time) - state.time))} left)`).join(", ")}.
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Jobs({ session }: { session: GameSession }) {
   const contracts = session.state.contracts ?? [];
   const active = contracts.filter((c) => c.status === "active");
@@ -522,6 +558,8 @@ function Jobs({ session }: { session: GameSession }) {
           <p class="muted">Nothing signed. Take a job below; deliveries and sample runs are turned in aboard the Intrepid.</p>
         )}
       </section>
+
+      <HelmFund session={session} />
 
       <section>
         <h2>On offer</h2>
