@@ -58,8 +58,9 @@ export const DUPLICATE_BOUNTY = { 1: 150, 2: 500, 3: 1_500 } as const;
  * Chance that a drilling run turns up a mineral specimen from the ore being worked:
  * about 3.5% per hour of drilling, capped at 30% per run.
  */
-export function rollMineralSpecimen(rng: Rng, host: CommodityId, hours: number): MineralSpecimen | null {
-  if (rng.next() >= Math.min(0.3, 0.035 * hours)) return null;
+/** `chanceMult` scales the odds (Fortune Favors doubles them; a large value makes a find certain). */
+export function rollMineralSpecimen(rng: Rng, host: CommodityId, hours: number, chanceMult = 1): MineralSpecimen | null {
+  if (rng.next() >= Math.min(0.3, 0.035 * hours) * chanceMult) return null;
   const pool = MINERAL_SPECIMENS.filter((g) => g.host === host);
   if (pool.length === 0) return null;
   return rng.weighted(pool.map((g) => [g, RARITY_WEIGHT[g.rarity]] as const));

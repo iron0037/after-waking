@@ -49,9 +49,10 @@ export function fuelPrice(market: MarketState): number {
 }
 
 /** Credits for selling `tonnes`, averaging the price slide across the sale. Records the glut. */
-export function sellCommodity(market: MarketState, id: CommodityId, tonnes: number): number {
+/** `impact` scales how much the sale floods the market (Bulk Seller: half). */
+export function sellCommodity(market: MarketState, id: CommodityId, tonnes: number, impact = 1): number {
   const before = sellPrice(market, id);
-  market.glut[id] += tonnes;
+  market.glut[id] += tonnes * impact;
   const after = sellPrice(market, id);
   return Math.round(((before + after) / 2) * tonnes);
 }

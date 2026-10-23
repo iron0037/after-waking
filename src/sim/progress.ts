@@ -5,7 +5,7 @@
 import { remainingTonnes } from "./actions";
 import type { Contract } from "./contracts";
 import type { Body } from "./bodies";
-import { shipStats } from "./ship";
+import { effectiveStats } from "./perks";
 import type { GameState } from "./state";
 import { siteKey } from "./bodysurface";
 import { exploredFraction, regionKey, type Deposit } from "./surface";
@@ -120,7 +120,7 @@ export function regionRecap(state: GameState, world: World, bodyId: string, regi
   const k = state.regions[regionKey(bodyId, region)];
   if (!k || k.visits === 0) return null;
   const map = world.region(bodyId, region);
-  const reach = shipStats(state.ship).drillMaxDepthM;
+  const reach = effectiveStats(state).drillMaxDepthM;
   let reachableTonnes = 0;
   for (const d of map.deposits) {
     if (k.discovered.includes(d.id) && d.depthM <= reach) reachableTonnes += remainingTonnes(k, d);
@@ -153,7 +153,7 @@ export interface KnownDeposit {
  */
 export function knownDeposits(state: GameState, world: World, bodyId: string): KnownDeposit[] {
   const { body } = world.body(bodyId);
-  const reach = shipStats(state.ship).drillMaxDepthM;
+  const reach = effectiveStats(state).drillMaxDepthM;
   const out: KnownDeposit[] = [];
   for (let r = 0; r < body.regions; r++) {
     const know = state.regions[regionKey(bodyId, r)];

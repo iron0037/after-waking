@@ -8,6 +8,7 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
+import { hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { Rng } from "./rng";
 import { removeCargo } from "./ship";
@@ -39,6 +40,8 @@ export interface Contract {
   count?: number;
   // survey
   surveyBodyIds?: string[];
+  /** A Preferred Captain's private offer. */
+  exclusive?: boolean;
   /** What was actually paid on completion (reward plus the comms officer's bonus). */
   paid?: number;
 }
@@ -158,6 +161,21 @@ export function deliveryContract(rng: Rng, now: number, serial: number): Contrac
   };
 }
 
+/** A private offer for a Preferred Captain: half again as large, and paid well above the board. */
+export function exclusiveContract(rng: Rng, serial: number): Contract {
+  const base = deliveryContract(rng, 0, serial);
+  const tonnes = Math.round(((base.tonnes ?? 10) * 1.5) / 10) * 10;
+  return {
+    ...base,
+    id: `private-${serial}`,
+    title: `Private: ${base.title.replace(/\d+ t/, `${tonnes} t`)}`,
+    text: `${base.text} Offered to you alone; it never reached the public board.`,
+    tonnes,
+    reward: Math.round((base.reward * 1.5 * 1.3) / 50) * 50,
+    exclusive: true,
+  };
+}
+
 /** Expire overdue contracts and post new deliveries now and then. Called as time passes. */
 export function tickContracts(state: GameState): void {
   state.contracts ??= [];
@@ -174,6 +192,10 @@ export function tickContracts(state: GameState): void {
     if (offered < 4) {
       const serial = state.contracts.length + 1;
       state.contracts.push(deliveryContract(rng, state.time, serial));
+    }
+    // Preferred Captain (comms): now and then a clan offers private work, bigger and better paid.
+    if (hasPerk(state, "preferred-captain") && rng.chance(0.5) && !state.contracts.some((c) => c.status === "offered" && c.exclusive)) {
+      state.contracts.push(exclusiveContract(rng, state.contracts.length + 1));
     }
     state.nextContractAt += rng.range(15, 30) * DAY;
     state.rngState = rng.state;
@@ -220,7 +242,8 @@ export function acceptContract(state: GameState, id: string): Result<Contract> {
   if (!c || c.status !== "offered") return fail("That contract isn't on offer.");
   if ((state.contracts ?? []).filter((x) => x.status === "active").length >= 4) return fail("You can hold at most 4 active contracts.");
   c.status = "active";
-  c.deadline = state.time + c.durationDays * DAY;
+  // Extensions (comms): the clans allow a quarter more time.
+  c.deadline = state.time + c.durationDays * DAY * (hasPerk(state, "extensions") ? 1.25 : 1);
   state.journal.push({ t: state.time, kind: "trade", text: `Signed with ${CLAN_NAMES[c.clan]}: "${c.title}". ${c.durationDays} days to deliver.` });
   awardXp(state, "comms", 8);
   return ok(c);

@@ -4,8 +4,18 @@
  */
 import type { TileSource } from "./bodysurface";
 import { hexDistance, neighbors } from "./hex";
-import { TERRAIN_INFO, type RegionMap, type Terrain } from "./surface";
+import { Terrain, TERRAIN_INFO, type RegionMap } from "./surface";
 import type { Vec2 } from "./units";
+
+/** What the rover can cross: climbing gear for mountains, and (Ground Navigator) rough ground at plain-ground cost. */
+export interface Mobility {
+  canClimb: boolean;
+  roughAsPlain?: boolean;
+}
+
+function mobilityOf(m: boolean | Mobility): Mobility {
+  return typeof m === "boolean" ? { canClimb: m } : m;
+}
 
 export interface PathStep extends Vec2 {
   minutes: number;
@@ -30,21 +40,23 @@ function source(tiles: TileSource | RegionMap): TileSource {
   return "terrainAt" in tiles ? tiles : regionSource(tiles);
 }
 
-export function canEnter(tiles: TileSource | RegionMap, x: number, y: number, canClimb: boolean): boolean {
+export function canEnter(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility): boolean {
   const t = source(tiles).terrainAt(x, y);
   if (t === null) return false;
   const passable = TERRAIN_INFO[t].passable;
-  return passable === "yes" || (passable === "climb" && canClimb);
+  return passable === "yes" || (passable === "climb" && mobilityOf(mobility).canClimb);
 }
 
-export function stepCost(tiles: TileSource | RegionMap, x: number, y: number): { minutes: number; energy: number } {
-  const t = source(tiles).terrainAt(x, y);
-  const info = TERRAIN_INFO[(t ?? 0) as Terrain];
+export function stepCost(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility = false): { minutes: number; energy: number } {
+  let t = (source(tiles).terrainAt(x, y) ?? 0) as Terrain;
+  if (t === Terrain.rough && mobilityOf(mobility).roughAsPlain) t = Terrain.plain;
+  const info = TERRAIN_INFO[t];
   return { minutes: info.minutes, energy: info.energy };
 }
 
 /** Path from `from` (exclusive) to `to` (inclusive), or null if unreachable. */
-export function findPath(tiles: TileSource | RegionMap, from: Vec2, to: Vec2, canClimb: boolean): PathStep[] | null {
+export function findPath(tiles: TileSource | RegionMap, from: Vec2, to: Vec2, mobility: boolean | Mobility): PathStep[] | null {
+  const canClimb = mobility;
   const src = source(tiles);
   if (!canEnter(src, to.x, to.y, canClimb)) return null;
   if (from.x === to.x && from.y === to.y) return [];
@@ -67,7 +79,7 @@ export function findPath(tiles: TileSource | RegionMap, from: Vec2, to: Vec2, ca
     for (const n of neighbors(x, y)) {
       if (!canEnter(src, n.x, n.y, canClimb)) continue;
       const next = keyOf(n.x, n.y);
-      const nc = c + stepCost(src, n.x, n.y).minutes;
+      const nc = c + stepCost(src, n.x, n.y, mobility).minutes;
       if (nc < (cost.get(next) ?? Infinity)) {
         cost.set(next, nc);
         prev.set(next, node);
@@ -81,7 +93,7 @@ export function findPath(tiles: TileSource | RegionMap, from: Vec2, to: Vec2, ca
   for (let node = goal; node !== start; node = prev.get(node) as number) {
     const x = node % w;
     const y = (node - x) / w;
-    steps.push({ x, y, ...stepCost(src, x, y) });
+    steps.push({ x, y, ...stepCost(src, x, y, mobility) });
   }
   return steps.reverse();
 }

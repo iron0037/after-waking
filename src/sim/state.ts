@@ -5,7 +5,8 @@
  */
 import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
-import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type Recruit } from "./crew";
+import { hasPerk } from "./perks";
+import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
 import type { ShipState, Cargo } from "./ship";
@@ -40,6 +41,8 @@ export type Location =
       ship?: Vec2;
       /** Set once positions are planet-wide; older saves stored region-local coordinates. */
       globalCoords?: boolean;
+      /** Jury-Rig already used on this landing. */
+      juryRigUsed?: boolean;
     };
 
 export interface Loan {
@@ -68,12 +71,14 @@ export interface GameState {
   /** Gameplay RNG state (not world generation). */
   rngState: number;
   /** The player. `xp` is their experience at the captain's station. */
-  captain: { name: string; born: number; xp?: number };
+  captain: { name: string; born: number; xp?: number; perks?: string[] };
   /** The five officers, one per station. */
   crew?: CrewMember[];
   /** The hiring hall aboard the Intrepid, and when its pool next turns over. */
   recruits?: Recruit[];
   nextRecruitsAt?: number;
+  /** Level-ups the player hasn't seen yet (the UI shows each as a popup). */
+  levelUps?: LevelUp[];
   credits: number;
   loan: Loan;
   ship: ShipState;
@@ -216,8 +221,8 @@ export interface LoanOutlook {
  * installment comes off it, so whatever exceeds the interest pays down principal. There's no
  * fixed term; it ends when the balance reaches zero. This projects that, assuming on-time payments.
  */
-export function loanOutlook(loan: Loan): LoanOutlook {
-  const periodRate = loan.annualRate * (loan.intervalDays / 365);
+export function loanOutlook(loan: Loan, annualRate = loan.annualRate): LoanOutlook {
+  const periodRate = annualRate * (loan.intervalDays / 365);
   let balance = loan.balance;
   let prepaid = loan.prepaid ?? 0;
   let due = loan.nextDue;
@@ -238,10 +243,15 @@ export function loanOutlook(loan: Loan): LoanOutlook {
   return { installments, payoffAt: due, nextInterest, totalInterest };
 }
 
+/** The note's rate in effect: Note Restructuring (comms) takes 2 points off. */
+export function loanRate(state: GameState): number {
+  return Math.max(0, state.loan.annualRate - (hasPerk(state, "note-restructuring") ? 0.02 : 0));
+}
+
 function settleLoan(state: GameState): void {
   const loan = state.loan;
   while (loan.balance > 0 && state.time >= loan.nextDue) {
-    loan.balance = Math.round(loan.balance * (1 + loan.annualRate * (loan.intervalDays / 365)));
+    loan.balance = Math.round(loan.balance * (1 + loanRate(state) * (loan.intervalDays / 365)));
     const when = loan.nextDue;
     loan.nextDue += loan.intervalDays * DAY;
     // Early payments already reduced the balance; they cover this installment first.

@@ -6,7 +6,7 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
-import { hashSeed, rngFor } from "./rng";
+import { hashSeed, rngFor, type Rng } from "./rng";
 import { disk, hexDistance, hexWorldPos, ring } from "./hex";
 import { clamp, type Vec2 } from "./units";
 
@@ -34,6 +34,8 @@ export const TERRAIN_INFO: Record<Terrain, { name: string; minutes: number; ener
 
 export interface DepositSpec {
   id: number;
+  /** Only crews with Hidden Seams (geology) can detect it. */
+  hidden?: boolean;
   commodity: CommodityId;
   /** 0..1: fraction of extracted rock that is worth keeping. */
   grade: number;
@@ -48,6 +50,8 @@ export interface Deposit extends DepositSpec {
 
 export interface FloraSpec {
   id: number;
+  /** Only crews with an Ecologist can spot it. */
+  hidden?: boolean;
   species: string;
 }
 
@@ -181,22 +185,44 @@ export function regionDeposits(seed: number, body: Body, region: number): Deposi
   const richness = body.easy ? rng.range(0.45, 0.9) : rng.range(0.3, 1.6);
   const count = Math.round(rng.range(3, 9) * richness * (body.kind === "asteroid" ? 0.6 : 1));
   const deposits: DepositSpec[] = [];
-  for (let i = 0; i < count; i++) {
-    const commodity = rng.weighted(entries);
-    const abundance = body.resources[commodity] ?? 0.2;
-    const grade = clamp(abundance * rng.range(0.25, 0.9) * richness, 0.05, 1);
-    // Precious ores come in smaller seams; shallow seams are more common than deep ones.
-    const sizeScale = clamp(Math.sqrt(150 / COMMODITIES[commodity].basePrice), 0.25, 1.6);
-    deposits.push({
-      id: i,
-      commodity,
-      grade: Math.round(grade * 100) / 100,
-      // Home worlds: the first scouts drilled the shallow seams' cores; most are within a starter drill's reach.
-      depthM: Math.round(15 + (body.easy ? 385 : 885) * Math.pow(rng.next(), 1.7)),
-      tonnes: Math.round(rng.range(30, 260) * (0.5 + grade) * sizeScale),
-    });
-  }
+  for (let i = 0; i < count; i++) deposits.push(depositSpec(rng, body, entries, richness, i));
   return deposits;
+}
+
+function depositSpec(rng: Rng, body: Body, entries: [CommodityId, number][], richness: number, id: number): DepositSpec {
+  const commodity = rng.weighted(entries);
+  const abundance = body.resources[commodity] ?? 0.2;
+  const grade = clamp(abundance * rng.range(0.25, 0.9) * richness, 0.05, 1);
+  // Precious ores come in smaller seams; shallow seams are more common than deep ones.
+  const sizeScale = clamp(Math.sqrt(150 / COMMODITIES[commodity].basePrice), 0.25, 1.6);
+  return {
+    id,
+    commodity,
+    grade: Math.round(grade * 100) / 100,
+    // Home worlds: the first scouts drilled the shallow seams' cores; most are within a starter drill's reach.
+    depthM: Math.round(15 + (body.easy ? 385 : 885) * Math.pow(rng.next(), 1.7)),
+    tonnes: Math.round(rng.range(30, 260) * (0.5 + grade) * sizeScale),
+  };
+}
+
+/**
+ * The hidden layer (Hidden Seams): about one extra deposit per two regions, from its own random
+ * stream so the ordinary deposits never change. Ids continue after the ordinary ones.
+ */
+export function hiddenDeposits(seed: number, body: Body, region: number, firstId: number): DepositSpec[] {
+  const entries = Object.entries(body.resources) as [CommodityId, number][];
+  if (entries.length === 0) return [];
+  const rng = rngFor(seed, body.id, region, "hidden-deposits");
+  const count = rng.chance(0.5) ? 1 : 0;
+  return Array.from({ length: count }, (_, i) => ({ ...depositSpec(rng, body, entries, rng.range(0.6, 1.4), firstId + i), hidden: true }));
+}
+
+/** The hidden layer of plant sites (Ecologist): one or two per region on living worlds. */
+export function hiddenFlora(seed: number, body: Body, region: number, firstId: number): FloraSpec[] {
+  const species = bodySpecies(seed, body);
+  if (species.length === 0) return [];
+  const rng = rngFor(seed, body.id, region, "hidden-flora");
+  return Array.from({ length: rng.int(1, 2) }, (_, i) => ({ id: firstId + i, species: rng.pick(species), hidden: true }));
 }
 
 /**
@@ -298,6 +324,22 @@ export function generateRegion(seed: number, body: Body, region: number): Region
     }
     return { ...spec, x: landing.x, y: landing.y + 2 };
   });
+
+  // The hidden layers, placed with their own stream so the ordinary sites above never move.
+  const hiddenRng = rngFor(seed, body.id, region, "hidden-placement");
+  const spot = (minFromLanding: number, needYes: boolean): Vec2 => {
+    for (let tries = 0; tries < 200; tries++) {
+      const x = hiddenRng.int(1, w - 2);
+      const y = hiddenRng.int(1, h - 2);
+      const passable = TERRAIN_INFO[terrain[y * w + x] as Terrain].passable;
+      if (passable === "no" || (needYes && passable !== "yes")) continue;
+      if (hexDistance({ x, y }, landing) < minFromLanding) continue;
+      return { x, y };
+    }
+    return { x: landing.x + 2, y: landing.y + 2 };
+  };
+  for (const spec of hiddenDeposits(seed, body, region, deposits.length)) deposits.push({ ...spec, ...spot(4, false) });
+  for (const spec of hiddenFlora(seed, body, region, flora.length)) flora.push({ ...spec, ...spot(3, true) });
 
   return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };
 }

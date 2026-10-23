@@ -14,6 +14,8 @@ import {
   moveRoverTo,
   prospect,
   remainingTonnes,
+  roverMobility,
+  routeEnergy,
   shipTile,
   stowRover,
   surfaceDeposit,
@@ -22,7 +24,8 @@ import type { SiteKey } from "./bodysurface";
 import { findPath, type PathStep } from "./pathfinding";
 import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
-import { cargoTonnes, shipStats } from "./ship";
+import { effectiveStats } from "./perks";
+import { cargoTonnes } from "./ship";
 import type { GameState, RoverState } from "./state";
 import { DAY } from "./units";
 import type { World } from "./world";
@@ -51,8 +54,8 @@ const MAX_LOADS = 60;
 /** Energy kept in reserve on top of the drive home. */
 const ENERGY_MARGIN = 6;
 
-function energyOf(path: PathStep[] | null): number {
-  return (path ?? []).reduce((sum, s) => sum + s.energy, 0);
+function energyOf(state: GameState, path: PathStep[] | null): number {
+  return routeEnergy(state, path);
 }
 
 function rover(state: GameState): RoverState | null {
@@ -72,7 +75,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
   const found = surfaceDeposit(state, world, key);
   if (!found) return fail("Unknown deposit.");
   const { deposit, know } = found;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
+  const mobility = roverMobility(state);
   if (deposit.depthM > stats.drillMaxDepthM) {
     return fail(`The seam is ${deposit.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
   }
@@ -127,10 +131,10 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
 
     // Drive to the deposit if we're not already beside it.
     if (hexDistance(r, deposit) > 1) {
-      const out = findPath(surface, r, deposit, stats.roverCanClimb);
-      const back = findPath(surface, deposit, shipTile(state, world), stats.roverCanClimb);
+      const out = findPath(surface, r, deposit, mobility);
+      const back = findPath(surface, deposit, shipTile(state, world), mobility);
       if (!out || !back) return finish("unreachable", "The rover has no route to that deposit and back.");
-      if (energyOf(out) + energyOf(back) + ENERGY_MARGIN >= stats.roverEnergy) {
+      if (energyOf(state, out) + energyOf(state, back) + ENERGY_MARGIN >= stats.roverEnergy) {
         return finish("unreachable", "Too far for one charge there and back. Move the ship closer, or upgrade the rover's cells.");
       }
       const moved = moveRoverTo(state, world, deposit.x, deposit.y);
@@ -143,8 +147,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
     }
 
     // Drill as long as the cells can still bring the rover home.
-    const homePath = findPath(surface, rover(state) as RoverState, shipTile(state, world), stats.roverCanClimb);
-    const budget = ((rover(state) as RoverState).energy - energyOf(homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
+    const homePath = findPath(surface, rover(state) as RoverState, shipTile(state, world), mobility);
+    const budget = ((rover(state) as RoverState).energy - energyOf(state, homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
     const bedRoom = stats.roverCargoT - cargoTonnes((rover(state) as RoverState).cargo);
     const loadCap = Math.min(bedRoom, holdRoom());
     if (budget > 0.5 && loadCap > 0.5) {

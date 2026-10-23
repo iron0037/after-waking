@@ -21,10 +21,12 @@ import {
   moveRoverTo,
   prospect,
   remainingTonnes,
+  roverMobility,
+  routeEnergy,
   scanBody,
   sellAll,
   shipTile,
-  sensorTierFor,
+  orbitalSensorTier,
   surveyBody,
   stowRover,
   recallRover,
@@ -36,7 +38,8 @@ import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
-import { cargoTonnes, shipStats } from "./ship";
+import { autoSpendCrew, effectiveStats } from "./perks";
+import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
 import { REGION_SIZE, regionKey, regionSignal } from "./surface";
 import { DAY } from "./units";
@@ -88,7 +91,9 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     const creditsBefore = state.credits;
     const loanPaidBefore = state.stats.loanPaid ?? 0;
     buyFuel(state, 999);
-    if (state.ship.fuel < shipStats(state.ship).fuelCapacity * 0.6) buyFuelOnCredit(state, 999);
+    if (state.ship.fuel < effectiveStats(state).fuelCapacity * 0.6) buyFuelOnCredit(state, 999);
+    // The bot's crew spend their perk points the way recruits do.
+    autoSpendCrew(state, rng);
 
     const target = chooseSystem(state, world);
     if (!target) {
@@ -127,7 +132,7 @@ function visitsTo(state: GameState, systemId: string): number {
 }
 
 function landable(state: GameState, body: Body): boolean {
-  return landingAccess(body, shipStats(state.ship).ratings).ok && Object.keys(body.resources).length > 0 && body.regions > 0;
+  return landingAccess(body, effectiveStats(state).ratings).ok && Object.keys(body.resources).length > 0 && body.regions > 0;
 }
 
 function bodyScore(body: Body): number {
@@ -167,7 +172,7 @@ function mineSystem(
   survey: boolean,
 ): void {
   const detail = world.system(systemId);
-  const stats = () => shipStats(state.ship);
+  const stats = () => effectiveStats(state);
   const holdFull = () => cargoTonnes(state.ship.cargo) >= stats().cargoCapacityT * 0.85;
   const arrived = state.time;
   const bodyVisits = (b: Body) =>
@@ -186,7 +191,7 @@ function mineSystem(
     const regionCount = Math.min(body.regions, 12);
     // Fresh ground first: a region we've already worked is worth a fraction of its signal.
     const regionValue = (r: number) =>
-      regionSignal(state.seed, body, r, sensorTierFor(state, body.id), stats().drillMaxDepthM) /
+      regionSignal(state.seed, body, r, orbitalSensorTier(state, body.id), stats().drillMaxDepthM) /
       (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
     const regions = Array.from({ length: regionCount }, (_, i) => i).sort((a, b) => regionValue(b) - regionValue(a));
     for (const region of regions.slice(0, 2)) {
@@ -209,7 +214,7 @@ function workRegion(
   const surface = world.surface(body.id);
   const origin = surface.origin(region);
   const know = knowledge(state, body.id, region);
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const holdRoom = () => stats.cargoCapacityT - cargoTonnes(state.ship.cargo);
   let explores = 0;
 
@@ -229,7 +234,7 @@ function workRegion(
     const candidates = surface
       .deposits(region)
       .filter((d) => know.discovered.includes(d.id) && remainingTonnes(know, d) > 0.5 && d.depthM <= stats.drillMaxDepthM)
-      .map((d) => ({ d, path: findPath(surface, rover, d, stats.roverCanClimb) }))
+      .map((d) => ({ d, path: findPath(surface, rover, d, roverMobility(state)) }))
       .filter((c) => c.path !== null)
       .map((c) => ({ ...c, score: valuePerHour(c.d, c.path!.length) }))
       // Not worth the crew's wages (25 cr/h for six on shift) unless the bed is nearly full anyway.
@@ -237,11 +242,11 @@ function workRegion(
       .sort((a, b) => b.score - a.score);
 
     const homeCost = (from: { x: number; y: number }) =>
-      (findPath(surface, from, shipTile(state, world), stats.roverCanClimb) ?? []).reduce((s, p) => s + p.energy, 0);
+      routeEnergy(state, findPath(surface, from, shipTile(state, world), roverMobility(state)));
 
     const next = candidates[0];
     if (next) {
-      const go = next.path!.reduce((s, p) => s + p.energy, 0);
+      const go = routeEnergy(state, next.path);
       if (rover.energy - go - homeCost(next.d) < 20 || cargoTonnes(rover.cargo) >= stats.roverCargoT - 0.5) {
         if (!returnAndUnload(state, world, must)) return;
         must("redeploy rover", deployRover(state, world));
@@ -259,9 +264,9 @@ function workRegion(
     // Explore within the landing region (its deposits are the ones the bot ranks).
     const tx = origin.x + clampTo(rover.x - origin.x + rng.int(-12, 12), REGION_SIZE);
     const ty = origin.y + clampTo(rover.y - origin.y + rng.int(-12, 12), REGION_SIZE);
-    const path = findPath(surface, rover, { x: tx, y: ty }, stats.roverCanClimb);
+    const path = findPath(surface, rover, { x: tx, y: ty }, roverMobility(state));
     if (!path) continue;
-    const go = path.reduce((s, p) => s + p.energy, 0);
+    const go = routeEnergy(state, path);
     if (rover.energy - go - homeCost({ x: tx, y: ty }) < 15) {
       if (!returnAndUnload(state, world, must)) return;
       must("redeploy rover", deployRover(state, world));

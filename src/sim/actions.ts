@@ -5,10 +5,10 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
-import { fuelPrice, sellCommodity } from "./economy";
+import { fuelPrice, sellCommodity, sellPrice } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
-import { canEnter, findPath } from "./pathfinding";
+import { canEnter, findPath, type Mobility } from "./pathfinding";
 import type { BodySurface, SiteKey, SurfaceDeposit, SurfaceFlora } from "./bodysurface";
 import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
@@ -28,11 +28,13 @@ import { FLORA_BY_NAME } from "../data/catalog";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses } from "./crew";
+import { effectiveStats, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
   markExplored,
   normalizeKnowledge,
   regionKey,
+  regionSignal,
   type Deposit,
   REGION_SIZE,
   TILE_KM,
@@ -67,6 +69,11 @@ export const RECALL_MINUTES = 3 * HOUR;
 export const SURVEY_MINUTES = 12 * HOUR;
 /** Rover cells recharge from the ship's reactor at this many energy units per hour. */
 export const ROVER_CHARGE_PER_HOUR = 10;
+
+/** Charge rate at the ship (Fast Charge doubles it). */
+export function roverChargePerHour(state: GameState): number {
+  return ROVER_CHARGE_PER_HOUR * (hasPerk(state, "fast-charge") ? 2 : 1);
+}
 /**
  * Surface crews work two 8-hour shifts a day, so hands-on work takes 1.5x its raw duration.
  * Applies to driving, prospecting and drilling.
@@ -109,9 +116,14 @@ export interface FoldPlan {
   blockers: string[];
 }
 
+/** How far out a fold may start, as a fraction of the system edge (Fold Calibration: 80%). */
+export function foldEdgeFraction(state: GameState): number {
+  return hasPerk(state, "fold-calibration") ? 0.8 : 0.98;
+}
+
 export function foldPlan(state: GameState, world: World, targetId: string): FoldPlan {
   const from = currentSystemId(state);
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const ly = from === targetId ? 0 : distanceLy(world.galaxy, from, targetId);
   const crew = crewBonuses(state);
   const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * 10) / 10;
@@ -122,7 +134,7 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   if (state.location.kind === "space") {
     const edge = world.system(state.location.systemId).edgeAU;
     const pos = shipPosition(state, world) as Vec2;
-    if (Math.hypot(pos.x, pos.y) < edge * 0.98) {
+    if (Math.hypot(pos.x, pos.y) < edge * foldEdgeFraction(state)) {
       blockers.push(`Folds can't start inside the gravity well. Fly out to the system edge (${edge.toFixed(1)} AU).`);
     }
   }
@@ -144,7 +156,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   // Folding is instant (lore). The drive's recharge clock starts now.
   state.foldReadyAt = state.time + plan.rechargeMinutes;
   // The crew tops up the rover's cells from the reactor during the pre-fold checks.
-  state.ship.roverEnergy = shipStats(state.ship).roverEnergy;
+  state.ship.roverEnergy = effectiveStats(state).roverEnergy;
   awardXp(state, "navigation", 15 + 3 * plan.ly);
 
   if (targetId === "intrepid") {
@@ -218,7 +230,7 @@ export interface FlightPlan {
 export function flightPlan(state: GameState, world: World, target: FlightTarget): Result<FlightPlan> {
   const loc = state.location;
   if (loc.kind !== "space") return fail(loc.kind === "surface" ? "Launch from the surface first." : "Undock and fold out first.");
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const from = shipPosition(state, world) as Vec2;
   const detail = world.system(loc.systemId);
 
@@ -242,7 +254,7 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
     distanceAU = Math.hypot(arrival.x - from.x, arrival.y - from.y);
   }
 
-  const minutes = travelMinutes(distanceAU, stats.cruiseSpeedC) + MANEUVER_MINUTES;
+  const minutes = travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) + MANEUVER_MINUTES;
   const fuel =
     Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
   return ok({ distanceAU, minutes, fuel, arrival });
@@ -264,6 +276,8 @@ export function flyTo(state: GameState, world: World, target: FlightTarget): Res
   if ("bodyId" in target) {
     const { body } = world.body(target.bodyId);
     log(state, "travel", `Entered orbit around ${body.name} after ${formatDuration(plan.minutes)} (${plan.distanceAU.toFixed(2)} AU).`);
+    // Prospector's Eye reads a surveyed world's deposits from orbit, including worlds surveyed before.
+    if (hasPerk(state, "prospectors-eye") && (state.surveyedBodies ?? []).includes(body.id)) chartAllDeposits(state, world, body);
   } else {
     log(state, "travel", `Reached the system edge. Clear to fold.`);
   }
@@ -279,7 +293,41 @@ function orbitingBody(state: GameState, world: World): Body | null {
 
 /** Sensor tier in effect for a body: the ship's array, plus one if we flew a detailed survey there. */
 export function sensorTierFor(state: GameState, bodyId: string): number {
-  return shipStats(state.ship).sensorTier + ((state.surveyedBodies ?? []).includes(bodyId) ? 1 : 0);
+  return effectiveStats(state).sensorTier + ((state.surveyedBodies ?? []).includes(bodyId) ? 1 : 0);
+}
+
+/** Sensor tier for orbital region readings: the array, a survey, and the Sensor Calibration and Long Ears perks. */
+export function orbitalSensorTier(state: GameState, bodyId: string): number {
+  return sensorTierFor(state, bodyId) + (hasPerk(state, "sensor-calibration") ? 1 : 0) + (hasPerk(state, "long-ears") ? 1 : 0);
+}
+
+/** Hunch (captain): the region a gut feeling points to, read as if the sensors were perfect. Null without the perk. */
+export function hunchRegion(state: GameState, body: Body): number | null {
+  if (!hasPerk(state, "hunch") || body.regions === 0) return null;
+  let best = 0;
+  let bestScore = -1;
+  for (let r = 0; r < body.regions; r++) {
+    const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
+    const score = regionSignal(state.seed, body, r, 3, effectiveStats(state).drillMaxDepthM) * (visited ? 0.5 : 1);
+    if (score > bestScore) [best, bestScore] = [r, score];
+  }
+  return best;
+}
+
+/**
+ * Market Wire (comms): where each commodity's price is heading over the next `days`, assuming the
+ * usual drift back toward normal and the glut of recent sales clearing. Null without the perk.
+ */
+export function marketForecast(state: GameState, days = 7): Partial<Record<CommodityId, number>> | null {
+  if (!hasPerk(state, "market-wire")) return null;
+  const market = structuredClone(state.market);
+  for (const id of Object.keys(market.mult) as CommodityId[]) {
+    market.mult[id] = 1 + (market.mult[id] - 1) * Math.pow(0.92, days);
+    market.glut[id] *= Math.pow(0.97, days);
+  }
+  const out: Partial<Record<CommodityId, number>> = {};
+  for (const id of Object.keys(market.mult) as CommodityId[]) out[id] = sellPrice(market, id);
+  return out;
 }
 
 /** How far (in hexes) the rover's or ship's sensors sweep on this body: array tier, survey, and the science officer. */
@@ -289,10 +337,30 @@ export function sensorRadius(state: GameState, bodyId: string): number {
 
 /** Tonnes per hour from a deposit: the drill, the grade, and the engineer. */
 export function drillRate(state: GameState, d: Deposit): number {
-  return shipStats(state.ship).drillRateTph * (0.4 + d.grade) * crewBonuses(state).drillRate;
+  return effectiveStats(state).drillRateTph * (0.4 + d.grade) * crewBonuses(state).drillRate;
 }
 
 /** A slow, careful orbital pass: sharper region readings and wider rover detection on this body. */
+/** A detailed survey's duration (Close Orbit halves it). */
+export function surveyMinutes(state: GameState): number {
+  return SURVEY_MINUTES * (hasPerk(state, "close-orbit") ? 0.5 : 1);
+}
+
+/** Prospector's Eye: the survey charts every deposit on the world, so they're known before landing. */
+function chartAllDeposits(state: GameState, world: World, body: Body): void {
+  let n = 0;
+  const hidden = hasPerk(state, "hidden-seams");
+  for (let r = 0; r < body.regions; r++) {
+    const know = knowledge(state, body.id, r);
+    for (const d of world.region(body.id, r).deposits) {
+      if ((d.hidden && !hidden) || know.discovered.includes(d.id)) continue;
+      know.discovered.push(d.id);
+      n++;
+    }
+  }
+  if (n > 0) log(state, "discovery", `The survey charted ${n} deposit${n === 1 ? "" : "s"} across ${body.name}'s surface.`);
+}
+
 export function surveyBody(state: GameState, world: World): Result<Body> {
   const body = orbitingBody(state, world);
   if (!body) return fail("Enter orbit first.");
@@ -300,8 +368,9 @@ export function surveyBody(state: GameState, world: World): Result<Body> {
   state.surveyedBodies ??= [];
   if (state.surveyedBodies.includes(body.id)) return fail("Already surveyed in detail.");
   if (body.regions === 0) return fail("There's no surface to survey.");
-  advanceTime(state, SURVEY_MINUTES);
+  advanceTime(state, surveyMinutes(state));
   state.surveyedBodies.push(body.id);
+  if (hasPerk(state, "prospectors-eye")) chartAllDeposits(state, world, body);
   awardXp(state, "science", 25);
   log(state, "discovery", `Detailed survey of ${body.name} complete. Region readings sharpened; rover sensors will reach farther here.`);
   return ok(body);
@@ -330,7 +399,7 @@ export function scanBody(state: GameState, world: World): Result<Body> {
 
 /** Bodies in a system the current ship could set down on and mine (ignores scans and fuel). */
 export function landableBodies(state: GameState, world: World, systemId: string): Body[] {
-  const ratings = shipStats(state.ship).ratings;
+  const ratings = effectiveStats(state).ratings;
   return world
     .system(systemId)
     .bodies.filter((b) => b.regions > 0 && Object.keys(b.resources).length > 0 && landingAccess(b, ratings).ok);
@@ -341,7 +410,7 @@ export function landingBlockers(state: GameState, world: World, region: number):
   if (!body) return ["Enter orbit first."];
   const blockers: string[] = [];
   if (!state.scannedBodies.includes(body.id)) blockers.push("Scan the body before landing.");
-  blockers.push(...landingAccess(body, shipStats(state.ship).ratings).reasons);
+  blockers.push(...landingAccess(body, effectiveStats(state).ratings).reasons);
   if (body.regions > 0 && (region < 0 || region >= body.regions || !Number.isInteger(region))) {
     blockers.push("Choose a valid landing region.");
   }
@@ -448,7 +517,7 @@ export function hopFuel(state: GameState, world: World): number {
 /** Fuel to hop to (x, y): the base hop, plus more the farther it goes (a region's width doubles it). */
 export function hopFuelTo(state: GameState, world: World, x: number, y: number): number {
   const d = hexDistance(shipTile(state, world), { x, y });
-  return Math.round(hopFuel(state, world) * (1 + d / REGION_SIZE) * 10) / 10;
+  return Math.round(hopFuel(state, world) * (1 + d / REGION_SIZE) * (hasPerk(state, "hop-master") ? 0.5 : 1) * 10) / 10;
 }
 
 /** Lift off and set down elsewhere (any region), so far deposits come within rover range. */
@@ -487,9 +556,9 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
   if (loc.rover) return fail("The rover is already out.");
-  const full = shipStats(state.ship).roverEnergy;
+  const full = effectiveStats(state).roverEnergy;
   const stored = Math.min(full, state.ship.roverEnergy ?? full);
-  const chargedHours = (full - stored) / ROVER_CHARGE_PER_HOUR;
+  const chargedHours = (full - stored) / roverChargePerHour(state);
   advanceTime(state, 15 + chargedHours * HOUR);
   state.ship.roverEnergy = full;
   const home = shipTile(state, world);
@@ -498,20 +567,36 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   return ok({ chargedHours });
 }
 
+/** How the rover gets around: climbing gear, and Ground Navigator's way with rough ground. */
+export function roverMobility(state: GameState): Mobility {
+  return { canClimb: effectiveStats(state).roverCanClimb, roughAsPlain: hasPerk(state, "ground-navigator") };
+}
+
+/** Multiplier on route energy (Pathfinder: 10% less). Apply to findPath's step energy. */
+export function routeEnergyMult(state: GameState): number {
+  return hasPerk(state, "pathfinder") ? 0.9 : 1;
+}
+
+/** Energy to drive a planned route, with the crew's perks. */
+export function routeEnergy(state: GameState, path: readonly { energy: number }[] | null): number {
+  return (path ?? []).reduce((sum, s) => sum + s.energy, 0) * routeEnergyMult(state);
+}
+
 /** Drive toward (x, y), across region borders if needed. Stops early if energy runs short. */
 export function moveRoverTo(state: GameState, world: World, x: number, y: number): Result<{ steps: number; stopped: string | null }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { surface, rover, bodyId } = ctx.value;
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
-  const path = findPath(surface, rover, { x, y }, shipStats(state.ship).roverCanClimb);
+  const path = findPath(surface, rover, { x, y }, roverMobility(state));
+  const energyMult = routeEnergyMult(state);
   if (!path) return fail("No route there for this rover.");
   let steps = 0;
   for (const step of path) {
-    if (rover.energy < step.energy) {
+    if (rover.energy < step.energy * energyMult) {
       return ok({ steps, stopped: "Rover energy too low to continue." });
     }
-    rover.energy -= step.energy;
+    rover.energy -= step.energy * energyMult;
     rover.x = step.x;
     rover.y = step.y;
     advanceTime(state, step.minutes * SHIFT_FACTOR);
@@ -531,21 +616,27 @@ function revealAround(state: GameState, world: World): void {
 function revealAt(state: GameState, world: World, bodyId: string, center: Vec2): void {
   const surface = world.surface(bodyId);
   const radius = sensorRadius(state, bodyId);
-  const near = (p: Vec2) => hexDistance(p, center) <= radius;
+  // Seam Sense and Field Botanist: deposits and plants show up farther out than the terrain sweep.
+  const depositRange = Math.floor(radius * (hasPerk(state, "seam-sense") ? 1.5 : 1));
+  const floraRange = Math.floor(radius * (hasPerk(state, "field-botanist") ? 1.5 : 1));
+  const hiddenSeams = hasPerk(state, "hidden-seams");
+  const hiddenFlora = hasPerk(state, "ecologist");
   const foundDeposits: SurfaceDeposit[] = [];
   const foundFlora: SurfaceFlora[] = [];
-  for (const region of surface.regionsNear(center, radius)) {
+  for (const region of surface.regionsNear(center, Math.max(radius, depositRange, floraRange))) {
     const know = knowledge(state, bodyId, region);
     const o = surface.origin(region);
     markExplored(know, center.x - o.x, center.y - o.y, radius);
     for (const d of surface.deposits(region)) {
-      if (!know.discovered.includes(d.id) && near(d)) {
+      if (d.hidden && !hiddenSeams) continue;
+      if (!know.discovered.includes(d.id) && hexDistance(d, center) <= depositRange) {
         know.discovered.push(d.id);
         foundDeposits.push(d);
       }
     }
     for (const f of surface.flora(region)) {
-      if (!know.floraFound.includes(f.id) && near(f)) {
+      if (f.hidden && !hiddenFlora) continue;
+      if (!know.floraFound.includes(f.id) && hexDistance(f, center) <= floraRange) {
         know.floraFound.push(f.id);
         foundFlora.push(f);
       }
@@ -579,11 +670,16 @@ export function surfaceDeposit(
   return know.discovered.includes(deposit.id) ? { deposit, know } : null;
 }
 
-function depositNearRover(state: GameState, world: World, ctx: SurfaceCtx, key: SiteKey): Result<{ d: SurfaceDeposit; know: RegionKnowledge }> {
+function depositNearRover(state: GameState, world: World, ctx: SurfaceCtx, key: SiteKey, range = 1): Result<{ d: SurfaceDeposit; know: RegionKnowledge }> {
   const found = surfaceDeposit(state, world, key);
   if (!found) return fail("Unknown deposit.");
-  if (hexDistance(found.deposit, ctx.rover) > 1) return fail("Drive the rover next to the deposit first.");
+  if (hexDistance(found.deposit, ctx.rover) > range) return fail(range > 1 ? `Drive the rover within ${range} hexes of the deposit first.` : "Drive the rover next to the deposit first.");
   return ok({ d: found.deposit, know: found.know });
+}
+
+/** How close the rover must be to prospect (Assayer: two hexes). Drilling always needs it adjacent. */
+export function prospectRange(state: GameState): number {
+  return hasPerk(state, "assayer") ? 2 : 1;
 }
 
 export function remainingTonnes(know: RegionKnowledge, d: Deposit): number {
@@ -593,14 +689,14 @@ export function remainingTonnes(know: RegionKnowledge, d: Deposit): number {
 export function prospect(state: GameState, world: World, key: SiteKey): Result<SurfaceDeposit> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
-  const found = depositNearRover(state, world, ctx.value, key);
+  const found = depositNearRover(state, world, ctx.value, key, prospectRange(state));
   if (!found.ok) return found;
   const { d, know } = found.value;
   const { rover } = ctx.value;
   if (know.prospected.includes(d.id)) return ok(d);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
-  advanceTime(state, PROSPECT_MINUTES * SHIFT_FACTOR);
+  advanceTime(state, PROSPECT_MINUTES * SHIFT_FACTOR * (hasPerk(state, "assayer") ? 0.5 : 1));
   know.prospected.push(d.id);
   awardXp(state, "science", 6);
   log(
@@ -629,7 +725,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   if (!found.ok) return found;
   const { d, know } = found.value;
   const { rover, bodyId } = ctx.value;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   if (!know.prospected.includes(d.id)) return fail("Prospect the deposit before drilling.");
   if (d.depthM > stats.drillMaxDepthM) return fail(`The seam is ${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
   const remaining = remainingTonnes(know, d);
@@ -646,7 +742,9 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   }
 
   const rate = drillRate(state, d);
-  let hours = Math.min(remaining / rate, room / rate, maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
+  // Rich Veins: more ore per tonne of seam worked.
+  const yieldMult = hasPerk(state, "rich-veins") ? 1.1 : 1;
+  let hours = Math.min(remaining / rate, room / (rate * yieldMult), maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
   if (hours <= 0.01) return fail("Not enough rover energy to run the drill.");
 
   const { body } = world.body(bodyId);
@@ -654,9 +752,10 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   const incident = withRng(state, (rng) => rollIncident(rng, body, hours, crew.incidentRate, crew.incidentHours));
   if (incident) hours *= incident.atFraction;
 
-  const tonnes = Math.round(rate * hours * 10) / 10;
+  const worked = Math.round(rate * hours * 10) / 10;
+  const tonnes = Math.round(worked * yieldMult * 10) / 10;
   addCargo(rover.cargo, d.commodity, tonnes, stats.roverCargoT);
-  know.extracted[d.id] = (know.extracted[d.id] ?? 0) + tonnes;
+  know.extracted[d.id] = (know.extracted[d.id] ?? 0) + worked;
   rover.energy -= hours * DRILL_ENERGY_PER_HOUR;
   state.stats.tonnesMined += tonnes;
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
@@ -664,15 +763,27 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
 
   const where = placeName(world, bodyId);
   if (tonnes > 0) recordFind(state, "mineral", d.commodity, where, COMMODITIES[d.commodity].name);
-  const gem = withRng(state, (rng) => rollMineralSpecimen(rng, d.commodity, hours));
+  const fortune = hasPerk(state, "fortune-favors");
+  const gem = withRng(state, (rng) => rollMineralSpecimen(rng, d.commodity, hours, fortune ? 2 : 1));
   if (gem) foundMineralSpecimen(state, gem, where);
 
   if (incident) {
     rover.energy = Math.max(0, rover.energy - incident.energy);
-    advanceTime(state, incident.lostHours * HOUR);
+    const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
+    if (hasPerk(state, "jury-rig") && !loc.juryRigUsed) {
+      loc.juryRigUsed = true;
+      log(state, "warning", `${incident.text} The engineer jury-rigged it on the spot: no time lost.`);
+    } else {
+      advanceTime(state, incident.lostHours * HOUR);
+      log(state, "warning", `${incident.text} Lost ${formatDuration(incident.lostHours * HOUR)}.`);
+    }
     awardXp(state, "engineering", 10);
     awardXp(state, "medical", 6);
-    log(state, "warning", `${incident.text} Lost ${formatDuration(incident.lostHours * HOUR)}.`);
+    // Fortune Favors: sometimes the trouble turns something up.
+    if (fortune) {
+      const lucky = withRng(state, (rng) => (rng.chance(0.25) ? rollMineralSpecimen(rng, d.commodity, hours, 100) : null));
+      if (lucky) foundMineralSpecimen(state, lucky, where);
+    }
   }
   return ok({
     tonnes,
@@ -760,15 +871,18 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   const { site, know } = found;
   if (know.floraSampled.includes(site.id)) return fail("Already sampled here.");
   if (hexDistance(site, rover) > 1) return fail("Drive the rover next to the plants first.");
-  if (specimenCount(rover.specimens) >= ROVER_SPECIMEN_SLOTS) return fail("The rover's sample cases are full.");
+  const slots = roverSpecimenSlots(state);
+  if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;
   advanceTime(state, SAMPLE_MINUTES * SHIFT_FACTOR);
   rover.specimens ??= {};
   const specimen = specimenKey(bodyId, site.species);
-  rover.specimens[specimen] = (rover.specimens[specimen] ?? 0) + 1;
+  // Careful Hands: two samples from one site, if the cases have room.
+  const count = hasPerk(state, "careful-hands") && specimenCount(rover.specimens) + 2 <= slots ? 2 : 1;
+  rover.specimens[specimen] = (rover.specimens[specimen] ?? 0) + count;
   know.floraSampled.push(site.id);
-  log(state, "discovery", `Collected a living sample of ${site.species}.`);
+  log(state, "discovery", count === 2 ? `Collected two living samples of ${site.species}.` : `Collected a living sample of ${site.species}.`);
   awardXp(state, "medical", 5);
   awardXp(state, "science", 2);
   const entry = FLORA_BY_NAME.get(site.species);
@@ -784,7 +898,7 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   if (hexDistance(rover, shipTile(state, world)) > 1) {
     return fail("Drive the rover back to the ship first.");
   }
-  const capacity = shipStats(state.ship).cargoCapacityT;
+  const capacity = effectiveStats(state).cargoCapacityT;
   let unloaded = 0;
   let jettisoned = 0;
   for (const [id, tonnes] of Object.entries(rover.cargo) as [CommodityId, number][]) {
@@ -795,7 +909,7 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   let lostSamples = 0;
   state.ship.specimens ??= {};
   for (const [key, n] of Object.entries(rover.specimens ?? {})) {
-    const room = SHIP_SPECIMEN_SLOTS - specimenCount(state.ship.specimens);
+    const room = shipSpecimenSlots(state) - specimenCount(state.ship.specimens);
     const moved = Math.min(room, n);
     if (moved > 0) state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + moved;
     lostSamples += n - moved;
@@ -816,9 +930,9 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   if (hexDistance(rover, shipTile(state, world)) > 1) {
     return fail("Drive the rover back to the ship to recharge.");
   }
-  const full = shipStats(state.ship).roverEnergy;
+  const full = effectiveStats(state).roverEnergy;
   if (rover.energy >= full - 0.5) return fail("The rover's cells are already full.");
-  const hours = (full - rover.energy) / ROVER_CHARGE_PER_HOUR;
+  const hours = (full - rover.energy) / roverChargePerHour(state);
   advanceTime(state, hours * HOUR);
   rover.energy = full;
   return ok({ hours });
@@ -867,7 +981,7 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   if (!docked.ok) return docked;
   const amount = removeCargo(state.ship.cargo, id, tonnes ?? Infinity);
   if (amount <= 0) return fail(`No ${COMMODITIES[id].name.toLowerCase()} aboard.`);
-  const credits = Math.round(sellCommodity(state.market, id, amount) * crewBonuses(state).salePrice);
+  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.5 : 1) * crewBonuses(state).salePrice);
   awardXp(state, "captain", credits / 500);
   state.credits += credits;
   state.stats.earned += credits;
@@ -938,7 +1052,7 @@ export function sellSpecimens(state: GameState): Result<number> {
 export function buyFuel(state: GameState, units: number): Result<number> {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
-  const room = shipStats(state.ship).fuelCapacity - state.ship.fuel;
+  const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
   const price = fuelPrice(state.market);
   const affordable = Math.floor(state.credits / price);
   const n = Math.min(Math.floor(units), Math.floor(room), affordable);
@@ -953,11 +1067,16 @@ export function buyFuel(state: GameState, units: number): Result<number> {
 export const FUEL_CREDIT_LIMIT = 90_000;
 export const FUEL_CREDIT_MARKUP = 1.15;
 
+/** How far the Exchange will let the note run for fuel (Credit Line: +50%). */
+export function fuelCreditLimit(state: GameState): number {
+  return FUEL_CREDIT_LIMIT * (hasPerk(state, "credit-line") ? 1.5 : 1);
+}
+
 /** Units of fuel the Exchange would still advance on credit right now. */
 export function fuelCreditAvailable(state: GameState): number {
   const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
-  const room = shipStats(state.ship).fuelCapacity - state.ship.fuel;
-  return Math.max(0, Math.min(Math.floor(room), Math.floor((FUEL_CREDIT_LIMIT - state.loan.balance) / price)));
+  const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
+  return Math.max(0, Math.min(Math.floor(room), Math.floor((fuelCreditLimit(state) - state.loan.balance) / price)));
 }
 
 /** Buy fuel on the Exchange's tab: no credits needed, but it's added to the loan with a markup. */
@@ -965,7 +1084,7 @@ export function buyFuelOnCredit(state: GameState, units: number): Result<number>
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
   const n = Math.min(Math.floor(units), fuelCreditAvailable(state));
-  if (n <= 0) return fail(state.loan.balance >= FUEL_CREDIT_LIMIT ? "The Exchange won't extend any more credit." : "Tanks are full.");
+  if (n <= 0) return fail(state.loan.balance >= fuelCreditLimit(state) ? "The Exchange won't extend any more credit." : "Tanks are full.");
   const cost = Math.round(n * fuelPrice(state.market) * FUEL_CREDIT_MARKUP);
   state.ship.fuel += n;
   chargeToNote(state, cost);
@@ -988,7 +1107,7 @@ function chargeToNote(state: GameState, amount: number): void {
 export function fuelToGetHome(state: GameState, world: World): number {
   const loc = state.location;
   if (loc.kind === "intrepid") return 0;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const crew = crewBonuses(state);
   const mass = shipMassT(state.ship, stats);
   const detail = world.system(loc.systemId);
@@ -1021,13 +1140,15 @@ export function rescueQuote(state: GameState, world: World): RescueQuote | null 
   if (loc.kind === "intrepid") return null;
   const need = fuelToGetHome(state, world);
   if (state.ship.fuel >= need) return null;
-  const room = shipStats(state.ship).fuelCapacity - state.ship.fuel;
+  const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
   const fuel = Math.max(1, Math.min(Math.floor(room), Math.ceil(need - state.ship.fuel + 2)));
   const ly = distanceLy(world.galaxy, loc.systemId, "intrepid");
+  // Distress Net: the comms officer raises a tender sooner and haggles the bill down.
+  const net = hasPerk(state, "distress-net");
   return {
     fuel,
-    cost: Math.round((fuel * fuelPrice(state.market) * RESCUE_FUEL_MARKUP + RESCUE_FEE + RESCUE_FEE_PER_LY * ly) / 10) * 10,
-    days: Math.round(3 + ly),
+    cost: Math.round(((fuel * fuelPrice(state.market) * RESCUE_FUEL_MARKUP + RESCUE_FEE + RESCUE_FEE_PER_LY * ly) * (net ? 0.75 : 1)) / 10) * 10,
+    days: Math.max(1, Math.round((3 + ly) * (net ? 0.5 : 1))),
   };
 }
 
