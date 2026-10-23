@@ -253,3 +253,11 @@
   z-index: 2;
   user-select: none;
 }
+
+/* A deposit and a plant site on the same hex: link to the other one */
+.twin-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

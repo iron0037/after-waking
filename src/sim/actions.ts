@@ -968,9 +968,86 @@ export function buyFuelOnCredit(state: GameState, units: number): Result<number>
   if (n <= 0) return fail(state.loan.balance >= FUEL_CREDIT_LIMIT ? "The Exchange won't extend any more credit." : "Tanks are full.");
   const cost = Math.round(n * fuelPrice(state.market) * FUEL_CREDIT_MARKUP);
   state.ship.fuel += n;
-  state.loan.balance += cost;
+  chargeToNote(state, cost);
   log(state, "warning", `The Exchange advanced ${n} units of fuel against your note: +${cost.toLocaleString()} cr owed.`);
   return ok(n);
+}
+
+/** Add a charge to the Exchange note. A note that was paid off restarts its installment schedule from today. */
+function chargeToNote(state: GameState, amount: number): void {
+  if (state.loan.balance <= 0) state.loan.nextDue = state.time + state.loan.intervalDays * DAY;
+  state.loan.balance += amount;
+}
+
+// --- stranded ----------------------------------------------------------------------------
+
+/**
+ * Fuel to get from here back to the Intrepid: lift off (if landed), fly out to the system edge,
+ * and fold home. 0 when docked.
+ */
+export function fuelToGetHome(state: GameState, world: World): number {
+  const loc = state.location;
+  if (loc.kind === "intrepid") return 0;
+  const stats = shipStats(state.ship);
+  const crew = crewBonuses(state);
+  const mass = shipMassT(state.ship, stats);
+  const detail = world.system(loc.systemId);
+  const pos = shipPosition(state, world) as Vec2;
+  const toEdge = Math.max(0, detail.edgeAU - Math.hypot(pos.x, pos.y));
+  const flight = IN_SYSTEM_FUEL_PER_AU_PER_KT * (mass / 1000) * toEdge * crew.flightFuel;
+  const ascent = loc.kind === "surface" ? surfaceBurnFuel(state, world.body(loc.bodyId).body) : 0;
+  const fold = FOLD_FUEL_PER_T_LY * mass * distanceLy(world.galaxy, loc.systemId, "intrepid") * crew.foldFuel;
+  return Math.round((ascent + flight + fold) * 10) / 10;
+}
+
+/** Fixed charge for sending a tender out, plus this much per light-year to reach you. */
+export const RESCUE_FEE = 2_000;
+export const RESCUE_FEE_PER_LY = 300;
+/** Rescue fuel is priced well above the Market's. */
+export const RESCUE_FUEL_MARKUP = 1.5;
+
+export interface RescueQuote {
+  /** Fuel the tender brings: enough to get home, with a little margin. */
+  fuel: number;
+  /** Added to the Exchange note. */
+  cost: number;
+  /** Days to wait for the tender. */
+  days: number;
+}
+
+/** What a distress call would cost, or null if the ship can still get home on its own. */
+export function rescueQuote(state: GameState, world: World): RescueQuote | null {
+  const loc = state.location;
+  if (loc.kind === "intrepid") return null;
+  const need = fuelToGetHome(state, world);
+  if (state.ship.fuel >= need) return null;
+  const room = shipStats(state.ship).fuelCapacity - state.ship.fuel;
+  const fuel = Math.max(1, Math.min(Math.floor(room), Math.ceil(need - state.ship.fuel + 2)));
+  const ly = distanceLy(world.galaxy, loc.systemId, "intrepid");
+  return {
+    fuel,
+    cost: Math.round((fuel * fuelPrice(state.market) * RESCUE_FUEL_MARKUP + RESCUE_FEE + RESCUE_FEE_PER_LY * ly) / 10) * 10,
+    days: Math.round(3 + ly),
+  };
+}
+
+/**
+ * Out of fuel and out of luck: the Exchange sends a tender with enough plicite to get home and
+ * adds the bill to your note. It's expensive and slow, but nobody is left out there.
+ */
+export function callForRescue(state: GameState, world: World): Result<RescueQuote> {
+  const quote = rescueQuote(state, world);
+  if (!quote) return fail("You have the fuel to get home. Save the distress call for when you need it.");
+  advanceTime(state, quote.days * DAY);
+  state.ship.fuel += quote.fuel;
+  chargeToNote(state, quote.cost);
+  log(
+    state,
+    "warning",
+    `An Exchange tender answered the distress call after ${quote.days} days and pumped ${quote.fuel} units of plicite aboard. ` +
+      `${quote.cost.toLocaleString()} cr added to your note.`,
+  );
+  return ok(quote);
 }
 
 /** Yard time to fit any upgrade. */

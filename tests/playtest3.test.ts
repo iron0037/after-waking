@@ -92,3 +92,37 @@ describe("known deposits from orbit", () => {
     expect(knownDeposits(state, world, body.id)).toHaveLength(0);
   });
 });
+
+describe("stranded without fuel (playtest 4)", () => {
+  it("a distress call brings enough fuel to get home, billed to the note", async () => {
+    const { callForRescue, fold: foldTo, fuelToGetHome, rescueQuote } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    expect(foldTo(state, world, "s0").ok).toBe(true);
+    expect(rescueQuote(state, world)).toBeNull(); // plenty of fuel
+    state.ship.fuel = 0.5;
+    const quote = rescueQuote(state, world)!;
+    expect(quote.fuel).toBeGreaterThan(0);
+    const balance = state.loan.balance;
+    const t0 = state.time;
+    expect(callForRescue(state, world).ok).toBe(true);
+    expect(state.ship.fuel).toBeGreaterThanOrEqual(fuelToGetHome(state, world));
+    expect(state.loan.balance).toBe(balance + quote.cost);
+    expect(state.time - t0).toBe(quote.days * DAY);
+    expect(rescueQuote(state, world)).toBeNull();
+  });
+
+  it("restarts the installment schedule on a note that was paid off", async () => {
+    const { callForRescue, fold: foldTo } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    state.loan.balance = 0;
+    state.loan.nextDue = 0; // long past
+    expect(foldTo(state, world, "s0").ok).toBe(true);
+    state.ship.fuel = 0;
+    state.credits = 0;
+    expect(callForRescue(state, world).ok).toBe(true);
+    expect(state.loan.missed).toBe(0);
+    expect(state.loan.nextDue).toBeGreaterThan(state.time);
+  });
+});

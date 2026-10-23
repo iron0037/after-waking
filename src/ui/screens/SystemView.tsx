@@ -26,6 +26,7 @@ import {
   wait,
 } from "../../sim";
 import { useSession, type GameSession } from "../session";
+import { RescuePanel } from "../Rescue";
 import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
@@ -377,6 +378,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       </div>
 
       <aside class="side sys-side">
+        <RescuePanel session={session} busy={busy} />
         <section class="sys-head">
           <h2>{sys.name}</h2>
           <div class="sys-star muted small">

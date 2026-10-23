@@ -253,7 +253,13 @@ export function StarMap({ session }: { session: GameSession }) {
 
   const onClick = (x: number, y: number) => {
     if (drag.current?.moved || session.busy) return;
-    setSelected(hitTest(x, y));
+    const hit = hitTest(x, y);
+    // Clicking where you already are goes back there (the system view, or the Intrepid's hub).
+    if (hit !== null && hit === fromId) {
+      back();
+      return;
+    }
+    setSelected(hit);
   };
 
   const centerOnShip = () => {

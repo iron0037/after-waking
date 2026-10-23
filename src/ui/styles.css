@@ -676,3 +676,17 @@ table.data th.num {
   color: var(--accent);
   letter-spacing: 0.04em;
 }
+
+/* Out of fuel far from home */
+.rescue-panel {
+  border-color: var(--danger);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rescue-panel h3 {
+  margin: 0;
+}
+.rescue-panel .btn {
+  align-self: flex-start;
+}

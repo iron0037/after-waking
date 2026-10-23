@@ -81,6 +81,7 @@ import {
 import { cargoList, pct, tonnes } from "../format";
 import { TERRAIN_COLORS, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
+import { RescuePanel } from "../Rescue";
 import { Canvas } from "../Canvas";
 import {
   cameraLayout,
@@ -721,6 +722,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         color: COMMODITIES[dep.d.commodity].color,
       });
     }
+    if (dep && flora) lines.push({ text: "Click again to switch between them", color: UI.muted });
     if (info.passable === "no") {
       lines.push({ text: "Impassable", color: UI.muted });
     } else if (needsClimber) {
@@ -781,7 +783,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
     const dep = depositAt(tile);
     const flora = floraAt(tile);
-    if (dep) setSelectedKey(dep.d.key);
+    // A deposit and a plant site can share a hex: repeated clicks alternate between them.
+    if (dep && flora) {
+      if (selected?.d.key === dep.d.key) setFloraKey(flora.f.key);
+      else setSelectedKey(dep.d.key);
+    } else if (dep) setSelectedKey(dep.d.key);
     else if (flora) setFloraKey(flora.f.key);
     void driveTo(tile, dep !== undefined || flora !== undefined);
   };
@@ -960,6 +966,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         )}
       </div>
       <aside class="side surface-side">
+        <RescuePanel session={session} busy={busy} />
         <div class="action-bar">
           <div class="ab-group">
             <span class="ab-label">Rover</span>
@@ -1056,6 +1063,28 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         <RoverPanel rover={rover} stats={stats} homeEnergy={homeEnergy} stranded={stranded} />
         <ShipPanel rover={rover} stats={stats} state={state} bodyId={loc.bodyId} />
 
+        {(() => {
+          // The other site on the same hex, if any, so it can be reached from here too.
+          const twinDep = selectedFlora ? depositAt(selectedFlora.f) : undefined;
+          const twinFlora = !selectedFlora && selected ? floraAt(selected.d) : undefined;
+          if (!twinDep && !twinFlora) return null;
+          return (
+            <div class="panel small twin-note">
+              Also on this hex:{" "}
+              {twinDep ? (
+                <button class="btn" onClick={() => setSelectedKey(twinDep.d.key)}>
+                  {COMMODITIES[twinDep.d.commodity].name} deposit
+                </button>
+              ) : (
+                twinFlora && (
+                  <button class="btn" onClick={() => setFloraKey(twinFlora.f.key)}>
+                    {twinFlora.f.species}
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })()}
         {selectedFlora ? (
           <FloraPanel
             session={session}
