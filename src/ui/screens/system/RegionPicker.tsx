@@ -12,6 +12,8 @@ import {
   regionKey,
   regionRecap,
   regionSignal,
+  regionLifeSignal,
+  bodySpecies,
   surfaceLayout,
   type Body,
   type GameState,
@@ -87,6 +89,11 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     [seed, body, sensorTier, reachM],
   );
   const layout = useMemo(() => regionLayout(body), [body]);
+  // Life signs: plant sites per region, on living worlds.
+  const life = useMemo(
+    () => (bodySpecies(seed, body).length > 0 ? Array.from({ length: body.regions }, (_, r) => regionLifeSignal(seed, body, r)) : null),
+    [seed, body],
+  );
   const known = knownDeposits(state, world, body.id);
   // The captain's Hunch perk: one region the gut points to.
   const hunch = hunchRegion(state, body);
@@ -102,7 +109,9 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     const visits = know?.visits ?? 0;
     const est = s > 0 ? ` (~${roughCredits(s)} cr est.)` : "";
     const seen = visits > 0 ? ` · visited, ${Math.round(exploredFraction(know) * 100)}% explored` : "";
-    return `Region ${r + 1} · signal ${strength}${est}${seen}${r === hunch ? " · your gut says here" : ""}`;
+    const sites = life?.[r] ?? 0;
+    const alive = life ? ` · life signs: ${sites === 0 ? "none" : `${sites} plant site${sites === 1 ? "" : "s"}`}` : "";
+    return `Region ${r + 1} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
@@ -158,6 +167,27 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         ctx.fillRect(x + 3, y + ch - 3 - barH, (cw - 6) * Math.max(0.08, explored), barH);
       }
     });
+
+    // Life signs: small green leaves along the bottom-right of each region, one per plant site (up to 5).
+    if (life) {
+      life.forEach((n, r) => {
+        const cell = layout.cells[r];
+        if (!cell || n <= 0) return;
+        const cw = (cell.x1 - cell.x0) * w;
+        const s = Math.max(2, Math.min(3.5, cw / 18));
+        for (let i = 0; i < Math.min(5, n); i++) {
+          const x = cell.x1 * w - 5 - s - i * (s * 2 + 1.5);
+          const y = cell.y1 * h - 5 - s;
+          ctx.beginPath();
+          ctx.ellipse(x, y, s * 0.7, s, Math.PI / 4, 0, Math.PI * 2);
+          ctx.fillStyle = "#5fd47a";
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#05070f";
+          ctx.stroke();
+        }
+      });
+    }
 
     // Known, untapped deposits: a row of commodity-coloured dots along the top of their region.
     const byRegion = new Map<number, KnownDeposit[]>();
@@ -312,6 +342,11 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         <span class="sys-region-key">
           <span class="sys-region-swatch" /> visited
         </span>
+        {life && (
+          <span class="sys-region-key">
+            <span class="sys-life-leaf" /> plant life
+          </span>
+        )}
       </div>
       {hunch !== null && (
         <div class="sys-hunch small">

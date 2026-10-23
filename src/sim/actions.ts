@@ -71,6 +71,16 @@ export const SURVEY_MINUTES = 12 * HOUR;
 /** Rover cells recharge from the ship's reactor at this many energy units per hour. */
 export const ROVER_CHARGE_PER_HOUR = 10;
 
+/** A stowed rover charges from the ship's reactor as time passes (in flight, in orbit, on the pad). */
+export function chargeStowedRover(state: GameState, minutes: number): void {
+  const loc = state.location;
+  if (loc.kind === "surface" && loc.rover) return;
+  const full = effectiveStats(state).roverEnergy;
+  const stored = state.ship.roverEnergy ?? full;
+  if (stored >= full) return;
+  state.ship.roverEnergy = Math.min(full, stored + (roverChargePerHour(state) * minutes) / 60);
+}
+
 /** Charge rate at the ship (Fast Charge doubles it). */
 export function roverChargePerHour(state: GameState): number {
   return ROVER_CHARGE_PER_HOUR * (hasPerk(state, "fast-charge") ? 2 : 1);
@@ -628,14 +638,45 @@ function revealAround(state: GameState, world: World): void {
 }
 
 /** Sweep the sensors (the rover's, or the ship's on the pad) around `center`, across region borders. */
+export interface SensorSweep {
+  /** Terrain sweep radius, in hexes. */
+  radius: number;
+  /** Deposits are detected out to here (Seam Sense stretches it). */
+  depositRange: number;
+  /** Plant sites are detected out to here (Field Botanist stretches it). */
+  floraRange: number;
+  /** Hidden Seams: the hidden deposit layer is detectable. */
+  hiddenSeams: boolean;
+  /** Ecologist: the hidden plant layer is detectable. */
+  hiddenFlora: boolean;
+}
+
+/** The sensors' reach on this body. The UI's drive preview uses this too, so both agree on what's found. */
+export function sensorSweep(state: GameState, bodyId: string): SensorSweep {
+  const radius = sensorRadius(state, bodyId);
+  return {
+    radius,
+    depositRange: Math.floor(radius * (hasPerk(state, "seam-sense") ? 1.5 : 1)),
+    floraRange: Math.floor(radius * (hasPerk(state, "field-botanist") ? 1.5 : 1)),
+    hiddenSeams: hasPerk(state, "hidden-seams"),
+    hiddenFlora: hasPerk(state, "ecologist"),
+  };
+}
+
+/** Would a sweep centred at `center` detect this deposit? */
+export function detectsDeposit(sweep: SensorSweep, center: Vec2, d: { x: number; y: number; hidden?: boolean }): boolean {
+  return (!d.hidden || sweep.hiddenSeams) && hexDistance(d, center) <= sweep.depositRange;
+}
+
+/** Would a sweep centred at `center` detect this plant site? */
+export function detectsFlora(sweep: SensorSweep, center: Vec2, f: { x: number; y: number; hidden?: boolean }): boolean {
+  return (!f.hidden || sweep.hiddenFlora) && hexDistance(f, center) <= sweep.floraRange;
+}
+
 function revealAt(state: GameState, world: World, bodyId: string, center: Vec2): void {
   const surface = world.surface(bodyId);
-  const radius = sensorRadius(state, bodyId);
-  // Seam Sense and Field Botanist: deposits and plants show up farther out than the terrain sweep.
-  const depositRange = Math.floor(radius * (hasPerk(state, "seam-sense") ? 1.5 : 1));
-  const floraRange = Math.floor(radius * (hasPerk(state, "field-botanist") ? 1.5 : 1));
-  const hiddenSeams = hasPerk(state, "hidden-seams");
-  const hiddenFlora = hasPerk(state, "ecologist");
+  const sweep = sensorSweep(state, bodyId);
+  const { radius, depositRange, floraRange } = sweep;
   const foundDeposits: SurfaceDeposit[] = [];
   const foundFlora: SurfaceFlora[] = [];
   for (const region of surface.regionsNear(center, Math.max(radius, depositRange, floraRange))) {
@@ -643,15 +684,13 @@ function revealAt(state: GameState, world: World, bodyId: string, center: Vec2):
     const o = surface.origin(region);
     markExplored(know, center.x - o.x, center.y - o.y, radius);
     for (const d of surface.deposits(region)) {
-      if (d.hidden && !hiddenSeams) continue;
-      if (!know.discovered.includes(d.id) && hexDistance(d, center) <= depositRange) {
+      if (!know.discovered.includes(d.id) && detectsDeposit(sweep, center, d)) {
         know.discovered.push(d.id);
         foundDeposits.push(d);
       }
     }
     for (const f of surface.flora(region)) {
-      if (f.hidden && !hiddenFlora) continue;
-      if (!know.floraFound.includes(f.id) && hexDistance(f, center) <= floraRange) {
+      if (!know.floraFound.includes(f.id) && detectsFlora(sweep, center, f)) {
         know.floraFound.push(f.id);
         foundFlora.push(f);
       }

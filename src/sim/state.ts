@@ -7,7 +7,7 @@ import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
 import type { Station } from "../data/crew";
 import { UPGRADES_BY_ID } from "../data/ship";
-import { tickYard } from "./actions";
+import { chargeStowedRover, tickYard } from "./actions";
 import type { HelmRecord } from "./helm";
 import { hasPerk } from "./perks";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
@@ -209,6 +209,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   tickContracts(state);
   tickRecruits(state);
   tickYard(state);
+  chargeStowedRover(state, minutes);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);

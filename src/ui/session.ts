@@ -40,7 +40,11 @@ export class GameSession {
   notices: Notice[] = [];
   timelapse: TimeLapse | null = null;
   /** Set while an animation (flight, rover drive) is playing; input should be ignored. */
-  busy = false;
+  private animating = false;
+  /** True while an animation or the time-lapse clock plays: input waits until the time has passed. */
+  get busy(): boolean {
+    return this.animating || this.timelapse !== null;
+  }
   /** Whose perk tree is open (UI only; any screen can open it). */
   perkTree: Station | null = null;
   private listeners = new Set<() => void>();
@@ -109,7 +113,7 @@ export class GameSession {
   }
 
   setBusy(busy: boolean): void {
-    this.busy = busy;
+    this.animating = busy;
     this.emit();
   }
 

@@ -57,6 +57,9 @@ import {
   SAMPLE_ENERGY,
   SAMPLE_MINUTES,
   sensorRadius,
+  sensorSweep,
+  detectsDeposit,
+  detectsFlora,
   shipSpecimenSlots,
   shipTile,
   SHIFT_FACTOR,
@@ -591,10 +594,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
 
     // Mid-drive, the sensors sweep ahead of the sim: paint tiles in (and show finds) as the rover passes.
-    const sweep = sensorRadius(state, loc.bodyId);
-    // Seam Sense and Field Botanist stretch the sweep for deposits and plants only.
-    const depositSweep = Math.floor(sweep * (hasPerk(state, "seam-sense") ? 1.5 : 1));
-    const floraSweep = Math.floor(sweep * (hasPerk(state, "field-botanist") ? 1.5 : 1));
+    // The sim's own sweep rules, so the preview never shows a site the sensors won't actually find.
+    const sensors = sensorSweep(state, loc.bodyId);
+    const sweep = sensors.radius;
+    const depositSweep = sensors.depositRange;
+    const floraSweep = sensors.floraRange;
     let reveal: Reveal | null = null;
     let rc = revealRef.current;
     if (anim) {
@@ -615,8 +619,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         }
         for (const r of surface.regionsNear(p, Math.max(sweep, depositSweep, floraSweep))) {
           const k = know(r) ?? NO_KNOWLEDGE;
-          for (const d of surface.deposits(r)) if (!k.discovered.includes(d.id) && hexDistance(p, d) <= depositSweep) rc.deposits.add(d.key);
-          for (const f of surface.flora(r)) if (!k.floraFound.includes(f.id) && hexDistance(p, f) <= floraSweep) rc.flora.add(f.key);
+          for (const d of surface.deposits(r)) if (!k.discovered.includes(d.id) && detectsDeposit(sensors, p, d)) rc.deposits.add(d.key);
+          for (const f of surface.flora(r)) if (!k.floraFound.includes(f.id) && detectsFlora(sensors, p, f)) rc.flora.add(f.key);
         }
       }
       const terrain: RegionImage[] = [];

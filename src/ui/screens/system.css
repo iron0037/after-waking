@@ -321,3 +321,15 @@
 .sys-hunch .linklike:hover {
   color: var(--text);
 }
+
+/* Life signs on the region chart */
+.sys-life-leaf {
+  display: inline-block;
+  width: 6px;
+  height: 9px;
+  border-radius: 50% 0;
+  background: #5fd47a;
+  transform: rotate(45deg);
+  margin-right: 4px;
+  vertical-align: middle;
+}

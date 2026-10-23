@@ -176,6 +176,14 @@ export function regionFlora(seed: number, body: Body, region: number): FloraSpec
   return Array.from({ length: rng.int(2, 5) }, (_, id) => ({ id, species: rng.pick(species) }));
 }
 
+/**
+ * Life signs from orbit: how many plant sites a region holds (the ordinary ones; the hidden layer
+ * needs an Ecologist on the ground). Cheap enough to compute for every region.
+ */
+export function regionLifeSignal(seed: number, body: Body, region: number): number {
+  return regionFlora(seed, body, region).length;
+}
+
 /** Deposit list without positions; cheap enough to compute for every region in an orbital scan. */
 export function regionDeposits(seed: number, body: Body, region: number): DepositSpec[] {
   const rng = rngFor(seed, body.id, region, "deposits");
