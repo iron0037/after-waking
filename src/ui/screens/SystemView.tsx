@@ -422,9 +422,9 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
               class="btn"
               disabled={busy}
               onClick={() => session.act((s) => wait(s, s.foldReadyAt - s.time))}
-              title="Hold position and let the fold drive finish charging"
+              title="Hold position and let the fold drive finish its refit"
             >
-              Hold until the fold drive is charged ({formatDuration(state.foldReadyAt - state.time)})
+              Hold until the fold drive is refitted ({formatDuration(state.foldReadyAt - state.time)})
             </button>
           )}
           {edgeFuelShort && edgeRes.ok && <div class="danger small">The edge burn needs {edgeRes.value.fuel} fuel.</div>}

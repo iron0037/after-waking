@@ -221,6 +221,12 @@
   flex-direction: column;
   gap: 8px;
 }
+.hub-rush {
+  margin-top: 6px;
+}
+.hub-upkeep-note {
+  margin: 0;
+}
 .hub-checklist .mark {
   display: inline-block;
   width: 20px;

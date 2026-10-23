@@ -72,6 +72,9 @@ describe("rover upgrade tiers (SCRUM-51)", () => {
     expect(buyUpgrade(state, "roverSled2").ok).toBe(false);
     expect(buyUpgrade(state, "roverSled").ok).toBe(true);
     expect(buyUpgrade(state, "roverSled2").ok).toBe(true);
+    // Installs queue in the yard's one bay: two days each, done before the ship can leave.
+    expect(shipStats(state.ship).roverCargoT).toBe(BASE_STATS.roverCargoT);
+    advanceTime(state, 4 * DAY);
     expect(shipStats(state.ship).roverCargoT).toBe(BASE_STATS.roverCargoT + 60);
   });
 });

@@ -113,7 +113,7 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
 |---|---|
 | In-system flight | Hours to about 1 day |
 | Surface expedition (exploring one region) | Days to weeks. Planets are huge, and a single world can hold a career's worth of sites. |
-| Fold drive recharge (scales with distance) | Days to weeks |
+| Fold-drive refit (scales with distance; the engineer and paid yard crews shorten it) | Days to weeks |
 | Refit and repair at the Intrepid | Weeks |
 | Crew training course | Weeks to months |
 | Drilling, extraction and on-site ore processing | Days to weeks per site; see exploration.md |
@@ -147,8 +147,8 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
   | Station | Bonus per level above 1 |
   |---|---|
   | Science | +1 hex of sensor sweep at levels 4, 7 and 10 |
-  | Engineering | +4% drill rate; −5% incident chance |
-  | Navigation | −3% flight fuel; −2% fold fuel; −4% fold recharge |
+  | Engineering | +4% drill rate; −5% incident chance; −4% fold-drive refit time |
+  | Navigation | −3% flight fuel; −2% fold fuel; −2% flight time |
   | Captain | +1% sale prices |
   | Comms | +3% contract pay |
   | Medical | −5% time lost to incidents; +3% specimen prices |
@@ -193,7 +193,7 @@ Your third-rate freighter can only be improved so far. Later in a career, captai
 | Damage-control parties mid-battle | The engineer assigns repair crews each turn; that's when Engineering XP pays off |
 | Striking colors / surrender | Surrender is always available to both sides, with the consequences carried forward (cargo seized, reputation, prisoners) |
 | **Prizes and boarding** | **Disable and board** an enemy to capture it: sell the hull, salvage parts, ransom the crew. This is the Freebooters' trade. |
-| The chase | Many fights are pursuits. Speed, drive damage and fold-recharge timing decide whether you escape. |
+| The chase | Many fights are pursuits. Speed, drive damage and fold-refit timing decide whether you escape. |
 
 **Mechanics [PROPOSED]**
 - **Simultaneous turns.** Each side plots orders, then they resolve together. A turn represents about 5–10 minutes, so a full battle takes a few hours of game time. That matches the age-of-sail feel and the game's time scale.
@@ -237,7 +237,7 @@ Your starting clan shapes the early game. Every perk is small but felt, and each
 | Clan | Perk | Cost / friction |
 |---|---|---|
 | **Exchange** *(user's idea)* | Loan interest halved (3%); 10% off fuel and Exchange goods; slightly better sell prices | Exchange collectors are relentless; missed payments hurt your reputation with them twice as much |
-| **Helm** | Fold drive recharges 15% faster; 3 extra systems charted at start | Helm expects you to take enforcement jobs; refusing costs standing |
+| **Helm** | Fold-drive refits 15% faster; 3 extra systems charted at start | Helm expects you to take enforcement jobs; refusing costs standing |
 | **Midshipmen** | 10% off Midshipmen ship upgrades; start with a skilled engineer | Fussy about maintenance: skipping refits costs reputation |
 | **Diggers** | Drill rate +15%; one free high-grade deposit lead per year | Diggers expect a cut of your biggest strikes (a tithe on plicite and platinum) |
 | **Lyceum** | Orbital scans and surveys take half the time; specimens sell for 15% more | Upkeep: the Lyceum asks you to carry its researchers, which takes up berths |

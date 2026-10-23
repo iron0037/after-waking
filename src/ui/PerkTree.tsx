@@ -8,12 +8,15 @@ import {
   acknowledgeLevelUp,
   bonusLine,
   captainTitle,
+  formatDuration,
   freePerkPoints,
+  inTraining,
   levelForXp,
   officerAt,
   perkBlocker,
   perkHolder,
   takePerk,
+  trainingEndsAt,
   wageAt,
   type CrewMember,
   type GameState,
@@ -46,6 +49,7 @@ function PerkCard({ session, station, def }: { session: GameSession; station: St
   const st = perkState(state, station, def);
   const holder = perkHolder(state, station);
   const reason = holder ? perkBlocker(holder, station, def) : null;
+  const away = inTraining(state, station);
   return (
     <div class={`perk perk-s-${st}`} title={reason ?? undefined}>
       <div class="perk-head">
@@ -55,7 +59,12 @@ function PerkCard({ session, station, def }: { session: GameSession; station: St
       </div>
       <div class="perk-text small">{def.text}</div>
       {st === "available" && (
-        <button class="btn primary perk-take" onClick={() => session.act((s) => takePerk(s, station, def.id))}>
+        <button
+          class="btn primary perk-take"
+          disabled={away}
+          title={away ? "They're away on a Lyceum course until it finishes." : undefined}
+          onClick={() => session.act((s) => takePerk(s, station, def.id))}
+        >
           Take this perk
         </button>
       )}
@@ -74,6 +83,7 @@ export function PerkTreeModal({ session, station, onClose }: { session: GameSess
   const level = levelForXp(holder?.xp ?? 0);
   const free = holder ? freePerkPoints(holder) : 0;
   const taken = holder?.perks?.length ?? 0;
+  const courseEnds = trainingEndsAt(state, station);
   return (
     <div class="overlay perk-overlay" onClick={onClose}>
       <div class="contracts perk-modal" onClick={(e) => e.stopPropagation()}>
@@ -101,6 +111,12 @@ export function PerkTreeModal({ session, station, onClose }: { session: GameSess
           <p class="danger">Nobody holds this post.</p>
         ) : (
           <div class="con-body perk-body">
+            {courseEnds !== null && (
+              <p class="accent small perk-note" role="status">
+                On a Lyceum course: back in {formatDuration(Math.max(0, courseEnds - state.time))}. No perks can be taken until then; the points come back
+                when it ends.
+              </p>
+            )}
             <p class="muted small perk-note">
               Tier n needs n−1 perks already taken in its branch. Nine points buy one branch and most of a second, never all three.
               {state.location.kind !== "intrepid" && " Retraining is offered aboard the Intrepid."}

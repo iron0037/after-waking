@@ -48,14 +48,14 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     [
       ["drive-harmonics", "Drive Harmonics", "+2 effective Navigation levels for fold fuel."],
       ["sensor-calibration", "Sensor Calibration", "+1 sensor tier for orbital region readings."],
-      ["plicite-chemistry", "Plicite Chemistry", "+2 effective Navigation levels for fold-drive recharge."],
+      ["plicite-chemistry", "Plicite Chemistry", "+2 effective Engineering levels for fold-drive refits."],
       ["field-theory", "Field Theory", "Better shields and sensors in combat.", "M3 combat"],
       ["anomaly-theory", "Anomaly Theory", "Detects the \"glitches\" the Covenant asks about.", "the Awaken path"],
     ],
   ],
   navigation: [
     [
-      ["fold-plotter", "Fold Plotter", "The star map shows fold fuel and recharge for every star at a glance."],
+      ["fold-plotter", "Fold Plotter", "The star map shows fold fuel and refit time for every star at a glance."],
       ["fold-calibration", "Fold Calibration", "A precise target lock needs less clear space: folds can start 80% of the way to the system edge."],
       ["long-fold", "Long Fold", "+1 ly fold range."],
       ["shoal-reader", "Shoal Reader", "Finds fold shoals: cheap, unstable shortcuts.", "fold shoals"],
@@ -155,7 +155,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     ],
     [
       ["haggler", "Haggler", "+2 effective Captain levels for sale prices."],
-      ["bulk-seller", "Bulk Seller", "Big lots move the market price half as much."],
+      ["bulk-seller", "Bulk Seller", "Big lots move the market price 30% less."],
       ["credit-line", "Credit Line", "The Exchange extends 50% more fuel credit."],
       ["futures", "Futures", "Commodity futures contracts.", "Exchange futures"],
       ["shareholder", "Shareholder", "A cut of an outpost's trade.", "outposts (M4)"],

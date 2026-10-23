@@ -171,8 +171,10 @@ export interface CrewBonuses {
   flightFuel: number;
   /** Navigation: fold fuel multiplier. */
   foldFuel: number;
-  /** Navigation: fold-drive recharge time multiplier. */
-  foldRecharge: number;
+  /** Engineering: fold-drive refit time multiplier. */
+  foldRefit: number;
+  /** Navigation: in-system flight time multiplier. */
+  flightTime: number;
   /** Captain: sale price multiplier. */
   salePrice: number;
   /** Comms: contract pay multiplier. */
@@ -186,9 +188,9 @@ export function stationBonuses(station: Station, level: number): Partial<CrewBon
     case "science":
       return { sensorRadius: b < 0 ? -1 : Math.floor(b / 3) };
     case "engineering":
-      return { drillRate: 1 + 0.04 * b, incidentRate: 1 - 0.05 * b };
+      return { drillRate: 1 + 0.04 * b, incidentRate: 1 - 0.05 * b, foldRefit: 1 - 0.04 * b };
     case "navigation":
-      return { flightFuel: 1 - 0.03 * b, foldFuel: 1 - 0.02 * b, foldRecharge: 1 - 0.04 * b };
+      return { flightFuel: 1 - 0.03 * b, foldFuel: 1 - 0.02 * b, flightTime: 1 - 0.02 * b };
     case "captain":
       return { salePrice: 1 + 0.01 * b };
     case "comms":
@@ -207,7 +209,8 @@ export function crewBonuses(state: GameState): CrewBonuses {
     specimenPrice: 1,
     flightFuel: 1,
     foldFuel: 1,
-    foldRecharge: 1,
+    foldRefit: 1,
+    flightTime: 1,
     salePrice: 1,
     contractPay: 1,
   };
@@ -237,7 +240,8 @@ export function bonusLine(state: GameState, station: Station, level = stationLev
   if (b.incidentRate !== undefined) parts.push(`incidents ${pct(b.incidentRate)}`);
   if (b.flightFuel !== undefined) parts.push(`flight fuel ${pct(b.flightFuel)}`);
   if (b.foldFuel !== undefined) parts.push(`fold fuel ${pct(b.foldFuel)}`);
-  if (b.foldRecharge !== undefined) parts.push(`fold recharge ${pct(b.foldRecharge)}`);
+  if (b.foldRefit !== undefined) parts.push(`fold refit ${pct(b.foldRefit)}`);
+  if (b.flightTime !== undefined) parts.push(`flight time ${pct(b.flightTime)}`);
   if (b.salePrice !== undefined) parts.push(`sale prices ${pct(b.salePrice)}`);
   if (b.contractPay !== undefined) parts.push(`contract pay ${pct(b.contractPay)}`);
   if (b.incidentHours !== undefined) parts.push(`time lost to incidents ${pct(b.incidentHours)}`);

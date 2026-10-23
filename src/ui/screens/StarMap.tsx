@@ -4,6 +4,9 @@ import {
   autoFold,
   clamp,
   currentSystemId,
+  isWaitBlocker,
+  departureReadyAt,
+  yardReadyAt,
   distanceLy,
   flightPlan,
   fold,
@@ -59,8 +62,8 @@ const INTREPID_HIT = 22;
 /** Drawn width of the Intrepid sprite on the chart, in pixels (sprite is 307x41). */
 const INTREPID_W = 78;
 
-/** Blockers a one-click departure can resolve itself (fly to the edge, wait out the recharge). */
-const isSoftBlocker = (b: string): boolean => b.startsWith("Fold drive recharging") || b.startsWith("Folds can't start inside");
+/** Blockers a one-click departure can resolve itself (fly to the edge, wait out the refit or yard work). */
+const isSoftBlocker = (b: string): boolean => isWaitBlocker(b) || b.startsWith("Folds can't start inside");
 
 const intrepidImg = typeof Image === "undefined" ? null : new Image();
 if (intrepidImg) intrepidImg.src = "./assets/intrepid.png";
@@ -131,7 +134,7 @@ export function StarMap({ session }: { session: GameSession }) {
 
   const stats = effectiveStats(state);
   const here = positionOf(world.galaxy, fromId);
-  // Fold Plotter (navigator): fuel and recharge for every star within the drive's range, cheap enough to recompute on each render.
+  // Fold Plotter (navigator): fuel and refit time for every star within the drive's range, cheap enough to recompute on each render.
   const plotter = hasPerk(state, "fold-plotter");
   const plots = new Map<string, FoldPlan>();
   if (plotter) {
@@ -149,11 +152,14 @@ export function StarMap({ session }: { session: GameSession }) {
   const hardBlockers = plan ? plan.blockers.filter((b) => !isSoftBlocker(b)) : [];
   const softBlockers = plan ? plan.blockers.filter(isSoftBlocker) : [];
   const needsEdge = softBlockers.some((b) => b.startsWith("Folds can't start inside"));
-  const rechargeLeft = Math.max(0, state.foldReadyAt - state.time);
+  const refitLeft = Math.max(0, state.foldReadyAt - state.time);
+  // Docked at the Intrepid, yard work (installs, Lyceum courses) also holds the ship; a one-click departure waits for the longest.
+  const yardLeft = docked ? Math.max(0, yardReadyAt(state) - state.time) : 0;
+  const departLeft = Math.max(0, departureReadyAt(state) - state.time);
   const edgeFlight = needsEdge ? flightPlan(state, world, { edge: true }) : null;
   const flightMinutes = edgeFlight?.ok ? edgeFlight.value.minutes : 0;
   const flightFuel = edgeFlight?.ok ? edgeFlight.value.fuel : 0;
-  const waitMinutes = Math.max(0, rechargeLeft - flightMinutes);
+  const waitMinutes = Math.max(0, departLeft - flightMinutes);
   const edgeProblem =
     edgeFlight && !edgeFlight.ok
       ? edgeFlight.reason
@@ -392,7 +398,7 @@ export function StarMap({ session }: { session: GameSession }) {
         if (withPlot) {
           const fp = plots.get(n.id) as FoldPlan;
           ctx.font = `10px ${FONT}`;
-          wd = Math.max(wd, ctx.measureText(`fuel ${fp.fuel} · ${formatDuration(fp.rechargeMinutes)}`).width);
+          wd = Math.max(wd, ctx.measureText(`fuel ${fp.fuel} · ${formatDuration(fp.refitMinutes)}`).width);
         }
         const flip = x + 140 > w;
         const x0 = flip ? x - r - 12 - wd : x + r + 12;
@@ -613,7 +619,7 @@ export function StarMap({ session }: { session: GameSession }) {
     if (fp && plotLabels.has(n.id)) {
       ctx.font = `10px ${FONT}`;
       ctx.fillStyle = fp.fuel > state.ship.fuel ? UI.danger : UI.cyan;
-      ctx.fillText(`fuel ${fp.fuel} · ${formatDuration(fp.rechargeMinutes)}`, flip ? x - r - 12 : x + r + 12, y + 17);
+      ctx.fillText(`fuel ${fp.fuel} · ${formatDuration(fp.refitMinutes)}`, flip ? x - r - 12 : x + r + 12, y + 17);
     }
   };
 
@@ -660,7 +666,7 @@ export function StarMap({ session }: { session: GameSession }) {
     const d = n.id === fromId ? "you are here" : `${distanceLy(world.galaxy, fromId, n.id).toFixed(1)} ly`;
     const fp = plots.get(n.id);
     const lines = [n.name, n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d];
-    if (fp) lines.push(`fold: ${fp.fuel} fuel, recharge ${formatDuration(fp.rechargeMinutes)}`);
+    if (fp) lines.push(`fold: ${fp.fuel} fuel, refit ${formatDuration(fp.refitMinutes)}`);
     ctx.save();
     ctx.font = `11px ${FONT}`;
     const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
@@ -739,10 +745,16 @@ export function StarMap({ session }: { session: GameSession }) {
               <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
                 {plan.fuel} of {state.ship.fuel.toFixed(1)}
               </dd>
-              <dt>Recharge after</dt>
-              <dd>{formatDuration(plan.rechargeMinutes)}</dd>
+              <dt>Refit after</dt>
+              <dd>{formatDuration(plan.refitMinutes)}</dd>
               <dt>Drive now</dt>
-              <dd class={rechargeLeft > 0 ? "accent" : "good"}>{rechargeLeft > 0 ? `Charging, ${formatDuration(rechargeLeft)}` : "Ready"}</dd>
+              <dd class={refitLeft > 0 ? "accent" : "good"}>{refitLeft > 0 ? `Refit, ${formatDuration(refitLeft)} left` : "Ready"}</dd>
+              {yardLeft > 0 && (
+                <>
+                  <dt>Yard work</dt>
+                  <dd class="accent">Done in {formatDuration(yardLeft)}</dd>
+                </>
+              )}
             </dl>
             {(hardBlockers.length > 0 || edgeProblem) && (
               <ul class="blockers sm-blockers">
@@ -770,7 +782,7 @@ export function StarMap({ session }: { session: GameSession }) {
             {softBlockers.length > 0 && canDepart && (
               <p class="muted small sm-auto-note">
                 {needsEdge ? "Folds start at the system edge, so the ship flies out first. " : ""}
-                {waitMinutes > 0 ? "Then it holds position until the drive is charged. " : ""}
+                {waitMinutes > 0 ? (docked ? "Then it waits aboard until the refit and the yard are done. " : "Then it holds position until the drive's refit is done. ") : ""}
                 Same time and fuel as doing it by hand.
               </p>
             )}

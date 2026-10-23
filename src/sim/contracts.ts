@@ -14,7 +14,9 @@ import { Rng } from "./rng";
 import { removeCargo } from "./ship";
 import type { GameState } from "./state";
 import { DAY } from "./units";
-import type { World } from "./world";
+import { fuelPrice } from "./economy";
+import { distanceLy } from "./galaxy";
+import { World } from "./world";
 
 export type ContractKind = "deliver" | "specimens" | "survey";
 export type ContractStatus = "offered" | "active" | "done" | "failed";
@@ -176,6 +178,50 @@ export function exclusiveContract(rng: Rng, serial: number): Contract {
   };
 }
 
+const worldCache = new Map<number, World>();
+function worldFor(seed: number): World {
+  let w = worldCache.get(seed);
+  if (!w) {
+    w = new World(seed);
+    worldCache.clear();
+    worldCache.set(seed, w);
+  }
+  return w;
+}
+
+/**
+ * Helm always has charting work: survey two worlds of a charted system from orbit. No landing or
+ * mining needed, and it pays the fuel there and back with something over, so a captain who's
+ * down on their luck always has a way to earn. One on the board at a time.
+ */
+export function standingSurvey(state: GameState, rng: Rng, serial: number): Contract | null {
+  const world = worldFor(state.seed);
+  const surveyed = new Set(state.surveyedBodies ?? []);
+  const claimed = new Set((state.contracts ?? []).filter((c) => c.status === "active" || c.status === "offered").flatMap((c) => c.surveyBodyIds ?? []));
+  const options = world.galaxy.systems
+    .filter((s) => s.charted)
+    .map((s) => ({ s, bodies: world.system(s.id).bodies.filter((b) => b.regions > 0 && !surveyed.has(b.id) && !claimed.has(b.id)) }))
+    .filter((o) => o.bodies.length >= 2);
+  if (options.length === 0) return null;
+  const { s, bodies } = rng.pick(options);
+  const targets = bodies.slice(0, 2);
+  const ly = distanceLy(world.galaxy, "intrepid", s.id);
+  // Round-trip fold fuel for the starter freighter (about 2 units per ly each way), with margin.
+  const fuelCost = 4 * ly * fuelPrice(state.market);
+  return {
+    id: `survey-${serial}`,
+    clan: "helm",
+    kind: "survey",
+    title: `Helm: finish the ${s.name} charts`,
+    text: `Helm pays steady money for orbital surveys. Fly detailed surveys of ${targets.map((b) => b.name).join(" and ")}. No landing needed.`,
+    surveyBodyIds: targets.map((b) => b.id),
+    reward: Math.round((fuelCost * 1.5 + 2_000) / 50) * 50,
+    durationDays: 90,
+    deadline: null,
+    status: "offered",
+  };
+}
+
 /** Expire overdue contracts and post new deliveries now and then. Called as time passes. */
 export function tickContracts(state: GameState): void {
   state.contracts ??= [];
@@ -192,6 +238,12 @@ export function tickContracts(state: GameState): void {
     if (offered < 4) {
       const serial = state.contracts.length + 1;
       state.contracts.push(deliveryContract(rng, state.time, serial));
+    }
+    // Helm's standing survey work: one on the board at all times, so there's always a way to earn.
+    const hasSurvey = state.contracts.some((c) => c.kind === "survey" && !c.starter && (c.status === "offered" || c.status === "active"));
+    if (!hasSurvey) {
+      const survey = standingSurvey(state, rng, state.contracts.length + 1);
+      if (survey) state.contracts.push(survey);
     }
     // Preferred Captain (comms): now and then a clan offers private work, bigger and better paid.
     if (hasPerk(state, "preferred-captain") && rng.chance(0.5) && !state.contracts.some((c) => c.status === "offered" && c.exclusive)) {

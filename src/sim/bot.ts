@@ -31,6 +31,10 @@ import {
   stowRover,
   recallRover,
   wait,
+  callForRescue,
+  departureReadyAt,
+  isWaitBlocker,
+  rescueQuote,
   type Result,
 } from "./actions";
 import type { Body } from "./bodies";
@@ -38,6 +42,7 @@ import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
+import { levelForXp } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
@@ -50,7 +55,18 @@ export interface BotReport {
   tripsCompleted: number;
   /** Unexpected action failures: these indicate bugs or dead ends in the loop. */
   errors: string[];
-  tripSummaries: { system: string; days: number; tonnes: number; revenue: number; net: number }[];
+  tripSummaries: {
+    system: string;
+    days: number;
+    tonnes: number;
+    revenue: number;
+    net: number;
+    /** After the trip. */
+    credits: number;
+    loan: number;
+    crewLevel: number;
+    rescues: number;
+  }[];
 }
 
 export interface BotOptions {
@@ -60,12 +76,15 @@ export interface BotOptions {
   upgrades?: readonly string[];
   /** Keep at least this many credits after buying an upgrade. */
   reserve?: number;
+  /** Play like a new captain: picks systems at random, takes the chart's default region, never surveys, calls for rescue when stranded. */
+  novice?: boolean;
 }
 
 export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
 
 export function runBot(seed: number, trips: number, options: BotOptions = {}): BotReport {
-  const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000 } = options;
+  const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false } = options;
+  let rescues = 0;
   const world = new World(seed);
   const state = newGame({ seed });
   const rng = new Rng(seed ^ 0xb07);
@@ -95,17 +114,19 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     // The bot's crew spend their perk points the way recruits do.
     autoSpendCrew(state, rng);
 
-    const target = chooseSystem(state, world);
+    const target = chooseSystem(state, world, novice ? rng : null);
     if (!target) {
       errors.push(`trip ${trip}: no reachable system with landable worlds`);
       break;
     }
-    if (state.time < state.foldReadyAt) wait(state, state.foldReadyAt - state.time);
+    if (state.time < departureReadyAt(state)) wait(state, departureReadyAt(state) - state.time);
     if (must("fold out", fold(state, world, target)) === null) break;
 
     const tonnesBefore = state.stats.tonnesMined;
-    mineSystem(state, world, target, rng, must, survey);
+    mineSystem(state, world, target, rng, must, survey, novice);
 
+    // Stranded (it happens to new captains): call the Exchange for a tender.
+    if (rescueQuote(state, world) && callForRescue(state, world).ok) rescues++;
     if (must("fly to edge", flyTo(state, world, { edge: true })) === null) break;
     if (state.time < state.foldReadyAt) wait(state, state.foldReadyAt - state.time);
     if (must("fold home", fold(state, world, "intrepid")) === null) break;
@@ -119,6 +140,10 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
       revenue: sold.ok ? sold.value : 0,
       // Fuel bought before departure is a trip cost; fuel left in the tanks carries over.
       net: state.credits - creditsBefore + ((state.stats.loanPaid ?? 0) - loanPaidBefore),
+      credits: state.credits,
+      loan: state.loan.balance,
+      crewLevel: (state.crew ?? []).reduce((s, m) => s + levelForXp(m.xp), 0) / Math.max(1, (state.crew ?? []).length),
+      rescues,
     });
   }
 
@@ -143,23 +168,26 @@ function bodyScore(body: Body): number {
 }
 
 /** Best system we can reach and still fold home from. */
-function chooseSystem(state: GameState, world: World): string | null {
+function chooseSystem(state: GameState, world: World, randomly: Rng | null = null): string | null {
   let best: string | null = null;
   let bestScore = 0;
+  const options: string[] = [];
   for (const sys of world.galaxy.systems) {
     const out = foldPlan(state, world, sys.id);
-    const blockers = out.blockers.filter((b) => !b.startsWith("Fold drive recharging"));
+    const blockers = out.blockers.filter((b) => !isWaitBlocker(b));
     if (blockers.length > 0) continue;
     if (out.fuel * 2 + 4 > state.ship.fuel) continue; // round trip plus margin
     const bodies = world.system(sys.id).bodies.filter((b) => landable(state, b));
     if (bodies.length === 0) continue;
     const priorVisits = visitsTo(state, sys.id);
     const score = bodies.reduce((s, b) => s + bodyScore(b), 0) / (1 + out.ly * 0.1) / (1 + priorVisits * 0.6);
+    options.push(sys.id);
     if (score > bestScore) {
       bestScore = score;
       best = sys.id;
     }
   }
+  if (randomly && options.length > 0) return randomly.pick(options);
   return best;
 }
 
@@ -170,6 +198,7 @@ function mineSystem(
   rng: Rng,
   must: <T>(label: string, r: Result<T>) => T | null,
   survey: boolean,
+  novice = false,
 ): void {
   const detail = world.system(systemId);
   const stats = () => effectiveStats(state);
@@ -186,7 +215,7 @@ function mineSystem(
     if (holdFull() || state.time - arrived > 60 * DAY) return;
     if (must(`fly to ${body.name}`, flyTo(state, world, { bodyId: body.id })) === null) return;
     must(`scan ${body.name}`, scanBody(state, world));
-    if (survey && !state.surveyedBodies.includes(body.id)) must(`survey ${body.name}`, surveyBody(state, world));
+    if (survey && !novice && !state.surveyedBodies.includes(body.id)) must(`survey ${body.name}`, surveyBody(state, world));
 
     const regionCount = Math.min(body.regions, 12);
     // Fresh ground first: a region we've already worked is worth a fraction of its signal.
@@ -194,6 +223,7 @@ function mineSystem(
       regionSignal(state.seed, body, r, orbitalSensorTier(state, body.id), stats().drillMaxDepthM) /
       (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
     const regions = Array.from({ length: regionCount }, (_, i) => i).sort((a, b) => regionValue(b) - regionValue(a));
+    // A new captain takes the region the chart pre-selects (strongest signal at their sensor tier), so no shuffle.
     for (const region of regions.slice(0, 2)) {
       if (holdFull()) break;
       if (must(`land on ${body.name}`, land(state, world, region)) === null) break;

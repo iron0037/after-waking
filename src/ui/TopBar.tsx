@@ -53,7 +53,7 @@ export function TopBar({
       <div class="tb-block">
         <div class="tb-label">Fold drive</div>
         <div class={`tb-value ${foldReady ? "good" : "muted"}`}>
-          {foldReady ? "Ready" : `Charging ${formatDuration(state.foldReadyAt - state.time)}`}
+          {foldReady ? "Ready" : `Refit ${formatDuration(state.foldReadyAt - state.time)}`}
         </div>
       </div>
       <div class="tb-block" title={`Next payment due ${formatDate(state.loan.nextDue)}`}>

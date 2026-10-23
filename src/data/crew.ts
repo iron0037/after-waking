@@ -34,12 +34,12 @@ export const STATION_INFO: Record<Station, StationInfo> = {
   navigation: {
     title: "Navigator",
     learnsFrom: "folds and in-system flights",
-    improves: "fuel per fold and per AU, fold-drive recharge",
+    improves: "fuel per fold and per AU, in-system flight time",
   },
   engineering: {
     title: "Engineer",
-    learnsFrom: "drilling and dealing with breakdowns",
-    improves: "drill rate, fewer storms-and-jams stoppages",
+    learnsFrom: "drilling, dealing with breakdowns, and fold-drive refits",
+    improves: "drill rate, fewer storms-and-jams stoppages, faster fold-drive refits",
   },
   comms: {
     title: "Comms officer",

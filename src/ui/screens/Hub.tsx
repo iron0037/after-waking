@@ -16,8 +16,17 @@ import {
   contractProgress,
   crewBonuses,
   effectiveStats,
+  dailyUpkeep,
   dailyWages,
   DAY,
+  departureReadyAt,
+  fuelCreditPastLimit,
+  GRACE_FEE,
+  graceAvailableAt,
+  LIFELINE_FUEL,
+  rushRefit,
+  rushRefitCost,
+  UPKEEP_RATE_PER_DAY,
   formatDate,
   formatDuration,
   fuelPrice,
@@ -301,7 +310,9 @@ function Market({ session }: { session: GameSession }) {
               disabled={creditUnits < 1}
               title={
                 creditUnits < 1
-                  ? "The Exchange won't extend more credit against your note."
+                  ? fuelCreditPastLimit(state)
+                    ? `The Exchange won't extend more credit against your note, apart from the ${LIFELINE_FUEL}-unit lifeline.`
+                    : "The Exchange won't extend more credit against your note."
                   : `The Exchange advances fuel against your note at a ${Math.round((FUEL_CREDIT_MARKUP - 1) * 100)}% markup.`
               }
               onClick={() => session.act((s) => buyFuelOnCredit(s, room))}
@@ -315,6 +326,12 @@ function Market({ session }: { session: GameSession }) {
             </button>
             <span class="muted small">Note limit {cr(fuelCreditLimit(state))}</span>
           </div>
+        )}
+        {fuelCreditPastLimit(state) && (
+          <p class="small accent" title="The Exchange never leaves a captain grounded.">
+            Your note is at its limit, but the Exchange will still top the tanks up to {LIFELINE_FUEL} units on credit
+            {state.ship.fuel >= LIFELINE_FUEL ? " if they ever run lower than that" : ""}: enough for a short trip to earn your way out.
+          </p>
         )}
         <p class="muted small">
           Plicite is what makes folds possible. The Lyceum says it is just chemistry. The Exchange says it is just money.
@@ -567,6 +584,7 @@ function Shipyard({ session }: { session: GameSession }) {
   const hw = shipStats(state.ship);
   const r = stats.ratings;
   const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => UPGRADES.some((u) => u.category === c));
+  const queuedIds = new Set((state.yard ?? []).flatMap((j) => (j.kind === "install" && j.upgradeId ? [j.upgradeId] : [])));
 
   return (
     <div class="hub-grid">
@@ -633,24 +651,34 @@ function Shipyard({ session }: { session: GameSession }) {
       </Section>
 
       <section class="hub-upgrades">
+        <p class="muted small hub-upkeep-note">
+          Installed gear costs upkeep: {(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day, settled with the crew's wages whenever you're back
+          aboard. Yours comes to <strong class="accent">{cr(dailyUpkeep(state))}</strong> a day. Orders are fitted one at a time ({UPGRADE_INSTALL_DAYS} days
+          each) alongside refits and Lyceum courses; the ship can't fold out until the yard is done.
+        </p>
         {categories.map((cat) => {
           const inCat = UPGRADES.filter((u) => u.category === cat);
           const owned = inCat.filter((u) => state.ship.upgrades.includes(u.id)).length;
+          const fitting = inCat.filter((u) => queuedIds.has(u.id)).length;
           return (
-          <Section key={cat} id={`yard-${cat}`} title={UPGRADE_CATEGORY_NAMES[cat]} class="hub-vendor" summary={`${owned} of ${inCat.length} installed`}>
+          <Section key={cat} id={`yard-${cat}`} title={UPGRADE_CATEGORY_NAMES[cat]} class="hub-vendor" summary={`${owned} of ${inCat.length} installed${fitting > 0 ? `, ${fitting} being fitted` : ""}`}>
             <div class="hub-cards">
               {UPGRADES.filter((u) => u.category === cat).map((u) => {
                 const installed = state.ship.upgrades.includes(u.id);
+                const job = (state.yard ?? []).find((j) => j.kind === "install" && j.upgradeId === u.id);
                 const short = u.price - state.credits;
                 const req = u.requires ? UPGRADES.find((x) => x.id === u.requires) : undefined;
-                const missing = !!u.requires && !state.ship.upgrades.includes(u.requires);
+                // A queued install counts toward a requirement, as the sim allows ordering the next tier behind it.
+                const missing = !!u.requires && !state.ship.upgrades.includes(u.requires) && !queuedIds.has(u.requires);
                 const reqName = req?.name ?? u.requires ?? "";
                 return (
-                  <div key={u.id} class={`panel hub-card ${installed ? "installed" : ""}`}>
+                  <div key={u.id} class={`panel hub-card ${installed || job ? "installed" : ""}`}>
                     <div class="hub-card-head">
                       <strong>{u.name}</strong>
                       {installed ? (
                         <span class="tag good">Installed</span>
+                      ) : job ? (
+                        <span class="tag accent-tag">Installing</span>
                       ) : (
                         <span class="hub-price">
                           <span class="accent">{cr(u.price)}</span>
@@ -665,7 +693,15 @@ function Shipyard({ session }: { session: GameSession }) {
                       {missing && <span class="tag accent-tag">Requires {reqName}</span>}
                     </div>
                     <div class="muted small">{u.description}</div>
-                    {!installed && (
+                    <div class="muted small" title={`Installed gear costs ${(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day to keep running.`}>
+                      Upkeep {cr(u.price * UPKEEP_RATE_PER_DAY)} / day
+                    </div>
+                    {job && (
+                      <div class="accent small">
+                        Installing: ready in {formatDuration(Math.max(0, job.readyAt - state.time))}
+                      </div>
+                    )}
+                    {!installed && !job && (
                       <button
                         class="btn"
                         disabled={short > 0 || missing}
@@ -701,7 +737,7 @@ function Crew({ session }: { session: GameSession }) {
   const recruits = (state.recruits ?? []).length;
   return (
     <div class="hub-crew">
-      <Section id="crew-roster" title="Your crew" level={2} summary={`${cr(wages)} a day in wages`}>
+      <Section id="crew-roster" title="Your crew" level={2} summary={`${cr(wages)} a day in wages, ${cr(dailyUpkeep(state))} in upkeep`}>
         <Roster session={session} />
       </Section>
       <Section id="crew-hall" title="Hiring hall" level={2} summary={`${recruits} looking for a berth`}>
@@ -724,6 +760,8 @@ function Exchange({ session }: { session: GameSession }) {
   const covered = loan.payment > 0 ? Math.floor(prepaid / loan.payment) : 0;
   const rate = loanRate(state);
   const outlook = loanOutlook(loan, rate);
+  const graceAt = graceAvailableAt(loan);
+  const graceNow = state.time >= graceAt;
 
   const why = (n: number): string =>
     !owed ? "Nothing owed." : state.credits < n ? `You need ${cr(n - state.credits)} more.` : `Pay ${cr(n)}`;
@@ -754,6 +792,10 @@ function Exchange({ session }: { session: GameSession }) {
             </dd>
             <dt>Missed payments</dt>
             <dd class={loan.missed > 0 ? "danger" : ""}>{loan.missed}</dd>
+            <dt>Hardship deferral</dt>
+            <dd class={graceNow ? "good" : "muted"}>
+              {graceNow ? "Available now" : `Used ${formatDate(loan.graceAt ?? 0)}; next available ${formatDate(graceAt)}`}
+            </dd>
             <dt>Annual rate</dt>
             <dd>
               {(rate * 100).toFixed(1)}%
@@ -797,6 +839,11 @@ function Exchange({ session }: { session: GameSession }) {
             If the installment is due and your credits are short, it counts as a <strong>missed payment</strong>: the Exchange
             adds a 10% late fee to the balance, and remembers.
           </li>
+          <li>
+            Once a year, though, the Exchange grants a <strong>hardship deferral</strong>: an installment you can't cover is pushed to
+            the next due date for a {Math.round(GRACE_FEE * 100)}% fee instead of counting as missed. It's used automatically, and it
+            isn't offered again for a year.
+          </li>
         </ul>
         <div class="btn-row">
           <button class="btn" disabled={!owed || state.credits < next} title={why(next)} onClick={() => pay(next)}>
@@ -826,11 +873,75 @@ function Depart({ session }: { session: GameSession }) {
   const stats = effectiveStats(state);
   const held = cargoTonnes(state.ship.cargo);
   const fuelOk = state.ship.fuel >= stats.fuelCapacity * 0.5;
-  const chargeMinutes = state.foldReadyAt - state.time;
-  const foldReady = chargeMinutes <= 0;
+  const refitLeft = Math.max(0, state.foldReadyAt - state.time);
+  const jobs = [...(state.yard ?? [])].sort((a, b) => a.readyAt - b.readyAt);
+  const readyAt = departureReadyAt(state);
+  const waitMinutes = Math.max(0, Math.ceil(readyAt - state.time));
+  const pending = refitLeft > 0 || jobs.length > 0;
+  const rushOne = rushRefitCost(state, 1);
+  const rushThree = rushRefitCost(state, 3);
+  const rushAll = rushRefitCost(state, refitLeft / DAY);
+  const rushWhy = (cost: number): string =>
+    state.credits < cost ? `The yard crews want ${cr(cost)}; you need ${cr(cost - state.credits)} more.` : `Pay ${cr(cost)} to cut the refit short.`;
+  const rush = (days: number): void => {
+    session.act((s) => rushRefit(s, days));
+  };
 
   return (
     <div class="hub-grid">
+      <section class="panel">
+        <h2>Before you can leave</h2>
+        {pending ? (
+          <>
+            <ul class="hub-checklist">
+              {refitLeft > 0 && (
+                <li class="danger">
+                  <span class="mark">✘</span>
+                  Fold-drive refit: ready in {formatDuration(refitLeft)}
+                  <div class="muted small">Folding wears the drive; the engineers scrub it before the next fold. Yard crews will rush it for a fee.</div>
+                  <div class="btn-row hub-rush">
+                    {refitLeft > DAY && (
+                      <button class="btn" disabled={state.credits < rushOne} title={rushWhy(rushOne)} onClick={() => rush(1)}>
+                        Rush 1 day <span class="muted">({cr(rushOne)})</span>
+                      </button>
+                    )}
+                    {refitLeft > 3 * DAY && (
+                      <button class="btn" disabled={state.credits < rushThree} title={rushWhy(rushThree)} onClick={() => rush(3)}>
+                        Rush 3 days <span class="muted">({cr(rushThree)})</span>
+                      </button>
+                    )}
+                    <button class="btn" disabled={state.credits < rushAll} title={rushWhy(rushAll)} onClick={() => rush(refitLeft / DAY)}>
+                      Rush all <span class="muted">({cr(rushAll)})</span>
+                    </button>
+                  </div>
+                </li>
+              )}
+              {jobs.map((j, i) => (
+                <li key={`${j.kind}-${j.upgradeId ?? j.station}-${i}`} class="danger">
+                  <span class="mark">✘</span>
+                  {j.kind === "install" ? `Yard: installing ${j.label}` : `Lyceum: ${j.label}`} · ready in{" "}
+                  {formatDuration(Math.max(0, j.readyAt - state.time))}
+                </li>
+              ))}
+            </ul>
+            <p class="small muted">
+              Everything above runs at the same time, so the ship can leave when the <strong>longest</strong> one is done. Nothing here stops you
+              plotting a course meanwhile.
+            </p>
+            <button class="btn primary big" disabled={waitMinutes <= 0} onClick={() => session.act((s) => wait(s, Math.max(0, Math.ceil(departureReadyAt(s) - s.time))))}>
+              Wait until ready ({formatDuration(waitMinutes)})
+            </button>
+          </>
+        ) : (
+          <ul class="hub-checklist">
+            <li class="good">
+              <span class="mark">✔</span>
+              Nothing pending: the drive is refitted and the yard is clear.
+            </li>
+          </ul>
+        )}
+      </section>
+
       <section class="panel">
         <h2>Pre-departure</h2>
         <ul class="hub-checklist">
@@ -844,24 +955,22 @@ function Depart({ session }: { session: GameSession }) {
             {held <= 0.05 ? "Hold empty, ready for ore" : `${tonnes(held)} still in the hold`}
             {held > 0.05 && <span class="muted"> (sell it before you go if you can)</span>}
           </li>
-          <li class={foldReady ? "good" : "danger"}>
-            <span class="mark">{foldReady ? "✔" : "✘"}</span>
-            {foldReady ? "Fold drive charged" : `Fold drive charging: ${formatDuration(chargeMinutes)}`}
+          <li class={pending ? "danger" : "good"}>
+            <span class="mark">{pending ? "✘" : "✔"}</span>
+            {pending ? `Ship can leave in ${formatDuration(waitMinutes)}` : "Ship can leave now"}
           </li>
         </ul>
         <button class="btn primary big" onClick={() => session.go("starmap")}>
           Open star map
         </button>
-        <p class="muted small">You can plot a course now and fold when the drive is ready.</p>
+        <p class="muted small">You can plot a course now; "Fold when ready" waits out the refit and the yard for you.</p>
       </section>
 
       <section class="panel">
         <h2>Wait aboard the Intrepid</h2>
         <p class="muted small">
-          Let the days turn. Prices drift, the fold drive charges, and the note keeps counting.{" "}
-          <span class={foldReady ? "good" : "accent"}>
-            {foldReady ? "The fold drive is charged." : `Fold drive ready in ${formatDuration(chargeMinutes)}.`}
-          </span>
+          Let the days turn. Prices drift, the fold drive is refitted, and the note keeps counting. Wages and equipment upkeep are settled while
+          you're aboard.
         </p>
         <div class="btn-row">
           <button class="btn" onClick={() => session.act((s) => wait(s, DAY))}>
@@ -870,11 +979,6 @@ function Depart({ session }: { session: GameSession }) {
           <button class="btn" onClick={() => session.act((s) => wait(s, 7 * DAY))}>
             7 days
           </button>
-          {!foldReady && (
-            <button class="btn primary" onClick={() => session.act((s) => wait(s, Math.ceil(s.foldReadyAt - s.time)))}>
-              Until the fold drive is charged ({formatDuration(chargeMinutes)})
-            </button>
-          )}
         </div>
       </section>
     </div>

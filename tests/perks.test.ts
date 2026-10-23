@@ -4,6 +4,7 @@ import { BASE_STATS } from "../src/data/ship";
 import { PERKS, PERKS_BY_ID } from "../src/data/perks";
 import {
   acknowledgeLevelUp,
+  departureReadyAt,
   awardXp,
   contractPayout,
   crewBonuses,
@@ -124,9 +125,13 @@ describe("perk framework", () => {
     const t0 = state.time;
     const r = retrain(state, "science");
     expect(r.ok && r.value.refunded).toBe(1);
-    expect(officerAt(state, "science")!.perks).toEqual([]);
-    expect(state.time - t0).toBeGreaterThanOrEqual(14 * DAY);
+    // The course runs in the yard alongside other work: no time passes yet, but the ship can't leave.
+    expect(state.time).toBe(t0);
     expect(state.credits).toBeLessThan(100_000);
+    expect(departureReadyAt(state) - t0).toBeGreaterThanOrEqual(14 * DAY);
+    expect(takePerk(state, "science", "field-botanist").ok).toBe(false); // away on the course
+    wait(state, departureReadyAt(state) - state.time);
+    expect(officerAt(state, "science")!.perks).toEqual([]);
   });
 
   it("recruits arrive with their points spent", () => {
@@ -146,7 +151,7 @@ describe("cross-training counts as extra levels", () => {
     ["culture-lab", (s: GameState) => crewBonuses(s).specimenPrice, "up"],
     ["triage", (s: GameState) => crewBonuses(s).incidentHours, "down"],
     ["drive-harmonics", (s: GameState) => crewBonuses(s).foldFuel, "down"],
-    ["plicite-chemistry", (s: GameState) => crewBonuses(s).foldRecharge, "down"],
+    ["plicite-chemistry", (s: GameState) => crewBonuses(s).foldRefit, "down"],
     ["efficient-burns", (s: GameState) => crewBonuses(s).flightFuel, "down"],
     ["drive-tuning", (s: GameState) => crewBonuses(s).flightFuel, "down"],
   ] as const)("%s", (id, read, dir) => {

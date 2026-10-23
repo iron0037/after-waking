@@ -53,14 +53,15 @@ describe("crew roster", () => {
     expect(state.journal.at(-1)!.text).toMatch(/reached level/);
   });
 
-  it("a skilled navigator saves fold fuel and recharge time", () => {
+  it("a skilled navigator saves fold fuel; a skilled engineer shortens the refit", () => {
     const world = new World(42);
     const state = newGame({ seed: 42 });
     const before = foldPlan(state, world, "s0");
     awardXp(state, "navigation", xpForLevel(10));
+    awardXp(state, "engineering", xpForLevel(10));
     const after = foldPlan(state, world, "s0");
     expect(after.fuel).toBeLessThan(before.fuel);
-    expect(after.rechargeMinutes).toBeLessThan(before.rechargeMinutes);
+    expect(after.refitMinutes).toBeLessThan(before.refitMinutes);
     expect(fold(state, world, "s0").ok).toBe(true);
   });
 });

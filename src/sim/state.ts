@@ -5,6 +5,9 @@
  */
 import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
+import type { Station } from "../data/crew";
+import { UPGRADES_BY_ID } from "../data/ship";
+import { tickYard } from "./actions";
 import { hasPerk } from "./perks";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
@@ -45,6 +48,14 @@ export type Location =
       juryRigUsed?: boolean;
     };
 
+export interface YardJob {
+  kind: "install" | "retrain";
+  label: string;
+  readyAt: number;
+  upgradeId?: string;
+  station?: Station;
+}
+
 export interface Loan {
   balance: number;
   payment: number;
@@ -54,6 +65,8 @@ export interface Loan {
   annualRate: number;
   /** Early payments not yet applied to an installment; the auto-debit draws on this first. */
   prepaid?: number;
+  /** When the Exchange last granted a hardship deferral (one a year). */
+  graceAt?: number;
 }
 
 export type JournalKind = "info" | "travel" | "discovery" | "trade" | "warning";
@@ -79,6 +92,8 @@ export interface GameState {
   nextRecruitsAt?: number;
   /** Level-ups the player hasn't seen yet (the UI shows each as a popup). */
   levelUps?: LevelUp[];
+  /** Work in progress aboard the Intrepid (installs, Lyceum courses); the ship leaves when it's all done. */
+  yard?: YardJob[];
   credits: number;
   loan: Loan;
   ship: ShipState;
@@ -90,6 +105,8 @@ export interface GameState {
   surveyedBodies: string[];
   /** Crew wages accrued since the last payday (paid when docked at the Intrepid). */
   payrollOwed: number;
+  /** Upkeep on installed equipment accrued since the last settling at the Intrepid. */
+  upkeepOwed?: number;
   contracts: Contract[];
   /** When the job board next gets a new posting. */
   nextContractAt: number;
@@ -184,16 +201,33 @@ export function advanceTime(state: GameState, minutes: number): void {
   if (minutes < 0) throw new Error("Time cannot run backwards");
   state.time += minutes;
   state.payrollOwed += (minutes / DAY) * dailyWages(state);
+  state.upkeepOwed = (state.upkeepOwed ?? 0) + (minutes / DAY) * dailyUpkeep(state);
   if (state.location.kind === "intrepid") settlePayroll(state);
   tickContracts(state);
   tickRecruits(state);
+  tickYard(state);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);
 }
 
 /** Pay the crew what they're owed, as far as credits allow. Called whenever time passes at the Intrepid. */
+/** Daily upkeep on installed equipment: more gear, more to maintain (a share of its price per day). */
+export const UPKEEP_RATE_PER_DAY = 0.0006;
+
+export function dailyUpkeep(state: GameState): number {
+  return state.ship.upgrades.reduce((sum, id) => sum + (UPGRADES_BY_ID.get(id)?.price ?? 0), 0) * UPKEEP_RATE_PER_DAY;
+}
+
 export function settlePayroll(state: GameState): void {
+  // The yard's upkeep bill comes first; the crew are paid from what's left.
+  const upkeep = Math.round(state.upkeepOwed ?? 0);
+  if (upkeep >= 1) {
+    const paid = Math.min(upkeep, Math.max(0, state.credits));
+    state.credits -= paid;
+    state.upkeepOwed = (state.upkeepOwed ?? 0) - paid;
+    if (paid >= 100) log(state, "trade", `Paid the yard ${paid.toLocaleString()} cr for equipment upkeep.`);
+  }
   const owed = Math.round(state.payrollOwed);
   if (owed < 1) return;
   const paid = Math.min(owed, Math.max(0, state.credits));
@@ -243,6 +277,14 @@ export function loanOutlook(loan: Loan, annualRate = loan.annualRate): LoanOutlo
   return { installments, payoffAt: due, nextInterest, totalInterest };
 }
 
+/** Fee for a hardship deferral, as a share of the installment. */
+export const GRACE_FEE = 0.03;
+
+/** When the Exchange will next defer an installment it can't collect (one grace a year); 0 if it never has. */
+export function graceAvailableAt(loan: Loan): number {
+  return loan.graceAt === undefined ? 0 : loan.graceAt + YEAR;
+}
+
 /** The note's rate in effect: Note Restructuring (comms) takes 2 points off. */
 export function loanRate(state: GameState): number {
   return Math.max(0, state.loan.annualRate - (hasPerk(state, "note-restructuring") ? 0.02 : 0));
@@ -269,6 +311,18 @@ function settleLoan(state: GameState): void {
         state,
         "trade",
         `Exchange auto-debited ${due.toLocaleString()} cr${fromPrepaid > 0 ? ` (plus ${fromPrepaid.toLocaleString()} cr from early payments)` : ""}. Balance: ${loan.balance.toLocaleString()} cr.`,
+      );
+    } else if (loan.graceAt === undefined || state.time - loan.graceAt >= YEAR) {
+      // Hardship: once a year the Exchange defers an installment it can't collect, for a small fee,
+      // rather than marking it missed. A rough trip shouldn't snowball.
+      loan.graceAt = state.time;
+      const fee = Math.round(due * GRACE_FEE);
+      loan.balance += fee;
+      log(
+        state,
+        "warning",
+        `Couldn't cover the Exchange installment due ${formatDate(when)}. They deferred it to the next due date for a ${fee.toLocaleString()} cr fee. ` +
+          `That's this year's grace; next time it counts as a missed payment.`,
       );
     } else {
       loan.missed++;

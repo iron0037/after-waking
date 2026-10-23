@@ -13,7 +13,7 @@ import { levelForXp, officerAt, type CrewMember } from "./crew";
 import { fail, ok, type Result } from "./result";
 import type { Rng } from "./rng";
 import { shipStats } from "./ship";
-import { advanceTime, type GameState } from "./state";
+import type { GameState } from "./state";
 import { DAY } from "./units";
 
 /** Whoever holds a station: the captain's record, or the officer. */
@@ -61,6 +61,7 @@ export function takePerk(state: GameState, station: Station, perkId: string): Re
   if (!def) return fail("Unknown perk.");
   const holder = perkHolder(state, station);
   if (!holder) return fail("Nobody holds that station.");
+  if (inTraining(state, station)) return fail("They're away on a Lyceum course until it finishes.");
   const blocked = perkBlocker(holder, station, def);
   if (blocked) return fail(blocked);
   holder.perks = [...(holder.perks ?? []), def.id];
@@ -82,18 +83,40 @@ export function retrain(state: GameState, station: Station): Result<{ refunded: 
   if (!holder) return fail("Nobody holds that station.");
   const refunded = holder.perks?.length ?? 0;
   if (refunded === 0) return fail("Nothing to unlearn yet.");
+  if ((state.yard ?? []).some((j) => j.kind === "retrain" && j.station === station)) return fail("Already on a Lyceum course.");
   const cost = retrainCost(levelForXp(holder.xp ?? 0));
   if (state.credits < cost.credits) return fail(`The course costs ${cost.credits.toLocaleString()} cr.`);
   state.credits -= cost.credits;
+  // The course runs alongside yard work; the ship can't leave until it's done.
+  const who = station === "captain" ? "The captain" : (holder as CrewMember).name;
+  state.yard = [...(state.yard ?? []), { kind: "retrain", label: `${who}'s Lyceum course`, station, readyAt: state.time + cost.days * DAY }];
+  state.journal.push({ t: state.time, kind: "info", text: `${who} enrolled in a ${cost.days}-day Lyceum retraining course.` });
+  return ok({ refunded });
+}
+
+/** A Lyceum course is over: the person's perk points are free to spend again. */
+export function finishRetraining(state: GameState, station: Station): void {
+  const holder = perkHolder(state, station);
+  if (!holder) return;
+  const refunded = holder.perks?.length ?? 0;
   holder.perks = [];
-  advanceTime(state, cost.days * DAY);
   const who = station === "captain" ? "The captain" : (holder as CrewMember).name;
   state.journal.push({
     t: state.time,
     kind: "info",
-    text: `${who} finished a ${cost.days}-day Lyceum retraining course: ${refunded} perk point${refunded === 1 ? "" : "s"} to spend again.`,
+    text: `${who} finished the Lyceum retraining course: ${refunded} perk point${refunded === 1 ? "" : "s"} to spend again.`,
   });
-  return ok({ refunded });
+}
+
+/** True while someone is away on a Lyceum course (they can't take perks meanwhile). */
+export function inTraining(state: GameState, station: Station): boolean {
+  return trainingEndsAt(state, station) !== null;
+}
+
+/** When that person's Lyceum course ends, or null if they're not on one. */
+export function trainingEndsAt(state: GameState, station: Station): number | null {
+  const job = (state.yard ?? []).find((j) => j.kind === "retrain" && j.station === station);
+  return job ? job.readyAt : null;
 }
 
 // --- recruits arrive with their points spent ---------------------------------------------
@@ -161,7 +184,7 @@ export function effectiveStats(state: GameState): ShipStats {
 /** Extra effective levels that cross-training perks grant, per crew bonus (principle 2 in the design). */
 export const CROSS_TRAINING: Record<string, readonly string[]> = {
   foldFuel: ["drive-harmonics"],
-  foldRecharge: ["plicite-chemistry"],
+  foldRefit: ["plicite-chemistry"],
   flightFuel: ["efficient-burns", "drive-tuning"],
   drillRate: ["drill-master"],
   contractPay: ["deal-maker"],

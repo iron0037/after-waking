@@ -28,7 +28,7 @@ import { FLORA_BY_NAME } from "../data/catalog";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses } from "./crew";
-import { effectiveStats, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
+import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
   markExplored,
@@ -82,9 +82,16 @@ export const SHIFT_FACTOR = 1.5;
 /** Chance per drilling hour of a plain equipment breakdown; weather and tectonics add to it. */
 export const INCIDENT_BASE_PER_HOUR = 0.003;
 
-export function foldRechargeMinutes(ly: number): number {
-  return DAY * (1 + 0.75 * ly);
+/**
+ * Folding is hard on a ship: afterwards the engineers scrub and re-seat the drive before it can fold
+ * again. Longer folds do more damage. (Before the engineer and any rush crews.)
+ */
+export function foldRefitMinutes(ly: number): number {
+  return DAY * (REFIT_BASE_DAYS + REFIT_DAYS_PER_LY * ly);
 }
+
+export const REFIT_BASE_DAYS = 4;
+export const REFIT_DAYS_PER_LY = 1.5;
 
 // --- where are we ------------------------------------------------------------------------
 
@@ -112,7 +119,8 @@ export function shipPosition(state: GameState, world: World): Vec2 | null {
 export interface FoldPlan {
   ly: number;
   fuel: number;
-  rechargeMinutes: number;
+  /** Drive refit after this fold, before the next one. */
+  refitMinutes: number;
   blockers: string[];
 }
 
@@ -139,11 +147,14 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
     }
   }
   if (state.time < state.foldReadyAt) {
-    blockers.push(`Fold drive recharging: ready in ${formatDuration(state.foldReadyAt - state.time)}.`);
+    blockers.push(`Fold drive refit: ready in ${formatDuration(state.foldReadyAt - state.time)}.`);
+  }
+  if (state.location.kind === "intrepid" && yardReadyAt(state) > state.time) {
+    blockers.push(`Yard work in progress: done in ${formatDuration(yardReadyAt(state) - state.time)}.`);
   }
   if (ly > stats.foldRangeLy) blockers.push(`${ly.toFixed(1)} ly is beyond the drive's ${stats.foldRangeLy} ly range.`);
   if (fuel > state.ship.fuel) blockers.push(`Needs ${fuel} fuel; tanks hold ${state.ship.fuel.toFixed(1)}.`);
-  return { ly, fuel, rechargeMinutes: Math.round(foldRechargeMinutes(ly) * crew.foldRecharge), blockers };
+  return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit), blockers };
 }
 
 export function fold(state: GameState, world: World, targetId: string): Result {
@@ -153,8 +164,8 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   const fromId = currentSystemId(state);
   state.ship.fuel = Math.max(0, state.ship.fuel - plan.fuel);
   state.stats.folds++;
-  // Folding is instant (lore). The drive's recharge clock starts now.
-  state.foldReadyAt = state.time + plan.rechargeMinutes;
+  // Folding is instant (lore). The drive's refit clock starts now.
+  state.foldReadyAt = state.time + plan.refitMinutes;
   // The crew tops up the rover's cells from the reactor during the pre-fold checks.
   state.ship.roverEnergy = effectiveStats(state).roverEnergy;
   awardXp(state, "navigation", 15 + 3 * plan.ly);
@@ -194,7 +205,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
  */
 export function autoFold(state: GameState, world: World, targetId: string): Result<{ waited: number; flewToEdge: boolean }> {
   const plan = foldPlan(state, world, targetId);
-  const hard = plan.blockers.filter((b) => !b.startsWith("Fold drive recharging") && !b.startsWith("Folds can't start inside"));
+  const hard = plan.blockers.filter((b) => !isWaitBlocker(b) && !b.startsWith("Folds can't start inside"));
   if (hard.length > 0) return fail(hard[0] as string);
 
   let flewToEdge = false;
@@ -206,10 +217,10 @@ export function autoFold(state: GameState, world: World, targetId: string): Resu
     if (!flown.ok) return flown;
     flewToEdge = true;
   }
-  const waited = Math.max(0, state.foldReadyAt - state.time);
+  const waited = Math.max(0, departureReadyAt(state) - state.time);
   if (waited > 0) {
     advanceTime(state, waited);
-    log(state, "travel", `Held position ${formatDuration(waited)} while the fold drive charged.`);
+    log(state, "travel", `Waited ${formatDuration(waited)} for the fold-drive refit${state.location.kind === "intrepid" ? " and the yard" : ""}.`);
   }
   const folded = fold(state, world, targetId);
   if (!folded.ok) return folded;
@@ -254,7 +265,8 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
     distanceAU = Math.hypot(arrival.x - from.x, arrival.y - from.y);
   }
 
-  const minutes = travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) + MANEUVER_MINUTES;
+  const minutes =
+    travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime + MANEUVER_MINUTES;
   const fuel =
     Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
   return ok({ distanceAU, minutes, fuel, arrival });
@@ -981,7 +993,7 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   if (!docked.ok) return docked;
   const amount = removeCargo(state.ship.cargo, id, tonnes ?? Infinity);
   if (amount <= 0) return fail(`No ${COMMODITIES[id].name.toLowerCase()} aboard.`);
-  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.5 : 1) * crewBonuses(state).salePrice);
+  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.7 : 1) * crewBonuses(state).salePrice);
   awardXp(state, "captain", credits / 500);
   state.credits += credits;
   state.stats.earned += credits;
@@ -1076,8 +1088,20 @@ export function fuelCreditLimit(state: GameState): number {
 export function fuelCreditAvailable(state: GameState): number {
   const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
   const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
-  return Math.max(0, Math.min(Math.floor(room), Math.floor((fuelCreditLimit(state) - state.loan.balance) / price)));
+  const withinLimit = Math.floor((fuelCreditLimit(state) - state.loan.balance) / price);
+  // Lifeline: whatever the limit, the Exchange tops the tanks up to enough for a short trip.
+  const lifeline = Math.max(0, Math.floor(LIFELINE_FUEL - state.ship.fuel));
+  return Math.max(0, Math.min(Math.floor(room), Math.max(withinLimit, lifeline)));
 }
+
+/** True when the note's credit limit is used up, so only the lifeline (if that) is on offer. */
+export function fuelCreditPastLimit(state: GameState): boolean {
+  const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
+  return Math.floor((fuelCreditLimit(state) - state.loan.balance) / price) < 1;
+}
+
+/** The Exchange never leaves a captain grounded: it will always advance fuel up to this much in the tanks. */
+export const LIFELINE_FUEL = 20;
 
 /** Buy fuel on the Exchange's tab: no credits needed, but it's added to the loan with a markup. */
 export function buyFuelOnCredit(state: GameState, units: number): Result<number> {
@@ -1171,6 +1195,63 @@ export function callForRescue(state: GameState, world: World): Result<RescueQuot
   return ok(quote);
 }
 
+// --- the yard: work that runs in parallel while docked -------------------------------------
+
+/** Waits the one-click departure can sit out (a refit, the yard), as opposed to hard blockers. */
+export function isWaitBlocker(b: string): boolean {
+  return b.startsWith("Fold drive refit") || b.startsWith("Yard work in progress");
+}
+
+/** When the last yard job (installs, Lyceum courses) finishes; now if nothing is pending. */
+export function yardReadyAt(state: GameState): number {
+  return Math.max(state.time, ...(state.yard ?? []).map((j) => j.readyAt));
+}
+
+/** The ship can leave the Intrepid when the drive's refit and every yard job are done. */
+export function departureReadyAt(state: GameState): number {
+  const docked = state.location.kind === "intrepid";
+  return Math.max(state.foldReadyAt, docked ? yardReadyAt(state) : state.time);
+}
+
+/** Finish yard jobs whose time has come. Called as time passes. */
+export function tickYard(state: GameState): void {
+  if (!state.yard || state.yard.length === 0) return;
+  const done = state.yard.filter((j) => j.readyAt <= state.time);
+  if (done.length === 0) return;
+  state.yard = state.yard.filter((j) => j.readyAt > state.time);
+  for (const job of done) {
+    if (job.kind === "install" && job.upgradeId) {
+      if (!state.ship.upgrades.includes(job.upgradeId)) state.ship.upgrades.push(job.upgradeId);
+      log(state, "trade", `The yard finished installing the ${job.label}.`);
+    } else if (job.kind === "retrain" && job.station) {
+      finishRetraining(state, job.station);
+    }
+  }
+}
+
+/** Yard crews at the Intrepid will scrub the drive around the clock, for a price per day saved. */
+export const REFIT_RUSH_CR_PER_DAY = 400;
+
+export function rushRefitCost(state: GameState, days: number): number {
+  const left = Math.max(0, state.foldReadyAt - state.time) / DAY;
+  return Math.round(Math.min(days, left) * REFIT_RUSH_CR_PER_DAY);
+}
+
+/** Pay the Intrepid's yard crews to cut the fold-drive refit short (docked only). */
+export function rushRefit(state: GameState, days: number): Result<{ days: number; cost: number }> {
+  const docked = atIntrepid(state);
+  if (!docked.ok) return docked;
+  const left = Math.max(0, state.foldReadyAt - state.time) / DAY;
+  if (left <= 0) return fail("The drive is already refitted.");
+  const saved = Math.min(days, left);
+  const cost = rushRefitCost(state, saved);
+  if (state.credits < cost) return fail(`Rush crews want ${cost.toLocaleString()} cr.`);
+  state.credits -= cost;
+  state.foldReadyAt -= saved * DAY;
+  log(state, "trade", `Paid the yard ${cost.toLocaleString()} cr to rush the refit: ${formatDuration(saved * DAY)} sooner.`);
+  return ok({ days: saved, cost });
+}
+
 /** Yard time to fit any upgrade. */
 export const UPGRADE_INSTALL_DAYS = 2;
 
@@ -1180,14 +1261,18 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const upgrade = UPGRADES_BY_ID.get(upgradeId);
   if (!upgrade) return fail("Unknown upgrade.");
   if (state.ship.upgrades.includes(upgradeId)) return fail("Already installed.");
-  if (upgrade.requires && !state.ship.upgrades.includes(upgrade.requires)) {
+  const queued = (id: string) => state.ship.upgrades.includes(id) || (state.yard ?? []).some((j) => j.upgradeId === id);
+  if (upgrade.requires && !queued(upgrade.requires)) {
     return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);
   }
   if (state.credits < upgrade.price) return fail(`Costs ${upgrade.price.toLocaleString()} cr.`);
+  if ((state.yard ?? []).some((j) => j.upgradeId === upgradeId)) return fail("Already being installed.");
   state.credits -= upgrade.price;
-  state.ship.upgrades.push(upgradeId);
-  advanceTime(state, UPGRADE_INSTALL_DAYS * DAY);
-  log(state, "trade", `Installed ${upgrade.name}. ${UPGRADE_INSTALL_DAYS} days in the yard.`);
+  // One yard bay: installs queue behind each other, but run alongside Lyceum courses and the refit.
+  const installs = (state.yard ?? []).filter((j) => j.kind === "install");
+  const start = Math.max(state.time, ...installs.map((j) => j.readyAt));
+  state.yard = [...(state.yard ?? []), { kind: "install", label: upgrade.name, upgradeId, readyAt: start + UPGRADE_INSTALL_DAYS * DAY }];
+  log(state, "trade", `Ordered ${upgrade.name}. The yard will have it fitted in ${formatDuration(start + UPGRADE_INSTALL_DAYS * DAY - state.time)}.`);
   return ok(undefined);
 }
 

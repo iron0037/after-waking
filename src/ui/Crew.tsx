@@ -10,6 +10,7 @@ import {
   ageAt,
   bonusLine,
   dailyWages,
+  dailyUpkeep,
   freePerkPoints,
   formatDuration,
   hireRecruit,
@@ -21,6 +22,7 @@ import {
   retrain,
   retrainCost,
   signingFee,
+  trainingEndsAt,
   wageOf,
   xpForLevel,
   type CrewMember,
@@ -93,8 +95,14 @@ function PerkActions({ session, station }: { session: GameSession; station: Stat
   const cost = retrainCost(level);
   const aboard = state.location.kind === "intrepid";
   const short = cost.credits - state.credits;
+  const courseEnds = trainingEndsAt(state, station);
   return (
     <>
+      {courseEnds !== null && (
+        <div class="accent small crew-course" role="status">
+          On a Lyceum course: back in {formatDuration(Math.max(0, courseEnds - state.time))}. No perks can be taken until then.
+        </div>
+      )}
       <div class="crew-actions">
         <button class={`btn ${free > 0 ? "primary" : ""}`} onClick={() => session.openPerkTree(station)}>
           Perks
@@ -104,7 +112,7 @@ function PerkActions({ session, station }: { session: GameSession; station: Stat
             </span>
           )}
         </button>
-        {aboard && !confirming && (
+        {aboard && !confirming && courseEnds === null && (
           <button
             class="btn"
             disabled={taken === 0 || short > 0}
@@ -114,18 +122,19 @@ function PerkActions({ session, station }: { session: GameSession; station: Stat
                 ? "No perks to unlearn yet."
                 : short > 0
                   ? `You need ${cr(short)} more.`
-                  : `The Lyceum refunds ${taken} point${taken === 1 ? "" : "s"} for ${cr(cost.credits)} and ${cost.days} days.`
+                  : `The Lyceum refunds ${taken} point${taken === 1 ? "" : "s"} for ${cr(cost.credits)} and ${cost.days} days. It runs alongside other yard work, and the ship can't leave until it ends.`
             }
           >
             Retrain (Lyceum) · {cr(cost.credits)} · {cost.days} d
           </button>
         )}
       </div>
-      {aboard && confirming && (
+      {aboard && confirming && courseEnds === null && (
         <div class="crew-retrain-confirm">
           <span class="small">
             A Lyceum course takes <strong class="accent">{cost.days} days</strong> and <strong class="accent">{cr(cost.credits)}</strong>. It wipes{" "}
-            {taken} perk{taken === 1 ? "" : "s"} and gives the point{taken === 1 ? "" : "s"} back to spend again. Time passes while it runs, and wages keep accruing.
+            {taken} perk{taken === 1 ? "" : "s"} and gives the point{taken === 1 ? "" : "s"} back when it ends. The course runs alongside other yard work, but the ship can't leave until it's over, and meanwhile they can't take perks. Nothing
+            advances the clock until you wait or fly; wages keep accruing.
           </span>
           <div class="btn-row">
             <button
@@ -214,15 +223,25 @@ function PersonCard({ session, station }: { session: GameSession; station: Stati
 export function Roster({ session }: { session: GameSession }) {
   const { state } = session;
   const wages = dailyWages(state);
+  const upkeep = dailyUpkeep(state);
+  const owedSoFar = state.payrollOwed + (state.upkeepOwed ?? 0);
   return (
     <>
       <div class="crew-payroll">
         <span>
           Payroll: <strong class="accent">{cr(wages)}</strong> a day
+          <span class="muted"> · equipment upkeep </span>
+          <strong class="accent">{cr(upkeep)}</strong> a day
         </span>
         <span class="muted small">
-          Wages build up while you're out and are paid from your credits when you're back aboard or selling.
-          {state.payrollOwed >= 1 && <span class="accent"> Owed so far: {cr(state.payrollOwed)}.</span>}
+          Wages and upkeep build up while you're out and are paid from your credits when you're back aboard or selling.
+          {owedSoFar >= 1 && (
+            <span class="accent">
+              {" "}
+              Owed so far: {cr(owedSoFar)}
+              {state.upkeepOwed !== undefined && state.upkeepOwed >= 1 && ` (${cr(state.payrollOwed)} wages, ${cr(state.upkeepOwed)} upkeep)`}.
+            </span>
+          )}
         </span>
       </div>
       <div class="crew-cards">
