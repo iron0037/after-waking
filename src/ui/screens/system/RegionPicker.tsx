@@ -7,6 +7,7 @@ import { useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../../data/commodities";
 import {
   exploredFraction,
+  hunchRegion,
   knownDeposits,
   regionKey,
   regionRecap,
@@ -87,6 +88,8 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
   );
   const layout = useMemo(() => regionLayout(body), [body]);
   const known = knownDeposits(state, world, body.id);
+  // The captain's Hunch perk: one region the gut points to.
+  const hunch = hunchRegion(state, body);
   const max = Math.max(...signals, 0);
   const min = Math.min(...signals);
   const norm = (s: number) => (max - min < 1e-6 ? 0 : (s - min) / (max - min));
@@ -99,7 +102,7 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
     const visits = know?.visits ?? 0;
     const est = s > 0 ? ` (~${roughCredits(s)} cr est.)` : "";
     const seen = visits > 0 ? ` · visited, ${Math.round(exploredFraction(know) * 100)}% explored` : "";
-    return `Region ${r + 1} · signal ${strength}${est}${seen}`;
+    return `Region ${r + 1} · signal ${strength}${est}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
@@ -176,6 +179,30 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         ctx.strokeStyle = "#05070f";
         ctx.stroke();
       });
+    }
+
+    // Hunch: a cyan diamond in the region's lower-left corner.
+    const hcell = hunch !== null ? layout.cells[hunch] : undefined;
+    if (hcell) {
+      const hx = hcell.x0 * w + 11;
+      const hy = hcell.y1 * h - 13;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(hx, hy - 7);
+      ctx.lineTo(hx + 7, hy);
+      ctx.lineTo(hx, hy + 7);
+      ctx.lineTo(hx - 7, hy);
+      ctx.closePath();
+      ctx.fillStyle = rgba("#05070f", 0.85);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = UI.cyan;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(hx, hy, 1.8, 0, Math.PI * 2);
+      ctx.fillStyle = UI.cyan;
+      ctx.fill();
+      ctx.restore();
     }
 
     const hc = hover !== null && hover !== selected ? layout.cells[hover] : undefined;
@@ -286,6 +313,15 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
           <span class="sys-region-swatch" /> visited
         </span>
       </div>
+      {hunch !== null && (
+        <div class="sys-hunch small">
+          <span class="sys-hunch-mark">◇</span> Your gut says{" "}
+          <button class="linklike" onClick={() => onSelect(hunch)} title="Select that region">
+            region {hunch + 1}
+          </button>
+          .
+        </div>
+      )}
       <RegionRecapBox state={state} world={world} bodyId={body.id} region={selected} />
       <KnownDepositsBox known={known} selected={selected} onSelect={onSelect} />
     </div>

@@ -5,6 +5,7 @@
  * Components never mutate GameState directly: they call session.act(...) with a sim action.
  */
 import { useEffect, useReducer } from "preact/hooks";
+import type { Station } from "../data/crew";
 import { deserialize, migrateSurfaceCoords, newGame, serialize, World, type GameState, type Result } from "../sim";
 
 export const SAVE_KEY = "after-waking/save";
@@ -40,6 +41,8 @@ export class GameSession {
   timelapse: TimeLapse | null = null;
   /** Set while an animation (flight, rover drive) is playing; input should be ignored. */
   busy = false;
+  /** Whose perk tree is open (UI only; any screen can open it). */
+  perkTree: Station | null = null;
   private listeners = new Set<() => void>();
   private noticeId = 0;
 
@@ -97,6 +100,11 @@ export class GameSession {
   go(view: View): void {
     if (!validViews(this.state).includes(view)) return;
     this.view = view;
+    this.emit();
+  }
+
+  openPerkTree(station: Station | null): void {
+    this.perkTree = station;
     this.emit();
   }
 

@@ -13,12 +13,13 @@ import {
   landingAccess,
   landingBlockers,
   scanBody,
+  effectiveStats,
   shipPosition,
-  shipStats,
   SPECTRAL,
   SCAN_MINUTES,
-  SURVEY_MINUTES,
-  sensorTierFor,
+  surveyMinutes,
+  orbitalSensorTier,
+  foldEdgeFraction,
   surveyBody,
   type Body,
   type FlightTarget,
@@ -75,7 +76,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const orbitingId = loc.kind === "space" ? loc.orbiting : null;
   const detail = world.system(systemId);
   const sys = detail.system;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
 
   const [selectedId, setSelectedId] = useState<string | null>(orbitingId);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -99,7 +100,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const busy = session.busy || flying;
   const shipReal = shipPosition(state, world) as Vec2;
   const starDist = Math.hypot(shipReal.x, shipReal.y);
-  const atEdge = starDist >= detail.edgeAU * 0.98;
+  const atEdge = starDist >= detail.edgeAU * foldEdgeFraction(state);
 
   // Recomputed per render (not per animation frame): exploration rings and contract markers.
   const progress = new Map(detail.bodies.map((b) => [b.id, bodyProgress(state, b)] as const));
@@ -114,9 +115,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
   // Landing: default to the strongest unvisited region until the player picks one.
   const canPickRegion = orbitingSel && scanned && selected.regions > 0;
+  const orbTier = selected ? orbitalSensorTier(state, selected.id) : 0;
   const defaultRegion = useMemo(
-    () => (canPickRegion ? bestRegion(state, selected, sensorTierFor(state, selected.id), stats.drillMaxDepthM) : 0),
-    [canPickRegion, selected, stats.sensorTier, stats.drillMaxDepthM, state.stats.landings, state.surveyedBodies.length],
+    () => (canPickRegion ? bestRegion(state, selected, orbTier, stats.drillMaxDepthM) : 0),
+    [canPickRegion, selected, orbTier, stats.drillMaxDepthM, state.stats.landings, state.surveyedBodies.length],
   );
   const region = regionPick && selected && regionPick.bodyId === selected.id ? regionPick.region : defaultRegion;
 
@@ -383,7 +385,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           <h2>{sys.name}</h2>
           <div class="sys-star muted small">
             <span class="sys-star-dot" style={{ background: SPECTRAL[sys.spectral].color }} />
-            {SPECTRAL[sys.spectral].label} · class {sys.spectral} · fold limit {fmtAU(detail.edgeAU)} AU
+            {SPECTRAL[sys.spectral].label} · class {sys.spectral} ·{" "}
+            {foldEdgeFraction(state) < 0.9
+              ? `edge ${fmtAU(detail.edgeAU)} AU, folds from ${fmtAU(detail.edgeAU * foldEdgeFraction(state))} AU`
+              : `fold limit ${fmtAU(detail.edgeAU)} AU`}
           </div>
           <div class="sys-status">
             {orbitingId ? (
@@ -516,7 +521,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                           {!access.ok && " It needs no landing: the survey is flown from orbit."}
                         </div>
                         <button class="btn" disabled={busy} onClick={() => session.act((s, w) => surveyBody(s, w))}>
-                          Detailed survey ({formatDuration(SURVEY_MINUTES)})
+                          Detailed survey ({formatDuration(surveyMinutes(state))})
                         </button>
                       </div>
                     )}
@@ -524,7 +529,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       body={selected}
                       state={state}
                       world={world}
-                      sensorTier={sensorTierFor(state, selected.id)}
+                      sensorTier={orbTier}
                       reachM={stats.drillMaxDepthM}
                       selected={region}
                       landable={access.ok}

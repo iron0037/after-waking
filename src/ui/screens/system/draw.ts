@@ -3,6 +3,7 @@ import {
   bodyPosition,
   dist,
   formatDate,
+  foldEdgeFraction,
   formatDuration,
   SPECTRAL,
   type Body,
@@ -88,7 +89,7 @@ export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, 
   drawBackdrop(ctx, w, h, scene.view);
   drawScaleRings(ctx, proj, detail, w, h);
   drawOrbits(ctx, proj, scene);
-  drawFoldLimit(ctx, proj, detail);
+  drawFoldLimit(ctx, proj, detail, foldEdgeFraction(state));
   drawStar(ctx, proj, detail);
 
   // Bodies: planets first, then moons on top of their parents' orbit lines.
@@ -182,8 +183,26 @@ function drawOrbits(ctx: CanvasRenderingContext2D, proj: Projection, scene: Scen
   ctx.restore();
 }
 
-function drawFoldLimit(ctx: CanvasRenderingContext2D, proj: Projection, detail: SystemDetail): void {
+function drawFoldLimit(ctx: CanvasRenderingContext2D, proj: Projection, detail: SystemDetail, edgeFraction: number): void {
   const r = proj.radiusPx(detail.edgeAU);
+  // Fold Calibration lets a fold start well inside the system edge: mark where.
+  if (edgeFraction < 0.9) {
+    const inner = proj.radiusPx(detail.edgeAU * edgeFraction);
+    ctx.save();
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 6]);
+    ctx.strokeStyle = rgba(UI.good, 0.65);
+    ctx.beginPath();
+    ctx.arc(proj.cx, proj.cy, inner, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = FONT(11);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = rgba(UI.good, 0.85);
+    ctx.fillText(`CLEAR TO FOLD BEYOND · ${fmtAU(detail.edgeAU * edgeFraction)} AU`, proj.cx, proj.cy - inner + 6);
+    ctx.restore();
+  }
   ctx.save();
   ctx.lineWidth = 1.5;
   ctx.setLineDash([9, 7]);
@@ -196,7 +215,7 @@ function drawFoldLimit(ctx: CanvasRenderingContext2D, proj: Projection, detail: 
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.fillStyle = rgba(UI.cyan, 0.85);
-  ctx.fillText(`FOLD LIMIT · ${fmtAU(detail.edgeAU)} AU`, proj.cx, proj.cy - r - 6);
+  ctx.fillText(`${edgeFraction < 0.9 ? "SYSTEM EDGE" : "FOLD LIMIT"} · ${fmtAU(detail.edgeAU)} AU`, proj.cx, proj.cy - r - 6);
   ctx.restore();
 }
 

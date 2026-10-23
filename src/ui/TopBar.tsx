@@ -1,4 +1,4 @@
-import { activeRegion, ageAt, compendiumTotals, formatDate, formatDuration, shipStats, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, compendiumTotals, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -18,8 +18,9 @@ export function TopBar({
   onQuit: () => void;
 }) {
   const { state, world } = session;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const foldReady = state.time >= state.foldReadyAt;
+  const bankedPoints = crewFreePoints(state);
   const activeContracts = (state.contracts ?? []).filter((c) => c.status === "active").length;
   return (
     <header class="topbar">
@@ -67,6 +68,11 @@ export function TopBar({
       </button>
       <button class="btn" onClick={onCrew} title="Crew (O)">
         Crew
+        {bankedPoints > 0 && (
+          <span class="badge" title={`${bankedPoints} unspent perk point${bankedPoints === 1 ? "" : "s"}`}>
+            {bankedPoints}
+          </span>
+        )}
       </button>
       <button class="btn" onClick={onCompendium} title="Compendium (B)">
         Compendium {compendiumTotals(state).all.found}/{compendiumTotals(state).all.total}

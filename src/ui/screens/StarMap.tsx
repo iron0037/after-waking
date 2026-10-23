@@ -8,14 +8,16 @@ import {
   flightPlan,
   fold,
   foldPlan,
+  type FoldPlan,
   formatDuration,
   INTREPID_POS,
   KIND_LABEL,
   landableBodies,
   contractTargetsBySystem,
   explorationScore,
+  effectiveStats,
+  hasPerk,
   positionOf,
-  shipStats,
   SPECTRAL,
   systemProgress,
   type Body,
@@ -127,8 +129,19 @@ export function StarMap({ session }: { session: GameSession }) {
   const wrap = useRef<HTMLDivElement>(null);
   const stopDrag = useRef<(() => void) | null>(null);
 
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const here = positionOf(world.galaxy, fromId);
+  // Fold Plotter (navigator): fuel and recharge for every star within the drive's range, cheap enough to recompute on each render.
+  const plotter = hasPerk(state, "fold-plotter");
+  const plots = new Map<string, FoldPlan>();
+  if (plotter) {
+    for (const n of nodes) {
+      if (!n.star || n.id === fromId || distanceLy(world.galaxy, fromId, n.id) > stats.foldRangeLy) continue;
+      plots.set(n.id, foldPlan(state, world, n.id));
+    }
+  }
+  /** Stars whose Fold Plotter label fits without covering another label; the hovered and selected stars always get one. */
+  const plotLabels = new Set<string>();
   const target = selected ? (byId.get(selected) ?? null) : null;
   const plan = target ? foldPlan(state, world, target.id) : null;
 
@@ -367,6 +380,40 @@ export function StarMap({ session }: { session: GameSession }) {
       ctx.restore();
     }
 
+    // Fold Plotter labels: nearest stars first, each only if it clears the other stars' names and the labels already placed.
+    if (plots.size > 0) {
+      type Box = { x0: number; x1: number; y0: number; y1: number };
+      const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+      const boxFor = (n: Node, withPlot: boolean): Box => {
+        const [x, y] = toScreen(n.pos);
+        const r = starRadius(n.star as StarSystem);
+        ctx.font = `12px ${FONT}`;
+        let wd = ctx.measureText(n.star?.home ? `${n.name} ⌂` : n.name).width;
+        if (withPlot) {
+          const fp = plots.get(n.id) as FoldPlan;
+          ctx.font = `10px ${FONT}`;
+          wd = Math.max(wd, ctx.measureText(`fuel ${fp.fuel} · ${formatDuration(fp.rechargeMinutes)}`).width);
+        }
+        const flip = x + 140 > w;
+        const x0 = flip ? x - r - 12 - wd : x + r + 12;
+        return { x0, x1: x0 + wd, y0: y - 9, y1: withPlot ? y + 20 : y + 6 };
+      };
+      const names = nodes.filter((n) => n.star).map((n) => ({ id: n.id, box: boxFor(n, false) }));
+      const placed: Box[] = [];
+      const order = [...plots.keys()].sort((a, b) => (a === selected || a === hovered ? -1 : b === selected || b === hovered ? 1 : distanceLy(world.galaxy, fromId, a) - distanceLy(world.galaxy, fromId, b)));
+      for (const id of order) {
+        const n = byId.get(id) as Node;
+        if (!known(n)) continue;
+        const box = boxFor(n, true);
+        const forced = id === selected || id === hovered;
+        const clear = !names.some((o) => o.id !== id && hit(box, o.box)) && !placed.some((p) => hit(box, p));
+        if (forced || clear) {
+          plotLabels.add(id);
+          placed.push(box);
+        }
+      }
+    }
+
     // stars
     for (const n of nodes) {
       if (n.star) drawStar(ctx, n, w);
@@ -561,6 +608,13 @@ export function StarMap({ session }: { session: GameSession }) {
     const flip = x + 140 > w;
     ctx.textAlign = flip ? "right" : "left";
     ctx.fillText(s.home ? `${n.name} ⌂` : n.name, flip ? x - r - 12 : x + r + 12, y + 4);
+
+    const fp = plots.get(n.id);
+    if (fp && plotLabels.has(n.id)) {
+      ctx.font = `10px ${FONT}`;
+      ctx.fillStyle = fp.fuel > state.ship.fuel ? UI.danger : UI.cyan;
+      ctx.fillText(`fuel ${fp.fuel} · ${formatDuration(fp.rechargeMinutes)}`, flip ? x - r - 12 : x + r + 12, y + 17);
+    }
   };
 
   const drawIntrepid = (ctx: CanvasRenderingContext2D) => {
@@ -604,11 +658,13 @@ export function StarMap({ session }: { session: GameSession }) {
   const drawTooltip = (ctx: CanvasRenderingContext2D, n: Node, w: number, h: number) => {
     const [x, y] = toScreen(n.pos);
     const d = n.id === fromId ? "you are here" : `${distanceLy(world.galaxy, fromId, n.id).toFixed(1)} ly`;
+    const fp = plots.get(n.id);
     const lines = [n.name, n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d];
+    if (fp) lines.push(`fold: ${fp.fuel} fuel, recharge ${formatDuration(fp.rechargeMinutes)}`);
     ctx.save();
     ctx.font = `11px ${FONT}`;
     const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
-    const bh = 36;
+    const bh = 8 + lines.length * 14;
     const bx = clamp(x + 16, 6, w - bw - 6);
     const by = clamp(y + 14, 6, h - bh - 6);
     ctx.fillStyle = "rgba(17, 24, 41, 0.92)";
@@ -622,6 +678,10 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.fillText(lines[0] as string, bx + 7, by + 14);
     ctx.fillStyle = UI.muted;
     ctx.fillText(lines[1] as string, bx + 7, by + 28);
+    if (lines[2]) {
+      ctx.fillStyle = UI.cyan;
+      ctx.fillText(lines[2], bx + 7, by + 42);
+    }
     ctx.restore();
   };
 

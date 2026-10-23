@@ -301,3 +301,23 @@
 .sys-viewport .viewport-hint {
   user-select: none;
 }
+
+/* Captain's Hunch (AW-95): the gut-feeling region on the chart */
+.sys-hunch {
+  color: var(--text);
+}
+.sys-hunch-mark {
+  color: var(--cyan);
+}
+.sys-hunch .linklike {
+  font: inherit;
+  color: var(--cyan);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.sys-hunch .linklike:hover {
+  color: var(--text);
+}

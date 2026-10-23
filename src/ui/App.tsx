@@ -3,6 +3,7 @@ import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
 import { Journal } from "./Journal";
+import { LevelUpPopup, PerkTreeModal } from "./PerkTree";
 import { TimeLapseClock } from "./TimeLapseClock";
 import { TitleScreen } from "./TitleScreen";
 import { TopBar } from "./TopBar";
@@ -33,7 +34,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
       else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
       else if (ev.key === "Escape") {
-        setCrewOpen(false);
+        if (session.perkTree) session.openPerkTree(null);
+        else setCrewOpen(false);
         setJournalOpen(false);
         setCompendiumOpen(false);
         setContractsOpen(false);
@@ -44,6 +46,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
     return () => window.removeEventListener("keydown", onKey);
   }, [session]);
 
+  // Level-ups wait for animations (flights, drives, time-lapses) to finish, and for any tree the player has open.
+  const levelUp = session.busy || session.timelapse || session.perkTree ? null : (session.state.levelUps?.[0] ?? null);
   const latest = session.state.journal.slice(-2).reverse();
 
   return (
@@ -68,6 +72,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
       {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
+      {session.perkTree && <PerkTreeModal session={session} station={session.perkTree} onClose={() => session.openPerkTree(null)} />}
+      {levelUp && <LevelUpPopup session={session} up={levelUp} />}
       {session.timelapse && <TimeLapseClock lapse={session.timelapse} />}
       <div class="notices">
         {session.notices.map((n) => (

@@ -263,3 +263,12 @@
 .hub-notes strong {
   color: var(--text);
 }
+
+/* Fuel advanced against the Exchange note */
+.hub-credit-fuel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}

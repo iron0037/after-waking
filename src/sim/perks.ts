@@ -17,12 +17,12 @@ import { advanceTime, type GameState } from "./state";
 import { DAY } from "./units";
 
 /** Whoever holds a station: the captain's record, or the officer. */
-interface Holder {
+export interface PerkHolder {
   xp?: number;
   perks?: string[];
 }
 
-function holderOf(state: GameState, station: Station): Holder | null {
+export function perkHolder(state: GameState, station: Station): PerkHolder | null {
   return station === "captain" ? state.captain : officerAt(state, station);
 }
 
@@ -30,11 +30,11 @@ function holderOf(state: GameState, station: Station): Holder | null {
 export function hasPerk(state: GameState, id: string): boolean {
   const def = PERKS_BY_ID.get(id);
   if (!def || def.needs) return false;
-  return holderOf(state, def.station)?.perks?.includes(id) ?? false;
+  return perkHolder(state, def.station)?.perks?.includes(id) ?? false;
 }
 
 /** Points earned (one per level above 1) and not yet spent. */
-export function freePerkPoints(holder: Holder): number {
+export function freePerkPoints(holder: PerkHolder): number {
   return Math.max(0, levelForXp(holder.xp ?? 0) - 1 - (holder.perks?.length ?? 0));
 }
 
@@ -44,7 +44,7 @@ export function crewFreePoints(state: GameState): number {
 }
 
 /** Why `holder` (at `station`) can't take a perk now, or null if they can. */
-export function perkBlocker(holder: Holder, station: Station, def: PerkDef): string | null {
+export function perkBlocker(holder: PerkHolder, station: Station, def: PerkDef): string | null {
   if (def.station !== station) return "That perk belongs to another station.";
   if (def.needs) return `Arrives with ${def.needs}.`;
   const taken = holder.perks ?? [];
@@ -59,7 +59,7 @@ export function perkBlocker(holder: Holder, station: Station, def: PerkDef): str
 export function takePerk(state: GameState, station: Station, perkId: string): Result<PerkDef> {
   const def = PERKS_BY_ID.get(perkId);
   if (!def) return fail("Unknown perk.");
-  const holder = holderOf(state, station);
+  const holder = perkHolder(state, station);
   if (!holder) return fail("Nobody holds that station.");
   const blocked = perkBlocker(holder, station, def);
   if (blocked) return fail(blocked);
@@ -78,7 +78,7 @@ export function retrainCost(level: number): { credits: number; days: number } {
 /** A Lyceum course aboard the Intrepid: refunds every perk point, for credits and weeks of time. */
 export function retrain(state: GameState, station: Station): Result<{ refunded: number }> {
   if (state.location.kind !== "intrepid") return fail("The Lyceum runs its courses aboard the Intrepid.");
-  const holder = holderOf(state, station);
+  const holder = perkHolder(state, station);
   if (!holder) return fail("Nobody holds that station.");
   const refunded = holder.perks?.length ?? 0;
   if (refunded === 0) return fail("Nothing to unlearn yet.");

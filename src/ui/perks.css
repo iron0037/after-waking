@@ -1,0 +1,210 @@
+/* Perk tree, level-up popup, and the banked-point badges (AW-95) */
+.perk-overlay {
+  z-index: 42;
+}
+.contracts.perk-modal {
+  width: min(1180px, 96vw);
+  height: min(860px, 94vh);
+}
+.perk-modal .journal-head {
+  flex-wrap: wrap;
+}
+.perk-points {
+  padding: 2px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  color: var(--muted);
+}
+.perk-points.has {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: #3a2a10;
+}
+.perk-note {
+  margin: 0;
+}
+.perk-branches {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.perk-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.perk-branch h3 {
+  margin: 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-bright);
+  color: var(--cyan);
+}
+.perk {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+}
+.perk-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.perk-name {
+  flex: 1;
+}
+.perk-text {
+  color: var(--text);
+}
+.perk-s-taken {
+  border-color: var(--good);
+  background: #12261a;
+}
+.perk-s-available {
+  border-color: var(--accent);
+}
+.perk-s-points,
+.perk-s-tiers {
+  opacity: 0.85;
+}
+.perk-s-tiers .perk-name,
+.perk-s-tiers .perk-text {
+  color: var(--muted);
+}
+.perk-s-locked {
+  border-style: dashed;
+  opacity: 0.6;
+}
+.perk-locked-note {
+  color: var(--muted);
+  font-style: italic;
+}
+.perk-take {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* tags of perks already taken, on roster and recruit cards */
+.perk-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.perk-tags .tag {
+  cursor: help;
+}
+.crew-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: auto;
+}
+.crew-retrain-confirm {
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #1b1204;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 18px;
+}
+
+/* level-up popup */
+.levelup-overlay {
+  z-index: 45;
+  background: #000b;
+}
+.levelup {
+  position: relative;
+  width: min(420px, 92vw);
+  padding: 22px 26px 20px;
+  background: radial-gradient(ellipse at 50% 0%, #3a2a10 0%, var(--panel) 62%);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 0 40px #ffb34740, 0 8px 30px #000a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  animation: levelup-in 0.35s ease-out;
+}
+.levelup-burst {
+  font-size: 34px;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 14px var(--accent);
+  animation: levelup-pulse 1.8s ease-in-out infinite;
+}
+.levelup-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-size: 12px;
+  color: var(--accent);
+}
+.levelup-who {
+  font-size: 17px;
+}
+.levelup-level {
+  color: var(--muted);
+}
+.levelup-level strong {
+  color: var(--good);
+  font-size: 18px;
+}
+.kv.levelup-kv {
+  margin: 8px 0 4px;
+  width: 100%;
+  text-align: left;
+}
+.kv.levelup-kv dd {
+  text-align: left;
+}
+.levelup-actions {
+  justify-content: center;
+  margin-top: 6px;
+}
+@keyframes levelup-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes levelup-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .levelup,
+  .levelup-burst {
+    animation: none;
+  }
+}

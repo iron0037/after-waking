@@ -55,6 +55,14 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
       <div class="hub-card-head">
         <div>
           <span class="tag">{CLAN_NAMES[c.clan]}</span> <strong>{c.title}</strong>
+          {c.exclusive && (
+            <>
+              {" "}
+              <span class="tag accent-tag" title="A Preferred Captain's private offer: it never reaches the public board.">
+                Private
+              </span>
+            </>
+          )}
         </div>
         <span class="accent" title={payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer` : undefined}>
           {cr(payout)}

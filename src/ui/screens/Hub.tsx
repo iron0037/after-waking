@@ -5,18 +5,25 @@ import { CLAN_NAMES, UPGRADE_CATEGORY_NAMES, UPGRADES, type UpgradeCategory } fr
 import {
   acceptContract,
   buyFuel,
+  buyFuelOnCredit,
+  fuelCreditLimit,
+  FUEL_CREDIT_MARKUP,
+  fuelCreditAvailable,
   buyUpgrade,
   cargoTonnes,
   completeContract,
   contractPayout,
   contractProgress,
   crewBonuses,
+  effectiveStats,
   dailyWages,
   DAY,
   formatDate,
   formatDuration,
   fuelPrice,
   loanOutlook,
+  loanRate,
+  marketForecast,
   reservedCargo,
   sellableTonnes,
   UPGRADE_INSTALL_DAYS,
@@ -26,8 +33,8 @@ import {
   sellAll,
   sellPrice,
   sellSpecimens,
+  shipSpecimenSlots,
   shipStats,
-  SHIP_SPECIMEN_SLOTS,
   SPECIMEN_PRICE,
   specimenCount,
   wait,
@@ -134,9 +141,23 @@ function Trend({ mult }: { mult: number }) {
   return change > 0 ? <span class="good">▲{change}%</span> : <span class="danger">▼{-change}%</span>;
 }
 
+/** Market Wire: the price a week out, with an arrow for the direction. */
+function Forecast({ now, next }: { now: number; next: number }) {
+  const diff = next - now;
+  const flat = Math.abs(diff) < Math.max(0.5, now * 0.005);
+  return (
+    <td class="num" title={flat ? "Holding steady" : `${diff > 0 ? "Rising" : "Falling"} by ${cr(Math.abs(diff))} a tonne`}>
+      <span class={flat ? "muted" : diff > 0 ? "good" : "danger"}>
+        {flat ? "→" : diff > 0 ? "▲" : "▼"} {cr(next)}
+      </span>
+    </td>
+  );
+}
+
 function Market({ session }: { session: GameSession }) {
   const { state } = session;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
+  const forecast = marketForecast(state);
   const cargo = state.ship.cargo;
   const held = cargoTonnes(cargo);
   const reserved = reservedCargo(state);
@@ -148,6 +169,7 @@ function Market({ session }: { session: GameSession }) {
   const room = Math.floor(stats.fuelCapacity - state.ship.fuel);
   const affordable = Math.floor(state.credits / price);
   const canBuy = room >= 1 && affordable >= 1;
+  const creditUnits = fuelCreditAvailable(state);
   const buy = (n: number) => session.act((s) => buyFuel(s, n));
 
   return (
@@ -166,6 +188,11 @@ function Market({ session }: { session: GameSession }) {
               <th class="num">Aboard</th>
               <th class="num">Price / t</th>
               <th class="num">vs. base</th>
+              {forecast && (
+                <th class="num" title="Market Wire: where the price is heading over the next week">
+                  Next week
+                </th>
+              )}
               <th class="num">Hold value</th>
               <th />
             </tr>
@@ -197,6 +224,7 @@ function Market({ session }: { session: GameSession }) {
                   <td class="num">
                     <Trend mult={state.market.mult[id]} />
                   </td>
+                  {forecast && <Forecast now={p} next={(forecast[id] ?? sellPrice(state.market, id)) * salePrice} />}
                   <td class="num">{aboard ? cr(have * p) : <span class="muted">-</span>}</td>
                   <td class="num">
                     <button
@@ -266,6 +294,28 @@ function Market({ session }: { session: GameSession }) {
             Fill <span class="muted">({cr(Math.min(room, affordable) * price)})</span>
           </button>
         </div>
+        {room >= 1 && (
+          <div class="hub-credit-fuel">
+            <button
+              class="btn"
+              disabled={creditUnits < 1}
+              title={
+                creditUnits < 1
+                  ? "The Exchange won't extend more credit against your note."
+                  : `The Exchange advances fuel against your note at a ${Math.round((FUEL_CREDIT_MARKUP - 1) * 100)}% markup.`
+              }
+              onClick={() => session.act((s) => buyFuelOnCredit(s, room))}
+            >
+              Fill on credit{" "}
+              {creditUnits >= 1 && (
+                <span class="muted">
+                  (+{creditUnits} units, {cr(Math.round(creditUnits * price * FUEL_CREDIT_MARKUP))} on your note)
+                </span>
+              )}
+            </button>
+            <span class="muted small">Note limit {cr(fuelCreditLimit(state))}</span>
+          </div>
+        )}
         <p class="muted small">
           Plicite is what makes folds possible. The Lyceum says it is just chemistry. The Exchange says it is just money.
         </p>
@@ -309,8 +359,8 @@ function SpecimenDesk({ session }: { session: GameSession }) {
     <>
       <div class="hub-section-head">
         <h2>Lyceum specimen desk</h2>
-        <span class={held >= SHIP_SPECIMEN_SLOTS ? "accent" : "muted"}>
-          Containment: {held} / {SHIP_SPECIMEN_SLOTS}
+        <span class={held >= shipSpecimenSlots(state) ? "accent" : "muted"}>
+          Containment: {held} / {shipSpecimenSlots(state)}
         </span>
       </div>
       {rows.length > 0 ? (
@@ -380,6 +430,14 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
       <div class="hub-card-head">
         <div>
           <span class="tag">{CLAN_NAMES[c.clan]}</span> <strong>{c.title}</strong>
+          {c.exclusive && (
+            <>
+              {" "}
+              <span class="tag accent-tag" title="A Preferred Captain's private offer: it never reaches the public board.">
+                Private
+              </span>
+            </>
+          )}
           {c.starter && !active && (
             <>
               {" "}
@@ -486,9 +544,27 @@ function Jobs({ session }: { session: GameSession }) {
 
 // --- shipyard ----------------------------------------------------------------------------
 
+/** A ship stat as the crew gets to use it, noting the hardware figure when perks raise it. */
+function Perked({ eff, base, unit = "" }: { eff: number; base: number; unit?: string }) {
+  return (
+    <>
+      {eff}
+      {unit}
+      {eff !== base && (
+        <span class="good small" title="Raised by a crew perk">
+          {" "}
+          (hardware {base}
+          {unit}, +perks)
+        </span>
+      )}
+    </>
+  );
+}
+
 function Shipyard({ session }: { session: GameSession }) {
   const { state } = session;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
+  const hw = shipStats(state.ship);
   const r = stats.ratings;
   const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => UPGRADES.some((u) => u.category === c));
 
@@ -504,31 +580,47 @@ function Shipyard({ session }: { session: GameSession }) {
           <dt>Fuel capacity</dt>
           <dd>{stats.fuelCapacity} units</dd>
           <dt>Fold range</dt>
-          <dd>{stats.foldRangeLy} ly</dd>
+          <dd>
+            <Perked eff={stats.foldRangeLy} base={hw.foldRangeLy} unit=" ly" />
+          </dd>
           <dt>Cruise speed</dt>
-          <dd>{stats.cruiseSpeedC.toFixed(2)} c</dd>
+          <dd>
+            {stats.cruiseSpeedC.toFixed(2)} c
+            {stats.cruiseSpeedC !== hw.cruiseSpeedC && <span class="good small"> (hardware {hw.cruiseSpeedC.toFixed(2)} c, +perks)</span>}
+          </dd>
           <dt>Sensors</dt>
           <dd>Tier {stats.sensorTier}</dd>
         </dl>
         <h3 class="hub-gap">Drill &amp; rover</h3>
         <dl class="kv">
           <dt>Drill depth</dt>
-          <dd>{stats.drillMaxDepthM} m</dd>
+          <dd>
+            <Perked eff={stats.drillMaxDepthM} base={hw.drillMaxDepthM} unit=" m" />
+          </dd>
           <dt>Drill rate</dt>
           <dd>{stats.drillRateTph} t/h</dd>
           <dt>Rover cargo</dt>
-          <dd>{tonnes(stats.roverCargoT)}</dd>
+          <dd>
+            {tonnes(stats.roverCargoT)}
+            {stats.roverCargoT !== hw.roverCargoT && <span class="good small"> (hardware {tonnes(hw.roverCargoT)}, +perks)</span>}
+          </dd>
           <dt>Rover energy</dt>
-          <dd>{stats.roverEnergy}</dd>
+          <dd>
+            <Perked eff={stats.roverEnergy} base={hw.roverEnergy} />
+          </dd>
           <dt>Rover climbs</dt>
           <dd class={stats.roverCanClimb ? "good" : "muted"}>{stats.roverCanClimb ? "Mountains" : "Flat and rough only"}</dd>
         </dl>
         <h3 class="hub-gap">Landing ratings</h3>
         <dl class="kv">
           <dt>Gravity</dt>
-          <dd>up to {r.maxGravityG} g</dd>
+          <dd>
+            up to <Perked eff={r.maxGravityG} base={hw.ratings.maxGravityG} unit=" g" />
+          </dd>
           <dt>Pressure</dt>
-          <dd>up to {r.maxPressureAtm} atm</dd>
+          <dd>
+            up to <Perked eff={r.maxPressureAtm} base={hw.ratings.maxPressureAtm} unit=" atm" />
+          </dd>
           <dt>Temperature</dt>
           <dd>
             {r.minTempC} to {r.maxTempC} °C
@@ -630,7 +722,8 @@ function Exchange({ session }: { session: GameSession }) {
   const pay = (n: number) => session.act((s) => payLoan(s, n));
   const prepaid = loan.prepaid ?? 0;
   const covered = loan.payment > 0 ? Math.floor(prepaid / loan.payment) : 0;
-  const outlook = loanOutlook(loan);
+  const rate = loanRate(state);
+  const outlook = loanOutlook(loan, rate);
 
   const why = (n: number): string =>
     !owed ? "Nothing owed." : state.credits < n ? `You need ${cr(n - state.credits)} more.` : `Pay ${cr(n)}`;
@@ -662,7 +755,10 @@ function Exchange({ session }: { session: GameSession }) {
             <dt>Missed payments</dt>
             <dd class={loan.missed > 0 ? "danger" : ""}>{loan.missed}</dd>
             <dt>Annual rate</dt>
-            <dd>{(loan.annualRate * 100).toFixed(1)}%</dd>
+            <dd>
+              {(rate * 100).toFixed(1)}%
+              {rate !== loan.annualRate && <span class="good small"> (note says {(loan.annualRate * 100).toFixed(1)}%; your comms officer got it cut)</span>}
+            </dd>
             <dt>Next installment</dt>
             <dd>
               {cr(outlook.nextInterest)} interest
@@ -727,7 +823,7 @@ function Exchange({ session }: { session: GameSession }) {
 
 function Depart({ session }: { session: GameSession }) {
   const { state } = session;
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const held = cargoTonnes(state.ship.cargo);
   const fuelOk = state.ship.fuel >= stats.fuelCapacity * 0.5;
   const chargeMinutes = state.foldReadyAt - state.time;

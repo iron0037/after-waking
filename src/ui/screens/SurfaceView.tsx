@@ -46,15 +46,19 @@ import {
   regionKey,
   relocateShip,
   remainingTonnes,
-  ROVER_CHARGE_PER_HOUR,
-  ROVER_SPECIMEN_SLOTS,
+  roverChargePerHour,
+  roverMobility,
+  roverSpecimenSlots,
+  routeEnergyMult,
+  hasPerk,
+  effectiveStats,
+  orbitalSensorTier,
+  prospectRange,
   SAMPLE_ENERGY,
   SAMPLE_MINUTES,
   sensorRadius,
-  sensorTierFor,
-  shipStats,
+  shipSpecimenSlots,
   shipTile,
-  SHIP_SPECIMEN_SLOTS,
   SHIFT_FACTOR,
   specimenCount,
   specimensFrom,
@@ -108,7 +112,7 @@ import {
   type Reveal,
   type TipLine,
 } from "./surface/mapDraw";
-import { affordablePrefix, energyHome, evaluate, planPath, type RoutePlan } from "./surface/routing";
+import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
 import { terrainCache, type RegionImage } from "./surface/terrainImage";
 import "./surface.css";
@@ -205,7 +209,7 @@ function floraStatus(know: RegionKnowledge, f: FloraSite): "sampled" | "unsample
 
 /** Why the crew can't work this deposit right now (empty when they can). `know` is the deposit's own region's. */
 function workBlockers(state: GameState, know: RegionKnowledge, dep: Deposit): string[] {
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const out: string[] = [];
   if (!know.discovered.includes(dep.id)) out.push("This deposit hasn't been discovered yet.");
   else if (depositStatus(know, dep) === "depleted") out.push("This deposit is worked out.");
@@ -257,10 +261,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const surface = world.surface(loc.bodyId);
   const active = activeRegion(state, world);
   const activeKnow = peekKnowledge(state, loc.bodyId, active);
-  const stats = shipStats(state.ship);
+  const stats = effectiveStats(state);
   const rover = loc.rover;
   const busy = session.busy;
-  const canClimb = stats.roverCanClimb;
+  const mover: Mover = { mobility: roverMobility(state), energyMult: routeEnergyMult(state) };
+  const canClimb = mover.mobility.canClimb;
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);
   const [floraKey, setFloraKeyRaw] = useState<string | null>(null);
@@ -345,7 +350,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     return knownFlora(state, surface, loc.bodyId, [r]).find(({ f }) => f.x === t.x && f.y === t.y);
   };
 
-  const homeEnergy = rover ? energyHome(surface, rover, ship, canClimb) : null;
+  const homeEnergy = rover ? energyHome(surface, rover, ship, mover) : null;
   const stranded = rover !== null && (homeEnergy === null || homeEnergy > rover.energy);
 
   // --- camera ----------------------------------------------------------------------------
@@ -453,7 +458,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   /** True when the rover is already at the site: on its tile, or beside it if the tile can't be entered. */
   const atSite = (site: Vec2): boolean =>
     rover !== null &&
-    ((rover.x === site.x && rover.y === site.y) || (!canEnter(surface, site.x, site.y, canClimb) && hexDistance(rover, site) <= 1));
+    ((rover.x === site.x && rover.y === site.y) || (!canEnter(surface, site.x, site.y, mover.mobility) && hexDistance(rover, site) <= 1));
 
   /**
    * Drive to a tile. With `approach` (deposits and plants) the rover goes onto the site itself, even when
@@ -464,7 +469,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (!rover || session.busy) return false;
     if (rover.x === target.x && rover.y === target.y) return true;
     if (approach && atSite(target)) return true;
-    const path = planPath(surface, rover, target, canClimb, approach);
+    const path = planPath(surface, rover, target, mover, approach);
     if (!path) {
       session.notify("No route there for this rover.", "error");
       return false;
@@ -491,8 +496,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (routeRef.current.key === key) return routeRef.current.plan;
     const site = depositAt(tile) !== undefined || floraAt(tile) !== undefined;
     const inRange = site ? atSite(tile) : rover.x === tile.x && rover.y === tile.y;
-    const path = inRange ? null : planPath(surface, rover, tile, canClimb, site);
-    const plan = path && path.length > 0 ? evaluate(surface, path, rover, ship, canClimb) : null;
+    const path = inRange ? null : planPath(surface, rover, tile, mover, site);
+    const plan = path && path.length > 0 ? evaluate(surface, path, rover, ship, mover) : null;
     routeRef.current = { key, plan };
     return plan;
   };
@@ -587,6 +592,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
     // Mid-drive, the sensors sweep ahead of the sim: paint tiles in (and show finds) as the rover passes.
     const sweep = sensorRadius(state, loc.bodyId);
+    // Seam Sense and Field Botanist stretch the sweep for deposits and plants only.
+    const depositSweep = Math.floor(sweep * (hasPerk(state, "seam-sense") ? 1.5 : 1));
+    const floraSweep = Math.floor(sweep * (hasPerk(state, "field-botanist") ? 1.5 : 1));
     let reveal: Reveal | null = null;
     let rc = revealRef.current;
     if (anim) {
@@ -605,10 +613,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           rc.tiles.push(tile);
           rc.regions.add(region);
         }
-        for (const r of surface.regionsNear(p, sweep)) {
+        for (const r of surface.regionsNear(p, Math.max(sweep, depositSweep, floraSweep))) {
           const k = know(r) ?? NO_KNOWLEDGE;
-          for (const d of surface.deposits(r)) if (!k.discovered.includes(d.id) && hexDistance(p, d) <= sweep) rc.deposits.add(d.key);
-          for (const f of surface.flora(r)) if (!k.floraFound.includes(f.id) && hexDistance(p, f) <= sweep) rc.flora.add(f.key);
+          for (const d of surface.deposits(r)) if (!k.discovered.includes(d.id) && hexDistance(p, d) <= depositSweep) rc.deposits.add(d.key);
+          for (const f of surface.flora(r)) if (!k.floraFound.includes(f.id) && hexDistance(p, f) <= floraSweep) rc.flora.add(f.key);
         }
       }
       const terrain: RegionImage[] = [];
@@ -857,17 +865,17 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const stepRover = (dir: HexDir, repeat: boolean): void => {
     if (!rover) return;
     const to = step(rover.x, rover.y, dir);
-    if (!canEnter(surface, to.x, to.y, canClimb)) {
+    if (!canEnter(surface, to.x, to.y, mover.mobility)) {
       if (!repeat) session.notify("The rover can't go that way.", "error");
       return;
     }
-    const path = planPath(surface, rover, to, canClimb, false);
+    const path = planPath(surface, rover, to, mover, false);
     if (!path) return;
     if (!camRef.current.follow) setFollowing(true);
     void drive(path);
   };
 
-  const rechargeHours = rover ? Math.max(0, stats.roverEnergy - rover.energy) / ROVER_CHARGE_PER_HOUR : 0;
+  const rechargeHours = rover ? Math.max(0, stats.roverEnergy - rover.energy) / roverChargePerHour(state) : 0;
   const canRecharge = rover !== null && nearShip && stats.roverEnergy - rover.energy >= 0.5;
 
   keyRef.current = (ev: KeyboardEvent): void => {
@@ -1060,7 +1068,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           </div>
         </Section>
 
-        <RoverPanel rover={rover} stats={stats} homeEnergy={homeEnergy} stranded={stranded} />
+        <RoverPanel rover={rover} stats={stats} state={state} homeEnergy={homeEnergy} stranded={stranded} />
         <ShipPanel rover={rover} stats={stats} state={state} bodyId={loc.bodyId} />
 
         {(() => {
@@ -1217,11 +1225,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 function RoverPanel({
   rover,
   stats,
+  state,
   homeEnergy,
   stranded,
 }: {
   rover: RoverState | null;
-  stats: ReturnType<typeof shipStats>;
+  state: GameState;
+  stats: ReturnType<typeof effectiveStats>;
   homeEnergy: number | null;
   stranded: boolean;
 }) {
@@ -1266,12 +1276,12 @@ function RoverPanel({
           <CargoChips cargo={rover.cargo} />
           <dl class="kv spaced">
             <dt>Sample cases</dt>
-            <dd class={roverSamples >= ROVER_SPECIMEN_SLOTS ? "accent" : ""}>
-              {roverSamples} / {ROVER_SPECIMEN_SLOTS}
+            <dd class={roverSamples >= roverSpecimenSlots(state) ? "accent" : ""}>
+              {roverSamples} / {roverSpecimenSlots(state)}
             </dd>
           </dl>
-          <div class={`bar ${roverSamples >= ROVER_SPECIMEN_SLOTS ? "warn" : ""}`}>
-            <span style={{ width: `${pct(roverSamples, ROVER_SPECIMEN_SLOTS)}%` }} />
+          <div class={`bar ${roverSamples >= roverSpecimenSlots(state) ? "warn" : ""}`}>
+            <span style={{ width: `${pct(roverSamples, roverSpecimenSlots(state))}%` }} />
           </div>
           <SpecimenChips specimens={rover.specimens} />
         </>
@@ -1289,7 +1299,7 @@ function ShipPanel({
   bodyId,
 }: {
   rover: RoverState | null;
-  stats: ReturnType<typeof shipStats>;
+  stats: ReturnType<typeof effectiveStats>;
   state: GameState;
   bodyId: string;
 }) {
@@ -1315,11 +1325,11 @@ function ShipPanel({
           <dl class="kv spaced">
             <dt>Ship racks</dt>
             <dd>
-              {shipSamples} / {SHIP_SPECIMEN_SLOTS}
+              {shipSamples} / {shipSpecimenSlots(state)}
             </dd>
           </dl>
           <div class="bar">
-            <span style={{ width: `${pct(shipSamples, SHIP_SPECIMEN_SLOTS)}%` }} />
+            <span style={{ width: `${pct(shipSamples, shipSpecimenSlots(state))}%` }} />
           </div>
           <SpecimenChips specimens={state.ship.specimens} />
         </>
@@ -1410,7 +1420,7 @@ function FloraPanel({
   if (!rover) blockers.push("Deploy the rover first.");
   else {
     if (!near && !sampled) blockers.push(`The rover is ${dist} tiles away: drive it next to the plants.`);
-    if (specimenCount(rover.specimens) >= ROVER_SPECIMEN_SLOTS) {
+    if (specimenCount(rover.specimens) >= roverSpecimenSlots(session.state)) {
       blockers.push("The rover's sample cases are full. Drive back to the ship and stow.");
     }
     if (rover.energy < SAMPLE_ENERGY) blockers.push(`The sample kit needs ${SAMPLE_ENERGY} rover energy.`);
@@ -1480,7 +1490,7 @@ function DepositPanel({
   work: () => void;
   busy: boolean;
 }) {
-  const stats = shipStats(session.state.ship);
+  const stats = effectiveStats(session.state);
   const commodity = COMMODITIES[dep.commodity];
   const status = depositStatus(know, dep);
   const prospected = know.prospected.includes(dep.id);
@@ -1498,7 +1508,14 @@ function DepositPanel({
   if (!rover) placement.push("Deploy the rover first.");
   else if (!near) placement.push(`The rover is ${dist} tiles away: drive it next to the deposit.`);
 
-  const prospectBlockers = [...placement];
+  // Assayer (science): prospecting works from two hexes out, in half the time. Drilling still needs the rover beside the seam.
+  const pRange = prospectRange(session.state);
+  const prospectBlockers: string[] = [];
+  if (!rover) prospectBlockers.push("Deploy the rover first.");
+  else if (dist !== null && dist > pRange) {
+    prospectBlockers.push(`The rover is ${dist} tiles away: drive it ${pRange > 1 ? `within ${pRange} tiles of` : "next to"} the deposit.`);
+  }
+  const prospectMinutes = PROSPECT_MINUTES * SHIFT_FACTOR * (hasPerk(session.state, "assayer") ? 0.5 : 1);
   if (rover && rover.energy < PROSPECT_ENERGY) prospectBlockers.push(`Core samples need ${PROSPECT_ENERGY} rover energy.`);
 
   const drillBlockers = [...placement];
@@ -1515,7 +1532,7 @@ function DepositPanel({
   const setupMin = isSite ? 0 : DRILL_SETUP_MINUTES;
 
   const runProspect = async (): Promise<void> => {
-    if (!(await goTo())) return;
+    if (!(dist !== null && dist <= pRange) && !(await goTo())) return;
     session.act((s, w) => prospect(s, w, dep.key));
   };
 
@@ -1603,7 +1620,7 @@ function DepositPanel({
               disabled={busy || prospectBlockers.length > 0}
               onClick={() => void runProspect()}
             >
-              Prospect ({formatDuration(PROSPECT_MINUTES * SHIFT_FACTOR)})
+              Prospect ({formatDuration(prospectMinutes)})
             </button>
           </div>
         </>

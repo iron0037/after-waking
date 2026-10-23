@@ -1,14 +1,26 @@
 /** Route planning helpers for the surface screen (thin wrappers over the sim's pathfinder, planet-wide coordinates). */
-import { findPath, neighbors, type PathStep, type TileSource, type Vec2 } from "../../../sim";
+import { findPath, neighbors, type Mobility, type PathStep, type TileSource, type Vec2 } from "../../../sim";
+
+/** How this rover gets around, with the crew's perks: terrain it can cross (roverMobility) and the route energy multiplier (routeEnergyMult). */
+export interface Mover {
+  mobility: Mobility;
+  energyMult: number;
+}
+
+/** findPath with the crew's perks: step energy is already scaled, so every sum and budget downstream agrees with the sim. */
+function pathFor(tiles: TileSource, from: Vec2, to: Vec2, mover: Mover): PathStep[] | null {
+  const path = findPath(tiles, from, to, mover.mobility);
+  return path && mover.energyMult !== 1 ? path.map((s) => ({ ...s, energy: s.energy * mover.energyMult })) : path;
+}
 
 /** The cheapest route to `to`; if it can't be entered (and `approach`), to the cheapest hex next to it. */
-export function planPath(tiles: TileSource, from: Vec2, to: Vec2, canClimb: boolean, approach: boolean): PathStep[] | null {
-  const direct = findPath(tiles, from, to, canClimb);
+export function planPath(tiles: TileSource, from: Vec2, to: Vec2, mover: Mover, approach: boolean): PathStep[] | null {
+  const direct = pathFor(tiles, from, to, mover);
   if (direct || !approach) return direct;
   let best: PathStep[] | null = null;
   let bestMinutes = Infinity;
   for (const n of neighbors(to.x, to.y)) {
-    const path = findPath(tiles, from, n, canClimb);
+    const path = pathFor(tiles, from, n, mover);
     if (!path) continue;
     const minutes = path.reduce((s, p) => s + p.minutes, 0);
     if (minutes < bestMinutes) {
@@ -27,19 +39,19 @@ export interface RoutePlan {
   back: number | null;
 }
 
-export function evaluate(tiles: TileSource, path: PathStep[], start: Vec2, home: Vec2, canClimb: boolean): RoutePlan {
+export function evaluate(tiles: TileSource, path: PathStep[], start: Vec2, home: Vec2, mover: Mover): RoutePlan {
   const end = path.length > 0 ? (path[path.length - 1] as Vec2) : start;
   return {
     path,
     minutes: path.reduce((s, p) => s + p.minutes, 0),
     energy: path.reduce((s, p) => s + p.energy, 0),
-    back: energyHome(tiles, end, home, canClimb),
+    back: energyHome(tiles, end, home, mover),
   };
 }
 
 /** Energy to drive from `from` to the ship, or null if there is no route. */
-export function energyHome(tiles: TileSource, from: Vec2, home: Vec2, canClimb: boolean): number | null {
-  const path = findPath(tiles, from, home, canClimb);
+export function energyHome(tiles: TileSource, from: Vec2, home: Vec2, mover: Mover): number | null {
+  const path = pathFor(tiles, from, home, mover);
   return path ? path.reduce((s, p) => s + p.energy, 0) : null;
 }
 
