@@ -1,15 +1,15 @@
 /** Everything that can sit in a cargo hold. Prices are Intrepid base prices in credits per tonne. */
 
-export const COMMODITY_IDS = [
-  "ironNickel",
-  "copper",
-  "titanium",
-  "rareEarths",
-  "uranium",
-  "platinum",
-  "waterIce",
-  "plicite",
-] as const;
+/** Mined from deposits. World generation draws only from these, so adding goods never reshuffles worlds. */
+export const ORE_IDS = ["ironNickel", "copper", "titanium", "rareEarths", "uranium", "platinum", "waterIce", "plicite"] as const;
+
+/** Skimmed from giant planets' atmospheres by probes (AW-16). Thin markets: a few tonnes move the price. */
+export const GAS_IDS = ["methane", "deuterium", "xenon", "helium3"] as const;
+
+export const COMMODITY_IDS = [...ORE_IDS, ...GAS_IDS] as const;
+
+export type OreId = (typeof ORE_IDS)[number];
+export type GasId = (typeof GAS_IDS)[number];
 
 export type CommodityId = (typeof COMMODITY_IDS)[number];
 
@@ -89,5 +89,37 @@ export const COMMODITIES: Record<CommodityId, Commodity> = {
     color: "#ff5fd2",
     blurb:
       "The crystal that makes folding possible. It behaves almost too neatly, as if its lattice were designed. The Lyceum insists that's just good chemistry.",
+  },
+  methane: {
+    id: "methane",
+    name: "Methane",
+    basePrice: 20,
+    marketDepthT: 200,
+    color: "#7fb8a0",
+    blurb: "Feedstock for the Intrepid's plastics and chemical plants. Ice giants are full of it.",
+  },
+  deuterium: {
+    id: "deuterium",
+    name: "Deuterium",
+    basePrice: 500,
+    marketDepthT: 20,
+    color: "#8fb0ff",
+    blurb: "Heavy hydrogen for the fusion trials the Lyceum keeps promising will work this time.",
+  },
+  xenon: {
+    id: "xenon",
+    name: "Xenon",
+    basePrice: 800,
+    marketDepthT: 12,
+    color: "#c9a0ff",
+    blurb: "Ion-drive propellant and anaesthetic. The Medics and the Midshipmen bid against each other for it.",
+  },
+  helium3: {
+    id: "helium3",
+    name: "Helium-3",
+    basePrice: 2_500,
+    marketDepthT: 6,
+    color: "#ffe08a",
+    blurb: "The fusion fuel of the future, always. Found deep in gas giants, where probes go to die.",
   },
 };

@@ -13,6 +13,8 @@ export interface ShipState {
   roverEnergy?: number;
   /** Live specimens in the containment racks, keyed "bodyId|species". */
   specimens?: Record<string, number>;
+  /** Atmospheric probes in the bay. */
+  probes?: number;
 }
 
 export const SHIP_SPECIMEN_SLOTS = 16;

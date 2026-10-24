@@ -39,6 +39,10 @@ export interface ShipStats {
   roverCargoT: number;
   roverEnergy: number;
   roverCanClimb: boolean;
+  /** Atmospheric probes the bay can carry (0 = no bay). */
+  probeCapacity: number;
+  /** Deepest band the probes are rated for: 0 none, 1 cloud tops ... 4 abyss. */
+  probeMaxDepth: number;
   ratings: Ratings;
 }
 
@@ -54,6 +58,8 @@ export const BASE_STATS: ShipStats = {
   roverCargoT: 20,
   roverEnergy: 100,
   roverCanClimb: false,
+  probeCapacity: 0,
+  probeMaxDepth: 0,
   ratings: {
     maxGravityG: 1.3,
     maxPressureAtm: 2.5,
@@ -264,6 +270,34 @@ export const UPGRADES: readonly Upgrade[] = [
     description: "Sensor tier 3: exact region readings and the widest rover detection.",
     apply: (s) => {
       s.sensorTier = Math.max(s.sensorTier, 3);
+    },
+  },
+  {
+    id: "probeBay",
+    category: "sensors",
+    name: "Atmospheric probe bay",
+    vendor: "lyceum",
+    price: 20_000,
+    description:
+      "Carries 3 atmospheric probes for gas and ice giants, remote-piloted by your science officer down to the deep layers. Probes are sold separately.",
+    apply: (s) => {
+      s.probeCapacity = Math.max(s.probeCapacity, 3);
+      s.probeMaxDepth = Math.max(s.probeMaxDepth, 3);
+      s.hullMassT += 30;
+    },
+  },
+  {
+    id: "probeBay2",
+    category: "sensors",
+    requires: "probeBay",
+    name: "Pressure-rated probe racks",
+    vendor: "lyceum",
+    price: 35_000,
+    description: "Room for 6 probes, rated for abyssal dives where the helium-3 is richest.",
+    apply: (s) => {
+      s.probeCapacity = Math.max(s.probeCapacity, 6);
+      s.probeMaxDepth = Math.max(s.probeMaxDepth, 4);
+      s.hullMassT += 30;
     },
   },
 ];

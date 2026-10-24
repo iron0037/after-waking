@@ -207,6 +207,12 @@ export function stationBonuses(station: Station, level: number): Partial<CrewBon
   }
 }
 
+/** The level someone actually works at: a miserable officer goes through the motions, a level below. */
+export function workingLevel(state: GameState, station: Station): number {
+  const holder = station === "captain" ? null : officerAt(state, station);
+  return Math.max(0, stationLevel(state, station) - (holder && isMiserable(holder) ? 1 : 0));
+}
+
 export function crewBonuses(state: GameState): CrewBonuses {
   const out: CrewBonuses = {
     sensorRadius: 0,
@@ -222,9 +228,7 @@ export function crewBonuses(state: GameState): CrewBonuses {
     contractPay: 1,
   };
   for (const station of ["captain", ...OFFICER_STATIONS] as Station[]) {
-    // A miserable officer just goes through the motions: a level below themselves.
-    const holder = station === "captain" ? null : officerAt(state, station);
-    const level = Math.max(0, stationLevel(state, station) - (holder && isMiserable(holder) ? 1 : 0));
+    const level = workingLevel(state, station);
     const bonuses = stationBonuses(station, level) as Record<string, number>;
     for (const key of Object.keys(bonuses)) {
       // Cross-training perks count as extra levels for one named bonus.

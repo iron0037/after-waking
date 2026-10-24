@@ -3,7 +3,7 @@
  * from the galaxy seed. Orbits are real-scale (AU) so that inner worlds are short hops and the
  * outer system is a long haul.
  */
-import { COMMODITY_IDS, type CommodityId } from "../data/commodities";
+import { ORE_IDS, type CommodityId } from "../data/commodities";
 import { moonSuffix, roman } from "../data/names";
 import type { StarSystem } from "./galaxy";
 import { rngFor, type Rng } from "./rng";
@@ -313,8 +313,8 @@ function finishBody(ctx: Ctx, core: BodyCore): Body {
 
   const resources: Partial<Record<CommodityId, number>> = {};
   const weights = RESOURCE_WEIGHTS[core.kind];
-  const bonanza = rng.chance(0.1) ? rng.pick(COMMODITY_IDS) : null;
-  for (const id of COMMODITY_IDS) {
+  const bonanza = rng.chance(0.1) ? rng.pick(ORE_IDS) : null;
+  for (const id of ORE_IDS) {
     const w = weights[id] ?? 0;
     if (w <= 0) continue;
     let abundance = w * rng.range(0.3, 1.4) * (id === bonanza ? 2 : 1);

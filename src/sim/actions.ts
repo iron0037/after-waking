@@ -300,6 +300,7 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
 }
 
 export function flyTo(state: GameState, world: World, target: FlightTarget): Result<FlightPlan> {
+  if (state.probeDive) return fail("A probe is still on its way down: see it through first.");
   const planned = flightPlan(state, world, target);
   if (!planned.ok) return planned;
   const plan = planned.value;

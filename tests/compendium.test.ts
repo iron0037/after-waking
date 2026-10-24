@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COMMODITY_IDS } from "../src/data/commodities";
+import { ORE_IDS } from "../src/data/commodities";
 import { FLORA, MINERAL_SPECIMENS, FLORA_BY_NAME } from "../src/data/catalog";
 import { bodySpecies, compendiumTotals, World } from "../src/sim";
 import { runBot } from "../src/sim/bot";
@@ -15,7 +15,7 @@ describe("catalog", () => {
     for (const climate of ["cold", "temperate", "warm"] as const) {
       expect(FLORA.filter((f) => f.climates.includes(climate)).length).toBeGreaterThanOrEqual(6);
     }
-    for (const id of COMMODITY_IDS) expect(MINERAL_SPECIMENS.some((g) => g.host === id)).toBe(true);
+    for (const id of ORE_IDS) expect(MINERAL_SPECIMENS.some((g) => g.host === id)).toBe(true);
   });
 
   it("living worlds draw catalogued species", () => {
@@ -35,7 +35,7 @@ describe("compendium", () => {
     const { state } = runBot(42, 6);
     const totals = compendiumTotals(state);
     expect(totals.mineral.found).toBeGreaterThanOrEqual(3);
-    expect(totals.all.total).toBe(COMMODITY_IDS.length + MINERAL_SPECIMENS.length + FLORA.length);
+    expect(totals.all.total).toBe(ORE_IDS.length + MINERAL_SPECIMENS.length + FLORA.length);
   });
 
   it("turns up mineral specimens over a career", () => {

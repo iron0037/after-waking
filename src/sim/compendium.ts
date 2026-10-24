@@ -4,7 +4,7 @@
  *
  * Like contracts.ts, this writes the journal directly so it can be used from anywhere.
  */
-import { COMMODITIES, COMMODITY_IDS, type CommodityId } from "../data/commodities";
+import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
 import { FLORA, MINERAL_SPECIMENS, type CompendiumKind, type MineralSpecimen } from "../data/catalog";
 import type { Rng } from "./rng";
 import type { GameState } from "./state";
@@ -39,7 +39,7 @@ export interface CompendiumTotals {
 
 export function compendiumTotals(state: GameState): CompendiumTotals {
   const has = (kind: CompendiumKind, id: string) => Boolean(state.compendium?.[compendiumKey(kind, id)]);
-  const mineral = { found: COMMODITY_IDS.filter((id) => has("mineral", id)).length, total: COMMODITY_IDS.length };
+  const mineral = { found: ORE_IDS.filter((id) => has("mineral", id)).length, total: ORE_IDS.length };
   const gem = { found: MINERAL_SPECIMENS.filter((g) => has("gem", g.id)).length, total: MINERAL_SPECIMENS.length };
   const flora = { found: FLORA.filter((f) => has("flora", f.id)).length, total: FLORA.length };
   return {

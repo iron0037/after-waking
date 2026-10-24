@@ -9,6 +9,7 @@ import type { Station } from "../data/crew";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { chargeStowedRover, tickYard } from "./actions";
 import type { HelmRecord } from "./helm";
+import type { ProbeDive } from "./probes";
 import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
@@ -102,6 +103,8 @@ export interface GameState {
   lastDockedAt?: number;
   /** Share of each sale paid to the crew as bonuses, 0–0.2. */
   crewShare?: number;
+  /** An atmospheric probe on its way down (AW-16). */
+  probeDive?: ProbeDive;
   credits: number;
   loan: Loan;
   ship: ShipState;

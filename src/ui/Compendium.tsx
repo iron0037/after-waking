@@ -3,7 +3,7 @@
  * unfound ones are silhouettes with just enough of a hint to go looking.
  */
 import { useState } from "preact/hooks";
-import { COMMODITIES, COMMODITY_IDS } from "../data/commodities";
+import { COMMODITIES, ORE_IDS } from "../data/commodities";
 import { FLORA, MINERAL_SPECIMENS, type Rarity } from "../data/catalog";
 import { compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
 import type { GameSession } from "./session";
@@ -36,7 +36,7 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
     hint: `Grows on ${f.climates.map((c) => CLIMATE_HINT[c]).join(" and ")}`,
     rarity: f.rarity,
   }));
-  const ores: Card[] = COMMODITY_IDS.map((id) => ({
+  const ores: Card[] = ORE_IDS.map((id) => ({
     key: compendiumKey("mineral", id),
     name: COMMODITIES[id].name,
     color: COMMODITIES[id].color,
