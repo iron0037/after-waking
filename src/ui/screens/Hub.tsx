@@ -15,6 +15,7 @@ import {
   contractPayout,
   contractProgress,
   crewBonuses,
+  crewCut,
   effectiveStats,
   dailyUpkeep,
   dailyWages,
@@ -53,7 +54,7 @@ import {
 } from "../../sim";
 import { cr, pct, tonnes } from "../format";
 import { HiringHall, Roster } from "../Crew";
-import { Section } from "../Section";
+import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
 import "./hub.css";
 
@@ -86,6 +87,24 @@ export function Hub({ session }: { session: GameSession }) {
   const [tab, setTab] = useState<Tab>(() =>
     starterOffers > 0 && state.stats.folds === 0 && contracts.every((c) => c.status === "offered") ? "jobs" : "market",
   );
+
+  const [hallPing, setHallPing] = useState(0);
+  // "Go to the hiring hall" (from the crew overlay or an empty post): show the Crew tab, hall unfolded and in view.
+  useEffect(() => {
+    if (!session.hallRequested) return;
+    session.hallRequested = false;
+    unfoldSection("crew-hall");
+    setTab("crew");
+    setHallPing((n) => n + 1);
+    // The Crew tab may not be on screen yet: look for the hall for a moment.
+    let tries = 0;
+    const scrollToHall = () => {
+      const hall = document.getElementById("sec-crew-hall");
+      if (hall) hall.scrollIntoView({ block: "start" });
+      else if (++tries < 20) setTimeout(scrollToHall, 50);
+    };
+    setTimeout(scrollToHall, 60);
+  });
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
@@ -136,7 +155,7 @@ export function Hub({ session }: { session: GameSession }) {
         {tab === "market" && <Market session={session} />}
         {tab === "jobs" && <Jobs session={session} />}
         {tab === "shipyard" && <Shipyard session={session} />}
-        {tab === "crew" && <Crew session={session} />}
+        {tab === "crew" && <Crew session={session} hallPing={hallPing} />}
         {tab === "exchange" && <Exchange session={session} />}
         {tab === "depart" && <Depart session={session} />}
       </div>
@@ -176,6 +195,7 @@ function Market({ session }: { session: GameSession }) {
   const sellable = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id), 0);
   const heldBack = held - sellable;
   const estimate = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id) * sellPrice(state.market, id) * salePrice, 0);
+  const crewCutNow = crewCut(state, estimate);
   const price = fuelPrice(state.market);
   const room = Math.floor(stats.fuelCapacity - state.ship.fuel);
   const affordable = Math.floor(state.credits / price);
@@ -271,6 +291,12 @@ function Market({ session }: { session: GameSession }) {
                 ? "Everything aboard is held for delivery contracts."
                 : "The hold is empty."}
             {sellable > 0.05 && heldBack > 0.05 && <span class="accent"> · keeps {tonnes(heldBack)} for your contracts</span>}
+            {sellable > 0.05 && crewCutNow > 0 && (
+              <span class="accent" title="Set under Crew. Paid as bonuses after each sale, split by level.">
+                {" "}
+                · crew share {Math.round((state.crewShare ?? 0) * 100)}%: about {cr(crewCutNow)} of this goes to the crew
+              </span>
+            )}
           </span>
         </div>
       </section>
@@ -769,7 +795,7 @@ function Shipyard({ session }: { session: GameSession }) {
 
 // --- crew --------------------------------------------------------------------------------
 
-function Crew({ session }: { session: GameSession }) {
+function Crew({ session, hallPing }: { session: GameSession; hallPing: number }) {
   const { state } = session;
   const wages = dailyWages(state);
   const recruits = (state.recruits ?? []).length;
@@ -778,7 +804,7 @@ function Crew({ session }: { session: GameSession }) {
       <Section id="crew-roster" title="Your crew" level={2} summary={`${cr(wages)} a day in wages, ${cr(dailyUpkeep(state))} in upkeep`}>
         <Roster session={session} />
       </Section>
-      <Section id="crew-hall" title="Hiring hall" level={2} summary={`${recruits} looking for a berth`}>
+      <Section id="crew-hall" title="Hiring hall" level={2} revealKey={hallPing || null} summary={`${recruits} looking for a berth`}>
         <HiringHall session={session} />
       </Section>
     </div>

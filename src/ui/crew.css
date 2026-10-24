@@ -53,3 +53,71 @@
 .contracts.crew-overlay {
   width: min(1180px, 96vw);
 }
+
+/* mood, notice and the share setting (AW-100, AW-101) */
+.crew-help {
+  cursor: help;
+}
+.crew-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.crew-mood-bar {
+  display: inline-block;
+  width: 90px;
+  height: 7px;
+}
+.crew-mood-bar.mood-low > span {
+  background: var(--danger);
+}
+.crew-mood-bar.mood-medium > span {
+  background: var(--muted);
+}
+.crew-mood-bar.mood-high > span {
+  background: var(--good);
+}
+.crew-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  background: #ff6b6b1a;
+  color: var(--danger);
+}
+.crew-notice .small {
+  color: var(--text);
+}
+.tag.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.crew-empty {
+  border-style: dashed;
+  border-color: var(--danger);
+}
+.crew-share {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.crew-share-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.crew-seg {
+  display: inline-flex;
+  gap: 4px;
+}
+.crew-seg-btn {
+  padding: 3px 10px;
+}
+.btn .badge.badge-warn {
+  background: var(--danger);
+  color: #fff;
+}

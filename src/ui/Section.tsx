@@ -34,6 +34,11 @@ function remember(id: string, isFolded: boolean): void {
   }
 }
 
+/** Make sure a section starts unfolded the next time it mounts (an already-mounted one needs its revealKey bumped). */
+export function unfoldSection(id: string): void {
+  remember(id, false);
+}
+
 export function Section({
   id,
   title,
@@ -73,7 +78,7 @@ export function Section({
   };
   const Heading = level === 2 ? "h2" : "h3";
   return (
-    <div class={`panel fold ${open ? "" : "folded"} ${className}`}>
+    <div id={`sec-${id}`} class={`panel fold ${open ? "" : "folded"} ${className}`}>
       <div
         class="fold-head"
         role="button"

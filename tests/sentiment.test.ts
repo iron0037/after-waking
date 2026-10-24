@@ -2,7 +2,9 @@
 import { describe, expect, it } from "vitest";
 import {
   awardXp,
+  crewAlerts,
   crewBonuses,
+  crewCut,
   DAY,
   fold,
   hireRecruit,
@@ -120,5 +122,20 @@ describe("crew sentiment", () => {
     expect(ra.ok && rb.ok).toBe(true);
     expect(b.credits).toBeLessThan(a.credits);
     expect(officerAt(b, "engineering")!.happiness!).toBeGreaterThan(officerAt(a, "engineering")!.happiness!);
+  });
+
+  it("crewAlerts lists officers on notice and empty posts; crewCut previews the share", () => {
+    const state = newGame({ seed: 42 });
+    expect(crewAlerts(state)).toEqual({ onNotice: [], emptyPosts: [] });
+    officerAt(state, "comms")!.noticeAt = state.time;
+    state.crew = state.crew!.filter((m) => m.station !== "medical");
+    const alerts = crewAlerts(state);
+    expect(alerts.onNotice.map((m) => m.station)).toEqual(["comms"]);
+    expect(alerts.emptyPosts).toEqual(["medical"]);
+    expect(crewCut(state, 1000)).toBe(0);
+    setCrewShare(state, 0.1);
+    expect(crewCut(state, 1000)).toBe(100);
+    state.crew = [];
+    expect(crewCut(state, 1000)).toBe(0);
   });
 });

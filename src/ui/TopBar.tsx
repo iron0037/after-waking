@@ -1,4 +1,5 @@
-import { activeRegion, ageAt, compendiumTotals, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, compendiumTotals, crewAlerts, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
+import { STATION_INFO } from "../data/crew";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -21,6 +22,11 @@ export function TopBar({
   const stats = effectiveStats(state);
   const foldReady = state.time >= state.foldReadyAt;
   const bankedPoints = crewFreePoints(state);
+  const alerts = crewAlerts(state);
+  const alertLines = [
+    ...alerts.onNotice.map((m) => `${STATION_INFO[m.station].title} ${m.name} has given notice`),
+    ...alerts.emptyPosts.map((st) => `${STATION_INFO[st].title}: post empty`),
+  ];
   const activeContracts = (state.contracts ?? []).filter((c) => c.status === "active").length;
   return (
     <header class="topbar">
@@ -71,6 +77,11 @@ export function TopBar({
         {bankedPoints > 0 && (
           <span class="badge" title={`${bankedPoints} unspent perk point${bankedPoints === 1 ? "" : "s"}`}>
             {bankedPoints}
+          </span>
+        )}
+        {alertLines.length > 0 && (
+          <span class="badge badge-warn" role="img" aria-label="Crew needs attention" title={alertLines.join("\n")}>
+            !
           </span>
         )}
       </button>

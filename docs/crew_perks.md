@@ -99,6 +99,42 @@ Each officer has two opinions of the captain:
 - **Quitting.** The lower happiness plus loyalty, the likelier someone is to give notice at the next docking, or to desert in a crisis. Young crew are more restless.
 - **Visibility.** By default the roster shows each as low / medium / high. The captain's **Read the Room** perk shows exact 0–100 scores.
 
+### v1 as built (2026-10-24, `src/sim/sentiment.ts`)
+
+**Happiness**
+- **Drift:** relaxes toward 55, about 3% of the gap per day.
+- **Shore leave:** at the Intrepid it adds 1.5 per day, up to 80.
+- **Long hauls:** after 45 days away it falls 0.4 per day.
+- **Events:**
+
+  | Event | Effect |
+  |---|---|
+  | Level-up | +8 to that officer |
+  | Finds | +1 each to science, up to +2 per sweep |
+  | Sample collected | +1 to medical |
+  | Incident | −1 to all, plus −2 to engineering and −1 to medical |
+  | Rescue | −8 to all |
+  | Trip profit or loss, at docking | ±6 to all |
+  | Unpaid wages at docking | −8 to all (and −2 loyalty) |
+  | Contract done or lapsed | ±2 to all |
+
+**Loyalty**
+- **Drift:** follows happiness at ±0.05 per day (at happiness 100 or 0).
+- **Clan:** contracts done or lapsed for a clan give its officers ±4; buying a clan's gear gives its officers +2.
+- **Bonuses:** up to +2 per payout.
+- **Starting values:** 50 for the starting crew, 40 for new hires, and 25 or 20 for Freebooters.
+
+**Notice and leaving** (combined score = average of happiness and loyalty)
+- **Notice:** given at docking when the score drops below 30 (35 for crew under 30 years old).
+- **Leaving:** at the next docking they leave if it's still below 35, or withdraw their notice at 40 or more. The post stays empty until someone is signed.
+- **Miserable** (happiness below 25): they work one level below their real level.
+
+**Perks:** Morale (shore leave twice as fast, good news +50%), Loyalty (loyalty gains +50%) and Read the Room (exact scores).
+
+**Career report:**
+- **Competent:** pays a 5% share; crew happiness stays around 80 and loyalty reaches its maximum in about 3 years; nobody quits.
+- **Novice:** pays nothing; happiness is around 70 and loyalty 45–60, with about 1 quit per career late on.
+
 ### Bonuses: a share of the spoils
 
 - **A setting.** The captain chooses what share of each trip's profit goes to the crew as a bonus (0–20%).

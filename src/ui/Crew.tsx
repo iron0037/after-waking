@@ -13,20 +13,26 @@ import {
   dailyUpkeep,
   freePerkPoints,
   formatDuration,
+  hasPerk,
   hireRecruit,
+  isMiserable,
   levelForXp,
   levelProgress,
+  MAX_CREW_SHARE,
   MAX_LEVEL,
+  moodLevel,
   officerAt,
   perkHolder,
   retrain,
   retrainCost,
+  setCrewShare,
   signingFee,
+  startingLoyalty,
   trainingEndsAt,
   wageOf,
   xpForLevel,
   type CrewMember,
-  type GameState,
+  type MoodLevel,
   type Recruit,
 } from "../sim";
 import { cr } from "./format";
@@ -156,7 +162,74 @@ function PerkActions({ session, station }: { session: GameSession; station: Stat
   );
 }
 
-function PersonCard({ session, station }: { session: GameSession; station: Station }) {
+const MOOD_LABEL: Record<MoodLevel, string> = { low: "Low", medium: "Medium", high: "High" };
+const MOOD_CLASS: Record<MoodLevel, string> = { low: "danger", medium: "muted", high: "good" };
+
+const HAPPINESS_TIP =
+  "How they feel lately. Finds, level-ups, good trips, shore leave aboard the Intrepid and bonuses lift it; long hauls, losing trips, unpaid wages and incidents lower it. It settles back toward neutral over a few weeks.";
+const LOYALTY_TIP =
+  "Their long-term bond with you. It grows with sustained happiness, bonuses and work for their clan, and sinks when they're unhappy for long. Freebooters start low. Low spirits and low loyalty together make an officer give notice.";
+
+/** Low / Medium / High, coloured; with Read the Room also the exact 0-100 score and a bar. */
+function Mood({ value, exact }: { value: number; exact: boolean }) {
+  const level = moodLevel(value);
+  return (
+    <span class="crew-mood">
+      {exact && (
+        <span class={`bar crew-mood-bar mood-${level}`} title={`${Math.round(value)} / 100`}>
+          <span style={{ width: `${Math.round(value)}%` }} />
+        </span>
+      )}
+      <span class={MOOD_CLASS[level]}>{MOOD_LABEL[level]}</span>
+      {exact && <span class="muted small">{Math.round(value)}</span>}
+    </span>
+  );
+}
+
+/** Happiness and loyalty rows for an officer's definition list. */
+function MoodRows({ m, exact }: { m: CrewMember; exact: boolean }) {
+  return (
+    <>
+      <dt class="crew-help" title={HAPPINESS_TIP}>
+        Happiness
+      </dt>
+      <dd title={HAPPINESS_TIP}>
+        <Mood value={m.happiness ?? 60} exact={exact} />
+      </dd>
+      <dt class="crew-help" title={LOYALTY_TIP}>
+        Loyalty
+      </dt>
+      <dd title={LOYALTY_TIP}>
+        <Mood value={m.loyalty ?? startingLoyalty(m.clan, false)} exact={exact} />
+      </dd>
+    </>
+  );
+}
+
+/** Warnings under a card's heading: on notice, and miserable. */
+function MoodWarnings({ m }: { m: CrewMember }) {
+  const miserable = isMiserable(m);
+  if (m.noticeAt === undefined && !miserable) return null;
+  return (
+    <>
+      {m.noticeAt !== undefined && (
+        <div class="crew-notice" role="alert">
+          <strong>Has given notice: leaves at the next docking unless things improve.</strong>
+          <span class="small">Shore leave aboard the Intrepid, a bonus share of the spoils or a good trip can change their mind.</span>
+        </div>
+      )}
+      {miserable && (
+        <div>
+          <span class="tag danger" title="Happiness is below 25: they just go through the motions, and their station gives the bonuses of one level lower until things pick up.">
+            Miserable: working below their level
+          </span>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PersonCard({ session, station, onHall }: { session: GameSession; station: Station; onHall?: () => void }) {
   const { state } = session;
   const info = STATION_INFO[station];
   if (station === "captain") {
@@ -185,16 +258,41 @@ function PersonCard({ session, station }: { session: GameSession; station: Stati
   }
   const m = officerAt(state, station);
   if (!m) {
+    const aboard = state.location.kind === "intrepid";
+    const lost = bonusLine(state, station, 0);
     return (
-      <div class="panel crew-card">
+      <div class="panel crew-card crew-empty">
         <div class="hub-card-head">
           <span class="accent">{info.title}</span>
+          <span class="tag danger">post empty</span>
         </div>
-        <div class="danger small">The post is empty. Hire someone at the Intrepid.</div>
-        <div class="muted small">Improves: {info.improves}</div>
+        <div class="danger small">Post empty: sign someone at the hiring hall.</div>
+        <dl class="kv crew-kv">
+          <dt>Improves</dt>
+          <dd>{info.improves}</dd>
+          <dt>Meanwhile</dt>
+          <dd class="danger">{lost || "nothing"}</dd>
+        </dl>
+        <div class="crew-actions">
+          {aboard ? (
+            <button
+              class="btn primary"
+              title="Jump to this month's recruits"
+              onClick={() => {
+                onHall?.();
+                session.showHiringHall();
+              }}
+            >
+              Go to the hiring hall
+            </button>
+          ) : (
+            <span class="muted small">Hiring happens aboard the Intrepid.</span>
+          )}
+        </div>
       </div>
     );
   }
+  const exact = hasPerk(state, "read-the-room");
   return (
     <div class="panel crew-card">
       <div class="hub-card-head">
@@ -203,9 +301,11 @@ function PersonCard({ session, station }: { session: GameSession; station: Stati
         </div>
         <span class="muted small">age {ageAt(m.born, state.time)}</span>
       </div>
+      <MoodWarnings m={m} />
       <ClanLine m={m} />
       <LevelMeter xp={m.xp} />
       <dl class="kv crew-kv">
+        <MoodRows m={m} exact={exact} />
         <dt>Wage</dt>
         <dd>{cr(wageOf(m))} / day</dd>
         <dt>Learns from</dt>
@@ -219,9 +319,12 @@ function PersonCard({ session, station }: { session: GameSession; station: Stati
   );
 }
 
-/** The captain and the five officers, with the daily payroll. */
-export function Roster({ session }: { session: GameSession }) {
+const SHARE_CHOICES = [0, 0.05, 0.1, 0.15, MAX_CREW_SHARE];
+
+/** The captain and the five officers, with the daily payroll. `onHall` runs before jumping to the hiring hall (the overlay closes itself). */
+export function Roster({ session, onHall }: { session: GameSession; onHall?: () => void }) {
   const { state } = session;
+  const share = state.crewShare ?? 0;
   const wages = dailyWages(state);
   const upkeep = dailyUpkeep(state);
   const owedSoFar = state.payrollOwed + (state.upkeepOwed ?? 0);
@@ -244,9 +347,34 @@ export function Roster({ session }: { session: GameSession }) {
           )}
         </span>
       </div>
+      <div class="crew-share">
+        <span class="crew-share-head">
+          Share of the spoils:
+          <span class="crew-seg" role="radiogroup" aria-label="Share of each sale paid to the crew">
+            {SHARE_CHOICES.map((v) => {
+              const on = Math.abs(share - v) < 0.001;
+              return (
+                <button
+                  key={v}
+                  role="radio"
+                  aria-checked={on}
+                  class={`btn crew-seg-btn ${on ? "primary" : ""}`}
+                  onClick={() => session.act((s) => setCrewShare(s, v))}
+                >
+                  {Math.round(v * 100)}%
+                </button>
+              );
+            })}
+          </span>
+        </span>
+        <span class="muted small">
+          That share of each sale is paid out as bonuses, split by level. It lifts everyone's happiness and, slowly, their loyalty. 0% is fine: they're
+          salaried.
+        </span>
+      </div>
       <div class="crew-cards">
         {STATIONS.map((st) => (
-          <PersonCard key={st} session={session} station={st} />
+          <PersonCard key={st} session={session} station={st} onHall={onHall} />
         ))}
       </div>
     </>
@@ -264,6 +392,8 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
   const fee = signingFee(state, r);
   const short = fee - state.credits;
   const diff = wage - curWage;
+  const startLoyalty = startingLoyalty(r.clan, true);
+  const exact = hasPerk(state, "read-the-room");
   return (
     <div class="panel crew-card recruit">
       <div class="hub-card-head">
@@ -284,6 +414,13 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
         <dd>{cr(wage)} / day</dd>
         <dt>Learns from</dt>
         <dd>{info.learnsFrom}</dd>
+        <dt class="crew-help" title={LOYALTY_TIP}>
+          Loyalty
+        </dt>
+        <dd title={LOYALTY_TIP}>
+          <Mood value={startLoyalty} exact={exact} />
+          <span class="muted small"> ({r.clan === "freebooters" ? `${CLAN_NAMES[r.clan]}, ` : ""}on signing)</span>
+        </dd>
         <dt>Perks</dt>
         <dd>
           <PerkTags perks={r.perks} />
@@ -343,8 +480,8 @@ export function HiringHall({ session }: { session: GameSession }) {
             The pool turns over in <span class="accent">{formatDuration(next - state.time)}</span>.{" "}
           </>
         )}
-        Signing someone replaces the current officer at that station: they collect their pay and go ashore. A signing fee is paid up
-        front.
+        Signing someone fills an empty post, or replaces the current officer at that station: they collect their pay and go ashore. A
+        signing fee is paid up front.
       </p>
       {recruits.length > 0 ? (
         <div class="crew-cards">
@@ -372,7 +509,7 @@ export function CrewOverlay({ session, onClose }: { session: GameSession; onClos
           </button>
         </div>
         <div class="con-body">
-          <Roster session={session} />
+          <Roster session={session} onHall={onClose} />
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@
  * runs one trip, so the captain always gets a chance to turn things around. A miserable officer
  * also works a level below themselves until things improve.
  */
-import { STATION_INFO, type OfficerStation } from "../data/crew";
+import { OFFICER_STATIONS, STATION_INFO, type OfficerStation } from "../data/crew";
 import type { ClanId } from "../data/ship";
 import { levelForXp, wageOf, type CrewMember } from "./crew";
 import { hasPerk } from "./perks";
@@ -176,7 +176,7 @@ export function payShare(state: GameState, saleCredits: number): number {
   const share = Math.max(0, Math.min(MAX_CREW_SHARE, state.crewShare ?? 0));
   const crew = state.crew ?? [];
   if (share <= 0 || crew.length === 0 || saleCredits <= 0) return 0;
-  const pot = Math.round(saleCredits * share);
+  const pot = crewCut(state, saleCredits);
   const weights = crew.map((m) => levelForXp(m.xp) + 1);
   const total = weights.reduce((a, b) => a + b, 0);
   crew.forEach((m, i) => {
@@ -186,6 +186,22 @@ export function payShare(state: GameState, saleCredits: number): number {
     bond(state, m, Math.min(2, days * 0.1));
   });
   return pot;
+}
+
+/** What the crew's share of a sale of this size comes to under the current setting (0 if nobody is aboard to be paid). */
+export function crewCut(state: GameState, saleCredits: number): number {
+  const share = Math.max(0, Math.min(MAX_CREW_SHARE, state.crewShare ?? 0));
+  if (share <= 0 || (state.crew ?? []).length === 0 || saleCredits <= 0) return 0;
+  return Math.round(saleCredits * share);
+}
+
+/** Things about the crew that need the captain's attention: officers on notice, and empty posts. */
+export function crewAlerts(state: GameState): { onNotice: CrewMember[]; emptyPosts: OfficerStation[] } {
+  const crew = state.crew ?? [];
+  return {
+    onNotice: crew.filter((m) => m.noticeAt !== undefined),
+    emptyPosts: OFFICER_STATIONS.filter((st) => !crew.some((m) => m.station === st)),
+  };
 }
 
 /** The captain's setting: what share of each sale goes to the crew as bonuses (0–20%). */

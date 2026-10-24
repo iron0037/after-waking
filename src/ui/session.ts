@@ -47,6 +47,8 @@ export class GameSession {
   }
   /** Whose perk tree is open (UI only; any screen can open it). */
   perkTree: Station | null = null;
+  /** Set by "go to the hiring hall"; the Hub picks it up (switching to the Crew tab and scrolling) and clears it. */
+  hallRequested = false;
   private listeners = new Set<() => void>();
   private noticeId = 0;
 
@@ -114,6 +116,14 @@ export class GameSession {
   go(view: View): void {
     if (!validViews(this.state).includes(view)) return;
     this.view = view;
+    this.emit();
+  }
+
+  /** Take the captain to the hiring hall: the Hub's Crew tab, scrolled to the recruits. Only while docked. */
+  showHiringHall(): void {
+    if (this.state.location.kind !== "intrepid") return;
+    this.hallRequested = true;
+    this.view = "hub";
     this.emit();
   }
 
