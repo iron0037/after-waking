@@ -1,11 +1,13 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { useEffect, useState } from "preact/hooks";
-import { COMMODITIES, COMMODITY_IDS } from "../../data/commodities";
+import { COMMODITIES, COMMODITY_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
+import { PROBE_PRICE } from "../../data/probes";
 import { CLAN_NAMES, UPGRADE_CATEGORY_NAMES, UPGRADES, type UpgradeCategory } from "../../data/ship";
 import {
   acceptContract,
   buyFuel,
   buyFuelOnCredit,
+  buyProbes,
   fuelCreditLimit,
   FUEL_CREDIT_MARKUP,
   fuelCreditAvailable,
@@ -203,11 +205,61 @@ function Market({ session }: { session: GameSession }) {
   const creditUnits = fuelCreditAvailable(state);
   const buy = (n: number) => session.act((s) => buyFuel(s, n));
 
+  const row = (id: CommodityId) => {
+    const have = cargo[id] ?? 0;
+    const aboard = have > 0.05;
+    const p = sellPrice(state.market, id) * salePrice;
+    const free = sellableTonnes(state, id);
+    const kept = Math.min(have, reserved[id] ?? 0);
+    return (
+      <tr key={id}>
+        <td>
+          <span class="swatch" style={{ background: COMMODITIES[id].color }} />
+          <span class="hub-name" title={COMMODITIES[id].blurb}>
+            {COMMODITIES[id].name}
+          </span>
+        </td>
+        <td class="num">
+          {aboard ? tonnes(have) : <span class="muted">-</span>}
+          {aboard && kept > 0.05 && (
+            <div class="accent small" title="Held back for an active delivery contract. Turn it in under Jobs.">
+              {tonnes(kept)} for contract
+            </div>
+          )}
+        </td>
+        <td class="num">{cr(p)}</td>
+        <td class="num">
+          <Trend mult={state.market.mult[id]} />
+        </td>
+        {forecast && <Forecast now={p} next={(forecast[id] ?? sellPrice(state.market, id)) * salePrice} />}
+        <td class="num">{aboard ? cr(have * p) : <span class="muted">-</span>}</td>
+        <td class="num">
+          <button
+            class="btn"
+            disabled={free <= 0.05}
+            title={
+              !aboard
+                ? "None aboard"
+                : free <= 0.05
+                  ? "All of it is held for a delivery contract. Turn it in under Jobs."
+                  : kept > 0.05
+                    ? `Sell ${tonnes(free)}, keeping ${tonnes(kept)} for your contract`
+                    : `Sell all ${COMMODITIES[id].name.toLowerCase()}`
+            }
+            onClick={() => session.act((s) => sell(s, id, sellableTonnes(s, id)))}
+          >
+            Sell
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div class="hub-grid">
       <section class="panel hub-wide">
         <div class="hub-section-head">
-          <h2>Ore buyers</h2>
+          <h2>Ore &amp; gas buyers</h2>
           <span class="muted">
             Hold: {tonnes(held)} / {tonnes(stats.cargoCapacityT)}
           </span>
@@ -229,55 +281,16 @@ function Market({ session }: { session: GameSession }) {
             </tr>
           </thead>
           <tbody>
-            {COMMODITY_IDS.map((id) => {
-              const have = cargo[id] ?? 0;
-              const aboard = have > 0.05;
-              const p = sellPrice(state.market, id) * salePrice;
-              const free = sellableTonnes(state, id);
-              const kept = Math.min(have, reserved[id] ?? 0);
-              return (
-                <tr key={id}>
-                  <td>
-                    <span class="swatch" style={{ background: COMMODITIES[id].color }} />
-                    <span class="hub-name" title={COMMODITIES[id].blurb}>
-                      {COMMODITIES[id].name}
-                    </span>
-                  </td>
-                  <td class="num">
-                    {aboard ? tonnes(have) : <span class="muted">-</span>}
-                    {aboard && kept > 0.05 && (
-                      <div class="accent small" title="Held back for an active delivery contract. Turn it in under Jobs.">
-                        {tonnes(kept)} for contract
-                      </div>
-                    )}
-                  </td>
-                  <td class="num">{cr(p)}</td>
-                  <td class="num">
-                    <Trend mult={state.market.mult[id]} />
-                  </td>
-                  {forecast && <Forecast now={p} next={(forecast[id] ?? sellPrice(state.market, id)) * salePrice} />}
-                  <td class="num">{aboard ? cr(have * p) : <span class="muted">-</span>}</td>
-                  <td class="num">
-                    <button
-                      class="btn"
-                      disabled={free <= 0.05}
-                      title={
-                        !aboard
-                          ? "None aboard"
-                          : free <= 0.05
-                            ? "All of it is held for a delivery contract. Turn it in under Jobs."
-                            : kept > 0.05
-                              ? `Sell ${tonnes(free)}, keeping ${tonnes(kept)} for your contract`
-                              : `Sell all ${COMMODITIES[id].name.toLowerCase()}`
-                      }
-                      onClick={() => session.act((s) => sell(s, id, sellableTonnes(s, id)))}
-                    >
-                      Sell
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+            <tr class="hub-subhead">
+              <th colSpan={forecast ? 7 : 6}>Ores</th>
+            </tr>
+            {ORE_IDS.map(row)}
+            <tr class="hub-subhead">
+              <th colSpan={forecast ? 7 : 6} title="Skimmed from gas and ice giants by atmospheric probes. Thin markets: a few tonnes move the price.">
+                Gases
+              </th>
+            </tr>
+            {GAS_IDS.map(row)}
           </tbody>
         </table>
         <div class="hub-actions">
@@ -642,6 +655,48 @@ function Perked({ eff, base, unit = "" }: { eff: number; base: number; unit?: st
   );
 }
 
+/** Atmospheric probes: bought one at a time (or to fill the racks) once a bay is installed. */
+function ProbeRack({ session, capacity }: { session: GameSession; capacity: number }) {
+  const { state } = session;
+  const have = state.ship.probes ?? 0;
+  const room = capacity - have;
+  const afford = Math.floor(state.credits / PROBE_PRICE);
+  const fill = Math.min(room, afford);
+  const why = room <= 0 ? "The probe racks are full." : afford <= 0 ? `A probe costs ${cr(PROBE_PRICE)}.` : "";
+  return (
+    <div class="panel hub-card installed">
+      <div class="hub-card-head">
+        <strong>Atmospheric probes</strong>
+        <span class="hub-price">
+          <span class="accent">{cr(PROBE_PRICE)}</span>
+          <span class="muted small">each</span>
+        </span>
+      </div>
+      <div class="hub-card-tags">
+        <span class="tag">
+          In the bay {have} / {capacity}
+        </span>
+      </div>
+      <div class="muted small">
+        Fired into gas and ice giants by your science officer. A probe that comes back up is reused; one that doesn't has to be replaced.
+      </div>
+      <div class="btn-row">
+        <button class="btn" disabled={why !== ""} title={why || `Buy one probe for ${cr(PROBE_PRICE)}`} onClick={() => session.act((s) => buyProbes(s, 1))}>
+          Buy 1
+        </button>
+        <button
+          class="btn"
+          disabled={why !== "" || fill < 2}
+          title={why || (fill < 2 ? "Buy one at a time." : `Buy ${fill} for ${cr(fill * PROBE_PRICE)}`)}
+          onClick={() => session.act((s) => buyProbes(s, fill))}
+        >
+          Fill the racks{fill >= 2 ? ` (${fill})` : ""}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Shipyard({ session }: { session: GameSession }) {
   const { state } = session;
   const stats = effectiveStats(state);
@@ -784,6 +839,7 @@ function Shipyard({ session }: { session: GameSession }) {
                   </div>
                 );
               })}
+              {cat === "sensors" && stats.probeCapacity > 0 && <ProbeRack session={session} capacity={stats.probeCapacity} />}
             </div>
           </Section>
           );

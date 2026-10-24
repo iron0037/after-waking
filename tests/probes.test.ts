@@ -6,7 +6,10 @@ import {
   buyProbes,
   chooseProbeOption,
   currentProbeEvent,
+  diveDepthKm,
   diveOdds,
+  optionHint,
+  richnessLabel,
   flyTo,
   launchProbe,
   newGame,
@@ -124,5 +127,16 @@ describe("atmospheric probes", () => {
       prevNet = net;
     }
     console.table(rows);
+  });
+
+  it("describes richness and choices in words", () => {
+    expect(richnessLabel(0.65)).toBe("lean");
+    expect(richnessLabel(1)).toBe("average");
+    expect(richnessLabel(1.35)).toBe("rich");
+    expect(optionHint({ label: "x", risk: 0.04, hours: -2 })).toBe("faster, riskier");
+    expect(optionHint({ label: "x", riskMult: 0.5, yield: 0.7 })).toBe("safer, leaner sample");
+    expect(optionHint({ label: "x" })).toBe("");
+    expect(diveDepthKm(3, 0)).toBeLessThan(diveDepthKm(3, 2));
+    expect(diveDepthKm(3, 2)).toBeLessThan(900);
   });
 });

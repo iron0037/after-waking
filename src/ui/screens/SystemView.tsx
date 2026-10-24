@@ -45,6 +45,7 @@ import {
   type ViewAnchor,
   type ViewState,
 } from "./system/projection";
+import { ProbePanel } from "./system/ProbePanel";
 import { RegionPicker, bestRegion } from "./system/RegionPicker";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
@@ -570,6 +571,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                 )}
               </>
             )}
+
+            <ProbePanel session={session} body={selected} orbiting={orbitingSel} scanned={scanned} busy={busy} />
 
             {scanned ? (
               <Environment body={selected} ratings={stats.ratings} />

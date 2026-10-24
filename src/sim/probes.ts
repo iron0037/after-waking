@@ -5,7 +5,7 @@
  * one has to be replaced at the Shipyard.
  */
 import { COMMODITIES, GAS_IDS, type GasId } from "../data/commodities";
-import { DEPTHS, PROBE_EVENTS, PROBE_PRICE, type DepthBand, type ProbeDepth, type ProbeEvent } from "../data/probes";
+import { DEPTHS, PROBE_EVENTS, PROBE_PRICE, type DepthBand, type ProbeDepth, type ProbeEvent, type ProbeOption } from "../data/probes";
 import type { Body } from "./bodies";
 import { awardXp, workingLevel } from "./crew";
 import { sellPrice } from "./economy";
@@ -49,6 +49,32 @@ export function isGiant(body: Body): boolean {
 /** How rich a giant's atmosphere is (0.6–1.4), stable per body. */
 export function atmosphereRichness(seed: number, body: Body): number {
   return Math.round(rngFor(seed, body.id, "atmosphere").range(0.6, 1.4) * 100) / 100;
+}
+
+/** Words for an atmosphere's richness, for the dive planner. */
+export function richnessLabel(richness: number): "lean" | "average" | "rich" {
+  return richness < 0.8 ? "lean" : richness < 1.2 ? "average" : "rich";
+}
+
+/** A subtle nudge about what a choice leans toward (never numbers): "faster, riskier". */
+export function optionHint(option: ProbeOption): string {
+  const hints: string[] = [];
+  const hours = option.hours ?? 0;
+  if (hours < 0) hints.push("faster");
+  else if (hours > 0) hints.push("slower");
+  if (option.riskMult !== undefined && option.riskMult < 1) hints.push("safer");
+  else if ((option.risk ?? 0) > 0) hints.push("riskier");
+  else if ((option.risk ?? 0) < 0) hints.push("safer");
+  const y = option.yield ?? 1;
+  if (y > 1) hints.push("richer sample");
+  else if (y < 1) hints.push("leaner sample");
+  return hints.join(", ");
+}
+
+/** Roughly how far down the probe is when it reaches decision point `step` (0-based) of a dive. */
+export function diveDepthKm(depth: ProbeDepth, step: number): number {
+  const band = depthBand(depth);
+  return Math.round((band.km * (step + 1)) / (band.events + 1));
 }
 
 export function depthBand(depth: ProbeDepth): DepthBand {

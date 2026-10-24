@@ -6,7 +6,19 @@
  */
 import { useEffect, useReducer } from "preact/hooks";
 import type { Station } from "../data/crew";
-import { deserialize, migrateSurfaceCoords, newGame, serialize, World, type GameState, type Result } from "../sim";
+import type { ProbeDepth } from "../data/probes";
+import {
+  chooseProbeOption,
+  deserialize,
+  depthBand,
+  migrateSurfaceCoords,
+  newGame,
+  serialize,
+  World,
+  type DiveResult,
+  type GameState,
+  type Result,
+} from "../sim";
 
 export const SAVE_KEY = "after-waking/save";
 
@@ -29,6 +41,18 @@ export interface ActOptions {
   timelapse?: boolean;
 }
 
+/** A finished probe dive on its way to the debrief (UI only; the sim has already played it out). */
+export interface ProbeReport {
+  /** "signal": the link is gone and the ballast timer is running; "debrief": the result is in. */
+  stage: "signal" | "debrief";
+  bodyName: string;
+  depth: ProbeDepth;
+  bandName: string;
+  km: number;
+  choices: string[];
+  result: DiveResult;
+}
+
 export interface Notice {
   id: number;
   text: string;
@@ -45,6 +69,8 @@ export class GameSession {
   get busy(): boolean {
     return this.animating || this.timelapse !== null;
   }
+  /** The dive that just ended, until the player closes the debrief. */
+  probeReport: ProbeReport | null = null;
   /** Whose perk tree is open (UI only; any screen can open it). */
   perkTree: Station | null = null;
   /** Set by "go to the hiring hall"; the Hub picks it up (switching to the Crew tab and scrolling) and clears it. */
@@ -87,6 +113,43 @@ export class GameSession {
     this.save();
     this.emit();
     return result;
+  }
+
+  /** Make the call at the current probe decision point. After the last one, the descent plays out and a debrief follows. */
+  chooseProbe(option: 0 | 1): void {
+    const dive = this.state.probeDive;
+    if (!dive || this.busy) return;
+    const bodyName = this.world.body(dive.bodyId).body.name;
+    const res = this.act((s, w) => chooseProbeOption(s, w, option));
+    if (!res.ok || !res.value.done || !res.value.result) return;
+    const band = depthBand(dive.depth);
+    const report: ProbeReport = {
+      stage: "signal",
+      bodyName,
+      depth: dive.depth,
+      bandName: band.name,
+      km: band.km,
+      choices: [...dive.choices],
+      result: res.value.result,
+    };
+    this.probeReport = report;
+    this.emit();
+    // Let the signal-lost beat land, and the time-lapse clock (if the dive was long enough for one) finish, before the result.
+    setTimeout(
+      () =>
+        this.whenIdle(() => {
+          if (this.probeReport === report) {
+            report.stage = "debrief";
+            this.emit();
+          }
+        }),
+      2200,
+    );
+  }
+
+  closeProbeReport(): void {
+    this.probeReport = null;
+    this.emit();
   }
 
   /** Show the clock sweeping from `from` to `to`: longer stretches play a little longer (1–3.5 s). */

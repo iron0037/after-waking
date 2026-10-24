@@ -64,6 +64,35 @@ Each body has an **environment profile**, and each vehicle has **ratings** again
 | **Asteroid / tiny moon** | **Docks and anchors.** No rover driving in microgravity. | Freighter mining laser; EVA team for artifacts and samples |
 | **Star** | Late-game **corona skim** for rare isotopes; high risk | — |
 
+### Atmospheric probes v1 **[DECIDED 2026-10-24]** (AW-16)
+
+The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
+
+- **Equipment:**
+  - The Lyceum's **probe bay** (20k cr) carries 3 probes and reaches the deep layers.
+  - The **pressure-rated racks** (35k cr) carry 6 and reach the abyss.
+  - Probes cost 2,500 cr each and are reused when they come back.
+- **The dive:**
+  - In orbit of a scanned gas or ice giant, choose a depth band: cloud tops, middle decks, deep layers or the abyss.
+  - The science officer flies 1–3 decision points on the way down: a storm band, lightning, a rich layer, a pressure spike or icing. Each choice trades risk for haul or time.
+  - Then the link fails, and a mechanical ballast timer brings the probe up. Nothing aboard thinks for itself.
+  - **Outcomes:** recovered, damaged (half the haul) or lost.
+  - **Skill:** each science level trims risk, to 40% of the base at best, and adds 3% yield.
+- **Gases:** methane, deuterium, xenon and helium-3. Thin markets mean a few tonnes move the price.
+  - Gas giants run richer in helium-3 deeper down; ice giants are methane-heavy.
+  - Each giant's richness (0.6–1.4) is fixed per world.
+- **Economics** (simulated at science level 1, before market saturation):
+
+  | Depth band | Net per dive | Loss rate |
+  |---|---|---|
+  | Cloud tops | ~0.25k cr | 7% |
+  | Middle decks | ~1k cr | 10% |
+  | Deep layers | ~1.9k cr | 22% |
+  | The abyss | ~2.5k cr | 36% |
+
+  A few dives add roughly half a mining trip, with real variance.
+- **Generation:** world generation draws only from ore types (`ORE_IDS`), so adding gases didn't change any existing world.
+
 ### Probes and remote operation **[PROPOSED, lore fit]**
 - No AI means no autonomous drones. Probes are **remote-piloted by your Science officer**, so crew skill sets how deep they go, how much they recover and whether they survive.
 - That keeps the human-only rule and gives Science a hands-on role.

@@ -3,6 +3,7 @@ import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
 import { Journal } from "./Journal";
+import { ProbeDiveOverlay } from "./ProbeDive";
 import { LevelUpPopup, PerkTreeModal } from "./PerkTree";
 import { TimeLapseClock } from "./TimeLapseClock";
 import { TitleScreen } from "./TitleScreen";
@@ -47,7 +48,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   }, [session]);
 
   // Level-ups wait for animations (flights, drives, time-lapses) to finish, and for any tree the player has open.
-  const levelUp = session.busy || session.timelapse || session.perkTree ? null : (session.state.levelUps?.[0] ?? null);
+  const levelUp = session.busy || session.timelapse || session.perkTree || session.probeReport ? null : (session.state.levelUps?.[0] ?? null);
   const latest = session.state.journal.slice(-2).reverse();
 
   return (
@@ -72,6 +73,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
       {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
+      <ProbeDiveOverlay session={session} />
       {session.perkTree && <PerkTreeModal session={session} station={session.perkTree} onClose={() => session.openPerkTree(null)} />}
       {levelUp && <LevelUpPopup session={session} up={levelUp} />}
       {session.timelapse && <TimeLapseClock lapse={session.timelapse} />}
