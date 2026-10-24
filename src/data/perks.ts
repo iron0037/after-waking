@@ -139,7 +139,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     ],
     [
       ["mentor", "Mentor", "The whole crew earns 10% more experience."],
-      ["morale", "Morale", "Happiness recovers twice as fast.", "crew sentiment (AW-100)"],
+      ["morale", "Morale", "Shore leave restores happiness twice as fast, and good news lifts spirits 50% more."],
       ["steady-hands", "Steady Hands", "Drilling incidents are 15% rarer."],
       ["longevity", "Longevity", "Crew retire five years later.", "aging (AW-96)"],
       ["family-ship", "Family Ship", "Retiring veterans leave a trained protégé.", "aging (AW-96)"],
@@ -150,7 +150,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["talent-scout", "Talent Scout", "The hiring hall offers two more recruits, at higher levels."],
       ["recruiter", "Recruiter", "Signing fees halved."],
       ["inspiring", "Inspiring", "The whole crew earns 10% more experience."],
-      ["loyalty", "Loyalty", "Loyalty grows 50% faster; veterans delay retirement.", "crew sentiment (AW-100)"],
+      ["loyalty", "Loyalty", "Loyalty grows 50% faster."],
       ["silver-tongue", "Silver Tongue", "Persuade colonists to move to an outpost, or pirates to let you go.", "outposts (M4)"],
     ],
     [
@@ -162,7 +162,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     ],
     [
       ["hunch", "Hunch", "The region chart marks where your gut says to land."],
-      ["read-the-room", "Read the Room", "See crew happiness and loyalty as exact 0–100 scores.", "crew sentiment (AW-100)"],
+      ["read-the-room", "Read the Room", "See crew happiness and loyalty as exact 0–100 scores, not just low, medium or high."],
       ["fortune-favors", "Fortune Favors", "Rare mineral specimens are twice as likely, and a quarter of incidents turn up a specimen."],
       ["read-the-enemy", "Read the Enemy", "A hint of the enemy's next move in combat.", "M3 combat"],
       ["sixth-sense", "Sixth Sense", "Notice the world's \"seams\" first.", "the Awaken path"],

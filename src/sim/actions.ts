@@ -28,7 +28,8 @@ import { FLORA_BY_NAME } from "../data/catalog";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses } from "./crew";
-import { helmCoversRescue, helmOnDeparture, helmOnDocked } from "./helm";
+import { helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
+import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
 import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
@@ -186,6 +187,8 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     state.location = { kind: "intrepid" };
     advanceTime(state, DOCKING_MINUTES);
     log(state, "travel", `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
+    const departWorth = state.helm?.departWorth;
+    sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
     helmOnDocked(state);
     return ok(undefined);
   }
@@ -217,6 +220,19 @@ export function fold(state: GameState, world: World, targetId: string): Result {
  * charging, then fold. Costs exactly the same time and fuel as doing it by hand.
  */
 export function autoFold(state: GameState, world: World, targetId: string): Result<{ waited: number; flewToEdge: boolean }> {
+  const prepared = prepareFold(state, world, targetId);
+  if (!prepared.ok) return prepared;
+  const folded = fold(state, world, targetId);
+  if (!folded.ok) return folded;
+  return prepared;
+}
+
+/**
+ * Everything a one-click departure does before the fold itself: fly out to the edge if needed and
+ * wait out the refit and the yard. Split from the fold so the UI can show the wait before revealing
+ * the destination.
+ */
+export function prepareFold(state: GameState, world: World, targetId: string): Result<{ waited: number; flewToEdge: boolean }> {
   const plan = foldPlan(state, world, targetId);
   const hard = plan.blockers.filter((b) => !isWaitBlocker(b) && !b.startsWith("Folds can't start inside"));
   if (hard.length > 0) return fail(hard[0] as string);
@@ -235,8 +251,6 @@ export function autoFold(state: GameState, world: World, targetId: string): Resu
     advanceTime(state, waited);
     log(state, "travel", `Waited ${formatDuration(waited)} for the fold-drive refit${state.location.kind === "intrepid" ? " and the yard" : ""}.`);
   }
-  const folded = fold(state, world, targetId);
-  if (!folded.ok) return folded;
   return ok({ waited, flewToEdge });
 }
 
@@ -716,6 +730,7 @@ function revealAt(state: GameState, world: World, bodyId: string, center: Vec2):
     }
   }
   awardXp(state, "science", 2 * (foundDeposits.length + foundFlora.length));
+  if (foundDeposits.length + foundFlora.length > 0) cheerStation(state, "science", Math.min(2, foundDeposits.length + foundFlora.length));
   if (foundDeposits.length > 0) {
     const names = foundDeposits.map((d) => COMMODITIES[d.commodity].name.toLowerCase());
     log(
@@ -852,6 +867,9 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
     }
     awardXp(state, "engineering", 10);
     awardXp(state, "medical", 6);
+    cheerAll(state, -1);
+    cheerStation(state, "engineering", -2);
+    cheerStation(state, "medical", -1);
     // Fortune Favors: sometimes the trouble turns something up.
     if (fortune) {
       const lucky = withRng(state, (rng) => (rng.chance(0.25) ? rollMineralSpecimen(rng, d.commodity, hours, 100) : null));
@@ -958,6 +976,7 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   log(state, "discovery", count === 2 ? `Collected two living samples of ${site.species}.` : `Collected a living sample of ${site.species}.`);
   awardXp(state, "medical", 5);
   awardXp(state, "science", 2);
+  cheerStation(state, "medical", 1);
   const entry = FLORA_BY_NAME.get(site.species);
   if (entry) recordFind(state, "flora", entry.id, placeName(world, bodyId), entry.name);
   return ok(site);
@@ -1059,6 +1078,11 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   state.credits += credits;
   state.stats.earned += credits;
   log(state, "trade", `Sold ${amount.toFixed(1)} t of ${COMMODITIES[id].name.toLowerCase()} for ${credits.toLocaleString()} cr.`);
+  const bonus = payShare(state, credits);
+  if (bonus > 0) {
+    state.credits -= bonus;
+    log(state, "trade", `Paid the crew ${bonus.toLocaleString()} cr as their share.`);
+  }
   settlePayroll(state); // the crew gets paid out of the proceeds
   return ok(credits);
 }
@@ -1247,6 +1271,7 @@ export function callForRescue(state: GameState, world: World): Result<RescueQuot
   advanceTime(state, quote.days * DAY);
   state.ship.fuel += quote.fuel;
   const helmPays = helmCoversRescue(state);
+  cheerAll(state, -8);
   if (!helmPays) chargeToNote(state, quote.cost);
   log(
     state,
@@ -1334,6 +1359,7 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const installs = (state.yard ?? []).filter((j) => j.kind === "install");
   const start = Math.max(state.time, ...installs.map((j) => j.readyAt));
   state.yard = [...(state.yard ?? []), { kind: "install", label: upgrade.name, upgradeId, readyAt: start + UPGRADE_INSTALL_DAYS * DAY }];
+  bondClan(state, upgrade.vendor, 2);
   log(state, "trade", `Ordered ${upgrade.name}. The yard will have it fitted in ${formatDuration(start + UPGRADE_INSTALL_DAYS * DAY - state.time)}.`);
   return ok(undefined);
 }

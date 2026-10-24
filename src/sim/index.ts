@@ -22,3 +22,4 @@ export * from "./bodysurface";
 export * from "./crew";
 export * from "./perks";
 export * from "./helm";
+export * from "./sentiment";

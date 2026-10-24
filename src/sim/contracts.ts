@@ -8,6 +8,7 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
+import { bondClan, cheerAll } from "./sentiment";
 import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { Rng } from "./rng";
@@ -235,6 +236,8 @@ export function tickContracts(state: GameState): void {
     if (c.status === "active" && c.deadline !== null && state.time > c.deadline) {
       c.status = "failed";
       state.journal.push({ t: state.time, kind: "warning", text: `Contract lapsed: "${c.title}". ${CLAN_NAMES[c.clan]} won't forget it.` });
+      bondClan(state, c.clan, -4);
+      cheerAll(state, -2);
     }
   }
   state.nextContractAt ??= state.time + 20 * DAY;
@@ -339,5 +342,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
   state.journal.push({ t: state.time, kind: "trade", text: `Contract fulfilled: "${c.title}". ${CLAN_NAMES[c.clan]} paid ${pay.toLocaleString()} cr.` });
   awardXp(state, "comms", 25);
   awardXp(state, "captain", 25);
+  bondClan(state, c.clan, 4);
+  cheerAll(state, 2);
   return ok(pay);
 }

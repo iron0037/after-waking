@@ -97,8 +97,18 @@ export class GameSession {
       if (this.timelapse === lapse) {
         this.timelapse = null;
         this.emit();
+        const queued = this.idleQueue.splice(0);
+        for (const fn of queued) fn();
       }
     }, durMs + 700);
+  }
+
+  private idleQueue: (() => void)[] = [];
+
+  /** Run `fn` once the time-lapse clock (if any) has finished, so nothing jumps ahead of it. */
+  whenIdle(fn: () => void): void {
+    if (this.timelapse) this.idleQueue.push(fn);
+    else fn();
   }
 
   go(view: View): void {

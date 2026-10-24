@@ -1,7 +1,7 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
-  autoFold,
+  prepareFold,
   clamp,
   currentSystemId,
   orbitalSensorTier,
@@ -324,9 +324,14 @@ export function StarMap({ session }: { session: GameSession }) {
     timer.current = window.setTimeout(() => {
       timer.current = 0;
       flash.current = 0;
-      const result = auto ? session.act((s, w) => autoFold(s, w, id)) : session.act((s, w) => fold(s, w, id));
+      // Waiting out the refit plays the clock first; the fold (and the destination) come after it.
+      const prepared = auto ? session.act((s, w) => prepareFold(s, w, id)) : null;
       session.setBusy(false);
-      if (result.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
+      if (prepared && !prepared.ok) return;
+      session.whenIdle(() => {
+        const result = session.act((s, w) => fold(s, w, id));
+        if (result.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
+      });
     }, FLASH_MS);
   };
 

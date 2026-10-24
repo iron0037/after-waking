@@ -17,6 +17,7 @@ import {
 } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { fail, ok, type Result } from "./result";
+import { cheer, ensureSentiment, isMiserable } from "./sentiment";
 import { autoSpendPerks, crossTrainingLevels, hasPerk, MAX_EFFECTIVE_LEVEL } from "./perks";
 import { rngFor, type Rng } from "./rng";
 import type { GameState } from "./state";
@@ -31,6 +32,11 @@ export interface CrewMember {
   xp: number;
   /** Perks taken (AW-95); they leave with the person. */
   perks?: string[];
+  /** What they think of the captain (AW-100): short-term happiness and long-term loyalty, 0–100. */
+  happiness?: number;
+  loyalty?: number;
+  /** When they gave notice, if they have. */
+  noticeAt?: number;
 }
 
 /** A level gained, waiting for the player to see it (and maybe pick a perk). */
@@ -120,6 +126,7 @@ export function awardXp(state: GameState, station: Station, amount: number): voi
       text: `${STATION_INFO[station].title} ${m.name} reached level ${after}: ${bonusLine(state, station)}. Wage now ${wageOf(m)} cr a day.`,
     });
     queueLevelUp(state, { station, name: m.name, level: after });
+    cheer(state, m, 8);
   }
 }
 
@@ -215,7 +222,9 @@ export function crewBonuses(state: GameState): CrewBonuses {
     contractPay: 1,
   };
   for (const station of ["captain", ...OFFICER_STATIONS] as Station[]) {
-    const level = stationLevel(state, station);
+    // A miserable officer just goes through the motions: a level below themselves.
+    const holder = station === "captain" ? null : officerAt(state, station);
+    const level = Math.max(0, stationLevel(state, station) - (holder && isMiserable(holder) ? 1 : 0));
     const bonuses = stationBonuses(station, level) as Record<string, number>;
     for (const key of Object.keys(bonuses)) {
       // Cross-training perks count as extra levels for one named bonus.
@@ -324,6 +333,7 @@ export function hireRecruit(state: GameState, recruitId: string): Result<{ hired
   if (state.credits < fee) return fail(`Signing ${r.name} costs ${fee.toLocaleString()} cr.`);
   state.credits -= fee;
   const { fee: _fee, ...hired } = r;
+  ensureSentiment(hired, true);
   const replaced = officerAt(state, r.station);
   state.crew = [...(state.crew ?? []).filter((m) => m.station !== r.station), hired];
   state.recruits = recruits.filter((x) => x.id !== recruitId);
@@ -342,6 +352,8 @@ export function hireRecruit(state: GameState, recruitId: string): Result<{ hired
 export function ensureCrew(state: GameState): void {
   state.captain.xp ??= 0;
   if (!state.crew || state.crew.length === 0) state.crew = starterCrew(state.seed, state.time);
+  for (const m of state.crew) ensureSentiment(m);
+  state.lastDockedAt ??= state.time;
   if (state.nextRecruitsAt === undefined) {
     state.nextRecruitsAt = state.time;
     tickRecruits(state);

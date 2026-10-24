@@ -11,7 +11,7 @@ const TRIPS = 60;
 const BUCKET = 10;
 
 const PROFILES: Record<string, BotOptions> = {
-  competent: { survey: true, upgrades: DEFAULT_UPGRADES },
+  competent: { survey: true, upgrades: DEFAULT_UPGRADES, crewShare: 0.05 },
   novice: { novice: true, upgrades: DEFAULT_UPGRADES },
 };
 
@@ -40,6 +40,9 @@ describe.skipIf(!env.BALANCE)("career report", () => {
           loan: avg(last.map((t) => t!.loan)),
           "crew lvl": Math.round(avg(last.map((t) => t!.crewLevel * 10))) / 10,
           rescues: avg(last.map((t) => t!.rescues * 10)) / 10,
+          quits: avg(last.map((t) => t!.quits * 10)) / 10,
+          happy: avg(last.map((t) => t!.happiness)),
+          loyal: avg(last.map((t) => t!.loyalty)),
         });
       }
       console.log(`\n=== ${name} ===`);

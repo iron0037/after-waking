@@ -42,7 +42,8 @@ import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
-import { levelForXp } from "./crew";
+import { OFFICER_STATIONS } from "../data/crew";
+import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
@@ -66,6 +67,10 @@ export interface BotReport {
     loan: number;
     crewLevel: number;
     rescues: number;
+    /** Officers who have left so far, and the crew's average happiness and loyalty after the trip. */
+    quits: number;
+    happiness: number;
+    loyalty: number;
   }[];
 }
 
@@ -78,12 +83,14 @@ export interface BotOptions {
   reserve?: number;
   /** Play like a new captain: picks systems at random, takes the chart's default region, never surveys, calls for rescue when stranded. */
   novice?: boolean;
+  /** Share of each sale paid to the crew as bonuses (0–0.2). */
+  crewShare?: number;
 }
 
 export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
 
 export function runBot(seed: number, trips: number, options: BotOptions = {}): BotReport {
-  const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false } = options;
+  const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false, crewShare = 0 } = options;
   let rescues = 0;
   const world = new World(seed);
   const state = newGame({ seed });
@@ -109,6 +116,13 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     const start = state.time;
     const creditsBefore = state.credits;
     const loanPaidBefore = state.stats.loanPaid ?? 0;
+    // Fill any empty post from the hiring hall (cheapest recruit for it).
+    state.crewShare = crewShare;
+    for (const station of OFFICER_STATIONS) {
+      if (officerAt(state, station)) continue;
+      const pick = (state.recruits ?? []).filter((r) => r.station === station).sort((a, b) => signingFee(state, a) - signingFee(state, b))[0];
+      if (pick && state.credits > signingFee(state, pick)) hireRecruit(state, pick.id);
+    }
     buyFuel(state, 999);
     if (state.ship.fuel < effectiveStats(state).fuelCapacity * 0.6) buyFuelOnCredit(state, 999);
     // The bot's crew spend their perk points the way recruits do.
@@ -144,10 +158,17 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
       loan: state.loan.balance,
       crewLevel: (state.crew ?? []).reduce((s, m) => s + levelForXp(m.xp), 0) / Math.max(1, (state.crew ?? []).length),
       rescues,
+      quits: state.journal.filter((j) => j.text.includes("left the ship")).length,
+      happiness: avgOf(state.crew ?? [], (m) => m.happiness ?? 0),
+      loyalty: avgOf(state.crew ?? [], (m) => m.loyalty ?? 0),
     });
   }
 
   return { state, tripsCompleted, errors, tripSummaries };
+}
+
+function avgOf<T>(xs: readonly T[], f: (x: T) => number): number {
+  return xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : 0;
 }
 
 function visitsTo(state: GameState, systemId: string): number {

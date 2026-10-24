@@ -10,6 +10,7 @@ import { UPGRADES_BY_ID } from "../data/ship";
 import { chargeStowedRover, tickYard } from "./actions";
 import type { HelmRecord } from "./helm";
 import { hasPerk } from "./perks";
+import { tickSentiment } from "./sentiment";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
@@ -97,6 +98,10 @@ export interface GameState {
   yard?: YardJob[];
   /** Helm's Small Operators' Fund: trip scoring, assists given, obligations. */
   helm?: HelmRecord;
+  /** When the ship last docked at the Intrepid (long hauls wear on the crew). */
+  lastDockedAt?: number;
+  /** Share of each sale paid to the crew as bonuses, 0–0.2. */
+  crewShare?: number;
   credits: number;
   loan: Loan;
   ship: ShipState;
@@ -210,6 +215,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   tickRecruits(state);
   tickYard(state);
   chargeStowedRover(state, minutes);
+  tickSentiment(state, minutes);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);
