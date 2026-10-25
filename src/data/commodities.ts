@@ -6,10 +6,31 @@ export const ORE_IDS = ["ironNickel", "copper", "titanium", "rareEarths", "urani
 /** Skimmed from giant planets' atmospheres by probes (AW-16). Thin markets: a few tonnes move the price. */
 export const GAS_IDS = ["methane", "deuterium", "xenon", "helium3"] as const;
 
-export const COMMODITY_IDS = [...ORE_IDS, ...GAS_IDS] as const;
+/**
+ * Ore concentrate from the portable refinery (AW-18): lighter and worth a little more than the ore
+ * it came from. Its price follows its ore's market.
+ */
+export const CONC_IDS = ["ironNickelConc", "copperConc", "titaniumConc", "rareEarthsConc", "uraniumConc", "platinumConc"] as const;
+
+export const COMMODITY_IDS = [...ORE_IDS, ...GAS_IDS, ...CONC_IDS] as const;
 
 export type OreId = (typeof ORE_IDS)[number];
 export type GasId = (typeof GAS_IDS)[number];
+export type ConcId = (typeof CONC_IDS)[number];
+
+/** Tonnes of ore that make one tonne of concentrate. */
+export const CONC_RATIO = 2.5;
+/** A tonne of concentrate is worth this much more than the ore that made it. */
+export const CONC_PREMIUM = 1.1;
+/** Which ore each concentrate is refined from. */
+export const CONC_SOURCE: Record<ConcId, OreId> = {
+  ironNickelConc: "ironNickel",
+  copperConc: "copper",
+  titaniumConc: "titanium",
+  rareEarthsConc: "rareEarths",
+  uraniumConc: "uranium",
+  platinumConc: "platinum",
+};
 
 export type CommodityId = (typeof COMMODITY_IDS)[number];
 
@@ -24,7 +45,7 @@ export interface Commodity {
   blurb: string;
 }
 
-export const COMMODITIES: Record<CommodityId, Commodity> = {
+const BASE: Record<OreId | GasId, Commodity> = {
   ironNickel: {
     id: "ironNickel",
     name: "Iron-nickel ore",
@@ -123,3 +144,22 @@ export const COMMODITIES: Record<CommodityId, Commodity> = {
     blurb: "The fusion fuel of the future, always. Found deep in gas giants, where probes go to die.",
   },
 };
+
+/** Concentrate entries, derived from their ores so the numbers stay in step. */
+function concentrates(): Record<ConcId, Commodity> {
+  const out = {} as Record<ConcId, Commodity>;
+  for (const id of CONC_IDS) {
+    const ore = BASE[CONC_SOURCE[id]];
+    out[id] = {
+      id,
+      name: ore.name.replace(/ ore$/, "") + " concentrate",
+      basePrice: Math.round(ore.basePrice * CONC_RATIO * CONC_PREMIUM),
+      marketDepthT: Math.round(ore.marketDepthT / CONC_RATIO),
+      color: ore.color,
+      blurb: `Refined ${ore.name.toLowerCase()}: ${CONC_RATIO} t of ore crushed, floated and dried down to one.`,
+    };
+  }
+  return out;
+}
+
+export const COMMODITIES: Record<CommodityId, Commodity> = { ...BASE, ...concentrates() };

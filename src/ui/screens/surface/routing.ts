@@ -1,11 +1,11 @@
 /** Route planning helpers for the surface screen (thin wrappers over the sim's pathfinder, planet-wide coordinates). */
 import { findPath, neighbors, type Mobility, type PathStep, type TileSource, type Vec2 } from "../../../sim";
 
-/** How this rover gets around, with the crew's perks: terrain it can cross (roverMobility) and the route energy and time multipliers (routeEnergyMult, routeMinutesMult). */
+/** How the vehicle being driven gets around, with the crew's perks: terrain it can cross (vehicleMobility) and the route energy and time multipliers (routeEnergyMult, vehicleMinutesMult). */
 export interface Mover {
   mobility: Mobility;
   energyMult: number;
-  /** Drive-time multiplier (uprated drive motors). */
+  /** Drive-time multiplier (uprated drive motors; the boat has none). */
   minutesMult: number;
 }
 
@@ -53,9 +53,9 @@ export function evaluate(tiles: TileSource, path: PathStep[], start: Vec2, home:
   };
 }
 
-/** Energy to drive from `from` to the ship, or null if there is no route. */
+/** Energy to get from `from` home (or, if home can't be entered, to the cheapest hex beside it: the shore by a moored boat), or null if there is no route. */
 export function energyHome(tiles: TileSource, from: Vec2, home: Vec2, mover: Mover): number | null {
-  const path = pathFor(tiles, from, home, mover);
+  const path = planPath(tiles, from, home, mover, true);
   return path ? path.reduce((s, p) => s + p.energy, 0) : null;
 }
 

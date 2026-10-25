@@ -9,6 +9,7 @@ export function TopBar({
   onCompendium,
   onContracts,
   onCrew,
+  onShip,
   onQuit,
 }: {
   session: GameSession;
@@ -16,6 +17,7 @@ export function TopBar({
   onCompendium: () => void;
   onContracts: () => void;
   onCrew: () => void;
+  onShip: () => void;
   onQuit: () => void;
 }) {
   const { state, world } = session;
@@ -52,10 +54,10 @@ export function TopBar({
           <span style={{ width: `${pct(state.ship.fuel, stats.fuelCapacity)}%` }} />
         </div>
       </div>
-      <div class="tb-block">
+      <button class="tb-block tb-click" onClick={onShip} title="Ship status: hold, specimens, vehicles, refinery (H)">
         <div class="tb-label">Hold</div>
         <div class="tb-value">{cargoSummary(state.ship.cargo, stats.cargoCapacityT)}</div>
-      </div>
+      </button>
       <div class="tb-block">
         <div class="tb-label">Fold drive</div>
         <div class={`tb-value ${foldReady ? "good" : "muted"}`}>

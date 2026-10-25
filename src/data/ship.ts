@@ -43,6 +43,8 @@ export interface ShipStats {
   roverChargeMult: number;
   /** Multiplies the time each hex takes the rover (below 1 is faster). */
   roverDriveTime: number;
+  /** Portable refinery (AW-18): tonnes of ore processed per crew hour; 0 means none aboard. */
+  refineryRateTph: number;
   /** Boat (AW-17): cargo and cell capacity; boatEnergy 0 means no boat aboard. */
   boatCargoT: number;
   boatEnergy: number;
@@ -67,6 +69,7 @@ export const BASE_STATS: ShipStats = {
   roverCanClimb: false,
   roverChargeMult: 1,
   roverDriveTime: 1,
+  refineryRateTph: 0,
   boatCargoT: 0,
   boatEnergy: 0,
   probeCapacity: 0,
@@ -225,6 +228,18 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.boatCargoT = 30;
       s.boatEnergy = 140;
+    },
+  },
+  {
+    id: "refinery",
+    category: "mining",
+    name: "Portable refinery",
+    vendor: "diggers",
+    price: 30_000,
+    description:
+      "Crushes, floats and dries metal ore in the hold into concentrate: 2.5 t of ore makes 1 t worth 10% more. Frees hold space and lightens the ship for the fold. About 4 t of ore an hour, crew time.",
+    apply: (s) => {
+      s.refineryRateTph = Math.max(s.refineryRateTph, 4);
     },
   },
   {

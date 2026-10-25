@@ -696,3 +696,31 @@ table.data th.num {
 .rescue-panel .btn {
   align-self: flex-start;
 }
+
+/* Ship status window (AW-130) and the clickable hold readout */
+.tb-click {
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+.tb-click:hover .tb-value {
+  text-decoration: underline dotted;
+}
+.ship-status .con-body section + section {
+  margin-top: 14px;
+}
+.ship-hold-bar {
+  margin: 4px 0 10px;
+}
+.ship-upgrades {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  columns: 2;
+}
+.ship-status .kv + h3 {
+  margin-top: 12px;
+}

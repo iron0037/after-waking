@@ -47,3 +47,14 @@ export function vehiclesOut(state: GameState): { rover: boolean; boat: boolean }
   const active = loc.rover ? vehicleOf(loc.rover) : null;
   return { rover: active === "rover" || !!loc.roverAboard, boat: active === "boat" || !!loc.parkedBoat };
 }
+
+/**
+ * Why the vehicle being driven (null: nothing out) can't work a site, or null if it can. Seabed
+ * deposits and sea life are the boat's; everything ashore is the rover's. Same wording as the verbs.
+ */
+export function vehicleMismatch(vehicle: Vehicle | null, wet: boolean, what: "deposit" | "plants"): string | null {
+  if (vehicle === null) return wet ? "Launch the boat first." : "Deploy the rover first.";
+  if (wet && vehicle !== "boat") return what === "deposit" ? "That seam is under the sea: take the boat out to dredge it." : "That's sea life: take the boat out to sample it.";
+  if (!wet && vehicle === "boat") return what === "deposit" ? "That deposit is on land: put the rover ashore to work it." : "Those grow ashore: put the rover ashore to sample them.";
+  return null;
+}

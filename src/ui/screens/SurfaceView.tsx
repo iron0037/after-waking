@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
   activeRegion,
+  autoWorkVehicleBlocker,
+  boardBoat,
   canEnter,
   cargoTonnes,
   collectSample,
@@ -23,6 +25,7 @@ import {
   exploredFraction,
   formatDuration,
   formatPressure,
+  hasBoat,
   hexDistance,
   hexToPixel,
   HOP_MINUTES,
@@ -32,13 +35,17 @@ import {
   KEY_TO_DIR,
   KIND_LABEL,
   launch,
+  launchBoat,
+  launchBoatBlockers,
   mapPixelSize,
   moveRoverTo,
+  neighbors,
   isExplored,
   normalizeKnowledge,
   PROSPECT_ENERGY,
   PROSPECT_MINUTES,
   prospect,
+  putRoverAshore,
   RECALL_FUEL,
   recallRover,
   rechargeRover,
@@ -48,9 +55,9 @@ import {
   remainingTonnes,
   roverChargePerHour,
   roverMobility,
+  siteOnWater,
   roverSpecimenSlots,
   routeEnergyMult,
-  routeMinutesMult,
   hasPerk,
   effectiveStats,
   orbitalSensorTier,
@@ -85,6 +92,15 @@ import {
   type SurfaceDeposit,
   type SurfaceFlora,
   type Vec2,
+  type World,
+  type Vehicle,
+  vehicleCargoT,
+  vehicleEnergyMax,
+  vehicleHome,
+  vehicleMinutesMult,
+  vehicleMismatch,
+  vehicleMobility,
+  vehicleOf,
   workDeposit,
 } from "../../sim";
 import { cargoList, pct, tonnes } from "../format";
@@ -96,6 +112,7 @@ import {
   cameraLayout,
   drawBase,
   drawBlockedTile,
+  drawBoat,
   drawDeposits,
   drawEnergyBar,
   drawFlora,
@@ -107,9 +124,11 @@ import {
   drawRover,
   drawSensorRange,
   drawShip,
+  drawShoreTargets,
   drawTooltip,
   fitSize,
   tileAt,
+  tileCenter,
   viewCenter,
   visibleRegions,
   type DepositMark,
@@ -215,7 +234,7 @@ function floraStatus(know: RegionKnowledge, f: FloraSite): "sampled" | "unsample
 }
 
 /** Why the crew can't work this deposit right now (empty when they can). `know` is the deposit's own region's. */
-function workBlockers(state: GameState, know: RegionKnowledge, dep: Deposit): string[] {
+function workBlockers(state: GameState, world: World, know: RegionKnowledge, dep: Deposit): string[] {
   const stats = effectiveStats(state);
   const out: string[] = [];
   if (!know.discovered.includes(dep.id)) out.push("This deposit hasn't been discovered yet.");
@@ -224,6 +243,9 @@ function workBlockers(state: GameState, know: RegionKnowledge, dep: Deposit): st
     out.push(`The seam is ${dep.depthM} m down and the drill only reaches ${stats.drillMaxDepthM} m. A better drill would get it.`);
   }
   if (out.length === 0 && stats.cargoCapacityT - cargoTonnes(state.ship.cargo) <= 0.5) out.push("The ship's hold is full.");
+  // Seabed seams need the boat, land seams the rover (and the other one stowed).
+  const vehicle = out.length === 0 ? autoWorkVehicleBlocker(state, world, dep) : null;
+  if (vehicle) out.push(vehicle);
   return out;
 }
 
@@ -285,9 +307,18 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const active = activeRegion(state, world);
   const activeKnow = peekKnowledge(state, loc.bodyId, active);
   const stats = effectiveStats(state);
+  // The vehicle being driven: the rover, or (AW-17) the survey boat. `loc.parkedBoat` waits offshore while the
+  // rover is ashore; `loc.roverAboard` rides the boat's deck.
   const rover = loc.rover;
+  const vehicle: Vehicle | null = rover ? vehicleOf(rover) : null;
+  const isBoat = vehicle === "boat";
+  const noun = isBoat ? "boat" : "rover";
+  const parkedBoat = loc.parkedBoat ?? null;
+  const roverAboard = loc.roverAboard ?? null;
+  const energyMax = vehicle ? vehicleEnergyMax(state, vehicle) : stats.roverEnergy;
+  const cargoMax = vehicle ? vehicleCargoT(state, vehicle) : stats.roverCargoT;
   const busy = session.busy;
-  const mover: Mover = { mobility: roverMobility(state), energyMult: routeEnergyMult(state), minutesMult: routeMinutesMult(state) };
+  const mover: Mover = { mobility: vehicleMobility(state), energyMult: routeEnergyMult(state), minutesMult: vehicleMinutesMult(state) };
   const canClimb = mover.mobility.canClimb;
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);
@@ -326,6 +357,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const stopDragRef = useRef<(() => void) | null>(null);
   // "Move ship" targeting mode (only while the rover is stowed).
   const [moveMode, setMoveMode] = useState(false);
+  // "Put rover ashore" targeting mode (boat out with the rover aboard): pick a shore hex beside the boat.
+  const [ashoreMode, setAshoreModeRaw] = useState(false);
+  const setAshoreMode = (on: boolean): void => {
+    setAshoreModeRaw(on);
+    if (on) setMoveMode(false);
+  };
   // Offer a recharge after a drive ends beside the ship with low cells.
   const [rechargeHint, setRechargeHint] = useState(false);
   const keyRef = useRef<(ev: KeyboardEvent) => void>(() => {});
@@ -352,6 +389,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const ship = shipTile(state, world);
   const home = rover ?? ship;
+  // Boat out with the rover on deck: the land hexes beside the boat where it can be put ashore.
+  const ashoreOn = ashoreMode && isBoat && roverAboard !== null;
+  const shoreTargets: Vec2[] =
+    isBoat && roverAboard && rover ? neighbors(rover.x, rover.y).filter((n) => canEnter(surface, n.x, n.y, roverMobility(state))) : [];
   // The side panel lists sites in the active region and the regions around it.
   const nearRegions = regionAndNeighbours(surface, active);
   const discovered = knownDeposits(state, surface, loc.bodyId, nearRegions);
@@ -373,7 +414,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     return knownFlora(state, surface, loc.bodyId, [r]).find(({ f }) => f.x === t.x && f.y === t.y);
   };
 
-  const homeEnergy = rover ? energyHome(surface, rover, ship, mover) : null;
+  // Where the vehicle heads to go home: the boat to the water beside the ship, a rover to its moored boat's shore.
+  const homeSpot = vehicleHome(state, world);
+  const homeName = !isBoat && parkedBoat ? "the boat" : "the ship";
+  const homeEnergy = rover ? energyHome(surface, rover, homeSpot, mover) : null;
   const stranded = rover !== null && (homeEnergy === null || homeEnergy > rover.energy);
 
   // --- camera ----------------------------------------------------------------------------
@@ -447,7 +491,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (!rover || session.busy || path.length === 0) return false;
     const steps = affordablePrefix(path, rover.energy);
     if (steps.length === 0) {
-      session.notify("Rover energy is too low to move.", "error");
+      session.notify(`${isBoat ? "Boat" : "Rover"} energy is too low to move.`, "error");
       return false;
     }
     const startedNearShip = hexDistance(rover, ship) <= 1;
@@ -472,12 +516,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (!result.ok) return false;
     const cut = result.value.stopped !== null || steps.length < path.length;
     if (cut) {
-      session.notify("Rover energy ran out before it reached the target.", "error");
+      session.notify(`${isBoat ? "Boat" : "Rover"} energy ran out before it reached the target.`, "error");
       return false;
     }
     const now = session.state.location;
     if (!quiet && !startedNearShip && now.kind === "surface" && now.rover) {
-      if (hexDistance(now.rover, ship) <= 1 && now.rover.energy < stats.roverEnergy * RECHARGE_HINT_BELOW) setRechargeHint(true);
+      if (hexDistance(now.rover, ship) <= 1 && now.rover.energy < energyMax * RECHARGE_HINT_BELOW) setRechargeHint(true);
     }
     return true;
   };
@@ -498,7 +542,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (approach && atSite(target)) return true;
     const path = planPath(surface, rover, target, mover, approach);
     if (!path) {
-      session.notify("No route there for this rover.", "error");
+      session.notify(isBoat ? "No open water route there." : "No route there for this rover.", "error");
       return false;
     }
     return drive(path, quiet);
@@ -520,12 +564,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const hoverPlan = (tile: Vec2): RoutePlan | null => {
     if (!rover) return null;
-    const key = `${rover.x},${rover.y},${tile.x},${tile.y},${rover.energy}`;
+    const key = `${vehicle},${rover.x},${rover.y},${tile.x},${tile.y},${rover.energy},${homeSpot.x},${homeSpot.y}`;
     if (routeRef.current.key === key) return routeRef.current.plan;
     const site = depositAt(tile) !== undefined || floraAt(tile) !== undefined;
     const inRange = site ? atSite(tile) : rover.x === tile.x && rover.y === tile.y;
     const path = inRange ? null : planPath(surface, rover, tile, mover, site);
-    const plan = path && path.length > 0 ? evaluate(surface, path, rover, ship, mover) : null;
+    const plan = path && path.length > 0 ? evaluate(surface, path, rover, homeSpot, mover) : null;
     routeRef.current = { key, plan };
     return plan;
   };
@@ -700,6 +744,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       const rest = anim.pts.slice(1).map((p) => ({ ...p, minutes: 0, energy: 0 }));
       drawRoute(ctx, L, anim.pts[0] as Vec2, rest, "rgba(95, 212, 255, 0.8)", null);
     }
+    if (ashoreOn) drawShoreTargets(ctx, L, shoreTargets, hover?.tile ?? null, t);
     if (hover && hopping && hopBlocker(hover.tile) !== null && !isShipTile(hover.tile)) {
       drawBlockedTile(ctx, L, hover.tile);
     } else if (hover && hopping && !isShipTile(hover.tile)) {
@@ -710,10 +755,17 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       drawHoverTile(ctx, L, hover.tile);
     } else if (hover) drawHoverTile(ctx, L, hover.tile);
 
+    // The boat waiting offshore while the rover is ashore.
+    if (parkedBoat) drawBoat(ctx, L, tileCenter(L, parkedBoat), t, 0, { moored: true });
     if (pos && tile && rover) {
-      const onPad = tile.x === ship.x && tile.y === ship.y;
-      drawRover(ctx, L, pos, t, onPad, facingRef.current, hd.cur);
-      drawEnergyBar(ctx, L, pos, onPad, Math.max(0, rover.energy - spent), stats.roverEnergy, preview);
+      if (isBoat) {
+        drawBoat(ctx, L, pos, t, hd.cur, { moving: anim !== null, roverAboard: roverAboard !== null });
+        drawEnergyBar(ctx, L, pos, false, Math.max(0, rover.energy - spent), energyMax, preview);
+      } else {
+        const onPad = tile.x === ship.x && tile.y === ship.y;
+        drawRover(ctx, L, pos, t, onPad, facingRef.current, hd.cur);
+        drawEnergyBar(ctx, L, pos, onPad, Math.max(0, rover.energy - spent), energyMax, preview);
+      }
     }
 
     if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, hopping ? hopTooltip(hover.tile) : tooltipLines(hover.tile));
@@ -761,7 +813,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         text: `${COMMODITIES[dep.d.commodity].name} · ${status === "new" ? "unsurveyed" : status === "depleted" ? "worked out" : `${Math.round(dep.d.grade * 100)}%`}`,
         color: COMMODITIES[dep.d.commodity].color,
       });
+      if (terrain === Terrain.liquid) lines.push({ text: "Seabed deposit (dredge with the boat)", color: UI.cyan });
     }
+    if (flora && terrain === Terrain.liquid) lines.push({ text: "Sea life (sample from the boat)", color: UI.cyan });
     if (dep && flora) lines.push({ text: "Click again to switch between them", color: UI.muted });
     if (!dep && !flora && local && tileKnow) {
       const sensedDep = tileKnow.sensed?.length && surface.deposits(local.region).some((d) => d.x === tile.x && d.y === tile.y && tileKnow.sensed!.includes(d.id) && !tileKnow.discovered.includes(d.id));
@@ -769,28 +823,39 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       if (sensedDep) lines.push({ text: "Unidentified deposit reading: drive closer to identify", color: UI.text });
       if (sensedFlora) lines.push({ text: "Unidentified plant reading: drive closer to identify", color: UI.good });
     }
-    if (info.passable === "no") {
+    const site = dep !== undefined || flora !== undefined;
+    const sea = terrain === Terrain.liquid;
+    if (ashoreOn) {
+      const ok = shoreTargets.some((n) => n.x === tile.x && n.y === tile.y);
+      lines.push(ok ? { text: "Click to put the rover ashore here", color: UI.good } : { text: "Pick a lit shore hex beside the boat", color: UI.muted });
+    } else if (isBoat && !sea && !site) {
+      lines.push({ text: "Dry land: the boat sails open water only", color: UI.muted });
+    } else if (!isBoat && sea && !site) {
+      lines.push({ text: hasBoat(state) ? "Open water: take the boat out to sail it" : "Impassable", color: UI.muted });
+    } else if (!sea && info.passable === "no") {
       lines.push({ text: "Impassable", color: UI.muted });
-    } else if (needsClimber) {
+    } else if (!isBoat && needsClimber) {
       lines.push({ text: "Rover can't climb this", color: UI.muted });
     } else if (!rover) {
-      lines.push({ text: "Deploy the rover to drive", color: UI.muted });
+      lines.push({ text: sea && hasBoat(state) ? "Launch the boat to sail" : "Deploy the rover to drive", color: UI.muted });
     } else {
       const plan = hoverPlan(tile);
       if (plan) {
         const bad = plan.energy > rover.energy;
         const strands = plan.back === null || plan.energy + plan.back > rover.energy;
         lines.push({
-          text: `Drive ${formatDuration(plan.minutes * SHIFT_FACTOR)} · ${plan.energy.toFixed(1)} energy`,
+          text: `${isBoat ? "Sail" : "Drive"} ${formatDuration(plan.minutes * SHIFT_FACTOR)} · ${plan.energy.toFixed(1)} energy`,
           color: bad || strands ? UI.danger : UI.good,
         });
         if (bad) lines.push({ text: "Not enough energy", color: UI.danger });
-        else if (strands) lines.push({ text: "Too far to return to ship", color: UI.danger });
-      } else if ((dep || flora) && atSite(tile)) {
-        lines.push({ text: "Rover is in range", color: UI.good });
+        else if (strands) lines.push({ text: `Too far to return to ${homeName}`, color: UI.danger });
+      } else if (site && atSite(tile)) {
+        lines.push({ text: `${isBoat ? "Boat" : "Rover"} is in range`, color: UI.good });
       } else if (!(rover.x === tile.x && rover.y === tile.y)) {
         lines.push({ text: "No route", color: UI.danger });
       }
+      const wrong = dep ? vehicleMismatch(vehicle, sea, "deposit") : flora ? vehicleMismatch(vehicle, sea, "plants") : null;
+      if (wrong) lines.push({ text: wrong, color: UI.muted });
     }
     return lines;
   };
@@ -812,6 +877,19 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (dragRef.current?.moved) return;
     const tile = surfaceTileAt(px, py);
     if (!tile || session.busy) return;
+    if (ashoreOn) {
+      if (!shoreTargets.some((n) => n.x === tile.x && n.y === tile.y)) {
+        session.notify("Pick one of the lit shore hexes right beside the boat.", "error");
+        return;
+      }
+      const r = session.act((s, w) => putRoverAshore(s, w, tile.x, tile.y));
+      if (r.ok) {
+        setAshoreMode(false);
+        setFollowing(true);
+        session.notify("The rover is ashore. The boat waits, moored offshore: drive back beside it and board to sail on.");
+      }
+      return;
+    }
     if (moveMode && !rover) {
       const blocker = hopBlocker(tile);
       if (blocker) {
@@ -852,10 +930,30 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
   };
 
+  const launchBlock = launchBoatBlockers(state, world)[0] ?? null;
+  const doLaunch = (withRover: boolean): void => {
+    const r = session.act((s, w) => launchBoat(s, w, withRover));
+    if (!r.ok) return;
+    setMoveMode(false);
+    setAshoreMode(false);
+    setFollowing(true);
+    if (r.value.chargedHours >= 0.5) {
+      session.notify(`Charged the ${withRover ? "boat's and rover's cells" : "boat's cells"} for ${formatDuration(r.value.chargedHours * HOUR)} before launching.`);
+    }
+  };
+
+  const doBoard = (): void => {
+    const r = session.act((s, w) => boardBoat(s, w));
+    if (!r.ok) return;
+    setFollowing(true);
+    session.notify("The rover is back aboard the boat. Sail on, or put it ashore elsewhere.");
+  };
+
   const doStow = (): void => {
     const r = session.act((s, w) => stowRover(s, w));
     if (!r.ok) return;
     setRechargeHint(false);
+    setAshoreMode(false);
     setSelectedKey(null);
     setFloraKey(null);
     const { unloaded, jettisoned } = r.value;
@@ -865,18 +963,19 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const doRecharge = (): void => {
     const r = session.act((s, w) => rechargeRover(s, w));
     setRechargeHint(false);
-    if (r.ok) session.notify(`Recharged the rover's cells in ${formatDuration(r.value.hours * HOUR)}.`);
+    if (r.ok) session.notify(`Recharged the ${noun}'s cells in ${formatDuration(r.value.hours * HOUR)}.`);
   };
 
   const doWork = async (mark: DepositMark): Promise<void> => {
     const dep = mark.d;
-    const blockers = workBlockers(state, mark.know, dep);
+    const blockers = workBlockers(state, world, mark.know, dep);
     if (blockers[0]) {
       session.notify(blockers[0], "error");
       return;
     }
-    // A rover already beside the deposit rolls onto it first, where you can see it.
-    if (rover && hexDistance(rover, dep) <= 1 && !(await driveTo(dep, true, true))) return;
+    // A vehicle already beside the deposit moves onto it first, where you can see it.
+    const rightVehicle = rover !== null && vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, dep), "deposit") === null;
+    if (rightVehicle && rover && hexDistance(rover, dep) <= 1 && !(await driveTo(dep, true, true))) return;
     const name = COMMODITIES[dep.commodity].name.toLowerCase();
     const r = session.act((s, w) => workDeposit(s, w, dep.key));
     if (!r.ok) return;
@@ -904,7 +1003,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (!rover) return;
     const to = step(rover.x, rover.y, dir);
     if (!canEnter(surface, to.x, to.y, mover.mobility)) {
-      if (!repeat) session.notify("The rover can't go that way.", "error");
+      if (!repeat) session.notify(isBoat ? "The boat sails open water only." : "The rover can't go that way.", "error");
       return;
     }
     const path = planPath(surface, rover, to, mover, false);
@@ -913,8 +1012,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     void drive(path);
   };
 
-  const rechargeHours = rover ? Math.max(0, stats.roverEnergy - rover.energy) / roverChargePerHour(state) : 0;
-  const canRecharge = rover !== null && nearShip && stats.roverEnergy - rover.energy >= 0.5;
+  const rechargeHours = rover ? Math.max(0, energyMax - rover.energy) / roverChargePerHour(state) : 0;
+  const canRecharge = rover !== null && nearShip && energyMax - rover.energy >= 0.5;
 
   keyRef.current = (ev: KeyboardEvent): void => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -923,6 +1022,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const key = ev.key.toLowerCase();
     if (key === "escape") {
       if (moveMode) setMoveMode(false);
+      if (ashoreMode) setAshoreMode(false);
       return;
     }
     if (key === "+" || key === "=") {
@@ -941,8 +1041,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       stepRover(dir, ev.repeat);
     } else if (key === "r") {
       if (!rover) doDeploy();
+      else if (parkedBoat) session.notify("The boat is still moored offshore: board it and sail it back first.", "error");
       else if (nearShip) doStow();
-      else session.notify("Drive the rover back to the ship first.", "error");
+      else session.notify(isBoat ? "Sail the boat back to the ship first." : "Drive the rover back to the ship first.", "error");
+    } else if (key === "b") {
+      if (!rover && hasBoat(state)) {
+        if (launchBlock) session.notify(launchBlock, "error");
+        else doLaunch(false);
+      }
     } else if (key === "f") {
       if (selected) void doWork(selected);
       else session.notify("Select a deposit first.", "error");
@@ -951,7 +1057,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const activeMap = currentRegion(state, world);
   const present = activeMap ? ([...new Set(activeMap.terrain)] as Terrain[]).sort((a, b) => a - b) : [];
-  const subject = rover ? "rover" : "ship";
+  const subject = rover ? noun : "ship";
+  // What has to come back before the ship can move or lift off.
+  const outText = isBoat ? (roverAboard ? "Bring the boat in and stow it and the rover" : "Bring the boat in and stow it") : parkedBoat ? "Stow the rover and the moored boat" : "Stow the rover";
 
   return (
     <>
@@ -974,17 +1082,21 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           <button class="btn" onClick={() => setFollowing(true)} disabled={following} title={`Center the map on the ${subject} and follow it`}>
             Follow {subject}
           </button>
-          <button class="btn" onClick={resetView} title="Reset zoom and follow the rover">
+          <button class="btn" onClick={resetView} title={`Reset zoom and follow the ${subject}`}>
             Reset view
           </button>
         </div>
         <div class="surface-footer">
           <div class="viewport-hint">
-            {moveMode && !rover
-              ? "Click a clear tile to set the ship down · Esc to cancel · drag to pan, scroll to zoom"
-              : rover
-                ? "Click or Q/E/A/D/Z/C to drive · R stow at ship · F work selected deposit · drag to pan, scroll to zoom"
-                : "R deploy rover · Hover for terrain · drag to pan, scroll to zoom"}
+            {ashoreOn
+              ? "Click a lit shore hex beside the boat to put the rover ashore · Esc to cancel · drag to pan, scroll to zoom"
+              : moveMode && !rover
+                ? "Click a clear tile to set the ship down · Esc to cancel · drag to pan, scroll to zoom"
+                : isBoat
+                  ? "Click or Q/E/A/D/Z/C to sail · R stow at ship · F work selected seabed deposit · drag to pan, scroll to zoom"
+                  : rover
+                    ? `Click or Q/E/A/D/Z/C to drive · R stow at ship · F work selected deposit${parkedBoat ? " · the boat waits offshore" : ""} · drag to pan, scroll to zoom`
+                    : `R deploy rover${hasBoat(state) ? " · B launch boat" : ""} · Hover for terrain · drag to pan, scroll to zoom`}
           </div>
           <div class="surface-legend">
             {present.map((t) => (
@@ -999,7 +1111,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         {rechargeHint && rover && nearShip && canRecharge && !busy && (
           <div class="recharge-hint" role="status">
             <span>
-              Rover is beside the ship at {Math.round(pct(rover.energy, stats.roverEnergy))}% energy. Top up the cells (
+              {isBoat ? "Boat" : "Rover"} is beside the ship at {Math.round(pct(rover.energy, energyMax))}% energy. Top up the cells (
               {formatDuration(rechargeHours * HOUR)})?
             </span>
             <button class="btn primary" onClick={doRecharge}>
@@ -1015,26 +1127,55 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         <RescuePanel session={session} busy={busy} />
         <div class="action-bar">
           <div class="ab-group">
-            <span class="ab-label">Rover</span>
+            <span class="ab-label">{isBoat ? "Boat" : "Rover"}</span>
             {!rover && (
-              <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (R)" onClick={doDeploy}>
-                Deploy rover
-              </button>
+              <>
+                <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (R)" onClick={doDeploy}>
+                  Deploy rover
+                </button>
+                {hasBoat(state) && (
+                  <>
+                    <button
+                      class="btn"
+                      disabled={busy || launchBlock !== null}
+                      title={launchBlock ?? "Charge the cells and lower the survey boat into the water beside the ship (B)"}
+                      onClick={() => doLaunch(false)}
+                    >
+                      Launch boat
+                    </button>
+                    <button
+                      class="btn"
+                      disabled={busy || launchBlock !== null}
+                      title={launchBlock ?? "Launch the boat with the rover lashed to its deck, to put it ashore on another coast"}
+                      onClick={() => doLaunch(true)}
+                    >
+                      Launch boat with rover
+                    </button>
+                    {launchBlock && <p class="muted small ab-hint">{launchBlock}</p>}
+                  </>
+                )}
+              </>
             )}
             {rover && (
               <>
                 <button
                   class="btn"
-                  disabled={busy || (rover.x === ship.x && rover.y === ship.y)}
-                  title="Drive back to the ship"
-                  onClick={() => void driveTo(ship, false)}
+                  disabled={busy || (isBoat ? nearShip : rover.x === ship.x && rover.y === ship.y)}
+                  title={isBoat ? "Sail back to the water beside the ship" : "Drive back to the ship"}
+                  onClick={() => void driveTo(isBoat ? homeSpot : ship, false)}
                 >
                   Return to ship
                 </button>
                 <button
                   class="btn"
-                  disabled={busy || !nearShip}
-                  title={!nearShip ? "Drive the rover back to the ship first" : "Unloads the cargo bed and recharges, 30 min (R)"}
+                  disabled={busy || !nearShip || parkedBoat !== null}
+                  title={
+                    parkedBoat
+                      ? "The boat is still moored offshore: board it and sail it back first"
+                      : !nearShip
+                        ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship first`
+                        : `Unloads the ${isBoat ? "hold" : "cargo bed"}${roverAboard ? " (and the rover on deck)" : ""} and recharges, 30 min (R)`
+                  }
                   onClick={doStow}
                 >
                   Stow &amp; unload
@@ -1044,9 +1185,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                   disabled={busy || !canRecharge}
                   title={
                     !nearShip
-                      ? "Drive the rover back to the ship to recharge"
+                      ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship to recharge`
                       : !canRecharge
-                        ? "The rover's cells are already full"
+                        ? `The ${noun}'s cells are already full`
                         : `Top up the cells from the ship's reactor without stowing: ${formatDuration(rechargeHours * HOUR)}`
                   }
                   onClick={doRecharge}
@@ -1055,16 +1196,43 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 </button>
               </>
             )}
+            {isBoat && roverAboard && (
+              <button
+                class={`btn ${ashoreOn ? "active" : ""}`}
+                disabled={busy}
+                title={
+                  ashoreOn
+                    ? "Cancel (Esc)"
+                    : shoreTargets.length === 0
+                      ? "No drivable shore beside the boat: sail up to a coast first"
+                      : "Pick a shore hex next to the boat and drive the rover off. The boat waits, moored. 20 min"
+                }
+                onClick={() => setAshoreMode(!ashoreOn)}
+              >
+                {ashoreOn ? "Cancel" : "Put rover ashore"}
+              </button>
+            )}
+            {!isBoat && parkedBoat && rover && (
+              <button
+                class="btn"
+                disabled={busy || hexDistance(rover, parkedBoat) > 1}
+                title={hexDistance(rover, parkedBoat) > 1 ? "Drive to the shore beside the boat" : "Drive the rover back aboard the boat. 20 min"}
+                onClick={doBoard}
+              >
+                Board the boat
+              </button>
+            )}
             {stranded && (
               <button
                 class="btn danger"
                 disabled={busy || state.ship.fuel < RECALL_FUEL}
-                title={`The rover can't drive home on its remaining energy. The ship hops over and winches it aboard: ${RECALL_FUEL} fuel and 3 h`}
+                title={`The ${noun} can't get home on its remaining energy. The ship hops over and winches ${isBoat || parkedBoat ? "everything" : "it"} aboard: ${RECALL_FUEL} fuel and 3 h`}
                 onClick={() => session.act((s, w) => recallRover(s, w))}
               >
-                Recall rover
+                Recall {noun}
               </button>
             )}
+            {parkedBoat && !isBoat && <p class="muted small ab-hint">The boat is moored offshore. Board it before you stow.</p>}
           </div>
           <div class="ab-group ship">
             <span class="ab-label">Ship</span>
@@ -1073,7 +1241,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               disabled={busy || rover !== null || (!moveMode && hopBase > state.ship.fuel)}
               title={
                 rover
-                  ? "Stow the rover before moving the ship"
+                  ? `${outText} before moving the ship`
                   : hopBase > state.ship.fuel
                     ? `A hop needs at least ${hopBase.toFixed(1)} fuel`
                     : `Hop the ship to another open tile, anywhere on the planet: from ${hopBase.toFixed(1)} fuel (more the farther it goes), ${formatDuration(HOP_MINUTES)}. A hop is cheaper than lifting off and landing again (${burnFuel.toFixed(1)} fuel each way): it costs about half a burn plus distance, so a region over is roughly one burn versus two.`
@@ -1087,7 +1255,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               disabled={busy || rover !== null}
               title={
                 rover
-                  ? "Take the ship back to orbit (stow the rover first)"
+                  ? `Take the ship back to orbit (${outText.charAt(0).toLowerCase()}${outText.slice(1)} first)`
                   : state.ship.fuel < burnFuel
                     ? `Ascent needs ${burnFuel.toFixed(1)} fuel and you have ${state.ship.fuel.toFixed(1)}`
                     : `Take the ship back to orbit. Ascent burns ${burnFuel.toFixed(1)} fuel (landing again costs the same).`
@@ -1112,8 +1280,18 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           </div>
         </Section>
 
-        <RoverPanel rover={rover} stats={stats} state={state} homeEnergy={homeEnergy} stranded={stranded} />
-        <ShipPanel rover={rover} stats={stats} state={state} bodyId={loc.bodyId} />
+        <RoverPanel
+          rover={rover}
+          parkedBoat={parkedBoat}
+          roverAboard={roverAboard}
+          energyMax={energyMax}
+          cargoMax={cargoMax}
+          homeName={homeName}
+          state={state}
+          homeEnergy={homeEnergy}
+          stranded={stranded}
+        />
+        <ShipPanel vehicles={[rover, roverAboard, parkedBoat].filter((v): v is RoverState => v !== null)} stats={stats} state={state} bodyId={loc.bodyId} />
 
         {(() => {
           // The other site on the same hex, if any, so it can be reached from here too.
@@ -1165,7 +1343,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             {discovered.length > 0 || floraFound.length > 0
               ? "Select a deposit or plant site on the map or in the list."
               : rover
-                ? "No deposits detected nearby yet. Drive the rover around to sweep with its sensors."
+                ? `No deposits detected nearby yet. ${isBoat ? "Sail the boat" : "Drive the rover"} around to sweep with its sensors.`
                 : "Deploy the rover to start surveying."}
           </div>
         )}
@@ -1197,6 +1375,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         <td>
                           <i class="leaf-mark" />
                           {f.species}
+                          {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
                         </td>
                         <td class="num">{dist}</td>
                         <td>{sampled ? <span class="muted">sampled ✓</span> : <span class="tag new">new</span>}</td>
@@ -1206,7 +1385,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </tbody>
             </table>
             <div class="muted small tbl-note">
-              In this region and the ones around it. Distance in tiles from {rover ? "the rover" : "the ship"}.
+              In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}.
             </div>
           </Section>
         )}
@@ -1238,6 +1417,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         <td>
                           <i class="swatch" style={{ background: status === "depleted" ? "#5b6472" : COMMODITIES[d.commodity].color }} />
                           {COMMODITIES[d.commodity].name}
+                          {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
                         </td>
                         <td class="num">{dist}</td>
                         <td>
@@ -1257,7 +1437,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </tbody>
             </table>
             <div class="muted small tbl-note">
-              In this region and the ones around it. Distance in tiles from {rover ? "the rover" : "the ship"}.
+              In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}.
             </div>
           </Section>
         )}
@@ -1268,39 +1448,56 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
 function RoverPanel({
   rover,
-  stats,
+  parkedBoat,
+  roverAboard,
+  energyMax,
+  cargoMax,
+  homeName,
   state,
   homeEnergy,
   stranded,
 }: {
   rover: RoverState | null;
+  /** The boat moored offshore while the rover is ashore. */
+  parkedBoat: RoverState | null;
+  /** The rover riding the boat's deck. */
+  roverAboard: RoverState | null;
+  /** Cell and hold capacity of the vehicle being driven. */
+  energyMax: number;
+  cargoMax: number;
+  homeName: string;
   state: GameState;
-  stats: ReturnType<typeof effectiveStats>;
   homeEnergy: number | null;
   stranded: boolean;
 }) {
-  const energyLow = rover !== null && (stranded || rover.energy < stats.roverEnergy * 0.3);
+  const boat = rover !== null && vehicleOf(rover) === "boat";
+  const noun = boat ? "boat" : "rover";
+  const energyLow = rover !== null && (stranded || rover.energy < energyMax * 0.3);
   const tight = rover !== null && !stranded && homeEnergy !== null && rover.energy < homeEnergy * 1.3;
   const bedT = rover ? cargoTonnes(rover.cargo) : 0;
   const roverSamples = specimenCount(rover?.specimens);
+  const slots = roverSpecimenSlots(state);
+  const title = boat ? "Boat" : "Rover";
+  const other = boat ? roverAboard : parkedBoat;
+  const otherName = boat ? "Rover (on deck)" : "Boat (moored offshore)";
   return (
-    <Section id="rover" title="Rover" summary={rover ? `energy ${Math.round(rover.energy)} / ${stats.roverEnergy}` : "stowed"}>
+    <Section id="rover" title={title} summary={rover ? `energy ${Math.round(rover.energy)} / ${energyMax}` : "stowed"}>
       {rover ? (
         <>
           <dl class="kv">
             <dt>Energy</dt>
             <dd>
-              {Math.round(rover.energy)} / {stats.roverEnergy}
+              {Math.round(rover.energy)} / {energyMax}
             </dd>
           </dl>
           <div class={`bar ${energyLow || tight ? "warn" : ""}`}>
-            <span style={{ width: `${pct(rover.energy, stats.roverEnergy)}%` }} />
+            <span style={{ width: `${pct(rover.energy, energyMax)}%` }} />
           </div>
           {stranded ? (
             <p class="danger small act-note">
               {homeEnergy === null
-                ? "No route back to the ship for this rover."
-                : `Not enough energy to drive home (needs ${homeEnergy.toFixed(1)}).`}
+                ? `No route back to ${homeName} for this ${noun}.`
+                : `Not enough energy to get home (needs ${homeEnergy.toFixed(1)}).`}
             </p>
           ) : (
             tight &&
@@ -1309,25 +1506,35 @@ function RoverPanel({
             )
           )}
           <dl class="kv spaced">
-            <dt>Cargo bed</dt>
+            <dt>{boat ? "Hold" : "Cargo bed"}</dt>
             <dd>
-              {tonnes(bedT)} / {tonnes(stats.roverCargoT)}
+              {tonnes(bedT)} / {tonnes(cargoMax)}
             </dd>
           </dl>
           <div class="bar">
-            <span style={{ width: `${pct(bedT, stats.roverCargoT)}%` }} />
+            <span style={{ width: `${pct(bedT, cargoMax)}%` }} />
           </div>
           <CargoChips cargo={rover.cargo} />
           <dl class="kv spaced">
             <dt>Sample cases</dt>
-            <dd class={roverSamples >= roverSpecimenSlots(state) ? "accent" : ""}>
-              {roverSamples} / {roverSpecimenSlots(state)}
+            <dd class={roverSamples >= slots ? "accent" : ""}>
+              {roverSamples} / {slots}
             </dd>
           </dl>
-          <div class={`bar ${roverSamples >= roverSpecimenSlots(state) ? "warn" : ""}`}>
-            <span style={{ width: `${pct(roverSamples, roverSpecimenSlots(state))}%` }} />
+          <div class={`bar ${roverSamples >= slots ? "warn" : ""}`}>
+            <span style={{ width: `${pct(roverSamples, slots)}%` }} />
           </div>
           <SpecimenChips specimens={rover.specimens} />
+          {other && (
+            <div class="other-vehicle small">
+              <div class="muted">{otherName}</div>
+              <div>
+                Energy {Math.round(other.energy)} / {vehicleEnergyMax(state, vehicleOf(other))}
+                {cargoTonnes(other.cargo) > 0.05 && <span class="muted"> · hold {tonnes(cargoTonnes(other.cargo))}</span>}
+                {specimenCount(other.specimens) > 0 && <span class="muted"> · {specimenCount(other.specimens)} samples</span>}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <p class="muted small">Stowed aboard.</p>
@@ -1337,19 +1544,20 @@ function RoverPanel({
 }
 
 function ShipPanel({
-  rover,
+  vehicles,
   stats,
   state,
   bodyId,
 }: {
-  rover: RoverState | null;
+  /** Every vehicle that's out (the one being driven, the rover on deck, the moored boat). */
+  vehicles: RoverState[];
   stats: ReturnType<typeof effectiveStats>;
   state: GameState;
   bodyId: string;
 }) {
   const hold = cargoTonnes(state.ship.cargo);
   const fuelPct = pct(state.ship.fuel, stats.fuelCapacity);
-  const roverSamples = specimenCount(rover?.specimens);
+  const roverSamples = vehicles.reduce((n, v) => n + specimenCount(v.specimens), 0);
   const shipSamples = specimenCount(state.ship.specimens);
   const jobs = (state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens" && c.bodyId === bodyId);
   return (
@@ -1379,7 +1587,7 @@ function ShipPanel({
         </>
       )}
       {jobs.map((c) => {
-        const inRover = specimensFrom(rover?.specimens, bodyId);
+        const inRover = vehicles.reduce((n, v) => n + specimensFrom(v.specimens, bodyId), 0);
         const aboard = specimensFrom(state.ship.specimens, bodyId);
         const need = c.count ?? 0;
         const have = inRover + aboard;
@@ -1387,9 +1595,9 @@ function ShipPanel({
           <div key={c.id} class="contract-note small" title={c.text}>
             <span class="accent">◆</span> {c.title}: {have} / {need} samples{" "}
             <span class="muted">
-              ({inRover} in the rover, {aboard} aboard)
+              ({inRover} in the field, {aboard} aboard)
             </span>
-            {have >= need && <div class="good">Enough collected. Stow the rover, lift off, and hand it in at the Intrepid.</div>}
+            {have >= need && <div class="good">Enough collected. Stow everything, lift off, and hand it in at the Intrepid.</div>}
           </div>
         );
       })}
@@ -1459,15 +1667,20 @@ function FloraPanel({
   const sampled = floraStatus(know, site) === "sampled";
   const dist = rover ? hexDistance(rover, site) : null;
   const near = dist !== null && dist <= 1;
+  const loc = session.state.location;
+  const wet = siteOnWater(session.world, loc.kind === "surface" ? loc.bodyId : "", site);
+  const vehicle = rover ? vehicleOf(rover) : null;
+  const noun = vehicle === "boat" ? "boat" : "rover";
+  const wrong = vehicleMismatch(vehicle, wet, "plants");
   const blockers: string[] = [];
   if (sampled) blockers.push("Already sampled here.");
-  if (!rover) blockers.push("Deploy the rover first.");
-  else {
-    if (!near && !sampled) blockers.push(`The rover is ${dist} tiles away: drive it next to the plants.`);
+  if (wrong) blockers.push(wrong);
+  else if (rover) {
+    if (!near && !sampled) blockers.push(`The ${noun} is ${dist} tiles away: ${vehicle === "boat" ? "sail" : "drive"} it next to the ${wet ? "sea life" : "plants"}.`);
     if (specimenCount(rover.specimens) >= roverSpecimenSlots(session.state)) {
-      blockers.push("The rover's sample cases are full. Drive back to the ship and stow.");
+      blockers.push(`The ${noun}'s sample cases are full. ${vehicle === "boat" ? "Sail" : "Drive"} back to the ship and stow.`);
     }
-    if (rover.energy < SAMPLE_ENERGY) blockers.push(`The sample kit needs ${SAMPLE_ENERGY} rover energy.`);
+    if (rover.energy < SAMPLE_ENERGY) blockers.push(`The sample kit needs ${SAMPLE_ENERGY} ${noun} energy.`);
   }
   const collect = async (): Promise<void> => {
     if (!(await goTo())) return;
@@ -1480,6 +1693,7 @@ function FloraPanel({
         <i class="leaf-mark big" />
         <span>{site.species}</span>
         <span class={`tag ${sampled ? "" : "new"}`}>{sampled ? "sampled" : "unsampled"}</span>
+        {wet && <span class="tag sea">sea life</span>}
       </div>
       <dl class="kv">
         <dt>Position</dt>
@@ -1496,9 +1710,9 @@ function FloraPanel({
         </ul>
       )}
       <div class="btn-row dep-actions">
-        {rover && !atSite && !sampled && (
+        {rover && !wrong && !atSite && !sampled && (
           <button class="btn" disabled={busy} onClick={drive}>
-            Drive there
+            {vehicle === "boat" ? "Sail there" : "Drive there"}
           </button>
         )}
         <button class="btn primary" disabled={busy || blockers.length > 0} onClick={() => void collect()}>
@@ -1506,7 +1720,9 @@ function FloraPanel({
         </button>
       </div>
       {blockers.length === 0 && (
-        <p class="muted small act-note">Uses {SAMPLE_ENERGY} rover energy. Samples ride in the rover's cases until you stow it.</p>
+        <p class="muted small act-note">
+          Uses {SAMPLE_ENERGY} {noun} energy. Samples ride in the {noun}'s cases until you stow it.
+        </p>
       )}
     </Section>
   );
@@ -1544,32 +1760,41 @@ function DepositPanel({
   const remaining = remainingTonnes(know, dep);
   const tooDeep = dep.depthM > stats.drillMaxDepthM;
   const rate = drillRate(session.state, dep);
-  const room = rover ? stats.roverCargoT - cargoTonnes(rover.cargo) : 0;
+  // Seabed seams are dredged from the boat (AW-17); everything else is the rover's.
+  const loc = session.state.location;
+  const wet = siteOnWater(session.world, loc.kind === "surface" ? loc.bodyId : "", dep);
+  const vehicle = rover ? vehicleOf(rover) : null;
+  const noun = vehicle === "boat" ? "boat" : "rover";
+  const go = vehicle === "boat" ? "sail" : "drive";
+  const wrong = vehicleMismatch(vehicle, wet, "deposit");
+  const bedName = vehicle === "boat" ? "hold" : "cargo bed";
+  const room = rover ? vehicleCargoT(session.state, vehicle as Vehicle) - cargoTonnes(rover.cargo) : 0;
+  const dredge = wet ? "Dredge" : "Drill";
 
-  const workBlock = workBlockers(session.state, know, dep);
+  const workBlock = workBlockers(session.state, session.world, know, dep);
 
   const placement: string[] = [];
-  if (!rover) placement.push("Deploy the rover first.");
-  else if (!near) placement.push(`The rover is ${dist} tiles away: drive it next to the deposit.`);
+  if (wrong) placement.push(wrong);
+  else if (!near) placement.push(`The ${noun} is ${dist} tiles away: ${go} it next to the deposit.`);
 
-  // Assayer (science): prospecting works from two hexes out, in half the time. Drilling still needs the rover beside the seam.
+  // Assayer (science): prospecting works from two hexes out, in half the time. Drilling still needs the vehicle beside the seam.
   const pRange = prospectRange(session.state);
   const prospectBlockers: string[] = [];
-  if (!rover) prospectBlockers.push("Deploy the rover first.");
+  if (wrong) prospectBlockers.push(wrong);
   else if (dist !== null && dist > pRange) {
-    prospectBlockers.push(`The rover is ${dist} tiles away: drive it ${pRange > 1 ? `within ${pRange} tiles of` : "next to"} the deposit.`);
+    prospectBlockers.push(`The ${noun} is ${dist} tiles away: ${go} it ${pRange > 1 ? `within ${pRange} tiles of` : "next to"} the deposit.`);
   }
   const prospectMinutes = PROSPECT_MINUTES * SHIFT_FACTOR * (hasPerk(session.state, "assayer") ? 0.5 : 1);
-  if (rover && rover.energy < PROSPECT_ENERGY) prospectBlockers.push(`Core samples need ${PROSPECT_ENERGY} rover energy.`);
+  if (rover && !wrong && rover.energy < PROSPECT_ENERGY) prospectBlockers.push(`Core samples need ${PROSPECT_ENERGY} ${noun} energy.`);
 
   const drillBlockers = [...placement];
   if (status === "depleted") drillBlockers.push("This deposit is worked out.");
   if (tooDeep) drillBlockers.push(`The seam is ${dep.depthM} m down and the drill only reaches ${stats.drillMaxDepthM} m. A better drill would get it.`);
-  if (rover && room <= 0.05) drillBlockers.push("The rover's cargo bed is full. Drive back to the ship and unload.");
+  if (rover && !wrong && room <= 0.05) drillBlockers.push(`The ${noun}'s ${bedName} is full. ${go === "sail" ? "Sail" : "Drive"} back to the ship and unload.`);
   const setupEnergy = isSite ? 0 : DRILL_SETUP_ENERGY;
-  if (rover && rover.energy < setupEnergy + 0.5) drillBlockers.push("Not enough rover energy to run the drill.");
+  if (rover && !wrong && rover.energy < setupEnergy + 0.5) drillBlockers.push(`Not enough ${noun} energy to run the ${wet ? "dredge" : "drill"}.`);
 
-  const hoursFull = rover
+  const hoursFull = rover && !wrong
     ? Math.max(0, Math.min(remaining / rate, room / rate, (rover.energy - setupEnergy) / DRILL_ENERGY_PER_HOUR))
     : 0;
   const hours4 = Math.min(4, hoursFull);
@@ -1585,8 +1810,8 @@ function DepositPanel({
     const r = session.act((s, w) => drill(s, w, dep.key, maxHours));
     if (!r.ok) return;
     const { tonnes: got, hours, depleted, roverFull, incident } = r.value;
-    const why = incident ? "interrupted" : depleted ? "deposit worked out" : roverFull ? "cargo bed full" : hours < maxHours - 0.01 ? "rover energy low" : "";
-    session.notify(`Drilled ${tonnes(got)} of ${commodity.name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}${why ? ` (${why})` : ""}.`);
+    const why = incident ? "interrupted" : depleted ? "deposit worked out" : roverFull ? `${bedName} full` : hours < maxHours - 0.01 ? `${noun} energy low` : "";
+    session.notify(`${wet ? "Dredged" : "Drilled"} ${tonnes(got)} of ${commodity.name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}${why ? ` (${why})` : ""}.`);
     if (incident) session.notify(incident, "error");
   };
 
@@ -1596,6 +1821,7 @@ function DepositPanel({
         <i class="swatch big" style={{ background: status === "depleted" ? "#5b6472" : commodity.color }} />
         <span>{commodity.name}</span>
         <span class={`tag ${status}`}>{status === "new" ? "unsurveyed" : status}</span>
+        {wet && <span class="tag sea">seabed</span>}
       </div>
       <p class="muted small blurb">{commodity.blurb}</p>
       <dl class="kv">
@@ -1644,7 +1870,9 @@ function DepositPanel({
           <p class="danger small act-note">{workBlock[0]}</p>
         ) : (
           <p class="muted small act-note">
-            The crew deploys the rover, prospects, drills and hauls loads home until the deposit is worked out or the hold is full.
+            {wet
+              ? "The crew launches the boat, prospects, dredges and hauls loads home until the deposit is worked out or the hold is full."
+              : "The crew deploys the rover, prospects, drills and hauls loads home until the deposit is worked out or the hold is full."}
           </p>
         )}
       </div>
@@ -1654,9 +1882,9 @@ function DepositPanel({
         <>
           <ul class="blockers">{prospectBlockers.map((b) => <li key={b}>{b}</li>)}</ul>
           <div class="btn-row dep-actions">
-            {rover && !atSite && (
+            {rover && !wrong && !atSite && (
               <button class="btn" disabled={busy} onClick={drive}>
-                Drive there
+                {vehicle === "boat" ? "Sail there" : "Drive there"}
               </button>
             )}
             <button
@@ -1672,16 +1900,16 @@ function DepositPanel({
         <>
           <ul class="blockers">{drillBlockers.map((b) => <li key={b}>{b}</li>)}</ul>
           <div class="btn-row dep-actions">
-            {rover && !atSite && (
+            {rover && !wrong && !atSite && (
               <button class="btn" disabled={busy} onClick={drive}>
-                Drive there
+                {vehicle === "boat" ? "Sail there" : "Drive there"}
               </button>
             )}
             <button class="btn" disabled={busy || drillBlockers.length > 0} onClick={() => void runDrill(Infinity)}>
-              Drill until full
+              {dredge} until full
             </button>
             <button class="btn" disabled={busy || drillBlockers.length > 0} onClick={() => void runDrill(4)}>
-              Drill 4 h
+              {dredge} 4 h
             </button>
           </div>
           {drillBlockers.length === 0 && (

@@ -1,6 +1,6 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { useEffect, useState } from "preact/hooks";
-import { COMMODITIES, COMMODITY_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
+import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
 import { FLORA_BY_NAME } from "../../data/catalog";
 import { PROBE_PRICE } from "../../data/probes";
 import { CLAN_NAMES, UPGRADE_CATEGORY_NAMES, UPGRADES, type UpgradeCategory } from "../../data/ship";
@@ -296,6 +296,16 @@ function Market({ session }: { session: GameSession }) {
               </th>
             </tr>
             {GAS_IDS.map(row)}
+            {(stats.refineryRateTph > 0 || CONC_IDS.some((id) => (state.ship.cargo[id] ?? 0) > 0.05)) && (
+              <>
+                <tr class="hub-subhead">
+                  <th colSpan={forecast ? 7 : 6} title="From the portable refinery: 2.5 t of ore makes 1 t, worth 10% more than the ore. Prices follow the ore's market.">
+                    Concentrates
+                  </th>
+                </tr>
+                {CONC_IDS.map(row)}
+              </>
+            )}
           </tbody>
         </table>
         <div class="hub-actions">
@@ -828,6 +838,14 @@ function Shipyard({ session }: { session: GameSession }) {
           </dd>
           <dt>Rover climbs</dt>
           <dd class={stats.roverCanClimb ? "good" : "muted"}>{stats.roverCanClimb ? "Mountains" : "Flat and rough only"}</dd>
+          {stats.boatEnergy > 0 && (
+            <>
+              <dt>Boat hold</dt>
+              <dd>{tonnes(stats.boatCargoT)}</dd>
+              <dt>Boat energy</dt>
+              <dd>{stats.boatEnergy}</dd>
+            </>
+          )}
         </dl>
         <h3 class="hub-gap">Landing ratings</h3>
         <dl class="kv">

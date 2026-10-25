@@ -4,6 +4,7 @@ import {
   boardBoat,
   boatDock,
   boatMobility,
+  canEnter,
   cargoTonnes,
   drill,
   findPath,
@@ -19,6 +20,9 @@ import {
   SEA_ID_BASE,
   stowRover,
   Terrain,
+  vehicleHome,
+  vehicleMinutesMult,
+  vehicleMismatch,
   vehicleOf,
   World,
   workDeposit,
@@ -167,5 +171,36 @@ describe("the boat (AW-17)", () => {
     state.location = { kind: "surface", systemId: body.id.split(".")[0]!, bodyId: body.id, region: 0, rover: { x: site.x, y: site.y, energy: 140, cargo: {}, vehicle: "boat" }, ship: { x: 0, y: 0 }, globalCoords: true };
     knowledge(state, body.id, 0).floraFound.push(site.id);
     expect(collectSample(state, world, site.key).ok).toBe(true);
+  });
+});
+
+describe("boat UI helpers (AW-17)", () => {
+  it("vehicleMismatch matches sites to vehicles", () => {
+    expect(vehicleMismatch(null, true, "deposit")).toMatch(/boat/);
+    expect(vehicleMismatch("rover", true, "plants")).toMatch(/boat/);
+    expect(vehicleMismatch("boat", false, "deposit")).toMatch(/ashore/);
+    expect(vehicleMismatch("boat", true, "deposit")).toBeNull();
+    expect(vehicleMismatch("rover", false, "plants")).toBeNull();
+  });
+
+  it("vehicleHome: the boat heads to its dock, a rover to the moored boat, otherwise the ship", () => {
+    const { world, state, shore } = seaScenario();
+    expect(vehicleHome(state, world)).toEqual(shore);
+    expect(launchBoat(state, world, true).ok).toBe(true);
+    expect(vehicleHome(state, world)).toEqual(boatDock(state, world));
+    const loc = state.location as { rover: { x: number; y: number } | null; parkedBoat?: { x: number; y: number } };
+    const boat = { x: loc.rover!.x, y: loc.rover!.y };
+    const spot = neighbors(boat.x, boat.y).find((n) => canEnter(world.surface((state.location as { bodyId: string }).bodyId), n.x, n.y, roverMobility(state)));
+    expect(spot).toBeDefined();
+    expect(putRoverAshore(state, world, spot!.x, spot!.y).ok).toBe(true);
+    expect(vehicleHome(state, world)).toEqual(boat);
+  });
+
+  it("vehicleMinutesMult: drive motors speed the rover, not the boat", () => {
+    const { world, state } = seaScenario();
+    state.ship.upgrades.push("roverMotors");
+    expect(vehicleMinutesMult(state)).toBeLessThan(1);
+    expect(launchBoat(state, world).ok).toBe(true);
+    expect(vehicleMinutesMult(state)).toBe(1);
   });
 });

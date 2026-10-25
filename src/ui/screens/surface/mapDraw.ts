@@ -733,6 +733,103 @@ export function drawRover(
   ctx.fillRect(x - r * 0.55, y - r * 0.4, r * 1.1, r * 0.8);
 }
 
+/**
+ * The survey boat (AW-17) at a canvas pixel position, a clean top-down hull with its bow along `heading`
+ * (degrees, 0 = north, clockwise). `moored` draws it at rest with a mooring ring instead of a wake;
+ * `roverAboard` lashes a little rover to the deck.
+ */
+export function drawBoat(
+  ctx: CanvasRenderingContext2D,
+  L: Layout,
+  at: Vec2,
+  timeMs: number,
+  heading: number,
+  opts: { moored?: boolean; moving?: boolean; roverAboard?: boolean } = {},
+): void {
+  const u = Math.max(7, L.tw * 0.85);
+  const bob = Math.sin(timeMs / 500 + at.x * 0.05) * u * 0.04;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.translate(at.x, at.y + bob);
+  // Water disturbance: a soft ring (moored) or a wake behind the stern (underway).
+  ctx.strokeStyle = "rgba(190, 235, 255, 0.55)";
+  ctx.lineWidth = 1.2;
+  if (opts.moored) {
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(0, 0, u * 1.15, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.rotate((heading * Math.PI) / 180);
+  if (opts.moving) {
+    ctx.beginPath();
+    ctx.moveTo(-u * 0.3, u * 0.95);
+    ctx.lineTo(-u * 0.7, u * 1.9);
+    ctx.moveTo(u * 0.3, u * 0.95);
+    ctx.lineTo(u * 0.7, u * 1.9);
+    ctx.stroke();
+  }
+  const hull = (k: number): void => {
+    ctx.beginPath();
+    ctx.moveTo(0, -u * 1.05 * k);
+    ctx.bezierCurveTo(u * 0.55 * k, -u * 0.55 * k, u * 0.5 * k, u * 0.5 * k, u * 0.4 * k, u * 0.9 * k);
+    ctx.lineTo(-u * 0.4 * k, u * 0.9 * k);
+    ctx.bezierCurveTo(-u * 0.5 * k, u * 0.5 * k, -u * 0.55 * k, -u * 0.55 * k, 0, -u * 1.05 * k);
+    ctx.closePath();
+  };
+  // shadow on the water
+  ctx.fillStyle = "rgba(5, 18, 32, 0.4)";
+  ctx.save();
+  ctx.translate(u * 0.08, u * 0.1);
+  hull(1.04);
+  ctx.fill();
+  ctx.restore();
+  // hull
+  hull(1);
+  ctx.fillStyle = "#e9f1f8";
+  ctx.fill();
+  ctx.lineWidth = Math.max(1.4, u * 0.1);
+  ctx.strokeStyle = "#1f7f9b";
+  ctx.lineJoin = "round";
+  ctx.stroke();
+  // deck well and cabin
+  ctx.fillStyle = "#b9c9d8";
+  ctx.fillRect(-u * 0.22, -u * 0.35, u * 0.44, u * 0.7);
+  ctx.fillStyle = "#1f7f9b";
+  ctx.fillRect(-u * 0.26, u * 0.42, u * 0.52, u * 0.3);
+  ctx.fillStyle = "#0b2a38";
+  ctx.fillRect(-u * 0.16, u * 0.5, u * 0.32, u * 0.1);
+  if (opts.roverAboard) {
+    // the rover lashed to the deck
+    ctx.fillStyle = "rgba(5, 7, 15, 0.9)";
+    ctx.fillRect(-u * 0.2, -u * 0.32, u * 0.4, u * 0.58);
+    ctx.fillStyle = UI.cyan;
+    ctx.fillRect(-u * 0.15, -u * 0.27, u * 0.3, u * 0.48);
+    ctx.fillStyle = "#e8fbff";
+    ctx.fillRect(-u * 0.09, -u * 0.18, u * 0.18, u * 0.16);
+  }
+  ctx.restore();
+}
+
+/** Shore hexes where the boat can put the rover off: tinted, with the hovered one picked out. */
+export function drawShoreTargets(ctx: CanvasRenderingContext2D, L: Layout, tiles: readonly Vec2[], hover: Vec2 | null, timeMs: number): void {
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 260);
+  ctx.setLineDash([]);
+  for (const t of tiles) {
+    const hot = hover !== null && hover.x === t.x && hover.y === t.y;
+    ctx.fillStyle = `rgba(95, 212, 255, ${hot ? 0.45 : 0.18 + pulse * 0.12})`;
+    ctx.beginPath();
+    tilePath(ctx, L, t);
+    ctx.fill();
+    ctx.strokeStyle = hot ? "#e8fbff" : UI.cyan;
+    ctx.lineWidth = hot ? 2 : 1.5;
+    ctx.beginPath();
+    tilePath(ctx, L, t, -1);
+    ctx.stroke();
+  }
+}
+
 /** What a hovered route would do to the rover's cells. */
 export interface EnergyPreview {
   /** Energy the move would use. */

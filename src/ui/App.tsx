@@ -1,3 +1,4 @@
+import { ShipStatus } from "./ShipStatus";
 import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
@@ -24,6 +25,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const [journalOpen, setJournalOpen] = useState(false);
   const [compendiumOpen, setCompendiumOpen] = useState(false);
   const [contractsOpen, setContractsOpen] = useState(false);
+  const [shipOpen, setShipOpen] = useState(false);
   const [crewOpen, setCrewOpen] = useState(false);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       // C is a hex movement key on the surface (down-right), so the compendium lives on B ("book").
       else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
+      else if (ev.key === "h" || ev.key === "H") setShipOpen((o) => !o);
       else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
       else if (ev.key === "Escape") {
         if (session.perkTree) session.openPerkTree(null);
@@ -40,6 +43,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
         setJournalOpen(false);
         setCompendiumOpen(false);
         setContractsOpen(false);
+        setShipOpen(false);
       }
       else if (ev.key === "m" || ev.key === "M") session.go(session.view === "starmap" ? defaultView(session.state) : "starmap");
     };
@@ -54,7 +58,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   return (
     <div class="game">
       <TopBar session={session} onJournal={() => setJournalOpen(true)} onCompendium={() => setCompendiumOpen(true)}
-        onContracts={() => setContractsOpen(true)} onCrew={() => setCrewOpen(true)}
+        onContracts={() => setContractsOpen(true)} onCrew={() => setCrewOpen(true)} onShip={() => setShipOpen(true)}
         onQuit={onQuit} />
       <main class="main">
         {session.view === "hub" && <Hub session={session} />}
@@ -72,6 +76,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {journalOpen && <Journal session={session} onClose={() => setJournalOpen(false)} />}
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
+      {shipOpen && <ShipStatus session={session} onClose={() => setShipOpen(false)} />}
       {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
       <ProbeDiveOverlay session={session} />
       {session.perkTree && <PerkTreeModal session={session} station={session.perkTree} onClose={() => session.openPerkTree(null)} />}

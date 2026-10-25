@@ -2,7 +2,8 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
-import { COMMODITIES, type CommodityId } from "../data/commodities";
+import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
+import { isConcentrate } from "./refinery";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { burnPath } from "./burnpath";
@@ -670,6 +671,12 @@ export function vehicleMobility(state: GameState): Mobility {
   return loc.kind === "surface" && loc.rover && vehicleOf(loc.rover) === "boat" ? boatMobility() : roverMobility(state);
 }
 
+/** Multiplier on route minutes: the drive motors are the rover's; the boat keeps its own pace. */
+export function vehicleMinutesMult(state: GameState): number {
+  const loc = state.location;
+  return loc.kind === "surface" && loc.rover && vehicleOf(loc.rover) === "boat" ? 1 : routeMinutesMult(state);
+}
+
 /** Drive (or sail) toward (x, y), across region borders if needed. Stops early if energy runs short. */
 export function moveRoverTo(state: GameState, world: World, x: number, y: number): Result<{ steps: number; stopped: string | null }> {
   const ctx = surfaceCtx(state, world);
@@ -680,7 +687,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   const path = findPath(surface, rover, { x, y }, vehicleMobility(state));
   const energyMult = routeEnergyMult(state);
   // The drive motors are the rover's; the boat keeps its own pace.
-  const minutesMult = boat ? 1 : routeMinutesMult(state);
+  const minutesMult = vehicleMinutesMult(state);
   if (!path) return fail(boat ? "No open water route there." : "No route there for this rover.");
   let steps = 0;
   for (const step of path) {
@@ -1192,6 +1199,12 @@ export function reservedCargo(state: GameState): Partial<Record<CommodityId, num
 
 /** How much of a commodity can be sold without dipping into tonnage held for contracts. */
 export function sellableTonnes(state: GameState, id: CommodityId): number {
+  // Concentrate (AW-18) covers whatever a delivery still needs after the raw ore.
+  if (isConcentrate(id)) {
+    const ore = CONC_SOURCE[id];
+    const short = Math.max(0, (reservedCargo(state)[ore] ?? 0) - (state.ship.cargo[ore] ?? 0));
+    return Math.max(0, (state.ship.cargo[id] ?? 0) - short / CONC_RATIO);
+  }
   return Math.max(0, (state.ship.cargo[id] ?? 0) - (reservedCargo(state)[id] ?? 0));
 }
 

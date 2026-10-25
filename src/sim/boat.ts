@@ -10,7 +10,7 @@ import { fail, ok, type Result } from "./result";
 import { advanceTime, log, type GameState, type RoverState } from "./state";
 import { Terrain } from "./surface";
 import { HOUR, type Vec2 } from "./units";
-import { hasBoat, vehicleOf } from "./vehicles";
+import { hasBoat, siteOnWater, vehicleOf } from "./vehicles";
 import type { World } from "./world";
 
 /** Getting the rover on or off the boat. */
@@ -25,6 +25,32 @@ export function boatDock(state: GameState, world: World): Vec2 | null {
   const surface = world.surface(loc.bodyId);
   const home = shipTile(state, world);
   return neighbors(home.x, home.y).find((n) => surface.terrainAt(n.x, n.y) === Terrain.liquid) ?? null;
+}
+
+/**
+ * Where the vehicle being driven heads to go home: the boat to the water beside the ship, the
+ * rover to the moored boat's shore if the boat is waiting, otherwise the ship.
+ */
+export function vehicleHome(state: GameState, world: World): Vec2 {
+  const loc = state.location;
+  if (loc.kind !== "surface") return { x: 0, y: 0 };
+  if (loc.rover && vehicleOf(loc.rover) === "boat") return boatDock(state, world) ?? shipTile(state, world);
+  if (loc.parkedBoat) return { x: loc.parkedBoat.x, y: loc.parkedBoat.y };
+  return shipTile(state, world);
+}
+
+/** Why the crew can't auto-work a deposit with the vehicles as they are right now (null if they can). The hold and depth checks stay with the caller. */
+export function autoWorkVehicleBlocker(state: GameState, world: World, deposit: Vec2): string | null {
+  const loc = state.location;
+  if (loc.kind !== "surface") return "Land first.";
+  const wet = siteOnWater(world, loc.bodyId, deposit);
+  if (wet && !hasBoat(state)) return "That seam is under the sea. The Midshipmen fit survey boats.";
+  if (wet && !boatDock(state, world)) return "The ship needs to stand at the water's edge for the boat to work that seam. Hop it to a shore.";
+  if (loc.rover && vehicleOf(loc.rover) !== (wet ? "boat" : "rover")) {
+    return wet ? "Stow the rover first: this seam needs the boat." : "Bring the boat in first: this deposit needs the rover.";
+  }
+  if (loc.parkedBoat) return "The boat is moored offshore: get the rover back aboard and sail home first.";
+  return null;
 }
 
 /** Why the boat can't launch right now (empty if it can). */

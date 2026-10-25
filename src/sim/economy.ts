@@ -2,7 +2,7 @@
  * The Exchange's trade depot aboard the Intrepid. Prices drift day to day around their base,
  * and dumping a lot of one commodity depresses its price until the glut clears.
  */
-import { COMMODITIES, COMMODITY_IDS, type CommodityId } from "../data/commodities";
+import { COMMODITIES, COMMODITY_IDS, CONC_IDS, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import type { Rng } from "./rng";
 import { clamp } from "./units";
 
@@ -31,9 +31,12 @@ export function stepMarket(market: MarketState, rng: Rng, day: number): void {
   const days = Math.min(day - market.day, 3650);
   for (let i = 0; i < days; i++) {
     for (const id of COMMODITY_IDS) {
-      market.mult[id] = clamp(market.mult[id] + 0.08 * (1 - market.mult[id]) + rng.gaussian(0, 0.035), 0.5, 1.8);
       market.glut[id] *= 0.97;
+      // Concentrate prices follow their ore (below), so they draw nothing from the stream.
+      if ((CONC_IDS as readonly string[]).includes(id)) continue;
+      market.mult[id] = clamp(market.mult[id] + 0.08 * (1 - market.mult[id]) + rng.gaussian(0, 0.035), 0.5, 1.8);
     }
+    for (const c of CONC_IDS) market.mult[c] = market.mult[CONC_SOURCE[c]];
     market.fuelMult = clamp(market.fuelMult + 0.1 * (1 - market.fuelMult) + rng.gaussian(0, 0.02), 0.7, 1.5);
   }
   market.day = Math.max(market.day, day);

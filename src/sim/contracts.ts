@@ -8,6 +8,7 @@
 import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
+import { oreEquivalent, takeOreEquivalent } from "./refinery";
 import { bondClan, cheerAll } from "./sentiment";
 import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
@@ -361,7 +362,8 @@ export interface ContractProgress {
 export function contractProgress(state: GameState, c: Contract): ContractProgress {
   switch (c.kind) {
     case "deliver": {
-      const have = state.ship.cargo[c.commodity as CommodityId] ?? 0;
+      // Concentrate counts at its ore equivalent (AW-18).
+      const have = oreEquivalent(state, c.commodity as CommodityId);
       const need = c.tonnes ?? 0;
       return { have, need, ready: have >= need - 0.05, label: `${Math.floor(have)} / ${need} t aboard` };
     }
@@ -432,7 +434,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
   const progress = contractProgress(state, c);
   if (!progress.ready) return fail(`Not yet: ${progress.label}.`);
 
-  if (c.kind === "deliver") removeCargo(state.ship.cargo, c.commodity as CommodityId, c.tonnes ?? 0);
+  if (c.kind === "deliver") takeOreEquivalent(state, c.commodity as CommodityId, c.tonnes ?? 0);
   if (c.kind === "specimens") {
     let left = c.count ?? 0;
     const specimens = state.ship.specimens ?? {};

@@ -261,3 +261,22 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Survey boat (AW-17) */
+.dep-title .tag + .tag {
+  margin-left: 6px;
+}
+.tag.sea {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+.action-bar .ab-hint {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  line-height: 1.35;
+}
+.surface-side .other-vehicle {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-bright);
+}
