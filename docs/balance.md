@@ -75,6 +75,35 @@ The 15-trip strategy report now shows the investment payoff clearly. Late-trip p
       - The competent captain is barely affected; their early-to-late growth fell to about 1.8×.
   - **Exchange insurance** is deferred to combat (M3), when there are real losses to insure.
 
+## Frontier pass **[DECIDED 2026-10-25]** (playtest 8)
+
+The user found no reason to leave the safe, nearby worlds, so the first scouts' work now shows.
+
+| Where | Deposit tonnage | Deposits already worked out |
+|---|---|---|
+| Home worlds | 0.9× | 20% |
+| Charted worlds | 1.0× | 10% |
+| Past the charted stars | 1.25×, plus 5% per ly beyond 6 ly (capped at 1.8×) | none |
+
+- **Positions stay put.** Worked-out deposits are removed after placement, so positions, ids and plant sites never move.
+- **Bulk deliveries** now pay a 35 cr/t haulage fee on top of the goods' value.
+- **New gear:**
+  - cargo pods: +150 t after the expanded hold, 48k cr,
+  - a rover fast charger: 2× charge rate,
+  - uprated drive motors: 25% faster,
+  - and the probe bay now includes one probe.
+
+**Career report after the pass** (6 seeds, 60 trips):
+
+| | Early profit per trip | Late profit per trip | Early trips profitable |
+|---|---|---|---|
+| Competent | about 6.7k cr | about 13k cr | 70% |
+| Novice | about 6.6k cr | about 10k cr | 70% |
+
+- Growth comes from ranging out. The competent captain's profit per 100 days rises about 2.7×, a bit more than before, because the frontier rewards those who invest in range and landing ratings.
+- No careers went broke and the novice crew stayed.
+- An intermediate tuning (home 0.6× and 40% worked out) caused a novice spiral: debt over 100k cr and four crew quitting. It was rejected.
+
 ## Still open
 
 - **Late-game money needs somewhere to go.** A competent captain ends 60 trips with about 0.66M cr. The real sinks are ship classes (AW-103), research (AW-15), outposts (M4) and, eventually, the Intrepid's own fold. Until they exist, late-game wealth is expected.

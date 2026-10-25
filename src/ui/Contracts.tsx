@@ -1,7 +1,7 @@
 /** Contracts overlay: every active job with its targets, plus the postings on offer. Viewable from anywhere. */
 import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
-import { completeContract, contractPayout, contractProgress, DAY, formatDuration, type Contract } from "../sim";
+import { completeContract, contractBenefits, contractPayout, contractProgress, DAY, formatDuration, type Contract, type GameState } from "../sim";
 import { bandPhrase, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -46,6 +46,16 @@ function targetsOf(session: GameSession, c: Contract): Target[] {
   return [];
 }
 
+/** One subtle line of the non-credit upsides (experience, loyalty, spirits). Used on every contract card. */
+export function ContractAlso({ state, c }: { state: GameState; c: Contract }) {
+  const text = contractBenefits(state, c).join(" · ");
+  return (
+    <div class="con-also muted small" title="What finishing this job does besides paying: experience, loyalty and morale">
+      Also: {text}
+    </div>
+  );
+}
+
 function Row({ session, c }: { session: GameSession; c: Contract }) {
   const { state } = session;
   const active = c.status === "active";
@@ -73,6 +83,7 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
         </span>
       </div>
       <div class="muted small">{c.text}</div>
+      <ContractAlso state={state} c={c} />
       {active ? (
         <>
           <div class="hub-contract-row">

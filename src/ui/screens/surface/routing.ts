@@ -1,16 +1,20 @@
 /** Route planning helpers for the surface screen (thin wrappers over the sim's pathfinder, planet-wide coordinates). */
 import { findPath, neighbors, type Mobility, type PathStep, type TileSource, type Vec2 } from "../../../sim";
 
-/** How this rover gets around, with the crew's perks: terrain it can cross (roverMobility) and the route energy multiplier (routeEnergyMult). */
+/** How this rover gets around, with the crew's perks: terrain it can cross (roverMobility) and the route energy and time multipliers (routeEnergyMult, routeMinutesMult). */
 export interface Mover {
   mobility: Mobility;
   energyMult: number;
+  /** Drive-time multiplier (uprated drive motors). */
+  minutesMult: number;
 }
 
-/** findPath with the crew's perks: step energy is already scaled, so every sum and budget downstream agrees with the sim. */
+/** findPath with the crew's perks and gear: step energy and minutes are already scaled, so every sum and budget downstream agrees with the sim (moveRoverTo). */
 function pathFor(tiles: TileSource, from: Vec2, to: Vec2, mover: Mover): PathStep[] | null {
   const path = findPath(tiles, from, to, mover.mobility);
-  return path && mover.energyMult !== 1 ? path.map((s) => ({ ...s, energy: s.energy * mover.energyMult })) : path;
+  return path && (mover.energyMult !== 1 || mover.minutesMult !== 1)
+    ? path.map((s) => ({ ...s, energy: s.energy * mover.energyMult, minutes: s.minutes * mover.minutesMult }))
+    : path;
 }
 
 /** The cheapest route to `to`; if it can't be entered (and `approach`), to the cheapest hex next to it. */

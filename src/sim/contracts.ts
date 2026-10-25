@@ -406,6 +406,20 @@ export function acceptContract(state: GameState, id: string): Result<Contract> {
   return ok(c);
 }
 
+/**
+ * The non-credit upsides of finishing a contract, as short phrases for the card: experience for the
+ * comms officer and captain, loyalty with officers from the clan (or plain goodwill if none are aboard),
+ * the crew's spirits, and Helm's goodwill when it's an obligation. Mirrors what completeContract grants.
+ */
+export function contractBenefits(state: GameState, c: Contract): string[] {
+  const out = ["comms and captain experience"];
+  const kin = (state.crew ?? []).filter((m) => m.clan === c.clan);
+  out.push(kin.length > 0 ? `+loyalty with ${kin.map((m) => m.name).join(", ")}` : `+goodwill with ${CLAN_NAMES[c.clan]}`);
+  out.push("the crew's spirits");
+  if (c.obligation) out.push("keeps Helm's goodwill");
+  return out;
+}
+
 /** What a contract pays on completion: its reward, plus the comms officer's haggling. */
 export function contractPayout(state: GameState, c: Contract): number {
   return Math.round((c.reward * crewBonuses(state).contractPay) / 10) * 10;

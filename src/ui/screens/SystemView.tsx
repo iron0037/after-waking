@@ -22,6 +22,7 @@ import {
   orbitalSensorTier,
   foldEdgeFraction,
   surveyBody,
+  surfaceBurnFuel,
   type Body,
   type FlightTarget,
   type Vec2,
@@ -560,9 +561,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       <button
                         class="btn primary big"
                         disabled={busy || landBlockers.length > 0}
+                        title={`Descent burns ${surfaceBurnFuel(state, selected).toFixed(1)} fuel; lifting off again costs the same`}
                         onClick={() => session.act((s, w) => land(s, w, region))}
                       >
-                        Land in region {region + 1}
+                        Land in region {region + 1} ({surfaceBurnFuel(state, selected).toFixed(1)} fuel)
                       </button>
                     )}
                   </>

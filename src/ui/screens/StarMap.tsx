@@ -24,7 +24,9 @@ import {
   hasPerk,
   positionOf,
   SPECTRAL,
+  systemMinerals,
   systemProgress,
+  type SystemMineral,
   type Body,
   type Contract,
   type StarSystem,
@@ -32,6 +34,8 @@ import {
   type Vec2,
 } from "../../sim";
 import { CLAN_NAMES } from "../../data/ship";
+import { COMMODITIES } from "../../data/commodities";
+import { tonnes } from "../format";
 import { Canvas } from "../Canvas";
 import { BODY_COLOR, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
@@ -591,16 +595,23 @@ export function StarMap({ session }: { session: GameSession }) {
     }
 
     if (targets.has(n.id)) {
-      const mx = x - r - 6;
-      const my = y - r - 6;
+      // Amber "!" badge: this system has contract work outstanding.
+      const mx = x - r - 9;
+      const my = y - r - 9;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(mx, my - 4.5);
-      ctx.lineTo(mx + 4.5, my);
-      ctx.lineTo(mx, my + 4.5);
-      ctx.lineTo(mx - 4.5, my);
-      ctx.closePath();
+      ctx.arc(mx, my, 8, 0, Math.PI * 2);
       ctx.fillStyle = UI.accent;
       ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = UI.space;
+      ctx.stroke();
+      ctx.fillStyle = UI.space;
+      ctx.font = `bold 12px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", mx, my + 0.5);
+      ctx.restore();
     }
 
     if (state.visitedSystems.includes(n.id)) {
@@ -672,11 +683,17 @@ export function StarMap({ session }: { session: GameSession }) {
     const [x, y] = toScreen(n.pos);
     const d = n.id === fromId ? "you are here" : `${distanceLy(world.galaxy, fromId, n.id).toFixed(1)} ly`;
     const fp = plots.get(n.id);
-    const lines = [n.name, n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d];
-    if (fp) lines.push(`fold: ${fp.fuel} fuel, refit ${formatDuration(fp.refitMinutes)}`);
+    const lines: { text: string; color: string }[] = [
+      { text: n.name, color: UI.text },
+      { text: n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d, color: UI.muted },
+    ];
+    if (fp) lines.push({ text: `fold: ${fp.fuel} fuel, refit ${formatDuration(fp.refitMinutes)}`, color: UI.cyan });
+    const jobs = targets.get(n.id) ?? [];
+    for (const job of jobs.slice(0, 3)) lines.push({ text: `! ${job.title}`, color: UI.accent });
+    if (jobs.length > 3) lines.push({ text: `! +${jobs.length - 3} more jobs here`, color: UI.accent });
     ctx.save();
     ctx.font = `11px ${FONT}`;
-    const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14;
+    const bw = Math.max(...lines.map((l) => ctx.measureText(l.text).width)) + 14;
     const bh = 8 + lines.length * 14;
     const bx = clamp(x + 16, 6, w - bw - 6);
     const by = clamp(y + 14, 6, h - bh - 6);
@@ -687,14 +704,10 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.fill();
     ctx.stroke();
     ctx.textAlign = "left";
-    ctx.fillStyle = UI.text;
-    ctx.fillText(lines[0] as string, bx + 7, by + 14);
-    ctx.fillStyle = UI.muted;
-    ctx.fillText(lines[1] as string, bx + 7, by + 28);
-    if (lines[2]) {
-      ctx.fillStyle = UI.cyan;
-      ctx.fillText(lines[2], bx + 7, by + 42);
-    }
+    lines.forEach((l, i) => {
+      ctx.fillStyle = l.color;
+      ctx.fillText(l.text, bx + 7, by + 14 + i * 14);
+    });
     ctx.restore();
   };
 
@@ -727,7 +740,7 @@ export function StarMap({ session }: { session: GameSession }) {
         </div>
         <div class="sm-legend">
           <div>
-            <span class="good">◆</span> visited · <span class="accent">◆</span> contract target
+            <span class="good">◆</span> visited · <span class="sm-bang">!</span> contract work outstanding
           </div>
           <div>
             <span class="sm-ring">◯</span> ring: how thoroughly explored (full ring = painted)
@@ -854,6 +867,13 @@ export function StarMap({ session }: { session: GameSession }) {
                 )}
               </section>
             )}
+
+            {target.star && known(target) && (
+              <section class="panel">
+                <h3>Minerals</h3>
+                <MineralList session={session} systemId={target.id} />
+              </section>
+            )}
           </>
         ) : (
           <section class="panel">
@@ -888,7 +908,11 @@ export function StarMap({ session }: { session: GameSession }) {
                     {n.name}
                     {n.star?.home && <span class="good" title="Home system"> ⌂</span>}
                     {state.visitedSystems.includes(n.id) && <span class="good" title="Visited"> ◆</span>}
-                    {targets.has(n.id) && <span class="accent" title="Active contract target"> ◆</span>}
+                    {targets.has(n.id) && (
+                      <span class="sm-bang" title={`Contract work here: ${(targets.get(n.id) ?? []).map((c) => c.title).join("; ")}`}>
+                        !
+                      </span>
+                    )}
                   </td>
                   <td class="muted">{n.star ? n.star.spectral : "ship"}</td>
                   <td class="sm-prog">
@@ -946,7 +970,7 @@ function ExplorationBlock({ star, paint, contracts }: { star: StarSystem; paint:
       )}
       {contracts.length > 0 && (
         <div class="sm-contracts">
-          <h3 class="accent">◆ Contracts pointing here</h3>
+          <h3 class="accent">! Contracts pointing here</h3>
           <ul>
             {contracts.map((c) => (
               <li key={c.id}>
@@ -987,6 +1011,68 @@ function LandableSummary({ session, systemId }: { session: GameSession; systemId
     </div>
   ) : (
     <div class="danger small">No worlds here your ship can land on yet. Check gravity, heat and radiation ratings in the shipyard.</div>
+  );
+}
+
+const MINERAL_BODIES_SHOWN = 3;
+
+/** Known minerals in a system (orbital scans plus deposits the rover has found), flagging what active delivery jobs need. */
+function MineralList({ session, systemId }: { session: GameSession; systemId: string }) {
+  const { state, world } = session;
+  const minerals: SystemMineral[] = systemMinerals(state, world, systemId);
+  if (minerals.length === 0) return <div class="muted small">No scans on record here yet. Scan the worlds to see what they hold.</div>;
+  const wanted = new Map<string, number>();
+  for (const c of state.contracts ?? []) {
+    if (c.status === "active" && c.kind === "deliver" && c.commodity) wanted.set(c.commodity, (wanted.get(c.commodity) ?? 0) + (c.tonnes ?? 0));
+  }
+  return (
+    <ul class="sm-minerals">
+      {minerals.map((m) => {
+        const need = wanted.get(m.commodity);
+        const shown = m.bodies.slice(0, MINERAL_BODIES_SHOWN);
+        const rest = m.bodies.slice(MINERAL_BODIES_SHOWN);
+        return (
+          <li key={m.commodity} class={need !== undefined ? "wanted" : ""}>
+            <div class="sm-mineral-head">
+              <span class="sm-dot" style={{ background: COMMODITIES[m.commodity].color }} />
+              <span class="sm-mineral-name">{COMMODITIES[m.commodity].name}</span>
+              {need !== undefined && (
+                <span class="tag accent-tag" title="An active delivery contract needs this commodity">
+                  ◆ contract: {tonnes(need)}
+                </span>
+              )}
+            </div>
+            <div class="sm-mineral-bodies small">
+              {shown.map((b, i) => (
+                <span key={b.bodyId}>
+                  {i > 0 && ", "}
+                  {b.landable ? (
+                    <span title="Landable with your current ship">
+                      {b.name} <span class="good">▼</span>
+                    </span>
+                  ) : (
+                    <span class="danger" title="can't land with the current ship">
+                      {b.name}
+                    </span>
+                  )}
+                </span>
+              ))}
+              {rest.length > 0 && (
+                <span class="muted" title={rest.map((b) => `${b.name}${b.landable ? " ▼" : " (can't land with the current ship)"}`).join(", ")}>
+                  {" "}
+                  +{rest.length} more
+                </span>
+              )}
+            </div>
+            {m.found.count > 0 && (
+              <div class="small accent" title="Deposits the rover has found and not yet worked out; reachable means within your drill's depth on a world you can land on">
+                found: {tonnes(m.found.tonnes)}, {tonnes(m.found.reachableTonnes)} reachable
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

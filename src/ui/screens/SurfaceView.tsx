@@ -50,6 +50,7 @@ import {
   roverMobility,
   roverSpecimenSlots,
   routeEnergyMult,
+  routeMinutesMult,
   hasPerk,
   effectiveStats,
   orbitalSensorTier,
@@ -57,6 +58,7 @@ import {
   SAMPLE_ENERGY,
   SAMPLE_MINUTES,
   sensorRadius,
+  surfaceBurnFuel,
   sensorSweep,
   detectsDeposit,
   detectsFlora,
@@ -267,7 +269,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const stats = effectiveStats(state);
   const rover = loc.rover;
   const busy = session.busy;
-  const mover: Mover = { mobility: roverMobility(state), energyMult: routeEnergyMult(state) };
+  const mover: Mover = { mobility: roverMobility(state), energyMult: routeEnergyMult(state), minutesMult: routeMinutesMult(state) };
   const canClimb = mover.mobility.canClimb;
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);
@@ -483,6 +485,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   // --- ship hop --------------------------------------------------------------------------
 
   const hopBase = hopFuel(state, world);
+  const burnFuel = surfaceBurnFuel(state, body);
   const hopBlocker = (tile: Vec2): string | null => {
     if (!canEnter(surface, tile.x, tile.y, false)) return "The ship needs open, level ground to set down.";
     if (tile.x === ship.x && tile.y === ship.y) return "The ship is already there.";
@@ -1042,7 +1045,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                   ? "Stow the rover before moving the ship"
                   : hopBase > state.ship.fuel
                     ? `A hop needs at least ${hopBase.toFixed(1)} fuel`
-                    : `Hop the ship to another open tile, anywhere on the planet: from ${hopBase.toFixed(1)} fuel (more the farther it goes), ${formatDuration(HOP_MINUTES)}`
+                    : `Hop the ship to another open tile, anywhere on the planet: from ${hopBase.toFixed(1)} fuel (more the farther it goes), ${formatDuration(HOP_MINUTES)}. A hop is cheaper than lifting off and landing again (${burnFuel.toFixed(1)} fuel each way): it costs about half a burn plus distance, so a region over is roughly one burn versus two.`
               }
               onClick={toggleMoveMode}
             >
@@ -1051,10 +1054,16 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             <button
               class="btn liftoff"
               disabled={busy || rover !== null}
-              title={rover ? "Take the ship back to orbit (stow the rover first)" : "Take the ship back to orbit"}
+              title={
+                rover
+                  ? "Take the ship back to orbit (stow the rover first)"
+                  : state.ship.fuel < burnFuel
+                    ? `Ascent needs ${burnFuel.toFixed(1)} fuel and you have ${state.ship.fuel.toFixed(1)}`
+                    : `Take the ship back to orbit. Ascent burns ${burnFuel.toFixed(1)} fuel (landing again costs the same).`
+              }
               onClick={doLiftOff}
             >
-              Lift off (ship)
+              Lift off ({burnFuel.toFixed(1)} fuel)
             </button>
           </div>
         </div>

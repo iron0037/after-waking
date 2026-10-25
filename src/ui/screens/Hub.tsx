@@ -59,7 +59,7 @@ import {
   type Contract,
 } from "../../sim";
 import { bandPhrase, cr, pct, tonnes } from "../format";
-import { contractBodyNames } from "../Contracts";
+import { ContractAlso, contractBodyNames } from "../Contracts";
 import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
@@ -576,6 +576,7 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
         <span class="accent" title={payTitle}>{cr(payout)}</span>
       </div>
       <div class="muted small">{c.text}</div>
+      <ContractAlso state={state} c={c} />
       {c.kind === "probe" && c.bodyId && (
         <div class="small">
           {(() => {

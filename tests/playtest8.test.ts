@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   advanceTime,
   buyUpgrade,
+  contractBenefits,
   DAY,
   deliveryContract,
   deserialize,
@@ -107,5 +108,21 @@ describe("planning folds", () => {
     expect(minerals.length).toBeGreaterThan(0);
     for (const m of minerals) expect(m.bodies.length).toBeGreaterThan(0);
     expect(minerals.some((m) => m.bodies.some((b) => b.landable))).toBe(true);
+  });
+});
+
+describe("contract benefits line", () => {
+  it("names crewmates from the clan, else the clan's goodwill, and Helm obligations", () => {
+    const state = newGame({ seed: 42 });
+    const c = deliveryContract(new Rng(1), state.time, 1);
+    const kin = (state.crew ?? []).filter((m) => m.clan === c.clan);
+    const line = contractBenefits(state, c).join(" | ");
+    expect(line).toContain("experience");
+    expect(line).toContain("spirits");
+    if (kin.length > 0) expect(line).toContain(`+loyalty with ${kin[0]?.name}`);
+    else expect(line).toContain("+goodwill with");
+    state.crew = [];
+    expect(contractBenefits(state, c).join(" | ")).toContain("+goodwill with");
+    expect(contractBenefits(state, { ...c, obligation: true }).join(" | ")).toContain("Helm's goodwill");
   });
 });

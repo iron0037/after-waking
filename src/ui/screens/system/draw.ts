@@ -351,23 +351,24 @@ function drawProgressRing(ctx: CanvasRenderingContext2D, p: Vec2, r: number, exp
   ctx.restore();
 }
 
-/** Small accent diamond up and to the left of a world that an active contract points at. */
+/** An amber "!" badge up and to the left of a world that an active contract still needs work on (like Stellaris's markers). */
 function drawContractMark(ctx: CanvasRenderingContext2D, p: Vec2, r: number): void {
-  const x = p.x - r * 0.75 - 5;
-  const y = p.y - r * 0.75 - 5;
+  const x = p.x - r * 0.75 - 8;
+  const y = p.y - r * 0.75 - 8;
   ctx.save();
   ctx.setLineDash([]);
   ctx.beginPath();
-  ctx.moveTo(x, y - 4.5);
-  ctx.lineTo(x + 4.5, y);
-  ctx.lineTo(x, y + 4.5);
-  ctx.lineTo(x - 4.5, y);
-  ctx.closePath();
+  ctx.arc(x, y, 8, 0, Math.PI * 2);
   ctx.fillStyle = UI.accent;
   ctx.fill();
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.5;
   ctx.strokeStyle = UI.space;
   ctx.stroke();
+  ctx.fillStyle = UI.space;
+  ctx.font = FONT(12, "bold");
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("!", x, y + 0.5);
   ctx.restore();
 }
 
@@ -442,8 +443,8 @@ function drawTooltip(ctx: CanvasRenderingContext2D, scene: Scene, body: Body, p:
     lines.push(`landed ${prog.regionsVisited}/${prog.regions} regions · ${Math.round(prog.explored * 100)}% mapped`);
   }
   const jobs = scene.targets.get(body.id) ?? [];
-  const first = jobs[0];
-  if (first) lines.push(`◆ ${first.title}`);
+  for (const job of jobs.slice(0, 3)) lines.push(`! ${job.title}`);
+  if (jobs.length > 3) lines.push(`! +${jobs.length - 3} more jobs here`);
   ctx.font = FONT(11);
   const width = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
   const height = 8 + lines.length * 15;
@@ -462,7 +463,7 @@ function drawTooltip(ctx: CanvasRenderingContext2D, scene: Scene, body: Body, p:
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   lines.forEach((line, i) => {
-    ctx.fillStyle = i === 0 ? UI.text : line.startsWith("◆") ? UI.accent : UI.muted;
+    ctx.fillStyle = i === 0 ? UI.text : line.startsWith("!") ? UI.accent : UI.muted;
     ctx.fillText(line, x + 8, y + 12 + i * 15);
   });
 }
