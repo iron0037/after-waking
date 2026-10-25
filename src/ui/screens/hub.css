@@ -301,3 +301,13 @@ table.data tr.hub-subhead th {
 table.data tbody tr.hub-subhead:first-child th {
   padding-top: 4px;
 }
+
+/* Research projects (AW-15) */
+.research-needs {
+  margin: 4px 0;
+  padding-left: 4px;
+  list-style: none;
+}
+.research-needs li {
+  margin: 2px 0;
+}

@@ -4,7 +4,8 @@
  */
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
-import { UPGRADES_BY_ID } from "../data/ship";
+import { researchFor, upgradeUnlocked } from "./research";
+import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { burnPath } from "./burnpath";
 import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf, vehiclesOut } from "./vehicles";
@@ -1466,6 +1467,9 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const upgrade = UPGRADES_BY_ID.get(upgradeId);
   if (!upgrade) return fail("Unknown upgrade.");
   if (state.ship.upgrades.includes(upgradeId)) return fail("Already installed.");
+  // The top tier of each kind of gear waits on a research project (AW-15).
+  const gate = researchFor(upgradeId);
+  if (gate && !upgradeUnlocked(state, upgradeId)) return fail(`Needs research first: "${gate.name}" (${CLAN_NAMES[gate.clan]}).`);
   const queued = (id: string) => state.ship.upgrades.includes(id) || (state.yard ?? []).some((j) => j.upgradeId === id);
   if (upgrade.requires && !queued(upgrade.requires)) {
     return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);

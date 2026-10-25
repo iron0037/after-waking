@@ -63,6 +63,9 @@ describe("new gear", () => {
     state.credits = 200_000;
     expect(buyUpgrade(state, "expandedHold2").ok).toBe(false);
     expect(buyUpgrade(state, "expandedHold").ok).toBe(true);
+    // Cargo pods also wait on the Exchange's research (AW-15).
+    expect(buyUpgrade(state, "expandedHold2").ok).toBe(false);
+    state.research = { "pod-frames": { startedAt: 0, readyAt: 0, done: true } };
     expect(buyUpgrade(state, "expandedHold2").ok).toBe(true);
     advanceTime(state, 5 * DAY);
     expect(shipStats(state.ship).cargoCapacityT).toBe(450);

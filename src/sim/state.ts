@@ -12,6 +12,7 @@ import type { HelmRecord } from "./helm";
 import type { DiveRecord, ProbeDive } from "./probes";
 import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
+import { tickResearch, type ResearchRecord } from "./research";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
@@ -113,6 +114,8 @@ export interface GameState {
   probeDive?: ProbeDive;
   /** Depth bands profiled per giant, and which profiles the Lyceum has bought ("bodyId|depth"). */
   atmoReadings?: Record<string, number[]>;
+  /** Research projects commissioned at the Intrepid (AW-15), by project id. */
+  research?: Record<string, ResearchRecord>;
   atmoSold?: string[];
   /** Recent dives (for contracts and the record). */
   probeHistory?: DiveRecord[];
@@ -228,6 +231,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   tickContracts(state);
   tickRecruits(state);
   tickYard(state);
+  tickResearch(state);
   chargeStowedRover(state, minutes);
   tickSentiment(state, minutes);
   const day = Math.floor(state.time / DAY);

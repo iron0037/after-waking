@@ -1,4 +1,6 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
+import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
+import { requirementProgress, researchBlockers, researchFor, researchStatus, startResearch, upgradeUnlocked } from "../../sim";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
 import { FLORA_BY_NAME } from "../../data/catalog";
@@ -65,11 +67,12 @@ import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
 import "./hub.css";
 
-type Tab = "market" | "jobs" | "shipyard" | "crew" | "exchange" | "depart";
+type Tab = "market" | "jobs" | "shipyard" | "research" | "crew" | "exchange" | "depart";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "market", label: "Market" },
   { id: "shipyard", label: "Shipyard" },
+  { id: "research", label: "Research" },
   { id: "crew", label: "Crew" },
   { id: "exchange", label: "Exchange" },
   // Jobs come last before departure: a contract's clock starts when it's accepted.
@@ -81,6 +84,8 @@ const TAB_BLURB: Record<Tab, string> = {
   market: "The Exchange clan runs the Concourse scales. Everything is weighed, nothing is free.",
   jobs: "The clan boards by the Concourse gate. Paper contracts, wet signatures, and a deadline on every one.",
   shipyard: "Gantries, sparks and clan salesmen. Every part on the shelf was pulled from somebody's grandmother's engine room.",
+  research:
+    "The clan labs, deep in the old cryo decks, where the Archive is read a page at a time. Bring them what they need and they'll build what Earth only described. The Covenant leaves pamphlets on the benches.",
   crew: "The crew bunks are a long walk from the Concourse, but the hiring hall is always open. Everyone has a clan, a price and an opinion about your last fold.",
   exchange: "Brass counters under dim lamps. The note on your ship is older than most of the clerks.",
   depart: "Last checks at the airlock. The Verge is out there, and it doesn't care about your schedule.",
@@ -162,6 +167,7 @@ export function Hub({ session }: { session: GameSession }) {
         {tab === "market" && <Market session={session} />}
         {tab === "jobs" && <Jobs session={session} />}
         {tab === "shipyard" && <Shipyard session={session} />}
+        {tab === "research" && <Research session={session} />}
         {tab === "crew" && <Crew session={session} hallPing={hallPing} />}
         {tab === "exchange" && <Exchange session={session} />}
         {tab === "depart" && <Depart session={session} />}
@@ -889,6 +895,9 @@ function Shipyard({ session }: { session: GameSession }) {
                 // A queued install counts toward a requirement, as the sim allows ordering the next tier behind it.
                 const missing = !!u.requires && !state.ship.upgrades.includes(u.requires) && !queuedIds.has(u.requires);
                 const reqName = req?.name ?? u.requires ?? "";
+                // Top-tier gear waits on a research project (AW-15).
+                const gate = researchFor(u.id);
+                const gated = !!gate && !upgradeUnlocked(state, u.id);
                 return (
                   <div key={u.id} class={`panel hub-card ${installed || job ? "installed" : ""}`}>
                     <div class="hub-card-head">
@@ -909,6 +918,12 @@ function Shipyard({ session }: { session: GameSession }) {
                         {CLAN_NAMES[u.vendor]}
                       </span>
                       {missing && <span class="tag accent-tag">Requires {reqName}</span>}
+                      {gated && gate && (
+                        <span class="tag accent-tag" title={`Commission "${gate.name}" from ${CLAN_NAMES[gate.clan]} under Research`}>
+                          Research: {gate.name}
+                          {researchStatus(state, gate.id) === "running" ? " (under way)" : ""}
+                        </span>
+                      )}
                     </div>
                     <div class="muted small">{u.description}</div>
                     <div class="muted small" title={`Installed gear costs ${(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day to keep running.`}>
@@ -922,9 +937,11 @@ function Shipyard({ session }: { session: GameSession }) {
                     {!installed && !job && (
                       <button
                         class="btn"
-                        disabled={short > 0 || missing}
+                        disabled={short > 0 || missing || gated}
                         title={
-                          missing
+                          gated && gate
+                            ? `Needs the "${gate.name}" research project first (Research tab).`
+                            : missing
                             ? `Requires ${reqName} first.`
                             : short > 0
                               ? `You need ${cr(short)} more.`
@@ -943,6 +960,89 @@ function Shipyard({ session }: { session: GameSession }) {
           </Section>
           );
         })}
+      </section>
+    </div>
+  );
+}
+
+// --- research (AW-15) -------------------------------------------------------------------
+
+function Research({ session }: { session: GameSession }) {
+  useSession(session);
+  const { state } = session;
+  const running = RESEARCH.filter((p) => researchStatus(state, p.id) === "running").length;
+  return (
+    <div class="hub-grid">
+      <section class="panel hub-wide">
+        <div class="hub-section-head">
+          <h2>Research projects</h2>
+          <span class="muted">
+            {running} / {MAX_ACTIVE_RESEARCH} under way · projects run while you fly
+          </span>
+        </div>
+        <p class="muted small">
+          Each clan can turn a piece of the Archive into gear you can buy, if you bring back what the work needs and pay for the lab time. Goods
+          are handed over when the project starts; survey data, readings and charts are copied, not used up.
+        </p>
+        <div class="hub-cards">
+          {RESEARCH.map((p) => {
+            const status = researchStatus(state, p.id);
+            const rec = state.research?.[p.id];
+            const gear = UPGRADES.find((u) => u.id === p.unlocks);
+            const blockers = researchBlockers(state, p.id);
+            return (
+              <div key={p.id} class={`panel hub-card ${status === "done" ? "installed" : ""}`}>
+                <div class="hub-card-head">
+                  <strong>{p.name}</strong>
+                  {status === "done" ? (
+                    <span class="tag good">Finished</span>
+                  ) : status === "running" ? (
+                    <span class="tag accent-tag">Under way</span>
+                  ) : (
+                    <span class="hub-price">
+                      <span class="accent">{cr(p.cost)}</span>
+                      <span class="muted small">{p.days} days</span>
+                    </span>
+                  )}
+                </div>
+                <div class="hub-card-tags">
+                  <span class="tag">{CLAN_NAMES[p.clan]}</span>
+                  <span class="tag" title={gear?.description}>
+                    Unlocks {gear?.name ?? p.unlocks}
+                  </span>
+                </div>
+                <div class="muted small">{p.blurb}</div>
+                {status === "available" && (
+                  <ul class="research-needs small">
+                    {p.needs.map((req, i) => {
+                      const prog = requirementProgress(state, req);
+                      return (
+                        <li key={i} class={prog.met ? "good" : ""}>
+                          {prog.met ? "✓ " : "· "}
+                          {prog.label}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {status === "running" && rec && (
+                  <div class="accent small">Results in {formatDuration(Math.max(0, rec.readyAt - state.time))}</div>
+                )}
+                {status === "done" && <div class="good small">The {gear?.name ?? "gear"} is on sale at the Shipyard.</div>}
+                {status === "available" && (
+                  <button
+                    class="btn"
+                    disabled={blockers.length > 0}
+                    title={blockers[0] ?? `Hand over the goods and ${cr(p.cost)}; results in ${p.days} days.`}
+                    onClick={() => session.act((s) => startResearch(s, p.id))}
+                  >
+                    Commission
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
     </div>
   );

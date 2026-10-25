@@ -120,6 +120,19 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
 ## 3. How Technology Unlocks
 **[PROPOSED]** You don't just buy tech. You **bring back what's needed to develop it**.
 
+**Research v1 [DECIDED 2026-10-25] (AW-15).** The first tier of every kind of gear is sold outright at the Shipyard; the top tier waits on a research project (`src/data/research.ts`). You commission a project at the Intrepid's Research tab by handing over goods (ores accept concentrate at its ore equivalent) and paying for the lab time; survey data, probe readings and star charts are requirements but aren't used up. Projects run while you fly (21–30 days), two at a time.
+
+| Project | Clan | Unlocks | Needs |
+|---|---|---|---|
+| Fold harmonics | Helm | Fold coil Mk II | 8 t plicite, charts from 6 systems, 15k |
+| Plicite-bit metallurgy | Diggers | Plicite-bit core drill | 25 t titanium, 4 t plicite, 12k |
+| Crust acoustics | Helm | Deep-crust sounding array | detailed surveys of 10 worlds, 10k |
+| Deep-atmosphere modelling | Lyceum | Pressure-rated probe racks | 2 readings at depth 3+, 1 t helium-3, 12k |
+| Modular pod frames | Exchange | Cargo pods | 30 t titanium, 30 t copper, 10k |
+| Compact fusion cells | Midshipmen | Fusion cell pack | 15 t uranium, 3 t deuterium, 12k |
+
+Gear already fitted stays fitted. Later projects can open new tech (sub-ocean sonar, corrosion coatings) the same way.
+
 - Projects at the Intrepid (e.g. "pressure hull mk II") need specific resources, samples or survey data, plus money.
 - Each project is run by a clan: Midshipmen for ship systems, Diggers for mining gear and rovers, Lyceum for science and medicine, Helm for sensors and navigation, and so on. That links tech to reputation.
 - In lore, every project is humans slowly deciphering the **Archive**, the AI data dump. The Covenant opposes each one.
@@ -138,6 +151,8 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
 
 **Bay capacity [PROPOSED].** The freighter's vehicle bay has limited slots. Choosing rover, boat or extra probes before you fold becomes a real decision.
 
+**Boat v1 [DECIDED 2026-10-25] (AW-17).** Ocean worlds are about three-quarters sea in island chains; the ship lands on an island. The survey boat (Midshipmen) launches from a ship standing at the water's edge, sails open water only, dredges seabed deposits, samples sea life, and can carry the rover to put it ashore elsewhere (the boat waits, moored, until the rover boards again). Seabed deposits and sea life come from their own random streams, so land sites never moved, and the first scouts never worked anything at sea. The rover and boat are both carried; one is driven at a time.
+
 **Scope note.** The rover and boat share one surface engine with different terrain passability. The submersible adds a depth layer. Probes and EVA are short, focused sequences. That's three real modes in total, not five.
 
 ## 5. Surface Operations: Planets Are Big **[DECIDED]**
@@ -152,7 +167,7 @@ Starflight's instant pickup is out. Exploring and extracting take time, and that
 1. **Prospect.** Rover sensors and core samples confirm a deposit's grade and depth.
 2. **Set up a drill site.** This takes hours. Drill rating limits depth and rock hardness (Diggers sell the best gear).
 3. **Extract.** This takes days. Yield per day depends on drill tier, crew skill and the deposit. Weather and hazard events can interrupt it.
-4. **Process, or haul raw.**
+4. **Process, or haul raw.** *(v1 built, AW-18: the portable refinery turns 2.5 t of metal ore in the hold into 1 t of concentrate worth 10% more, about 4 t of ore per crew hour; concentrate prices follow their ore, and delivery contracts accept it.)*
    - Raw ore is heavy and low-value per ton.
    - A portable refinery turns it into concentrate, which is lighter and more valuable, but takes extra days, power and a bay slot.
    - That makes it a cargo-versus-time-versus-equipment tradeoff.
