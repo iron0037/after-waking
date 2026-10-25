@@ -165,6 +165,8 @@ export interface DiveOdds {
   blocked: string | null;
   /** True until a probe has come back from this giant: the haul is a guess from an average atmosphere. */
   estimated: boolean;
+  /** Expected tonnes of each gas in a full haul, largest first. */
+  gases: { gas: GasId; tonnes: number }[];
 }
 
 /** What each depth band looks like from orbit, for the dive planner. */
@@ -188,6 +190,9 @@ export function diveOdds(state: GameState, world: World, body: Body): DiveOdds[]
       value: Math.round(tonnes * perT),
       blocked: band.depth > maxDepth ? (maxDepth === 0 ? "No probe bay." : "The probes aren't rated this deep.") : null,
       estimated: !charted,
+      gases: (Object.entries(mix) as [GasId, number][])
+        .map(([gas, w]) => ({ gas, tonnes: (tonnes * w) / total }))
+        .sort((a, b) => b.tonnes - a.tonnes),
     };
   });
 

@@ -151,7 +151,9 @@ export function Environment({ body, ratings }: { body: Body; ratings: Ratings })
         <dd class={body.life ? "good" : "muted"}>{body.life ? "Detected" : "None detected"}</dd>
       </dl>
 
-      <h3 class="sys-sub">Resources</h3>
+      <h3 class="sys-sub" title="Read from orbit. Faint traces may have no seam worth digging anywhere on the surface.">
+        Potential resource signatures
+      </h3>
       {resources.length === 0 ? (
         <div class="muted small">No mineral signatures.</div>
       ) : (

@@ -101,6 +101,18 @@ describe("atmospheric probes", () => {
     expect(diveOdds(state, world, body)[2]!.risk).toBeLessThan(green);
   });
 
+  it("breaks the expected haul down by gas, adding up to the whole", () => {
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    state.ship.upgrades.push("probeBay");
+    const body = world.body(inOrbit(state, world)).body;
+    for (const o of diveOdds(state, world, body)) {
+      const sum = o.gases.reduce((s, g) => s + g.tonnes, 0);
+      expect(sum).toBeCloseTo(o.tonnes, 5);
+      expect(o.gases[0]!.tonnes).toBeGreaterThanOrEqual(o.gases.at(-1)!.tonnes);
+    }
+  });
+
   it("pays its way over many dives, deeper for more (and riskier) money", () => {
     const world = new World(42);
     const rows: Record<string, number | string>[] = [];

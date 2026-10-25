@@ -12,6 +12,7 @@ import {
   richnessLabel,
   type Body,
 } from "../../../sim";
+import { COMMODITIES } from "../../../data/commodities";
 import { DEPTHS } from "../../../data/probes";
 import { cr, tonnes } from "../../format";
 import type { GameSession } from "../../session";
@@ -101,6 +102,9 @@ export function ProbePanel({ session, body, orbiting, scanned, busy }: { session
                         {o.estimated ? "est. " : ""}~{tonnes(o.tonnes)} (~{cr(o.value)})
                       </span>{" "}
                       · {o.hours} h
+                      <div class="probe-gases" title="Expected haul by gas. Shallow layers run to methane; the deep ones to xenon and helium-3.">
+                        {o.gases.map((g) => `${COMMODITIES[g.gas].name.toLowerCase()} ${tonnes(g.tonnes)}`).join(" · ")}
+                      </div>
                       {fresh.value > 0 && (
                         <div class="probe-new accent" title={`The Lyceum pays once for each new band profiled: ${fresh.depths.length} new on the way down`}>
                           new reading: {cr(fresh.value)}
