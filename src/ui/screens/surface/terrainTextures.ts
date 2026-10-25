@@ -30,6 +30,7 @@ const NAMES = [
   "grass", "shrub", "sand", "hardpan",
   "dust", "frost", "rubble", "rock",
   "basalt", "steppe", "water", "lava",
+  "scree", "peaks",
 ] as const;
 type TexName = (typeof NAMES)[number];
 
@@ -40,7 +41,7 @@ const TEXTURE_FOR: Record<BodyKind, readonly [TexName, TexName, TexName, TexName
   desert: ["sand", "hardpan", "rock", "frost", "water", "lava"],
   terrestrial: ["steppe", "shrub", "rock", "frost", "water", "lava"],
   ocean: ["steppe", "shrub", "rock", "frost", "water", "lava"],
-  ice: ["frost", "rubble", "rock", "frost", "water", "lava"],
+  ice: ["frost", "scree", "peaks", "frost", "water", "lava"],
   hothouse: ["sand", "hardpan", "rock", "frost", "water", "lava"],
   volcanic: ["dust", "basalt", "basalt", "frost", "water", "lava"],
   gasGiant: ["dust", "rubble", "rock", "frost", "water", "lava"],
@@ -50,18 +51,25 @@ const TEXTURE_FOR: Record<BodyKind, readonly [TexName, TexName, TexName, TexName
 /** How much of the texture's contrast to keep, per terrain (bright palettes clip if pushed). */
 const AMOUNT: readonly number[] = [0.75, 0.75, 0.8, 0.22, 0.5, 1];
 /** Ordinary plains on worlds that use the steppe tile: kept quiet, so ground cover doesn't shout. */
-const STEPPE_AMOUNT = 0.4;
+const STEPPE_AMOUNT = 0.28;
 /** Shrubland keeps a bit less of its (very leafy) contrast than rock and rubble do. */
 const SHRUB_AMOUNT = 0.6;
+/** The ice worlds' own rock tiles: frozen scree on rough ground, snow-capped ranges on mountains. */
+const SCREE_AMOUNT = 0.5;
+const PEAKS_AMOUNT = 0.6;
 /** Steppe leans toward this dry olive, so it reads apart from the lush meadow. */
 const STEPPE_TINT = [150, 156, 92] as const;
 /** The lush meadow tile is toned down from the full-strength grass the first pass painted everywhere. */
-const LUSH_AMOUNT = 0.55;
+const LUSH_AMOUNT = 0.45;
+/** Share of its colour that grassland gives up toward grey (steppe, then meadow), so it sits back on the map. */
+const STEPPE_DESAT = 0.22;
+const LUSH_DESAT = 0.1;
 /** Ice and snow are painted darker and greyer than their palette colour (ice worlds most), so markers stand out on them. */
 const ICE_TONE = 0.8;
 const ICE_WORLD_TONE = 0.7;
 const ICE_GREY = 0.18;
 const ICE_ROCK_TONE = 0.8;
+const ICE_ROCK_GREY = 0.35;
 /** How much of the water tile's speckle shows (it is mostly flat). */
 const WATER_DETAIL = 0.12;
 
@@ -136,12 +144,18 @@ function parseHex(hex: string): [number, number, number] {
 function paletteColor(kind: BodyKind, terrain: number): [number, number, number] {
   const pal = parseHex(TERRAIN_COLORS[kind][terrain] as string);
   if (kind === "ice" && terrain !== Terrain.ice && terrain !== Terrain.lava && terrain !== Terrain.liquid) {
-    return pal.map((v) => v * ICE_ROCK_TONE) as [number, number, number]; // the bare ground between the sheets, a little less glaring
+    // The bare ground between the sheets: greyer and darker than the palette's blue, mountains most.
+    return desaturate(pal, ICE_ROCK_GREY).map((v) => v * ICE_ROCK_TONE * (terrain === Terrain.mountain ? 0.9 : 1)) as [number, number, number];
   }
   if (terrain !== Terrain.ice) return pal;
   const tone = kind === "ice" ? ICE_WORLD_TONE : ICE_TONE;
   const lum = 0.3 * pal[0] + 0.59 * pal[1] + 0.11 * pal[2];
   return pal.map((v) => (v + (lum - v) * ICE_GREY) * tone) as [number, number, number];
+}
+
+function desaturate(pal: readonly [number, number, number], by: number): [number, number, number] {
+  const lum = 0.3 * pal[0] + 0.59 * pal[1] + 0.11 * pal[2];
+  return pal.map((v) => v + (lum - v) * by) as [number, number, number];
 }
 
 /** `tex` recoloured so its mean is `pal`, keeping `amount` of its contrast. */
@@ -178,9 +192,12 @@ export function tintedTexture(kind: BodyKind, terrain: number): Uint8ClampedArra
   if (terrain === Terrain.lava) {
     out = new Uint8ClampedArray(tex.rgb); // painted colours as they are
   } else {
-    const amount = name === "steppe" ? STEPPE_AMOUNT : name === "shrub" ? SHRUB_AMOUNT : (AMOUNT[terrain] ?? 1);
+    const amount = name === "steppe" ? STEPPE_AMOUNT : name === "shrub" ? SHRUB_AMOUNT : name === "scree" ? SCREE_AMOUNT : name === "peaks" ? PEAKS_AMOUNT : (AMOUNT[terrain] ?? 1);
     let pal = paletteColor(kind, terrain);
-    if (name === "steppe") pal = pal.map((v, c) => (v + ((STEPPE_TINT[c] as number) - v) * 0.3) * 0.95) as [number, number, number];
+    if (name === "steppe") {
+      pal = pal.map((v, c) => (v + ((STEPPE_TINT[c] as number) - v) * 0.3) * 0.95) as [number, number, number];
+      pal = desaturate(pal, STEPPE_DESAT);
+    }
     out = recolour(tex, pal, amount);
   }
   tinted.set(key, out);
@@ -213,7 +230,7 @@ export function lushTexture(kind: BodyKind): Uint8ClampedArray | null {
   if (hit) return hit;
   const tex = texture("grass");
   if (!tex) return null;
-  const out = recolour(tex, paletteColor(kind, Terrain.plain), LUSH_AMOUNT);
+  const out = recolour(tex, desaturate(paletteColor(kind, Terrain.plain), LUSH_DESAT), LUSH_AMOUNT);
   tinted.set(key, out);
   return out;
 }
