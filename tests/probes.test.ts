@@ -140,3 +140,90 @@ describe("atmospheric probes", () => {
     expect(diveDepthKm(3, 2)).toBeLessThan(900);
   });
 });
+
+describe("probes v2: jobs, readings, floating life", () => {
+  it("a probe bay brings probe work to the job board", async () => {
+    const { advanceTime } = await import("../src/sim");
+    const state = newGame({ seed: 42 });
+    expect(state.contracts.some((c) => c.kind === "probe" || ["methane", "deuterium", "xenon", "helium3"].includes(c.commodity ?? ""))).toBe(false);
+    state.ship.upgrades.push("probeBay");
+    advanceTime(state, 1);
+    expect(state.contracts.some((c) => c.status === "offered" && (c.kind === "probe" || GAS_IDS.includes(c.commodity as never)))).toBe(true);
+  });
+
+  it("an atmospheric survey contract completes when a probe comes back from deep enough", async () => {
+    const { acceptContract, contractProgress, probeSurveyContract, Rng } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    state.ship.upgrades.push("probeBay");
+    state.ship.probes = 3;
+    const job = probeSurveyContract(state, new Rng(5), 900)!;
+    state.contracts.push(job);
+    expect(acceptContract(state, job.id).ok).toBe(true);
+    const body = world.body(job.bodyId!).body;
+    const systemId = job.bodyId!.split(".")[0]!;
+    state.location = { kind: "space", systemId, pos: { x: 0, y: 0 }, orbiting: body.id };
+    state.scannedBodies.push(body.id);
+    expect(contractProgress(state, job).ready).toBe(false);
+    expect(launchProbe(state, world, job.depth as 2 | 3).ok).toBe(true);
+    state.probeDive!.risk = 0; // make sure it comes back
+    while (currentProbeEvent(state)) chooseProbeOption(state, world, 0);
+    expect(contractProgress(state, job).ready).toBe(true);
+  });
+
+  it("returned probes chart the atmosphere: true values in the planner, and readings the Lyceum buys once", async () => {
+    const { atmosphereCharted, sellReadings, unsoldReadings } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    state.ship.upgrades.push("probeBay");
+    state.ship.probes = 3;
+    const bodyId = inOrbit(state, world);
+    const body = world.body(bodyId).body;
+    expect(atmosphereCharted(state, bodyId)).toBe(false);
+    expect(diveOdds(state, world, body)[0]!.estimated).toBe(true);
+    expect(launchProbe(state, world, 2).ok).toBe(true);
+    state.probeDive!.risk = 0;
+    while (currentProbeEvent(state)) chooseProbeOption(state, world, 1);
+    expect(atmosphereCharted(state, bodyId)).toBe(true);
+    expect(diveOdds(state, world, body)[0]!.estimated).toBe(false);
+    expect(unsoldReadings(state).map((r) => r.depth).sort()).toEqual([1, 2]);
+    state.location = { kind: "intrepid" };
+    const credits = state.credits;
+    expect(sellReadings(state).ok).toBe(true);
+    expect(state.credits).toBeGreaterThan(credits);
+    expect(sellReadings(state).ok).toBe(false); // each band pays once
+  });
+
+  it("deep dives sometimes bring up floating life, prized by the Lyceum", async () => {
+    const { sellSpecimens } = await import("../src/sim");
+    const world = new World(42);
+    let floaters = 0;
+    const N = 300;
+    let sample: GameState | null = null;
+    for (let i = 0; i < N; i++) {
+      const state = newGame({ seed: 42 });
+      state.rngState = (i * 2246822519) | 0;
+      state.ship.upgrades.push("probeBay", "probeBay2");
+      state.ship.probes = 1;
+      inOrbit(state, world);
+      launchProbe(state, world, 4);
+      state.probeDive!.risk = 0;
+      let result;
+      while (currentProbeEvent(state)) {
+        const r = chooseProbeOption(state, world, 1);
+        if (r.ok && r.value.done) result = r.value.result;
+      }
+      if (result?.floater) {
+        floaters++;
+        sample ??= state;
+      }
+    }
+    expect(floaters / N).toBeGreaterThan(0.06);
+    expect(floaters / N).toBeLessThan(0.25);
+    // A floater sells for well above an ordinary plant sample.
+    sample!.location = { kind: "intrepid" };
+    sample!.catalogedSpecies = Object.keys(sample!.ship.specimens ?? {}); // no first-sale bonus, just the price
+    const r = sellSpecimens(sample!);
+    expect(r.ok && r.value).toBeGreaterThan(1_000);
+  });
+});

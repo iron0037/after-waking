@@ -18,6 +18,10 @@ export interface FloraEntry {
   rarity: Rarity;
   color: string;
   blurb: string;
+  /** Drifts in a giant's atmosphere; only probes find it (never on a surface, so climates is empty). */
+  floating?: boolean;
+  /** Specimen price multiplier at the Lyceum (floating life is rare and prized). */
+  priceMult?: number;
 }
 
 export interface MineralSpecimen {
@@ -65,6 +69,11 @@ export const FLORA: readonly FloraEntry[] = [
   { id: "dune-runner", name: "dune runner", climates: ["warm"], rarity: 2, color: "#d4b483", blurb: "A tumbleweed that rolls uphill. The Lyceum has three theories and no proof." },
   { id: "pyre-lily", name: "pyre lily", climates: ["warm"], rarity: 3, color: "#ff7a3d", blurb: "Blooms only after wildfire, from seeds that wait decades for the heat." },
   { id: "mirror-palm", name: "mirror palm", climates: ["warm"], rarity: 3, color: "#d6e2e6", blurb: "Fronds coated in a reflective wax so perfect it looks machined." },
+  // --- floating life (giant atmospheres; probes only) ----------------------------------------
+  { id: "cloud-drifter", name: "cloud drifter", climates: [], rarity: 2, floating: true, priceMult: 4, color: "#f2e6c8", blurb: "A gas bladder the size of a hand, riding the updrafts and feeding on lightning-made nitrates." },
+  { id: "storm-kelp", name: "storm kelp", climates: [], rarity: 2, floating: true, priceMult: 4, color: "#9fc4a8", blurb: "Long ribbons that knot themselves around ice grains and sail the jet streams for years." },
+  { id: "lantern-siphon", name: "lantern siphon", climates: [], rarity: 3, floating: true, priceMult: 6, color: "#ffd48a", blurb: "A colony of glowing cells that pumps itself up and down through the decks, chasing warmth." },
+  { id: "abyssal-bloom", name: "abyssal bloom", climates: [], rarity: 3, floating: true, priceMult: 8, color: "#c08aff", blurb: "Found only where the pressure should crush anything alive. The Lyceum wants every one you can bring." },
 ];
 
 export const MINERAL_SPECIMENS: readonly MineralSpecimen[] = [

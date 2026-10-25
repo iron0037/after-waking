@@ -3,7 +3,7 @@
  * player has covered, and reminders of what's already known when returning somewhere.
  */
 import { remainingTonnes } from "./actions";
-import type { Contract } from "./contracts";
+import { contractProgress, type Contract } from "./contracts";
 import type { Body } from "./bodies";
 import { effectiveStats } from "./perks";
 import type { GameState } from "./state";
@@ -90,6 +90,7 @@ export function contractTargetsByBody(state: GameState): Map<string, Contract[]>
     if (c.status !== "active") continue;
     if (c.kind === "specimens" && c.bodyId) add(c.bodyId, c);
     if (c.kind === "survey") for (const id of c.surveyBodyIds ?? []) if (!state.surveyedBodies.includes(id)) add(id, c);
+    if (c.kind === "probe" && c.bodyId && !contractProgress(state, c).ready) add(c.bodyId, c);
   }
   return map;
 }

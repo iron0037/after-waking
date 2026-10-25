@@ -5,7 +5,7 @@
  * This module deliberately avoids importing runtime code from state.ts (it's called from
  * advanceTime), so it writes journal entries and runs its RNG directly.
  */
-import { COMMODITIES, type CommodityId } from "../data/commodities";
+import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
 import { bondClan, cheerAll } from "./sentiment";
@@ -19,7 +19,7 @@ import { fuelPrice } from "./economy";
 import { distanceLy } from "./galaxy";
 import { World } from "./world";
 
-export type ContractKind = "deliver" | "specimens" | "survey";
+export type ContractKind = "deliver" | "specimens" | "survey" | "probe";
 export type ContractStatus = "offered" | "active" | "done" | "failed";
 
 export interface Contract {
@@ -47,6 +47,10 @@ export interface Contract {
   exclusive?: boolean;
   /** Helm's survey asked in return for its fund's help; skipping it costs Helm's goodwill. */
   obligation?: boolean;
+  // probe (atmospheric survey): dive to at least this band on bodyId and bring the probe back
+  depth?: number;
+  /** When it was signed (dives before this don't count). */
+  acceptedAt?: number;
   /** What was actually paid on completion (reward plus the comms officer's bonus). */
   paid?: number;
 }
@@ -229,6 +233,74 @@ export function standingSurvey(state: GameState, rng: Rng, serial: number): Cont
   };
 }
 
+const GAS_DEMAND: readonly (readonly [GasId, ClanId, number, [number, number]])[] = [
+  ["deuterium", "lyceum", 40, [4, 8]],
+  ["xenon", "midshipmen", 30, [3, 6]],
+  ["helium3", "exchange", 15, [1, 3]],
+  ["methane", "diggers", 15, [20, 40]],
+];
+
+const GAS_FLAVOR: Partial<Record<ClanId, string>> = {
+  lyceum: "The Lyceum's fusion trials need heavy hydrogen, and they need it before the next council review.",
+  midshipmen: "The Midshipmen are testing ion drives and burning through propellant faster than anyone budgeted.",
+  exchange: "The Exchange is cornering the helium-3 market before anyone else works out what it's for.",
+  diggers: "The Diggers' plastics works runs on methane, and the last shipment was short.",
+};
+
+function isGas(id: CommodityId | undefined): boolean {
+  return id !== undefined && (GAS_IDS as readonly string[]).includes(id);
+}
+
+/** A gas delivery: probe work, paid above market (and a way around the thin gas markets). */
+export function gasDeliveryContract(rng: Rng, serial: number): Contract {
+  const [gas, clan, , range] = rng.weighted(GAS_DEMAND.map((d) => [d, d[2]] as const));
+  const tonnes = rng.int(range[0], range[1]);
+  return {
+    id: `gas-${serial}`,
+    clan,
+    kind: "deliver",
+    title: `${CLAN_NAMES[clan]}: ${tonnes} t of ${COMMODITIES[gas].name.toLowerCase()}`,
+    text: GAS_FLAVOR[clan] ?? "",
+    commodity: gas,
+    tonnes,
+    reward: Math.round((tonnes * COMMODITIES[gas].basePrice * 1.6 + 800) / 50) * 50,
+    durationDays: rng.int(90, 150),
+    deadline: null,
+    status: "offered",
+  };
+}
+
+const PROBE_SURVEY_PAY = [0, 1_500, 3_500, 6_000, 9_000];
+
+/** An atmospheric survey: dive a named giant to a depth band and bring the probe back. */
+export function probeSurveyContract(state: GameState, rng: Rng, serial: number): Contract | null {
+  const world = worldFor(state.seed);
+  const range = effectiveStats(state).foldRangeLy;
+  const giants = world.galaxy.systems
+    .filter((s) => s.charted && distanceLy(world.galaxy, "intrepid", s.id) <= range)
+    .flatMap((s) => world.system(s.id).bodies.filter((b) => b.kind === "gasGiant" || b.kind === "iceGiant").map((b) => ({ s, b })));
+  if (giants.length === 0) return null;
+  const { s, b } = rng.pick(giants);
+  const maxDepth = Math.max(2, effectiveStats(state).probeMaxDepth);
+  const depth = rng.int(2, maxDepth);
+  const ly = distanceLy(world.galaxy, "intrepid", s.id);
+  const clan: ClanId = rng.chance(0.6) ? "lyceum" : "helm";
+  const band = ["", "cloud tops", "middle decks", "deep layers", "abyss"][depth];
+  return {
+    id: `probe-${serial}`,
+    clan,
+    kind: "probe",
+    title: `${CLAN_NAMES[clan]}: profile ${b.name} down to the ${band}`,
+    text: `${clan === "lyceum" ? "The Lyceum wants" : "Helm wants"} a full atmospheric profile of ${b.name} in ${s.name}, down to the ${band}. The probe has to come back for the data to count.`,
+    bodyId: b.id,
+    depth,
+    reward: Math.round((PROBE_SURVEY_PAY[depth] ?? 0) + 250 * ly),
+    durationDays: rng.int(100, 160),
+    deadline: null,
+    status: "offered",
+  };
+}
+
 /** Expire overdue contracts and post new deliveries now and then. Called as time passes. */
 export function tickContracts(state: GameState): void {
   state.contracts ??= [];
@@ -261,6 +333,18 @@ export function tickContracts(state: GameState): void {
     state.nextContractAt += rng.range(15, 30) * DAY;
     state.rngState = rng.state;
   }
+  // Once there's a probe bay aboard, there's always a probe job on the board.
+  if (effectiveStats(state).probeCapacity > 0) {
+    const probeWork = state.contracts.some(
+      (c) => (c.kind === "probe" || (c.kind === "deliver" && isGas(c.commodity))) && (c.status === "offered" || c.status === "active"),
+    );
+    if (!probeWork) {
+      const rng = new Rng(state.rngState);
+      const job = rng.chance(0.5) ? probeSurveyContract(state, rng, state.contracts.length + 1) : gasDeliveryContract(rng, state.contracts.length + 1);
+      if (job) state.contracts.push(job);
+      state.rngState = rng.state;
+    }
+  }
 }
 
 export interface ContractProgress {
@@ -285,6 +369,13 @@ export function contractProgress(state: GameState, c: Contract): ContractProgres
       // Only samples in the ship's racks can be turned in.
       return { have, need, ready: aboard >= need, label: `${have} / ${need} samples collected` };
     }
+    case "probe": {
+      const since = c.acceptedAt ?? 0;
+      const done = (state.probeHistory ?? []).some(
+        (d) => d.bodyId === c.bodyId && d.depth >= (c.depth ?? 1) && d.outcome !== "lost" && d.t >= since,
+      );
+      return { have: done ? 1 : 0, need: 1, ready: done, label: done ? "profile taken, probe recovered" : "dive not yet flown" };
+    }
     case "survey": {
       const ids = c.surveyBodyIds ?? [];
       const have = ids.filter((id) => state.surveyedBodies.includes(id)).length;
@@ -303,6 +394,7 @@ export function acceptContract(state: GameState, id: string): Result<Contract> {
   if (!c || c.status !== "offered") return fail("That contract isn't on offer.");
   if ((state.contracts ?? []).filter((x) => x.status === "active").length >= 4) return fail("You can hold at most 4 active contracts.");
   c.status = "active";
+  c.acceptedAt = state.time;
   // Extensions (comms): the clans allow a quarter more time.
   c.deadline = state.time + c.durationDays * DAY * (hasPerk(state, "extensions") ? 1.25 : 1);
   state.journal.push({ t: state.time, kind: "trade", text: `Signed with ${CLAN_NAMES[c.clan]}: "${c.title}". ${c.durationDays} days to deliver.` });

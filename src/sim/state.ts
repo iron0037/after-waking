@@ -9,7 +9,7 @@ import type { Station } from "../data/crew";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { chargeStowedRover, tickYard } from "./actions";
 import type { HelmRecord } from "./helm";
-import type { ProbeDive } from "./probes";
+import type { DiveRecord, ProbeDive } from "./probes";
 import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
@@ -105,6 +105,11 @@ export interface GameState {
   crewShare?: number;
   /** An atmospheric probe on its way down (AW-16). */
   probeDive?: ProbeDive;
+  /** Depth bands profiled per giant, and which profiles the Lyceum has bought ("bodyId|depth"). */
+  atmoReadings?: Record<string, number[]>;
+  atmoSold?: string[];
+  /** Recent dives (for contracts and the record). */
+  probeHistory?: DiveRecord[];
   credits: number;
   loan: Loan;
   ship: ShipState;

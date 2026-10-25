@@ -4,16 +4,19 @@
  * mechanical ballast timer brings it back up, if it survives. A probe that returns is reused; a lost
  * one has to be replaced at the Shipyard.
  */
+import { FLORA, FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, GAS_IDS, type GasId } from "../data/commodities";
 import { DEPTHS, PROBE_EVENTS, PROBE_PRICE, type DepthBand, type ProbeDepth, type ProbeEvent, type ProbeOption } from "../data/probes";
 import type { Body } from "./bodies";
 import { awardXp, workingLevel } from "./crew";
 import { sellPrice } from "./economy";
-import { effectiveStats } from "./perks";
+import { recordFind } from "./compendium";
+import { specimenKey } from "./contracts";
+import { effectiveStats, shipSpecimenSlots } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { rngFor } from "./rng";
 import { cheerStation } from "./sentiment";
-import { addCargo } from "./ship";
+import { addCargo, specimenCount } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
 import { HOUR } from "./units";
 import type { World } from "./world";
@@ -40,6 +43,60 @@ export interface DiveResult {
   /** Tonnes recovered, by gas. */
   gases: Partial<Record<GasId, number>>;
   hours: number;
+  /** Depth bands profiled for the first time on this giant (readings the Lyceum will buy). */
+  newReadings: ProbeDepth[];
+  /** A floating organism caught in the canisters, if any. */
+  floater: string | null;
+}
+
+/** A dive on record (for contracts and the debrief history). */
+export interface DiveRecord {
+  bodyId: string;
+  depth: ProbeDepth;
+  outcome: ProbeOutcome;
+  t: number;
+}
+
+/** What the Lyceum pays for a first atmospheric profile of a depth band on a giant. */
+export const READING_PRICE_PER_DEPTH = 600;
+/** Chance a returning deep probe brings up floating life (gas giants; ice giants half as often). */
+export const FLOATER_CHANCE: Record<ProbeDepth, number> = { 1: 0, 2: 0, 3: 0.08, 4: 0.15 };
+
+/** Depth bands profiled on this giant (from probes that came back). */
+export function readingsFor(state: GameState, bodyId: string): ProbeDepth[] {
+  return (state.atmoReadings?.[bodyId] ?? []) as ProbeDepth[];
+}
+
+/** A giant's atmosphere is charted once any probe has come back from it: the planner then shows true values. */
+export function atmosphereCharted(state: GameState, bodyId: string): boolean {
+  return readingsFor(state, bodyId).length > 0;
+}
+
+/** Readings not yet sold to the Lyceum, and what they're worth. */
+export function unsoldReadings(state: GameState): { key: string; bodyId: string; depth: ProbeDepth; value: number }[] {
+  const sold = new Set(state.atmoSold ?? []);
+  const out: { key: string; bodyId: string; depth: ProbeDepth; value: number }[] = [];
+  for (const [bodyId, depths] of Object.entries(state.atmoReadings ?? {})) {
+    for (const depth of depths as ProbeDepth[]) {
+      const key = `${bodyId}|${depth}`;
+      if (!sold.has(key)) out.push({ key, bodyId, depth, value: READING_PRICE_PER_DEPTH * depth });
+    }
+  }
+  return out;
+}
+
+/** Sell new atmospheric profiles to the Lyceum (each giant and depth band pays once). */
+export function sellReadings(state: GameState): Result<number> {
+  if (state.location.kind !== "intrepid") return fail("The Lyceum buys readings aboard the Intrepid.");
+  const fresh = unsoldReadings(state);
+  if (fresh.length === 0) return fail("No new atmospheric readings to sell.");
+  const total = fresh.reduce((s, r) => s + r.value, 0);
+  state.atmoSold = [...(state.atmoSold ?? []), ...fresh.map((r) => r.key)];
+  state.credits += total;
+  state.stats.earned += total;
+  awardXp(state, "science", 3 * fresh.length);
+  log(state, "trade", `The Lyceum paid ${total.toLocaleString()} cr for ${fresh.length} new atmospheric profile${fresh.length === 1 ? "" : "s"}.`);
+  return ok(total);
 }
 
 export function isGiant(body: Body): boolean {
@@ -98,12 +155,16 @@ export interface DiveOdds {
   value: number;
   /** Why this depth can't be dived now, if it can't. */
   blocked: string | null;
+  /** True until a probe has come back from this giant: the haul is a guess from an average atmosphere. */
+  estimated: boolean;
 }
 
 /** What each depth band looks like from orbit, for the dive planner. */
 export function diveOdds(state: GameState, world: World, body: Body): DiveOdds[] {
   const pilot = pilotSkill(state);
-  const rich = atmosphereRichness(state.seed, body);
+  // Until a probe comes back from this giant, the planner can only assume an average atmosphere.
+  const charted = atmosphereCharted(state, body.id);
+  const rich = charted ? atmosphereRichness(state.seed, body) : 1;
   const maxDepth = effectiveStats(state).probeMaxDepth;
   const kind = body.kind === "iceGiant" ? "iceGiant" : "gasGiant";
   return DEPTHS.map((band) => {
@@ -118,6 +179,7 @@ export function diveOdds(state: GameState, world: World, body: Body): DiveOdds[]
       hours: band.hours,
       value: Math.round(tonnes * perT),
       blocked: band.depth > maxDepth ? (maxDepth === 0 ? "No probe bay." : "The probes aren't rated this deep.") : null,
+      estimated: !charted,
     };
   });
 
@@ -202,6 +264,8 @@ function finishDive(state: GameState, world: World): DiveResult {
   const roll = withRng(state, (rng) => rng.next());
   const outcome: ProbeOutcome = roll < risk ? "lost" : roll < Math.min(0.95, risk * 1.6) ? "damaged" : "recovered";
   const gases: Partial<Record<GasId, number>> = {};
+  const newReadings: ProbeDepth[] = [];
+  let floater: string | null = null;
   if (outcome !== "lost") {
     state.ship.probes = (state.ship.probes ?? 0) + 1;
     const haul = band.tonnes * dive.yieldMult * (outcome === "damaged" ? 0.5 : 1);
@@ -214,7 +278,36 @@ function finishDive(state: GameState, world: World): DiveResult {
       const added = addCargo(state.ship.cargo, gas, t, capacity);
       if (added > 0) gases[gas] = Math.round(added * 100) / 100;
     }
+    // The probe profiled every band it passed through on the way down.
+    state.atmoReadings ??= {};
+    const had = new Set(state.atmoReadings[body.id] ?? []);
+    for (let d = 1; d <= dive.depth; d++) {
+      if (!had.has(d)) {
+        newReadings.push(d as ProbeDepth);
+        had.add(d);
+      }
+    }
+    state.atmoReadings[body.id] = [...had].sort();
+    // Now and then something alive rides up in the canisters.
+    const chance = FLOATER_CHANCE[dive.depth] * (body.kind === "iceGiant" ? 0.5 : 1) * (outcome === "damaged" ? 0.5 : 1);
+    const pool = FLORA.filter((f) => f.floating && (dive.depth >= 4 || f.rarity < 3));
+    floater = withRng(state, (rng) => (pool.length > 0 && rng.chance(chance) ? rng.weighted(pool.map((f) => [f, f.rarity === 3 ? 1 : 3] as const)).name : null));
+    if (floater) {
+      const room = shipSpecimenSlots(state) - specimenCount(state.ship.specimens);
+      if (room > 0) {
+        state.ship.specimens ??= {};
+        const key = specimenKey(body.id, floater);
+        state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + 1;
+        const entry = FLORA_BY_NAME.get(floater);
+        if (entry) recordFind(state, "flora", entry.id, body.name, entry.name);
+        log(state, "discovery", `Something alive came up in the canisters: a ${floater}, still drifting in its sample jar.`);
+      } else {
+        log(state, "warning", `A ${floater} came up in the canisters, but the containment racks are full. It had to be released.`);
+        floater = null;
+      }
+    }
   }
+  state.probeHistory = [...(state.probeHistory ?? []).slice(-49), { bodyId: body.id, depth: dive.depth, outcome, t: state.time }];
   awardXp(state, "science", band.xp);
   cheerStation(state, "science", outcome === "lost" ? -3 : dive.depth >= 3 ? 2 : 1);
   const haulText = (Object.entries(gases) as [GasId, number][]).map(([g, t]) => `${t} t ${COMMODITIES[g].name.toLowerCase()}`).join(", ");
@@ -225,7 +318,7 @@ function finishDive(state: GameState, world: World): DiveResult {
       ? `The probe never came back up from ${body.name}'s ${band.name.toLowerCase()}. Contact was lost ${Math.round(dive.hours)} hours ago.`
       : `The probe surfaced from ${body.name}${outcome === "damaged" ? ", battered, with half its canisters cracked" : ""}: ${haulText || "nothing worth keeping"}.`,
   );
-  return { outcome, gases, hours: dive.hours };
+  return { outcome, gases, hours: dive.hours, newReadings, floater };
 }
 
 /** Buy probes at the Intrepid's Shipyard (up to the bay's capacity). */

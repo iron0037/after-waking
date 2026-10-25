@@ -1134,7 +1134,8 @@ export function sellSpecimens(state: GameState): Result<number> {
     if (reserved.has(key.split("|")[0])) continue;
     const bonus = state.catalogedSpecies.includes(key) ? 0 : NEW_SPECIES_BONUS;
     if (bonus) state.catalogedSpecies.push(key);
-    total += Math.round(n * SPECIMEN_PRICE * crewBonuses(state).specimenPrice) + bonus;
+    const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
+    total += Math.round(n * SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice) + bonus;
     awardXp(state, "medical", n);
     sold += n;
     delete specimens[key];
