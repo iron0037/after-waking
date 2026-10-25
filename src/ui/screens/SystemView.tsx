@@ -553,24 +553,28 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       selected={region}
                       landable={access.ok}
                       onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
+                      action={
+                        access.ok && (
+                          <>
+                            {landBlockers.length > 0 && (
+                              <ul class="blockers">
+                                {landBlockers.map((r) => (
+                                  <li key={r}>{r}</li>
+                                ))}
+                              </ul>
+                            )}
+                            <button
+                              class="btn primary big"
+                              disabled={busy || landBlockers.length > 0}
+                              title={`Descent burns ${surfaceBurnFuel(state, selected).toFixed(1)} fuel; lifting off again costs the same`}
+                              onClick={() => session.act((s, w) => land(s, w, region))}
+                            >
+                              Land in region {region + 1} ({surfaceBurnFuel(state, selected).toFixed(1)} fuel)
+                            </button>
+                          </>
+                        )
+                      }
                     />
-                    {access.ok && landBlockers.length > 0 && (
-                      <ul class="blockers">
-                        {landBlockers.map((r) => (
-                          <li key={r}>{r}</li>
-                        ))}
-                      </ul>
-                    )}
-                    {access.ok && (
-                      <button
-                        class="btn primary big"
-                        disabled={busy || landBlockers.length > 0}
-                        title={`Descent burns ${surfaceBurnFuel(state, selected).toFixed(1)} fuel; lifting off again costs the same`}
-                        onClick={() => session.act((s, w) => land(s, w, region))}
-                      >
-                        Land in region {region + 1} ({surfaceBurnFuel(state, selected).toFixed(1)} fuel)
-                      </button>
-                    )}
                   </>
                 ) : (
                   access.ok && <div class="muted small">Nothing to set down on.</div>

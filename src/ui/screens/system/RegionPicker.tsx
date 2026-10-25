@@ -3,6 +3,7 @@
  * same grid of regions the rover drives across. Terrain tint comes from the same
  * noise as the planet art; the orbital scan's signal is the amber glow over each region.
  */
+import type { ComponentChildren } from "preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../../data/commodities";
 import {
@@ -36,6 +37,8 @@ export interface RegionPickerProps {
   /** False when the ship can't set down: the chart stays readable and selectable, just framed as intel. */
   landable?: boolean;
   onSelect: (region: number) => void;
+  /** The landing controls, shown under the selected region's recap and above the (possibly long) known-deposits list. */
+  action?: ComponentChildren;
 }
 
 // --- layout ------------------------------------------------------------------------------
@@ -79,7 +82,7 @@ function regionAt(layout: Layout, u: number, v: number): number {
 
 // --- component ---------------------------------------------------------------------------
 
-export function RegionPicker({ body, state, world, sensorTier, reachM, selected, landable = true, onSelect }: RegionPickerProps) {
+export function RegionPicker({ body, state, world, sensorTier, reachM, selected, landable = true, onSelect, action }: RegionPickerProps) {
   const [hover, setHover] = useState<number | null>(null);
   const sizeRef = useRef({ w: 1, h: 1 });
   const seed = state.seed;
@@ -358,6 +361,7 @@ export function RegionPicker({ body, state, world, sensorTier, reachM, selected,
         </div>
       )}
       <RegionRecapBox state={state} world={world} bodyId={body.id} region={selected} />
+      {action}
       <KnownDepositsBox known={known} selected={selected} onSelect={onSelect} />
     </div>
   );
