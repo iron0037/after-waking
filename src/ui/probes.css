@@ -70,6 +70,25 @@
   border-top: 1px solid var(--border-bright);
   border-bottom: none;
 }
+.probe-reading {
+  margin: 2px 0;
+}
+.probe-floater {
+  margin: 4px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: #ffffff0a;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.probe-floater-head {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .probe-actions {
   justify-content: flex-end;
   margin-top: 6px;
@@ -131,4 +150,7 @@
 .probe-teaser {
   border-left: 2px solid var(--cyan);
   padding-left: 8px;
+}
+.probe-new {
+  margin-top: 2px;
 }

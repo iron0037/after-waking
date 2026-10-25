@@ -28,14 +28,16 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
   const found = state.compendium ?? {};
   const totals = compendiumTotals(state);
 
-  const flora: Card[] = FLORA.map((f) => ({
+  const floraCard = (f: (typeof FLORA)[number]): Card => ({
     key: compendiumKey("flora", f.id),
     name: f.name,
     color: f.color,
     blurb: f.blurb,
-    hint: `Grows on ${f.climates.map((c) => CLIMATE_HINT[c]).join(" and ")}`,
+    hint: f.floating ? "Drifts in the atmosphere of a gas or ice giant; only a probe can bring one up" : `Grows on ${f.climates.map((c) => CLIMATE_HINT[c]).join(" and ")}`,
     rarity: f.rarity,
-  }));
+  });
+  const flora: Card[] = FLORA.filter((f) => !f.floating).map(floraCard);
+  const floating: Card[] = FLORA.filter((f) => f.floating).map(floraCard);
   const ores: Card[] = ORE_IDS.map((id) => ({
     key: compendiumKey("mineral", id),
     name: COMMODITIES[id].name,
@@ -79,7 +81,17 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
           </button>
         </div>
         <div class="comp-body">
-          {tab === "flora" && <Grid cards={flora} found={found} />}
+          {tab === "flora" && (
+            <>
+              <Grid cards={flora} found={found} />
+              {floating.length > 0 && (
+                <>
+                  <h3>Floating life (giant atmospheres)</h3>
+                  <Grid cards={floating} found={found} />
+                </>
+              )}
+            </>
+          )}
           {tab === "minerals" && (
             <>
               <h3>Ores</h3>

@@ -1,5 +1,6 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { cargoTonnes, type Cargo } from "../sim";
+import { DEPTHS } from "../data/probes";
 
 export function cr(n: number): string {
   return `${Math.round(n).toLocaleString()} cr`;
@@ -22,4 +23,10 @@ export function cargoSummary(cargo: Cargo, capacity: number): string {
 
 export function pct(value: number, max: number): number {
   return max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
+}
+
+/** A probe depth band in a sentence: "the middle decks", "the abyss". */
+export function bandPhrase(depth: number): string {
+  const name = DEPTHS[depth - 1]?.name ?? "depths";
+  return `the ${name.toLowerCase().replace(/^the /, "")}`;
 }

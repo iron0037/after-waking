@@ -2,9 +2,10 @@
  * The descent of an atmospheric probe (AW-16): a decision point at a time, the signal going, and the debrief.
  * Rules live in src/sim/probes; this only shows them. A dive in progress is state.probeDive, so a reload resumes it.
  */
+import { FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, GAS_IDS } from "../data/commodities";
-import { currentProbeEvent, depthBand, diveDepthKm, optionHint, sellPrice } from "../sim";
-import { cr, tonnes } from "./format";
+import { currentProbeEvent, depthBand, diveDepthKm, optionHint, READING_PRICE_PER_DEPTH, sellPrice } from "../sim";
+import { bandPhrase, cr, tonnes } from "./format";
 import type { GameSession, ProbeReport } from "./session";
 import "./probes.css";
 
@@ -90,6 +91,9 @@ function Debrief({ session, report }: { session: GameSession; report: ProbeRepor
   });
   const totalT = rows.reduce((s, r) => s + r.t, 0);
   const totalValue = rows.reduce((s, r) => s + r.value, 0);
+  const fresh = report.result.newReadings;
+  const freshValue = fresh.reduce((s, d) => s + READING_PRICE_PER_DEPTH * d, 0);
+  const floater = report.result.floater ? FLORA_BY_NAME.get(report.result.floater) : undefined;
   return (
     <div class="overlay probe-overlay">
       <div class="probe-dive probe-debrief" role="dialog" aria-label="Probe debrief">
@@ -129,6 +133,23 @@ function Debrief({ session, report }: { session: GameSession; report: ProbeRepor
         ) : (
           <p class="muted small">No gas came back{report.result.outcome === "lost" ? "." : ": the hold had no room for it."}</p>
         )}
+        {fresh.length > 0 && (
+          <p class="small probe-reading">
+            Profiled {listOf(fresh.map(bandPhrase))} for the first time: the Lyceum will pay <span class="accent">{cr(freshValue)}</span>.
+          </p>
+        )}
+        {report.result.floater && (
+          <div class="probe-floater">
+            <div class="probe-floater-head">
+              {floater && <span class="swatch" style={{ background: floater.color }} />}
+              <strong>Something alive came up: {withArticle(report.result.floater)}</strong>
+            </div>
+            {floater && <div class="small muted">{floater.blurb}</div>}
+            {floater && floater.priceMult && (
+              <div class="small">Worth about {floater.priceMult}× an ordinary plant sample at the Lyceum desk.</div>
+            )}
+          </div>
+        )}
         {report.choices.length > 0 && (
           <div class="muted small probe-so-far">Your calls on the way down: {report.choices.map((c) => c.toLowerCase()).join(" · ")}.</div>
         )}
@@ -140,4 +161,14 @@ function Debrief({ session, report }: { session: GameSession; report: ProbeRepor
       </div>
     </div>
   );
+}
+
+/** "a, b and c" */
+function listOf(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function withArticle(name: string): string {
+  return `${/^[aeiou]/i.test(name) ? "an" : "a"} ${name}`;
 }

@@ -226,4 +226,17 @@ describe("probes v2: jobs, readings, floating life", () => {
     const r = sellSpecimens(sample!);
     expect(r.ok && r.value).toBeGreaterThan(1_000);
   });
+
+  it("planner helpers: which bands a dive would newly profile, and a floater's price per specimen", async () => {
+    const { newReadingsFor, specimenUnitPrice, SPECIMEN_PRICE, READING_PRICE_PER_DEPTH } = await import("../src/sim");
+    const world = new World(42);
+    const state = newGame({ seed: 42 });
+    const bodyId = inOrbit(state, world);
+    expect(newReadingsFor(state, bodyId, 3)).toEqual({ depths: [1, 2, 3], value: READING_PRICE_PER_DEPTH * 6 });
+    state.atmoReadings = { [bodyId]: [1, 2] };
+    expect(newReadingsFor(state, bodyId, 2)).toEqual({ depths: [], value: 0 });
+    expect(newReadingsFor(state, bodyId, 4)).toEqual({ depths: [3, 4], value: READING_PRICE_PER_DEPTH * 7 });
+    expect(specimenUnitPrice(state, `${bodyId}|abyssal bloom`)).toBeGreaterThanOrEqual(SPECIMEN_PRICE * 8);
+    expect(specimenUnitPrice(state, `${bodyId}|no such plant`)).toBeGreaterThanOrEqual(SPECIMEN_PRICE);
+  });
 });

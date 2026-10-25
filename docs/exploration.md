@@ -93,6 +93,20 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
   A few dives add roughly half a mining trip, with real variance.
 - **Generation:** world generation draws only from ore types (`ORE_IDS`), so adding gases didn't change any existing world.
 
+### Atmospheric probes v2 **[DECIDED 2026-10-24]**
+
+- **Probe work on the job board.** Once a probe bay is aboard, the board always carries one probe job. It is either:
+  - **an atmospheric survey:** dive a named giant within one fold to a depth band and bring the probe back. Pay is 1.5k / 3.5k / 6k / 9k cr by band, plus 250 cr per ly.
+  - **or a gas delivery for the clan that wants that gas:** deuterium for the Lyceum, xenon for the Midshipmen, helium-3 for the Exchange, methane for the Diggers. These pay above market and avoid the thin gas markets.
+- **Readings.** A returning probe profiles every band it passed through.
+  - The Lyceum buys each giant-and-band profile once, at 600 cr × the band's depth number. That's up to 6k cr per giant, so the incentive is to dive many giants rather than repeat one.
+  - Until a giant is charted, the dive planner shows estimates based on an average atmosphere. After the first returning probe, it shows exact values.
+- **Floating life.** Four drifting species (cloud drifter, storm kelp, lantern siphon, abyssal bloom) live in giant atmospheres.
+  - **Where:** they come up in about 8% of returning deep-layer dives and 15% of abyss dives on gas giants, half that on ice giants.
+  - **Value:** they sell for 4–8× a plant sample, plus the usual new-species bonus.
+  - **Compendium:** they're catalogued as flora, so they fill entries there.
+  - **Generation:** their climate list is empty, so no surface ever grows them and world generation is unchanged.
+
 ### Probes and remote operation **[PROPOSED, lore fit]**
 - No AI means no autonomous drones. Probes are **remote-piloted by your Science officer**, so crew skill sets how deep they go, how much they recover and whether they survive.
 - That keeps the human-only rule and gives Science a hands-on role.

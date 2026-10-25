@@ -2,7 +2,7 @@
 import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
 import { completeContract, contractPayout, contractProgress, DAY, formatDuration, type Contract } from "../sim";
-import { cr, pct } from "./format";
+import { bandPhrase, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
 interface Target {
@@ -13,7 +13,7 @@ interface Target {
   note?: string;
 }
 
-function names(session: GameSession, bodyId: string): { system: string; body: string } {
+export function contractBodyNames(session: GameSession, bodyId: string): { system: string; body: string } {
   let system = bodyId.split(".")[0] ?? bodyId;
   let body = bodyId;
   try {
@@ -30,14 +30,18 @@ function targetsOf(session: GameSession, c: Contract): Target[] {
   if (c.kind === "survey") {
     return (c.surveyBodyIds ?? []).map((id) => ({
       key: id,
-      ...names(session, id),
+      ...contractBodyNames(session, id),
       done: state.surveyedBodies.includes(id),
       note: "survey",
     }));
   }
   if (c.kind === "specimens" && c.bodyId) {
     const p = contractProgress(state, c);
-    return [{ key: c.bodyId, ...names(session, c.bodyId), done: p.ready, note: `${p.have} / ${p.need} samples` }];
+    return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: `${p.have} / ${p.need} samples` }];
+  }
+  if (c.kind === "probe" && c.bodyId) {
+    const p = contractProgress(state, c);
+    return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: `down to ${bandPhrase(c.depth ?? 1)}` }];
   }
   return [];
 }

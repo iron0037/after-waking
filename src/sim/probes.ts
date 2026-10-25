@@ -72,6 +72,14 @@ export function atmosphereCharted(state: GameState, bodyId: string): boolean {
   return readingsFor(state, bodyId).length > 0;
 }
 
+/** What a dive to `depth` on this giant would add for the Lyceum: the bands it passes that no probe has profiled yet. */
+export function newReadingsFor(state: GameState, bodyId: string, depth: ProbeDepth): { depths: ProbeDepth[]; value: number } {
+  const had = new Set<number>(readingsFor(state, bodyId));
+  const depths: ProbeDepth[] = [];
+  for (let d = 1; d <= depth; d++) if (!had.has(d)) depths.push(d as ProbeDepth);
+  return { depths, value: depths.reduce((s, d) => s + READING_PRICE_PER_DEPTH * d, 0) };
+}
+
 /** Readings not yet sold to the Lyceum, and what they're worth. */
 export function unsoldReadings(state: GameState): { key: string; bodyId: string; depth: ProbeDepth; value: number }[] {
   const sold = new Set(state.atmoSold ?? []);

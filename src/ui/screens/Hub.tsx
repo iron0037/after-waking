@@ -1,6 +1,7 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
+import { FLORA_BY_NAME } from "../../data/catalog";
 import { PROBE_PRICE } from "../../data/probes";
 import { CLAN_NAMES, UPGRADE_CATEGORY_NAMES, UPGRADES, type UpgradeCategory } from "../../data/ship";
 import {
@@ -51,10 +52,14 @@ import {
   shipStats,
   SPECIMEN_PRICE,
   specimenCount,
+  specimenUnitPrice,
+  unsoldReadings,
+  sellReadings,
   wait,
   type Contract,
 } from "../../sim";
-import { cr, pct, tonnes } from "../format";
+import { bandPhrase, cr, pct, tonnes } from "../format";
+import { contractBodyNames } from "../Contracts";
 import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
@@ -406,12 +411,25 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         count,
         reserved: reserved.has(bodyId),
         isNew: !state.catalogedSpecies.includes(key),
+        unit: Math.round(specimenUnitPrice(state, key)),
+        floating: (FLORA_BY_NAME.get(rest.join("|"))?.priceMult ?? 1) > 1,
       };
     })
     .sort((a, b) => a.bodyName.localeCompare(b.bodyName) || a.species.localeCompare(b.species));
   const sellable = rows.filter((r) => !r.reserved);
   const specimenPrice = Math.round(SPECIMEN_PRICE * crewBonuses(state).specimenPrice);
-  const estimate = sellable.reduce((sum, r) => sum + r.count * specimenPrice + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
+  const estimate = sellable.reduce((sum, r) => sum + Math.round(r.count * specimenUnitPrice(state, r.key)) + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
+  const readings = unsoldReadings(state).map((r) => {
+    let name = r.bodyId;
+    try {
+      name = world.body(r.bodyId).body.name;
+    } catch {
+      /* unknown body: show the raw id */
+    }
+    return { ...r, name };
+  });
+  const readingsTotal = readings.reduce((sum, r) => sum + r.value, 0);
+  const everProfiled = Object.keys(state.atmoReadings ?? {}).length > 0;
 
   return (
     <>
@@ -428,6 +446,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
               <th>Species</th>
               <th>Collected on</th>
               <th class="num">Count</th>
+              <th class="num">Each</th>
               <th />
             </tr>
           </thead>
@@ -437,10 +456,15 @@ function SpecimenDesk({ session }: { session: GameSession }) {
                 <td>{r.species}</td>
                 <td>{r.bodyName}</td>
                 <td class="num">{r.count}</td>
+                <td class="num">{cr(r.unit)}</td>
                 <td>
                   {r.reserved ? (
                     <span class="tag good" title="Reserved for an active specimen contract; the desk won't buy these.">
                       held for contract
+                    </span>
+                  ) : r.floating ? (
+                    <span class="tag accent-tag" title="Drifting life from a giant's atmosphere: the Lyceum pays several times a plant sample.">
+                      floating life{r.isNew ? ` +${cr(NEW_SPECIES_BONUS)} new` : ""}
                     </span>
                   ) : r.isNew ? (
                     <span class="tag accent-tag">new species +{cr(NEW_SPECIES_BONUS)}</span>
@@ -464,9 +488,53 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         </button>
         <span class="muted small">
           {sellable.length > 0 ? `about ${cr(estimate)}. ` : ""}
-          {cr(specimenPrice)} each; the first sale of a new species pays a bonus of {cr(NEW_SPECIES_BONUS)}.
+          {cr(specimenPrice)} for a plant sample (floating life from the giants pays several times that); the first sale of a new species
+          pays a bonus of {cr(NEW_SPECIES_BONUS)}.
         </span>
       </div>
+      {everProfiled && (
+        <>
+          <div class="hub-section-head hub-gap">
+            <h3>Atmospheric readings</h3>
+            <span class="muted">{readings.length > 0 ? `${readings.length} new profile${readings.length === 1 ? "" : "s"}` : "all sold"}</span>
+          </div>
+          {readings.length > 0 ? (
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>Giant</th>
+                  <th>Band</th>
+                  <th class="num">Pays</th>
+                </tr>
+              </thead>
+              <tbody>
+                {readings.map((r) => (
+                  <tr key={r.key}>
+                    <td>{r.name}</td>
+                    <td>{bandPhrase(r.depth)}</td>
+                    <td class="num">{cr(r.value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p class="muted">The Lyceum has bought every profile you've brought back. Dive another giant, or a deeper band.</p>
+          )}
+          <div class="hub-actions">
+            <button
+              class="btn primary"
+              disabled={readings.length === 0}
+              title={readings.length === 0 ? "No new readings to sell." : "Sell every new atmospheric profile"}
+              onClick={() => session.act((s) => sellReadings(s))}
+            >
+              Sell readings
+            </button>
+            <span class="muted small">
+              {readings.length > 0 ? `${cr(readingsTotal)}. ` : ""}Each giant and band pays once.
+            </span>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -508,6 +576,18 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
         <span class="accent" title={payTitle}>{cr(payout)}</span>
       </div>
       <div class="muted small">{c.text}</div>
+      {c.kind === "probe" && c.bodyId && (
+        <div class="small">
+          {(() => {
+            const n = contractBodyNames(session, c.bodyId);
+            return (
+              <>
+                Dive <strong>{n.body}</strong> <span class="muted">in {n.system}</span> down to {bandPhrase(c.depth ?? 1)}, and bring the probe back
+              </>
+            );
+          })()}
+        </div>
+      )}
       {active ? (
         <>
           <div class="hub-contract-row">

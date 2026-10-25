@@ -1122,6 +1122,12 @@ export function sellAll(state: GameState): Result<number> {
 export const SPECIMEN_PRICE = 300;
 export const NEW_SPECIES_BONUS = 900;
 
+/** What the Lyceum pays per specimen under this key ("bodyId|species"): floating life is prized (priceMult), and the comms crew's bonus applies. */
+export function specimenUnitPrice(state: GameState, key: string): number {
+  const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
+  return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice;
+}
+
 /** Sell specimens to the Lyceum, keeping any that an active contract still needs. */
 export function sellSpecimens(state: GameState): Result<number> {
   const docked = atIntrepid(state);
@@ -1134,8 +1140,7 @@ export function sellSpecimens(state: GameState): Result<number> {
     if (reserved.has(key.split("|")[0])) continue;
     const bonus = state.catalogedSpecies.includes(key) ? 0 : NEW_SPECIES_BONUS;
     if (bonus) state.catalogedSpecies.push(key);
-    const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
-    total += Math.round(n * SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice) + bonus;
+    total += Math.round(n * specimenUnitPrice(state, key)) + bonus;
     awardXp(state, "medical", n);
     sold += n;
     delete specimens[key];
