@@ -87,6 +87,9 @@ export interface RegionKnowledge {
   /** Flora sites spotted by the rover, and those already sampled. */
   floraFound: number[];
   floraSampled: number[];
+  /** Deposits and plant sites sensed but not yet identified (shown as "?" until the sensors get close). */
+  sensed?: number[];
+  floraSensed?: number[];
   /** Tiles swept by rover sensors, as a bitset of 32-bit words (row-major). The "painted" map. */
   explored: number[];
 }

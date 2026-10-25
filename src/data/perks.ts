@@ -32,14 +32,14 @@ type Row = [id: string, name: string, text: string, needs?: string];
 const TREES: Record<Station, readonly (readonly Row[])[]> = {
   science: [
     [
-      ["seam-sense", "Seam Sense", "Deposits are detected at +50% sensor range."],
+      ["seam-sense", "Seam Sense", "Sensors flag deposits out to +50% range as unidentified readings (?). Get close to see what they are."],
       ["assayer", "Assayer", "Takes core samples (prospecting) from two hexes away, in half the usual 2 hours. Drilling isn't affected."],
       ["rich-veins", "Rich Veins", "Every deposit yields 10% more ore."],
-      ["prospectors-eye", "Prospector's Eye", "A detailed survey charts every deposit on the world before you land."],
+      ["prospectors-eye", "Prospector's Eye", "Wherever the ship sets down (landing or a hop), every deposit in that region shows as an unidentified reading (?)."],
       ["hidden-seams", "Hidden Seams", "Sensors pick up a layer of deposits other crews miss."],
     ],
     [
-      ["field-botanist", "Field Botanist", "Plant sites are detected at +50% sensor range."],
+      ["field-botanist", "Field Botanist", "Sensors flag plant sites out to +50% range as unidentified readings (?). Get close to see what they are."],
       ["careful-hands", "Careful Hands", "Each collection yields two samples, if there's room."],
       ["ecologist", "Ecologist", "Sensors pick up plant sites other crews miss."],
       ["fauna-handler", "Fauna Handler", "Less harm from hostile specimens.", "hostile life"],

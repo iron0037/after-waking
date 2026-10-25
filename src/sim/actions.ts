@@ -323,8 +323,6 @@ export function flyTo(state: GameState, world: World, target: FlightTarget): Res
   if ("bodyId" in target) {
     const { body } = world.body(target.bodyId);
     log(state, "travel", `Entered orbit around ${body.name} after ${formatDuration(plan.minutes)} (${plan.distanceAU.toFixed(2)} AU).`);
-    // Prospector's Eye reads a surveyed world's deposits from orbit, including worlds surveyed before.
-    if (hasPerk(state, "prospectors-eye") && (state.surveyedBodies ?? []).includes(body.id)) chartAllDeposits(state, world, body);
   } else {
     log(state, "travel", `Reached the system edge. Clear to fold.`);
   }
@@ -413,18 +411,22 @@ export function surveyMinutes(state: GameState): number {
 }
 
 /** Prospector's Eye: the survey charts every deposit on the world, so they're known before landing. */
-function chartAllDeposits(state: GameState, world: World, body: Body): void {
-  let n = 0;
+/**
+ * Prospector's Eye: when the ship sets down, its sensors mark every deposit in that region as an
+ * unidentified reading ("?"). What each one is stays unknown until the rover's sensors get close.
+ */
+function senseRegionDeposits(state: GameState, world: World, bodyId: string, region: number): void {
+  if (!hasPerk(state, "prospectors-eye")) return;
   const hidden = hasPerk(state, "hidden-seams");
-  for (let r = 0; r < body.regions; r++) {
-    const know = knowledge(state, body.id, r);
-    for (const d of world.region(body.id, r).deposits) {
-      if ((d.hidden && !hidden) || know.discovered.includes(d.id)) continue;
-      know.discovered.push(d.id);
-      n++;
-    }
+  const know = knowledge(state, bodyId, region);
+  const sensed = (know.sensed ??= []);
+  let n = 0;
+  for (const d of world.surface(bodyId).deposits(region)) {
+    if ((d.hidden && !hidden) || know.discovered.includes(d.id) || sensed.includes(d.id)) continue;
+    sensed.push(d.id);
+    n++;
   }
-  if (n > 0) log(state, "discovery", `The survey charted ${n} deposit${n === 1 ? "" : "s"} across ${body.name}'s surface.`);
+  if (n > 0) log(state, "discovery", `The ship's sensors mark ${n} unidentified deposit reading${n === 1 ? "" : "s"} in this region.`);
 }
 
 export function surveyBody(state: GameState, world: World): Result<Body> {
@@ -436,7 +438,6 @@ export function surveyBody(state: GameState, world: World): Result<Body> {
   if (body.regions === 0) return fail("There's no surface to survey.");
   advanceTime(state, surveyMinutes(state));
   state.surveyedBodies.push(body.id);
-  if (hasPerk(state, "prospectors-eye")) chartAllDeposits(state, world, body);
   awardXp(state, "science", 25);
   log(state, "discovery", `Detailed survey of ${body.name} complete. Region readings sharpened; rover sensors will reach farther here.`);
   return ok(body);
@@ -516,6 +517,7 @@ export function land(state: GameState, world: World, region: number): Result {
   state.stats.landings++;
   revealAt(state, world, body.id, state.location.ship as Vec2);
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
+  senseRegionDeposits(state, world, body.id, region);
   return ok(undefined);
 }
 
@@ -603,6 +605,8 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   visitRegion(state, world, loc.bodyId, x, y);
   revealAt(state, world, loc.bodyId, loc.ship);
   log(state, "travel", `Hopped the ship ${Math.round(hexDistance(here, { x, y }) * TILE_KM)} km to a new landing site.`);
+  const landedIn = surface.regionAt(x, y);
+  if (landedIn !== null) senseRegionDeposits(state, world, loc.bodyId, landedIn);
   return ok(undefined);
 }
 
@@ -683,10 +687,14 @@ function revealAround(state: GameState, world: World): void {
 export interface SensorSweep {
   /** Terrain sweep radius, in hexes. */
   radius: number;
-  /** Deposits are detected out to here (Seam Sense stretches it). */
+  /** Deposits are identified out to here (the terrain sweep). */
   depositRange: number;
-  /** Plant sites are detected out to here (Field Botanist stretches it). */
+  /** Plant sites are identified out to here (the terrain sweep). */
   floraRange: number;
+  /** Deposits beyond depositRange but within this show as unidentified readings (Seam Sense). */
+  depositSenseRange: number;
+  /** Plant sites beyond floraRange but within this show as unidentified readings (Field Botanist). */
+  floraSenseRange: number;
   /** Hidden Seams: the hidden deposit layer is detectable. */
   hiddenSeams: boolean;
   /** Ecologist: the hidden plant layer is detectable. */
@@ -698,8 +706,10 @@ export function sensorSweep(state: GameState, bodyId: string): SensorSweep {
   const radius = sensorRadius(state, bodyId);
   return {
     radius,
-    depositRange: Math.floor(radius * (hasPerk(state, "seam-sense") ? 1.5 : 1)),
-    floraRange: Math.floor(radius * (hasPerk(state, "field-botanist") ? 1.5 : 1)),
+    depositRange: radius,
+    floraRange: radius,
+    depositSenseRange: Math.floor(radius * (hasPerk(state, "seam-sense") ? 1.5 : 1)),
+    floraSenseRange: Math.floor(radius * (hasPerk(state, "field-botanist") ? 1.5 : 1)),
     hiddenSeams: hasPerk(state, "hidden-seams"),
     hiddenFlora: hasPerk(state, "ecologist"),
   };
@@ -715,29 +725,51 @@ export function detectsFlora(sweep: SensorSweep, center: Vec2, f: { x: number; y
   return (!f.hidden || sweep.hiddenFlora) && hexDistance(f, center) <= sweep.floraRange;
 }
 
+/** Would a sweep at `center` sense (but not identify) this deposit? Seam Sense's outer ring. */
+export function sensesDeposit(sweep: SensorSweep, center: Vec2, d: { x: number; y: number; hidden?: boolean }): boolean {
+  return (!d.hidden || sweep.hiddenSeams) && hexDistance(d, center) <= sweep.depositSenseRange;
+}
+
+/** Would a sweep at `center` sense (but not identify) this plant site? Field Botanist's outer ring. */
+export function sensesFlora(sweep: SensorSweep, center: Vec2, f: { x: number; y: number; hidden?: boolean }): boolean {
+  return (!f.hidden || sweep.hiddenFlora) && hexDistance(f, center) <= sweep.floraSenseRange;
+}
+
 function revealAt(state: GameState, world: World, bodyId: string, center: Vec2): void {
   const surface = world.surface(bodyId);
   const sweep = sensorSweep(state, bodyId);
-  const { radius, depositRange, floraRange } = sweep;
+  const { radius, depositSenseRange, floraSenseRange } = sweep;
   const foundDeposits: SurfaceDeposit[] = [];
   const foundFlora: SurfaceFlora[] = [];
-  for (const region of surface.regionsNear(center, Math.max(radius, depositRange, floraRange))) {
+  let sensed = 0;
+  for (const region of surface.regionsNear(center, Math.max(radius, depositSenseRange, floraSenseRange))) {
     const know = knowledge(state, bodyId, region);
     const o = surface.origin(region);
     markExplored(know, center.x - o.x, center.y - o.y, radius);
     for (const d of surface.deposits(region)) {
-      if (!know.discovered.includes(d.id) && detectsDeposit(sweep, center, d)) {
+      if (know.discovered.includes(d.id)) continue;
+      if (detectsDeposit(sweep, center, d)) {
         know.discovered.push(d.id);
+        if (know.sensed) know.sensed = know.sensed.filter((id) => id !== d.id);
         foundDeposits.push(d);
+      } else if (sensesDeposit(sweep, center, d) && !(know.sensed ??= []).includes(d.id)) {
+        know.sensed.push(d.id);
+        sensed++;
       }
     }
     for (const f of surface.flora(region)) {
-      if (!know.floraFound.includes(f.id) && detectsFlora(sweep, center, f)) {
+      if (know.floraFound.includes(f.id)) continue;
+      if (detectsFlora(sweep, center, f)) {
         know.floraFound.push(f.id);
+        if (know.floraSensed) know.floraSensed = know.floraSensed.filter((id) => id !== f.id);
         foundFlora.push(f);
+      } else if (sensesFlora(sweep, center, f) && !(know.floraSensed ??= []).includes(f.id)) {
+        know.floraSensed.push(f.id);
+        sensed++;
       }
     }
   }
+  if (sensed > 0) log(state, "discovery", `Sensors flag ${sensed} unidentified reading${sensed === 1 ? "" : "s"} at the edge of their range.`);
   awardXp(state, "science", 2 * (foundDeposits.length + foundFlora.length));
   if (foundDeposits.length + foundFlora.length > 0) cheerStation(state, "science", Math.min(2, foundDeposits.length + foundFlora.length));
   if (foundDeposits.length > 0) {

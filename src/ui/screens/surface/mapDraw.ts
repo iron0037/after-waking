@@ -440,6 +440,41 @@ export function drawDeposits(
   }
 }
 
+/** Something the sensors flagged but haven't identified (Seam Sense, Field Botanist, Prospector's Eye). */
+export interface UnknownMark {
+  x: number;
+  y: number;
+  kind: "deposit" | "flora";
+}
+
+/** A dashed grey outline (diamond for a deposit, circle for a plant site) with a "?": something's there. */
+export function drawUnknowns(ctx: CanvasRenderingContext2D, L: Layout, marks: readonly UnknownMark[], timeMs: number): void {
+  const r = Math.max(5, L.tw * 0.36);
+  const glow = 0.65 + 0.2 * Math.sin(timeMs / 600);
+  for (const m of marks) {
+    const x = cx(L, m.x, m.y);
+    const y = cy(L, m.x, m.y);
+    ctx.setLineDash([]);
+    if (m.kind === "deposit") diamond(ctx, x, y, r + 1);
+    else {
+      ctx.beginPath();
+      ctx.arc(x, y, r + 1, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = "rgba(5, 7, 15, 0.75)";
+    ctx.fill();
+    ctx.setLineDash([2.5, 2]);
+    ctx.lineWidth = 1.3;
+    ctx.strokeStyle = `rgba(200, 210, 225, ${glow})`;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = `rgba(220, 228, 240, ${glow + 0.1})`;
+    ctx.font = `bold ${Math.round(r * 1.15)}px ${FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("?", x, y + 0.5);
+  }
+}
+
 const LEAF = "#5fd47a";
 const LEAF_DIM = "#4f7a5a";
 

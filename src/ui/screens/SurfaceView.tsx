@@ -99,6 +99,8 @@ import {
   drawDeposits,
   drawEnergyBar,
   drawFlora,
+  drawUnknowns,
+  type UnknownMark,
   drawHoverTile,
   drawRegionBorders,
   drawRoute,
@@ -243,6 +245,22 @@ function knownFlora(state: GameState, surface: BodySurface, bodyId: string, regi
     const know = peekKnowledge(state, bodyId, r);
     if (!know || know.floraFound.length === 0) continue;
     for (const f of surface.flora(r)) if (know.floraFound.includes(f.id)) out.push({ f, know });
+  }
+  return out;
+}
+
+/** Sites the sensors flagged but haven't identified yet, in `regions`. */
+function sensedSites(state: GameState, surface: BodySurface, bodyId: string, regions: readonly number[]): (UnknownMark & { key: string })[] {
+  const out: (UnknownMark & { key: string })[] = [];
+  for (const r of regions) {
+    const know = peekKnowledge(state, bodyId, r);
+    if (!know) continue;
+    if (know.sensed?.length) {
+      for (const d of surface.deposits(r)) if (know.sensed.includes(d.id) && !know.discovered.includes(d.id)) out.push({ x: d.x, y: d.y, kind: "deposit", key: d.key });
+    }
+    if (know.floraSensed?.length) {
+      for (const f of surface.flora(r)) if (know.floraSensed.includes(f.id) && !know.floraFound.includes(f.id)) out.push({ x: f.x, y: f.y, kind: "flora", key: f.key });
+    }
   }
   return out;
 }
@@ -659,6 +677,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
     if (tile) drawSensorRange(ctx, L, tile, sweep);
     drawShip(ctx, L, ship);
+    // Flagged but unidentified: a "?" until the sensors get close (the sweep in progress identifies some).
+    const unknowns = sensedSites(state, surface, loc.bodyId, inView).filter((u) => !rc || (!rc.deposits.has(u.key) && !rc.flora.has(u.key)));
+    drawUnknowns(ctx, L, unknowns, t);
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
     drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM);
 
@@ -742,6 +763,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       });
     }
     if (dep && flora) lines.push({ text: "Click again to switch between them", color: UI.muted });
+    if (!dep && !flora && local && tileKnow) {
+      const sensedDep = tileKnow.sensed?.length && surface.deposits(local.region).some((d) => d.x === tile.x && d.y === tile.y && tileKnow.sensed!.includes(d.id) && !tileKnow.discovered.includes(d.id));
+      const sensedFlora = tileKnow.floraSensed?.length && surface.flora(local.region).some((f) => f.x === tile.x && f.y === tile.y && tileKnow.floraSensed!.includes(f.id) && !tileKnow.floraFound.includes(f.id));
+      if (sensedDep) lines.push({ text: "Unidentified deposit reading: drive closer to identify", color: UI.text });
+      if (sensedFlora) lines.push({ text: "Unidentified plant reading: drive closer to identify", color: UI.good });
+    }
     if (info.passable === "no") {
       lines.push({ text: "Impassable", color: UI.muted });
     } else if (needsClimber) {

@@ -59,6 +59,9 @@ import {
   Rng,
   DAY,
   type GameState,
+  sensorSweep,
+  detectsDeposit,
+  sensesDeposit,
 } from "../src/sim";
 import { hexDistance } from "../src/sim/hex";
 import { regionSource } from "../src/sim/pathfinding";
@@ -245,21 +248,41 @@ describe("navigation perks", () => {
 });
 
 describe("surface perks", () => {
-  it("Seam Sense spots deposits beyond the terrain sweep; Hidden Seams reveals the hidden layer", () => {
+  it("Seam Sense flags deposits beyond the terrain sweep as unidentified; Hidden Seams includes the hidden layer", () => {
     const { state, world, bodyId } = onSurface();
     grant(state, "seam-sense");
     grant(state, "hidden-seams");
     expect(land(state, world, 0).ok).toBe(true);
     expect(deployRover(state, world).ok).toBe(true);
     const rover = (state.location as { rover: { x: number; y: number } }).rover;
-    const range = Math.floor(sensorRadius(state, bodyId) * 1.5);
+    const radius = sensorRadius(state, bodyId);
+    const range = Math.floor(radius * 1.5);
     const surface = world.surface(bodyId);
+    let flagged = 0;
     for (const r of surface.regionsNear(rover, range)) {
       const know = knowledge(state, bodyId, r);
       for (const d of surface.deposits(r)) {
-        if (hexDistance(d, rover) <= range) expect(know.discovered).toContain(d.id);
+        const dist = hexDistance(d, rover);
+        if (dist <= radius) expect(know.discovered).toContain(d.id);
+        else if (dist <= range && !know.discovered.includes(d.id)) {
+          expect(know.sensed ?? []).toContain(d.id);
+          flagged++;
+        }
       }
     }
+    // The outer ring is sensed but not identified.
+    const sweep = sensorSweep(state, bodyId);
+    const ring = { x: rover.x + radius + 1, y: rover.y };
+    expect(detectsDeposit(sweep, rover, ring)).toBe(false);
+    expect(sensesDeposit(sweep, rover, ring)).toBe(radius + 1 <= range);
+  });
+
+  it("without Seam Sense, nothing is flagged beyond the sweep", () => {
+    const { state, world, bodyId } = onSurface();
+    expect(land(state, world, 0).ok).toBe(true);
+    expect(deployRover(state, world).ok).toBe(true);
+    const surface = world.surface(bodyId);
+    for (let r = 0; r < surface.layout.regions; r++) expect(knowledge(state, bodyId, r).sensed ?? []).toHaveLength(0);
   });
 
   it("hidden sites stay hidden without the perks", () => {
@@ -268,14 +291,13 @@ describe("surface perks", () => {
     let hidden = 0;
     for (let r = 0; r < surface.layout.regions; r++) hidden += surface.deposits(r).filter((d) => d.hidden).length;
     expect(hidden).toBeGreaterThan(0);
-    // Prospector's Eye charts the ordinary deposits only (home worlds start surveyed, so survey afresh).
+    // Prospector's Eye flags the ordinary deposits of the landing region only.
     grant(state, "prospectors-eye");
-    state.surveyedBodies = state.surveyedBodies.filter((id) => id !== bodyId);
-    expect(scanBody(state, world).ok).toBe(true);
-    expect(surveyBody(state, world).ok).toBe(true);
-    for (let r = 0; r < surface.layout.regions; r++) {
-      const know = knowledge(state, bodyId, r);
-      for (const d of surface.deposits(r)) expect(know.discovered.includes(d.id)).toBe(!d.hidden);
+    expect(land(state, world, 0).ok).toBe(true);
+    const know = knowledge(state, bodyId, 0);
+    for (const d of surface.deposits(0)) {
+      const known = know.discovered.includes(d.id) || (know.sensed ?? []).includes(d.id);
+      expect(known).toBe(!d.hidden);
     }
   });
 
@@ -348,15 +370,22 @@ describe("surface perks", () => {
   });
 });
 
-describe("Prospector's Eye on a world surveyed earlier", () => {
-  it("charts its deposits on arrival in orbit", () => {
-    const world = new World(42);
-    const state = newGame({ seed: 42 });
+describe("Prospector's Eye", () => {
+  it("charts nothing from orbit, and flags (without identifying) the landing region's deposits", () => {
+    const { state, world, bodyId } = onSurface();
     grant(state, "prospectors-eye");
-    expect(fold(state, world, "s0").ok).toBe(true);
-    const body = world.system("s0").bodies.find((b) => b.easy && b.regions > 0 && state.surveyedBodies.includes(b.id))!;
-    expect(flyTo(state, world, { bodyId: body.id }).ok).toBe(true);
-    expect(knowledge(state, body.id, 0).discovered.length).toBeGreaterThan(0);
+    const surface = world.surface(bodyId);
+    expect(surveyBody(state, world).ok || state.surveyedBodies.includes(bodyId)).toBe(true);
+    for (let r = 0; r < surface.layout.regions; r++) expect(knowledge(state, bodyId, r).discovered).toHaveLength(0);
+    expect(land(state, world, 0).ok).toBe(true);
+    const know = knowledge(state, bodyId, 0);
+    const visible = surface.deposits(0).filter((d) => !d.hidden);
+    expect(visible.length).toBeGreaterThan(0);
+    for (const d of visible) expect(know.discovered.includes(d.id) || (know.sensed ?? []).includes(d.id)).toBe(true);
+    // Most of them are still unidentified: only the ones near the ship are named.
+    expect((know.sensed ?? []).length).toBeGreaterThan(0);
+    // Other regions stay dark.
+    if (surface.layout.regions > 1) expect(knowledge(state, bodyId, 1).sensed ?? []).toHaveLength(0);
   });
 });
 

@@ -22,10 +22,10 @@ Legend: ✅ works with today's systems · ⏳ needs a later system (named)
 
 | Tier | Geology | Xenobiology | Physics |
 |---|---|---|---|
-| 1 | **Seam Sense** ✅: deposits are detected at +50% sensor range | **Field Botanist** ✅: plant sites detected at +50% sensor range | **Drive Harmonics** ✅: +2 effective Navigation levels for fold fuel |
+| 1 | **Seam Sense** ✅: deposits out to +50% sensor range show as unidentified "?" readings | **Field Botanist** ✅: plant sites out to +50% sensor range show as unidentified "?" readings | **Drive Harmonics** ✅: +2 effective Navigation levels for fold fuel |
 | 2 | **Assayer** ✅: prospect from 2 hexes away, in half the time | **Careful Hands** ✅: each collection yields 2 samples | **Sensor Calibration** ✅: +1 sensor tier for orbital region readings |
 | 3 | **Rich Veins** ✅: +10% recoverable tonnes from every deposit | **Ecologist** ✅: reveals hidden plant sites (an extra layer only this perk sees) | **Plicite Chemistry** ✅: +2 effective Navigation levels for fold recharge |
-| 4 | **Prospector's Eye** ✅: a detailed survey marks deposit locations on the region chart before landing (ties into AW-92) | **Fauna Handler** ⏳ (hostile life): reduces harm from hostile specimens | **Field Theory** ⏳ (M3 combat): shield and sensor performance in combat |
+| 4 | **Prospector's Eye** ✅: wherever the ship sets down (landing or a hop), every deposit in that region shows as an unidentified "?" reading; the rover identifies them up close (reworked in playtest 9, AW-134) | **Fauna Handler** ⏳ (hostile life): reduces harm from hostile specimens | **Field Theory** ⏳ (M3 combat): shield and sensor performance in combat |
 | 5 | **Hidden Seams** ✅: reveals bonus deposits on every world (+10% deposits, generated as an extra layer only this perk sees) | **Xenologist** ⏳ (M6 aliens): +2 effective Comms levels in first contact; reveals alien biology dialogue | **Anomaly Theory** ⏳ (Awaken path): detects "glitches" for the Covenant's errands |
 
 ## Navigation: Interstellar · Interplanetary · Planetary
