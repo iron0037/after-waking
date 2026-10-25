@@ -11,7 +11,12 @@ import type { Vec2 } from "./units";
 export interface Mobility {
   canClimb: boolean;
   roughAsPlain?: boolean;
+  /** The boat: open water only (AW-17). */
+  water?: boolean;
 }
+
+/** A boat's step across open water. */
+export const BOAT_STEP = { minutes: 10, energy: 0.8 } as const;
 
 function mobilityOf(m: boolean | Mobility): Mobility {
   return typeof m === "boolean" ? { canClimb: m } : m;
@@ -43,12 +48,14 @@ function source(tiles: TileSource | RegionMap): TileSource {
 export function canEnter(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility): boolean {
   const t = source(tiles).terrainAt(x, y);
   if (t === null) return false;
+  if (mobilityOf(mobility).water) return t === Terrain.liquid;
   const passable = TERRAIN_INFO[t].passable;
   return passable === "yes" || (passable === "climb" && mobilityOf(mobility).canClimb);
 }
 
 export function stepCost(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility = false): { minutes: number; energy: number } {
   let t = (source(tiles).terrainAt(x, y) ?? 0) as Terrain;
+  if (mobilityOf(mobility).water) return { minutes: BOAT_STEP.minutes, energy: BOAT_STEP.energy };
   if (t === Terrain.rough && mobilityOf(mobility).roughAsPlain) t = Terrain.plain;
   const info = TERRAIN_INFO[t];
   return { minutes: info.minutes, energy: info.energy };

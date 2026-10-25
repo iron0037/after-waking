@@ -20,9 +20,6 @@ export function landingAccess(body: Body, ratings: Ratings): AccessResult {
     reasons.push(`${KIND_LABEL[body.kind]}s have no surface to land on. Skim or probe them instead.`);
     return { ok: false, reasons };
   }
-  if (body.surface === "liquid") {
-    reasons.push("Global ocean: no solid ground. Needs a boat (not yet available).");
-  }
   if (body.gravityG > ratings.maxGravityG) {
     reasons.push(`Gravity ${body.gravityG.toFixed(2)} g: thrusters can only lift off from ${ratings.maxGravityG.toFixed(1)} g.`);
   }

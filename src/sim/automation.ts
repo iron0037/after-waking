@@ -21,6 +21,8 @@ import {
   surfaceDeposit,
 } from "./actions";
 import type { SiteKey } from "./bodysurface";
+import { boatDock, launchBoat } from "./boat";
+import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf } from "./vehicles";
 import { findPath, type PathStep } from "./pathfinding";
 import { hexDistance } from "./hex";
 import { fail, ok, type Result } from "./result";
@@ -76,7 +78,15 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
   if (!found) return fail("Unknown deposit.");
   const { deposit, know } = found;
   const stats = effectiveStats(state);
-  const mobility = roverMobility(state);
+  // Seabed deposits are worked from the boat (AW-17), docking at the water beside the ship.
+  const wet = siteOnWater(world, loc.bodyId, deposit);
+  const vehicle = wet ? "boat" : "rover";
+  const mobility = wet ? boatMobility() : roverMobility(state);
+  const dock = () => (wet ? boatDock(state, world) : shipTile(state, world));
+  if (wet && !dock()) return fail("The ship needs to stand at the water's edge for the boat to work that seam. Hop it to a shore.");
+  const out0 = rover(state);
+  if (out0 && vehicleOf(out0) !== vehicle) return fail(wet ? "Stow the rover first: this seam needs the boat." : "Bring the boat in first: this deposit needs the rover.");
+  if (loc.parkedBoat) return fail("The boat is moored offshore: get the rover back aboard and sail home first.");
   if (deposit.depthM > stats.drillMaxDepthM) {
     return fail(`The seam is ${deposit.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
   }
@@ -103,8 +113,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
   const haulHome = (): boolean => {
     const r = rover(state);
     if (!r) return true;
-    const home = shipTile(state, world);
-    if (hexDistance(r, home) > 1) {
+    const home = dock() as { x: number; y: number };
+    if (hexDistance(r, shipTile(state, world)) > 1) {
       const moved = moveRoverTo(state, world, home.x, home.y);
       if (!moved.ok || moved.value.stopped) return false;
     }
@@ -124,7 +134,7 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
 
     // Out of the hangar, cells charged.
     if (!rover(state)) {
-      const deployed = deployRover(state, world);
+      const deployed = wet ? launchBoat(state, world) : deployRover(state, world);
       if (!deployed.ok) return fail(deployed.reason);
     }
     const r = rover(state) as RoverState;
@@ -132,9 +142,9 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
     // Drive to the deposit if we're not already beside it.
     if (hexDistance(r, deposit) > 1) {
       const out = findPath(surface, r, deposit, mobility);
-      const back = findPath(surface, deposit, shipTile(state, world), mobility);
-      if (!out || !back) return finish("unreachable", "The rover has no route to that deposit and back.");
-      if (energyOf(state, out) + energyOf(state, back) + ENERGY_MARGIN >= stats.roverEnergy) {
+      const back = findPath(surface, deposit, dock() as { x: number; y: number }, mobility);
+      if (!out || !back) return finish("unreachable", `The ${vehicle} has no route to that deposit and back.`);
+      if (energyOf(state, out) + energyOf(state, back) + ENERGY_MARGIN >= vehicleEnergyMax(state, vehicle)) {
         return finish("unreachable", "Too far for one charge there and back. Move the ship closer, or upgrade the rover's cells.");
       }
       const moved = moveRoverTo(state, world, deposit.x, deposit.y);
@@ -147,9 +157,9 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
     }
 
     // Drill as long as the cells can still bring the rover home.
-    const homePath = findPath(surface, rover(state) as RoverState, shipTile(state, world), mobility);
+    const homePath = findPath(surface, rover(state) as RoverState, dock() as { x: number; y: number }, mobility);
     const budget = ((rover(state) as RoverState).energy - energyOf(state, homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
-    const bedRoom = stats.roverCargoT - cargoTonnes((rover(state) as RoverState).cargo);
+    const bedRoom = vehicleCargoT(state, vehicle) - cargoTonnes((rover(state) as RoverState).cargo);
     const loadCap = Math.min(bedRoom, holdRoom());
     if (budget > 0.5 && loadCap > 0.5) {
       const rate = drillRate(state, deposit);

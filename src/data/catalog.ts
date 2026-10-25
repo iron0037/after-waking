@@ -22,6 +22,8 @@ export interface FloraEntry {
   floating?: boolean;
   /** Specimen price multiplier at the Lyceum (floating life is rare and prized). */
   priceMult?: number;
+  /** Lives in open water; only the boat can sample it (AW-17). */
+  aquatic?: boolean;
 }
 
 export interface MineralSpecimen {
@@ -69,6 +71,13 @@ export const FLORA: readonly FloraEntry[] = [
   { id: "dune-runner", name: "dune runner", climates: ["warm"], rarity: 2, color: "#d4b483", blurb: "A tumbleweed that rolls uphill. The Lyceum has three theories and no proof." },
   { id: "pyre-lily", name: "pyre lily", climates: ["warm"], rarity: 3, color: "#ff7a3d", blurb: "Blooms only after wildfire, from seeds that wait decades for the heat." },
   { id: "mirror-palm", name: "mirror palm", climates: ["warm"], rarity: 3, color: "#d6e2e6", blurb: "Fronds coated in a reflective wax so perfect it looks machined." },
+  // --- sea life (open water; the boat samples it) ----------------------------------------------
+  { id: "tide-bulb", name: "tide bulb", climates: ["cold", "temperate"], rarity: 1, aquatic: true, color: "#7fc7c0", blurb: "Floating bladders that bob in rafts and sink together at dusk. Nobody has found where they go." },
+  { id: "reef-lace", name: "reef lace", climates: ["temperate", "warm"], rarity: 1, aquatic: true, color: "#e3b2c8", blurb: "A brittle mesh that grows on itself in the shallows, one lattice cell a day." },
+  { id: "kelp-spire", name: "kelp spire", climates: ["cold", "temperate"], rarity: 2, aquatic: true, color: "#4f8a5e", blurb: "Stalks that rise straight from the seabed to just below the surface, and no higher." },
+  { id: "brine-fan", name: "brine fan", climates: ["warm"], rarity: 2, aquatic: true, color: "#d9b25c", blurb: "Gold fans that filter the warm seas and leave a crust of salt where they die." },
+  { id: "drift-veil", name: "drift veil", climates: ["temperate", "warm"], rarity: 2, aquatic: true, priceMult: 1.5, color: "#bfe4ff", blurb: "A colony as wide as a boat and as thin as paper, steering with the wind." },
+  { id: "abyss-lantern", name: "abyss lantern", climates: ["cold", "temperate", "warm"], rarity: 3, aquatic: true, priceMult: 2, color: "#9effd6", blurb: "Comes up from the deep only at night, glowing, and only near the boat. The Lyceum wants to know why." },
   // --- floating life (giant atmospheres; probes only) ----------------------------------------
   { id: "cloud-drifter", name: "cloud drifter", climates: [], rarity: 2, floating: true, priceMult: 4, color: "#f2e6c8", blurb: "A gas bladder the size of a hand, riding the updrafts and feeding on lightning-made nitrates." },
   { id: "storm-kelp", name: "storm kelp", climates: [], rarity: 2, floating: true, priceMult: 4, color: "#9fc4a8", blurb: "Long ribbons that knot themselves around ice grains and sail the jet streams for years." },

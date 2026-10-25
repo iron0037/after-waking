@@ -43,6 +43,9 @@ export interface ShipStats {
   roverChargeMult: number;
   /** Multiplies the time each hex takes the rover (below 1 is faster). */
   roverDriveTime: number;
+  /** Boat (AW-17): cargo and cell capacity; boatEnergy 0 means no boat aboard. */
+  boatCargoT: number;
+  boatEnergy: number;
   /** Atmospheric probes the bay can carry (0 = no bay). */
   probeCapacity: number;
   /** Deepest band the probes are rated for: 0 none, 1 cloud tops ... 4 abyss. */
@@ -64,6 +67,8 @@ export const BASE_STATS: ShipStats = {
   roverCanClimb: false,
   roverChargeMult: 1,
   roverDriveTime: 1,
+  boatCargoT: 0,
+  boatEnergy: 0,
   probeCapacity: 0,
   probeMaxDepth: 0,
   ratings: {
@@ -207,6 +212,19 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.drillMaxDepthM = Math.max(s.drillMaxDepthM, 700);
       s.drillRateTph *= 2;
+    },
+  },
+  {
+    id: "boat",
+    category: "rover",
+    name: "Survey boat",
+    vendor: "midshipmen",
+    price: 22_000,
+    description:
+      "A flat-bottomed boat that launches from a ship standing at the water's edge. Sails open water, dredges seabed deposits, samples sea life, and carries the rover to far shores. 30 t cargo.",
+    apply: (s) => {
+      s.boatCargoT = 30;
+      s.boatEnergy = 140;
     },
   },
   {

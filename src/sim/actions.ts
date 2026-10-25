@@ -6,6 +6,7 @@ import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { burnPath } from "./burnpath";
+import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf, vehiclesOut } from "./vehicles";
 import { fuelPrice, sellCommodity, sellPrice } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
@@ -75,12 +76,18 @@ export const ROVER_CHARGE_PER_HOUR = 10;
 
 /** A stowed rover charges from the ship's reactor as time passes (in flight, in orbit, on the pad). */
 export function chargeStowedRover(state: GameState, minutes: number): void {
-  const loc = state.location;
-  if (loc.kind === "surface" && loc.rover) return;
-  const full = effectiveStats(state).roverEnergy;
-  const stored = state.ship.roverEnergy ?? full;
-  if (stored >= full) return;
-  state.ship.roverEnergy = Math.min(full, stored + (roverChargePerHour(state) * minutes) / 60);
+  const out = vehiclesOut(state);
+  const stats = effectiveStats(state);
+  const gain = (roverChargePerHour(state) * minutes) / 60;
+  if (!out.rover) {
+    const stored = state.ship.roverEnergy ?? stats.roverEnergy;
+    if (stored < stats.roverEnergy) state.ship.roverEnergy = Math.min(stats.roverEnergy, stored + gain);
+  }
+  // The boat (AW-17) charges from the same reactor while it's in the bay.
+  if (!out.boat && stats.boatEnergy > 0) {
+    const stored = state.ship.boatEnergy ?? stats.boatEnergy;
+    if (stored < stats.boatEnergy) state.ship.boatEnergy = Math.min(stats.boatEnergy, stored + gain);
+  }
 }
 
 /** Charge rate at the ship (Fast Charge doubles it). */
@@ -480,6 +487,11 @@ export function landingBlockers(state: GameState, world: World, region: number):
   blockers.push(...landingAccess(body, effectiveStats(state).ratings).reasons);
   if (body.regions > 0 && (region < 0 || region >= body.regions || !Number.isInteger(region))) {
     blockers.push("Choose a valid landing region.");
+  } else if (body.regions > 0) {
+    // Ocean worlds (AW-17): the ship needs an island to set down on.
+    const surface = world.surface(body.id);
+    const spot = surface.landing(region);
+    if (!canEnter(surface, spot.x, spot.y, false)) blockers.push("No dry land in this region to set down on. Pick another.");
   }
   const fuel = surfaceBurnFuel(state, body);
   if (fuel > state.ship.fuel) blockers.push(`Descent needs ${fuel} fuel.`);
@@ -611,7 +623,7 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
 }
 
 /** First arrival in a region (by rover or ship hop) counts as a visit, for map painting. */
-function visitRegion(state: GameState, world: World, bodyId: string, x: number, y: number): void {
+export function visitRegion(state: GameState, world: World, bodyId: string, x: number, y: number): void {
   const region = world.surface(bodyId).regionAt(x, y);
   if (region === null) return;
   const know = knowledge(state, bodyId, region);
@@ -652,16 +664,24 @@ export function routeEnergy(state: GameState, path: readonly { energy: number }[
   return (path ?? []).reduce((sum, s) => sum + s.energy, 0) * routeEnergyMult(state);
 }
 
-/** Drive toward (x, y), across region borders if needed. Stops early if energy runs short. */
+/** How the vehicle being driven gets around: the boat on water, the rover on land. */
+export function vehicleMobility(state: GameState): Mobility {
+  const loc = state.location;
+  return loc.kind === "surface" && loc.rover && vehicleOf(loc.rover) === "boat" ? boatMobility() : roverMobility(state);
+}
+
+/** Drive (or sail) toward (x, y), across region borders if needed. Stops early if energy runs short. */
 export function moveRoverTo(state: GameState, world: World, x: number, y: number): Result<{ steps: number; stopped: string | null }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { surface, rover, bodyId } = ctx.value;
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
-  const path = findPath(surface, rover, { x, y }, roverMobility(state));
+  const boat = vehicleOf(rover) === "boat";
+  const path = findPath(surface, rover, { x, y }, vehicleMobility(state));
   const energyMult = routeEnergyMult(state);
-  const minutesMult = routeMinutesMult(state);
-  if (!path) return fail("No route there for this rover.");
+  // The drive motors are the rover's; the boat keeps its own pace.
+  const minutesMult = boat ? 1 : routeMinutesMult(state);
+  if (!path) return fail(boat ? "No open water route there." : "No route there for this rover.");
   let steps = 0;
   for (const step of path) {
     if (rover.energy < step.energy * energyMult) {
@@ -678,7 +698,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   return ok({ steps, stopped: null });
 }
 
-function revealAround(state: GameState, world: World): void {
+export function revealAround(state: GameState, world: World): void {
   const ctx = surfaceCtx(state, world);
   if (ctx.ok) revealAt(state, world, ctx.value.bodyId, ctx.value.rover);
 }
@@ -802,7 +822,14 @@ export function surfaceDeposit(
 function depositNearRover(state: GameState, world: World, ctx: SurfaceCtx, key: SiteKey, range = 1): Result<{ d: SurfaceDeposit; know: RegionKnowledge }> {
   const found = surfaceDeposit(state, world, key);
   if (!found) return fail("Unknown deposit.");
-  if (hexDistance(found.deposit, ctx.rover) > range) return fail(range > 1 ? `Drive the rover within ${range} hexes of the deposit first.` : "Drive the rover next to the deposit first.");
+  const wet = siteOnWater(world, ctx.bodyId, found.deposit);
+  const v = vehicleOf(ctx.rover);
+  if (wet && v !== "boat") return fail("That seam is under the sea: take the boat out to dredge it.");
+  if (!wet && v === "boat") return fail("That deposit is on land: put the rover ashore to work it.");
+  if (hexDistance(found.deposit, ctx.rover) > range) {
+    const what = v === "boat" ? "Sail the boat" : "Drive the rover";
+    return fail(range > 1 ? `${what} within ${range} hexes of the deposit first.` : `${what} next to the deposit first.`);
+  }
   return ok({ d: found.deposit, know: found.know });
 }
 
@@ -859,8 +886,9 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   if (d.depthM > stats.drillMaxDepthM) return fail(`The seam is ${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
   const remaining = remainingTonnes(know, d);
   if (remaining <= 0) return fail("This deposit is worked out.");
-  const room = stats.roverCargoT - cargoTonnes(rover.cargo);
-  if (room <= 0.05) return fail("The rover's cargo bed is full.");
+  const bed = vehicleCargoT(state, vehicleOf(rover));
+  const room = bed - cargoTonnes(rover.cargo);
+  if (room <= 0.05) return fail(vehicleOf(rover) === "boat" ? "The boat's hold is full." : "The rover's cargo bed is full.");
 
   if (!know.drillSites.includes(d.id)) {
     if (rover.energy < DRILL_SETUP_ENERGY) return fail("Not enough energy to set up the drill rig.");
@@ -883,12 +911,12 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
 
   const worked = Math.round(rate * hours * 10) / 10;
   const tonnes = Math.round(worked * yieldMult * 10) / 10;
-  addCargo(rover.cargo, d.commodity, tonnes, stats.roverCargoT);
+  addCargo(rover.cargo, d.commodity, tonnes, bed);
   know.extracted[d.id] = (know.extracted[d.id] ?? 0) + worked;
   rover.energy -= hours * DRILL_ENERGY_PER_HOUR;
   state.stats.tonnesMined += tonnes;
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
-  log(state, "info", `Drilled ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
+  log(state, "info", `${vehicleOf(rover) === "boat" ? "Dredged" : "Drilled"} ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
 
   const where = placeName(world, bodyId);
   if (tonnes > 0) recordFind(state, "mineral", d.commodity, where, COMMODITIES[d.commodity].name);
@@ -921,7 +949,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
     tonnes,
     hours,
     depleted: remainingTonnes(know, d) <= 0.05,
-    roverFull: stats.roverCargoT - cargoTonnes(rover.cargo) <= 0.05,
+    roverFull: bed - cargoTonnes(rover.cargo) <= 0.05,
     incident: incident?.text ?? null,
   });
 }
@@ -1002,7 +1030,10 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   if (!found) return fail("Unknown flora site.");
   const { site, know } = found;
   if (know.floraSampled.includes(site.id)) return fail("Already sampled here.");
-  if (hexDistance(site, rover) > 1) return fail("Drive the rover next to the plants first.");
+  const wet = siteOnWater(world, bodyId, site);
+  if (wet && vehicleOf(rover) !== "boat") return fail("That's sea life: take the boat out to sample it.");
+  if (!wet && vehicleOf(rover) === "boat") return fail("Those grow ashore: put the rover ashore to sample them.");
+  if (hexDistance(site, rover) > 1) return fail(wet ? "Sail the boat next to it first." : "Drive the rover next to the plants first.");
   const slots = roverSpecimenSlots(state);
   if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
@@ -1028,31 +1059,45 @@ export function stowRover(state: GameState, world: World): Result<{ unloaded: nu
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { rover } = ctx.value;
+  const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
+  if (loc.parkedBoat) return fail("The boat is still moored offshore: drive the rover aboard and sail it back first.");
   if (hexDistance(rover, shipTile(state, world)) > 1) {
-    return fail("Drive the rover back to the ship first.");
+    return fail(vehicleOf(rover) === "boat" ? "Sail the boat back to the ship first." : "Drive the rover back to the ship first.");
   }
+  return ok(unloadAll(state));
+}
+
+/** Unload, stow and plug in every vehicle that's out (the boat and the rover on its deck, or the rover). */
+function unloadAll(state: GameState): { unloaded: number; jettisoned: number } {
+  const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
+  const vehicles = [loc.rover, loc.roverAboard, loc.parkedBoat].filter((v): v is RoverState => !!v);
   const capacity = effectiveStats(state).cargoCapacityT;
   let unloaded = 0;
   let jettisoned = 0;
-  for (const [id, tonnes] of Object.entries(rover.cargo) as [CommodityId, number][]) {
-    const added = addCargo(state.ship.cargo, id, tonnes, capacity);
-    unloaded += added;
-    jettisoned += tonnes - added;
-  }
   let lostSamples = 0;
   state.ship.specimens ??= {};
-  for (const [key, n] of Object.entries(rover.specimens ?? {})) {
-    const room = shipSpecimenSlots(state) - specimenCount(state.ship.specimens);
-    const moved = Math.min(room, n);
-    if (moved > 0) state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + moved;
-    lostSamples += n - moved;
+  for (const v of vehicles) {
+    for (const [id, tonnes] of Object.entries(v.cargo) as [CommodityId, number][]) {
+      const added = addCargo(state.ship.cargo, id, tonnes, capacity);
+      unloaded += added;
+      jettisoned += tonnes - added;
+    }
+    for (const [key, n] of Object.entries(v.specimens ?? {})) {
+      const room = shipSpecimenSlots(state) - specimenCount(state.ship.specimens);
+      const moved = Math.min(room, n);
+      if (moved > 0) state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + moved;
+      lostSamples += n - moved;
+    }
+    if (vehicleOf(v) === "boat") state.ship.boatEnergy = v.energy;
+    else state.ship.roverEnergy = v.energy;
   }
   if (lostSamples > 0) log(state, "warning", `The containment racks are full. ${lostSamples} sample(s) had to be released.`);
   advanceTime(state, ROVER_STOW_MINUTES);
-  state.ship.roverEnergy = rover.energy;
-  (state.location as { rover: RoverState | null }).rover = null;
+  loc.rover = null;
+  loc.roverAboard = undefined;
+  loc.parkedBoat = undefined;
   if (jettisoned > 0.05) log(state, "warning", `The hold is full. ${jettisoned.toFixed(1)} t of ore left on the ground.`);
-  return ok({ unloaded, jettisoned });
+  return { unloaded, jettisoned };
 }
 
 /** Plug the rover into the ship's reactor without stowing it: tops up the cells, takes time. */
@@ -1063,8 +1108,8 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   if (hexDistance(rover, shipTile(state, world)) > 1) {
     return fail("Drive the rover back to the ship to recharge.");
   }
-  const full = effectiveStats(state).roverEnergy;
-  if (rover.energy >= full - 0.5) return fail("The rover's cells are already full.");
+  const full = vehicleEnergyMax(state, vehicleOf(rover));
+  if (rover.energy >= full - 0.5) return fail(vehicleOf(rover) === "boat" ? "The boat's cells are already full." : "The rover's cells are already full.");
   const hours = (full - rover.energy) / roverChargePerHour(state);
   advanceTime(state, hours * HOUR);
   rover.energy = full;
@@ -1079,6 +1124,13 @@ export function recallRover(state: GameState, world: World): Result {
   if (state.ship.fuel < RECALL_FUEL) return fail("Not enough fuel to hop the ship over to the rover.");
   state.ship.fuel -= RECALL_FUEL;
   advanceTime(state, RECALL_MINUTES);
+  const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
+  if (vehicleOf(rover) === "boat" || loc.parkedBoat) {
+    // The boat can't come ashore under its own power: the ship picks up everything and stows it.
+    unloadAll(state);
+    log(state, "warning", "Hopped the ship out to the boat and winched everything aboard. It cost fuel and three hours.");
+    return ok(undefined);
+  }
   const home = shipTile(state, world);
   rover.x = home.x;
   rover.y = home.y;

@@ -30,6 +30,8 @@ export interface RoverState {
   cargo: Cargo;
   /** Specimens riding in the rover's sample cases, keyed "bodyId|species". */
   specimens?: Record<string, number>;
+  /** Which vehicle this is (AW-17); absent means the rover. */
+  vehicle?: "rover" | "boat";
 }
 
 export type Location =
@@ -49,6 +51,10 @@ export type Location =
       globalCoords?: boolean;
       /** Jury-Rig already used on this landing. */
       juryRigUsed?: boolean;
+      /** The boat, moored offshore while the rover it carried is ashore (AW-17). */
+      parkedBoat?: RoverState;
+      /** The rover, riding on the boat's deck while the boat is the one being driven. */
+      roverAboard?: RoverState;
     };
 
 export interface YardJob {

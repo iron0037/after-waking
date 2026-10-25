@@ -163,13 +163,58 @@ export function bodySpecies(seed: number, body: Body): string[] {
   if (!body.life) return [];
   const rng = rngFor(seed, body.id, "species");
   const climate = climateOf(body.tempC);
-  const pool = FLORA.filter((f) => f.climates.includes(climate));
+  // Land plants only: sea life has its own list (aquaticSpecies), so adding it never reshuffles these.
+  const pool = FLORA.filter((f) => !f.aquatic && f.climates.includes(climate));
   const names = new Set<string>();
   const want = Math.min(pool.length, rng.int(3, 6));
   for (let guard = 0; names.size < want && guard < 200; guard++) {
     names.add(rng.weighted(pool.map((f) => [f.name, f.rarity === 1 ? 6 : f.rarity === 2 ? 3 : 1] as const)));
   }
   return [...names];
+}
+
+/** Sea life on a living world with open water (AW-17), from its own stream. */
+export function aquaticSpecies(seed: number, body: Body): string[] {
+  if (!body.life || (body.kind !== "terrestrial" && body.kind !== "ocean") || body.tempC < -10) return [];
+  const climate = climateOf(body.tempC);
+  const pool = FLORA.filter((f) => f.aquatic && f.climates.includes(climate));
+  if (pool.length === 0) return [];
+  const rng = rngFor(seed, body.id, "sea-species");
+  const names = new Set<string>();
+  const want = Math.min(pool.length, rng.int(2, 3));
+  for (let guard = 0; names.size < want && guard < 100; guard++) {
+    names.add(rng.weighted(pool.map((f) => [f.name, f.rarity === 1 ? 6 : f.rarity === 2 ? 3 : 1] as const)));
+  }
+  return [...names];
+}
+
+/** Seabed deposits and sea-life sites get ids from here up, clear of the land sites and hidden layers. */
+export const SEA_ID_BASE = 100;
+
+/**
+ * Seabed deposits and sea life in a region with open water (AW-17). Their own random streams, so
+ * no land site ever moves. The first scouts had no boats: nothing at sea has been worked.
+ */
+function seaSites(seed: number, body: Body, region: number, terrain: Uint8Array, w: number, h: number): { deposits: Deposit[]; flora: FloraSite[] } {
+  const water: number[] = [];
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) if (terrain[y * w + x] === Terrain.liquid) water.push(y * w + x);
+  if (water.length < w * h * 0.05) return { deposits: [], flora: [] };
+  const rng = rngFor(seed, body.id, region, "sea");
+  const at = (): Vec2 => {
+    const i = water[rng.int(0, water.length - 1)] as number;
+    return { x: i % w, y: Math.floor(i / w) };
+  };
+  const entries = Object.entries(body.resources) as [CommodityId, number][];
+  const nDeposits = entries.length === 0 ? 0 : body.kind === "ocean" ? rng.int(2, 4) : rng.int(0, 2);
+  const scale = frontierTonnage(seed, body);
+  const deposits: Deposit[] = Array.from({ length: nDeposits }, (_, i) => {
+    const spec = depositSpec(rng, body, entries, rng.range(0.5, 1.3), SEA_ID_BASE + i);
+    return { ...spec, tonnes: Math.max(5, Math.round(spec.tonnes * scale)), ...at() };
+  });
+  const species = aquaticSpecies(seed, body);
+  const flora: FloraSite[] =
+    species.length === 0 ? [] : Array.from({ length: rng.int(1, 3) }, (_, i) => ({ id: SEA_ID_BASE + i, species: rng.pick(species), ...at() }));
+  return { deposits, flora };
 }
 
 /** Specimen sites in one region of a living world. */
@@ -377,7 +422,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       const x = placeRng.int(1, w - 2);
       const y = placeRng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
-      if (TERRAIN_INFO[t].passable === "no") continue;
+      // On ocean worlds most seams lie under the sea, for the boat to dredge.
+      if (TERRAIN_INFO[t].passable === "no" && !(body.kind === "ocean" && t === Terrain.liquid)) continue;
       if (hexDistance({ x, y }, landing) < 4) continue;
       return { ...spec, x, y };
     }
@@ -415,8 +461,15 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   for (const spec of hiddenDeposits(seed, body, region, rolled.length)) deposits.push({ ...spec, ...spot(4, false) });
   for (const spec of hiddenFlora(seed, body, region, flora.length)) flora.push({ ...spec, ...spot(3, true) });
 
+  const sea = seaSites(seed, body, region, terrain, w, h);
+  deposits.push(...sea.deposits);
+  flora.push(...sea.flora);
+
   return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };
 }
+
+/** Elevation below which an ocean world is sea: about three-quarters water, in island chains (terrestrial worlds use 0.32). */
+export const OCEAN_SEA_LEVEL = 0.6;
 
 function classify(body: Body, e: number, rough: number, seaLevel: number, ruggedness: number): Terrain {
   const mountainLine = 0.78 - ruggedness * 0.15;
@@ -424,7 +477,8 @@ function classify(body: Body, e: number, rough: number, seaLevel: number, rugged
   const frozen = body.tempC < -10;
 
   if (body.kind === "volcanic" && e < 0.22 + seaLevel * 0.5) return Terrain.lava;
-  if ((body.kind === "terrestrial" || body.kind === "ocean") && e < 0.32 + seaLevel) {
+  // Ocean worlds are open sea with island chains; terrestrial worlds have lakes and inland seas.
+  if ((body.kind === "terrestrial" || body.kind === "ocean") && e < (body.kind === "ocean" ? OCEAN_SEA_LEVEL : 0.32) + seaLevel) {
     return frozen ? Terrain.ice : Terrain.liquid;
   }
   if (e > mountainLine) return Terrain.mountain;

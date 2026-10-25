@@ -1,5 +1,7 @@
 export * from "./actions";
 export * from "./burnpath";
+export * from "./vehicles";
+export * from "./boat";
 export * from "./bodies";
 export * from "./economy";
 export * from "./environment";

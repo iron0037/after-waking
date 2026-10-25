@@ -10,6 +10,7 @@ import {
   regionLifeSignal,
   sensorSweep,
   World,
+  SEA_ID_BASE,
 } from "../src/sim";
 import { BASE_STATS } from "../src/data/ship";
 
@@ -44,7 +45,8 @@ describe("life signs from orbit", () => {
     const world = new World(42);
     const body = world.system("s0").bodies.find((b) => b.life)!;
     for (let r = 0; r < 3; r++) {
-      expect(regionLifeSignal(42, body, r)).toBe(world.region(body.id, r).flora.filter((f) => !f.hidden).length);
+      // Sea life (AW-17) stays hidden under the waves from orbit.
+      expect(regionLifeSignal(42, body, r)).toBe(world.region(body.id, r).flora.filter((f) => !f.hidden && f.id < SEA_ID_BASE).length);
     }
   });
 });

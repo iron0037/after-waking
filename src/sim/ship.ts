@@ -11,6 +11,8 @@ export interface ShipState {
   cargo: Cargo;
   /** Rover cell charge while stowed; it recharges from the ship's reactor before each deployment. */
   roverEnergy?: number;
+  /** Boat cell charge while stowed (AW-17). */
+  boatEnergy?: number;
   /** Live specimens in the containment racks, keyed "bodyId|species". */
   specimens?: Record<string, number>;
   /** Atmospheric probes in the bay. */
