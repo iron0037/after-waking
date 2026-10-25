@@ -163,7 +163,8 @@ export function deliveryContract(rng: Rng, now: number, serial: number): Contrac
     text: DELIVERY_FLAVOR[clan],
     commodity,
     tonnes,
-    reward: Math.round((tonnes * price * rng.range(1.3, 1.6) + 1_000) / 50) * 50,
+    // A premium on the goods plus a haulage fee per tonne, so bulk jobs (iron, copper, ice) pay for the hold space.
+    reward: Math.round((tonnes * (price * rng.range(1.3, 1.6) + HAULAGE_PER_T) + 1_000) / 50) * 50,
     durationDays: rng.int(90, 160),
     deadline: null,
     status: "offered",
@@ -300,6 +301,9 @@ export function probeSurveyContract(state: GameState, rng: Rng, serial: number):
     status: "offered",
   };
 }
+
+/** What a delivery contract pays per tonne on top of the goods' value: it's hold space you could fill with ore. */
+export const HAULAGE_PER_T = 35;
 
 /** Expire overdue contracts and post new deliveries now and then. Called as time passes. */
 export function tickContracts(state: GameState): void {

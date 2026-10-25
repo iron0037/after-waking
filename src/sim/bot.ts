@@ -47,7 +47,7 @@ import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
-import { REGION_SIZE, regionKey, regionSignal } from "./surface";
+import { frontierTonnage, REGION_SIZE, regionKey, regionSignal, scoutedShare } from "./surface";
 import { DAY } from "./units";
 import { World } from "./world";
 
@@ -201,7 +201,10 @@ function chooseSystem(state: GameState, world: World, randomly: Rng | null = nul
     const bodies = world.system(sys.id).bodies.filter((b) => landable(state, b));
     if (bodies.length === 0) continue;
     const priorVisits = visitsTo(state, sys.id);
-    const score = bodies.reduce((s, b) => s + bodyScore(b), 0) / (1 + out.ly * 0.1) / (1 + priorVisits * 0.6);
+    // Like a player reading the star map's estimates: picked-over home stars are worth less, the frontier more.
+    const first = bodies[0] as Body;
+    const seams = frontierTonnage(state.seed, first) * (1 - scoutedShare(state.seed, first));
+    const score = (bodies.reduce((s, b) => s + bodyScore(b), 0) * seams) / (1 + out.ly * 0.1) / (1 + priorVisits * 0.6);
     options.push(sys.id);
     if (score > bestScore) {
       bestScore = score;

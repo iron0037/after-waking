@@ -39,6 +39,10 @@ export interface ShipStats {
   roverCargoT: number;
   roverEnergy: number;
   roverCanClimb: boolean;
+  /** Multiplies the rover's charge rate at the ship. */
+  roverChargeMult: number;
+  /** Multiplies the time each hex takes the rover (below 1 is faster). */
+  roverDriveTime: number;
   /** Atmospheric probes the bay can carry (0 = no bay). */
   probeCapacity: number;
   /** Deepest band the probes are rated for: 0 none, 1 cloud tops ... 4 abyss. */
@@ -58,6 +62,8 @@ export const BASE_STATS: ShipStats = {
   roverCargoT: 20,
   roverEnergy: 100,
   roverCanClimb: false,
+  roverChargeMult: 1,
+  roverDriveTime: 1,
   probeCapacity: 0,
   probeMaxDepth: 0,
   ratings: {
@@ -104,6 +110,19 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.cargoCapacityT += 100;
       s.hullMassT += 150;
+    },
+  },
+  {
+    id: "expandedHold2",
+    category: "ship",
+    requires: "expandedHold",
+    name: "Cargo pods",
+    vendor: "exchange",
+    price: 48_000,
+    description: "+150 t cargo capacity on top of the expanded hold. Adds 250 t of hull mass, so folds cost noticeably more.",
+    apply: (s) => {
+      s.cargoCapacityT += 150;
+      s.hullMassT += 250;
     },
   },
   {
@@ -199,6 +218,28 @@ export const UPGRADES: readonly Upgrade[] = [
     description: "+20 t rover cargo.",
     apply: (s) => {
       s.roverCargoT += 20;
+    },
+  },
+  {
+    id: "roverFastCharger",
+    category: "rover",
+    name: "Rover fast charger",
+    vendor: "midshipmen",
+    price: 9_000,
+    description: "A heavy feed from the ship's reactor: the rover charges twice as fast at the ship.",
+    apply: (s) => {
+      s.roverChargeMult *= 2;
+    },
+  },
+  {
+    id: "roverMotors",
+    category: "rover",
+    name: "Uprated drive motors",
+    vendor: "diggers",
+    price: 12_000,
+    description: "The rover covers ground 25% faster (same energy per hex).",
+    apply: (s) => {
+      s.roverDriveTime *= 0.75;
     },
   },
   {

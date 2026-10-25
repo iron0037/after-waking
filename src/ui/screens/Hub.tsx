@@ -410,7 +410,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         bodyName,
         count,
         reserved: reserved.has(bodyId),
-        isNew: !state.catalogedSpecies.includes(key),
+        isNew: !state.catalogedSpecies.includes(key.split("|")[1] ?? key),
         unit: Math.round(specimenUnitPrice(state, key)),
         floating: (FLORA_BY_NAME.get(rest.join("|"))?.priceMult ?? 1) > 1,
       };

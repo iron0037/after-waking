@@ -2,7 +2,9 @@
  * Exploration progress, for "map painting": how much of each region, world and system the
  * player has covered, and reminders of what's already known when returning somewhere.
  */
+import { COMMODITIES } from "../data/commodities";
 import { remainingTonnes } from "./actions";
+import { landingAccess } from "./environment";
 import { contractProgress, type Contract } from "./contracts";
 import type { Body } from "./bodies";
 import { effectiveStats } from "./perks";
@@ -176,4 +178,44 @@ export function knownDeposits(state: GameState, world: World, bodyId: string): K
     }
   }
   return out.sort((a, b) => Number(b.reachable) - Number(a.reachable) || b.remainingT - a.remainingT);
+}
+
+export interface SystemMineral {
+  commodity: Deposit["commodity"];
+  /** Scanned worlds whose orbital scan shows this mineral, and whether the ship can land on each. */
+  bodies: { bodyId: string; name: string; abundance: number; landable: boolean }[];
+  /** Untapped deposits the rover has actually found, across the system. */
+  found: { count: number; tonnes: number; reachableTonnes: number };
+}
+
+/**
+ * Everything known about a system's minerals, for planning folds: orbital-scan signatures per world
+ * (with whether you can land there) plus deposits already found on the ground. Richest first.
+ */
+export function systemMinerals(state: GameState, world: World, systemId: string): SystemMineral[] {
+  const ratings = effectiveStats(state).ratings;
+  const byId = new Map<string, SystemMineral>();
+  const entry = (c: Deposit["commodity"]) => {
+    let m = byId.get(c);
+    if (!m) {
+      m = { commodity: c, bodies: [], found: { count: 0, tonnes: 0, reachableTonnes: 0 } };
+      byId.set(c, m);
+    }
+    return m;
+  };
+  for (const body of world.system(systemId).bodies) {
+    if (!state.scannedBodies.includes(body.id)) continue;
+    const landable = body.regions > 0 && landingAccess(body, ratings).ok;
+    for (const [c, abundance] of Object.entries(body.resources) as [Deposit["commodity"], number][]) {
+      entry(c).bodies.push({ bodyId: body.id, name: body.name, abundance, landable });
+    }
+    if (body.regions === 0) continue;
+    for (const k of knownDeposits(state, world, body.id)) {
+      const m = entry(k.commodity);
+      m.found.count++;
+      m.found.tonnes += k.remainingT;
+      if (k.reachable && landable) m.found.reachableTonnes += k.remainingT;
+    }
+  }
+  return [...byId.values()].sort((a, b) => COMMODITIES[b.commodity].basePrice - COMMODITIES[a.commodity].basePrice);
 }

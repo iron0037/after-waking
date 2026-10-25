@@ -84,7 +84,12 @@ export function chargeStowedRover(state: GameState, minutes: number): void {
 
 /** Charge rate at the ship (Fast Charge doubles it). */
 export function roverChargePerHour(state: GameState): number {
-  return ROVER_CHARGE_PER_HOUR * (hasPerk(state, "fast-charge") ? 2 : 1);
+  return ROVER_CHARGE_PER_HOUR * (hasPerk(state, "fast-charge") ? 2 : 1) * effectiveStats(state).roverChargeMult;
+}
+
+/** Multiplier on route time (uprated drive motors). Apply to findPath's step minutes. */
+export function routeMinutesMult(state: GameState): number {
+  return effectiveStats(state).roverDriveTime;
 }
 /**
  * Surface crews work two 8-hour shifts a day, so hands-on work takes 1.5x its raw duration.
@@ -649,6 +654,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
   const path = findPath(surface, rover, { x, y }, roverMobility(state));
   const energyMult = routeEnergyMult(state);
+  const minutesMult = routeMinutesMult(state);
   if (!path) return fail("No route there for this rover.");
   let steps = 0;
   for (const step of path) {
@@ -658,7 +664,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
     rover.energy -= step.energy * energyMult;
     rover.x = step.x;
     rover.y = step.y;
-    advanceTime(state, step.minutes * SHIFT_FACTOR);
+    advanceTime(state, step.minutes * SHIFT_FACTOR * minutesMult);
     steps++;
     visitRegion(state, world, bodyId, step.x, step.y);
     revealAround(state, world);
@@ -1138,8 +1144,10 @@ export function sellSpecimens(state: GameState): Result<number> {
   const specimens = state.ship.specimens ?? {};
   for (const [key, n] of Object.entries(specimens)) {
     if (reserved.has(key.split("|")[0])) continue;
-    const bonus = state.catalogedSpecies.includes(key) ? 0 : NEW_SPECIES_BONUS;
-    if (bonus) state.catalogedSpecies.push(key);
+    // The Lyceum pays a bonus for the first specimen of each species, wherever it came from.
+    const species = key.split("|")[1] ?? key;
+    const bonus = state.catalogedSpecies.includes(species) ? 0 : NEW_SPECIES_BONUS;
+    if (bonus) state.catalogedSpecies.push(species);
     total += Math.round(n * specimenUnitPrice(state, key)) + bonus;
     awardXp(state, "medical", n);
     sold += n;
@@ -1317,6 +1325,10 @@ export function tickYard(state: GameState): void {
     if (job.kind === "install" && job.upgradeId) {
       if (!state.ship.upgrades.includes(job.upgradeId)) state.ship.upgrades.push(job.upgradeId);
       log(state, "trade", `The yard finished installing the ${job.label}.`);
+      if (job.upgradeId === "probeBay") {
+        state.ship.probes = (state.ship.probes ?? 0) + 1;
+        log(state, "trade", "The Lyceum included one probe with the bay, ready in the rack.");
+      }
     } else if (job.kind === "retrain" && job.station) {
       finishRetraining(state, job.station);
     }

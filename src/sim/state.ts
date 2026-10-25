@@ -126,7 +126,7 @@ export interface GameState {
   contracts: Contract[];
   /** When the job board next gets a new posting. */
   nextContractAt: number;
-  /** Species (by specimen key) already sold to the Lyceum; the first sale of each pays a bonus. */
+  /** Species (by name) already sold to the Lyceum; the first sale of each species pays a bonus. */
   catalogedSpecies: string[];
   /** Everything ever found, keyed "mineral:copper", "gem:plicite-geode", "flora:glass-reed". */
   compendium: Record<string, CompendiumRecord>;

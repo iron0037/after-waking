@@ -21,6 +21,8 @@ export function deserialize(json: string): GameState {
   data.contracts ??= [];
   data.nextContractAt ??= data.time;
   data.catalogedSpecies ??= [];
+  // Older saves kept the species bonus per world ("bodyId|species"); it's per species now.
+  data.catalogedSpecies = [...new Set(data.catalogedSpecies.map((k) => k.split("|")[1] ?? k))];
   data.compendium ??= {};
   data.loan.prepaid ??= 0;
   ensureCrew(data);

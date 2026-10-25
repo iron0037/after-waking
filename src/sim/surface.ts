@@ -6,9 +6,10 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
+import { generateGalaxy, INTREPID_POS, type Galaxy } from "./galaxy";
 import { hashSeed, rngFor, type Rng } from "./rng";
 import { disk, hexDistance, hexWorldPos, ring } from "./hex";
-import { clamp, type Vec2 } from "./units";
+import { clamp, dist, type Vec2 } from "./units";
 
 export const REGION_SIZE = 48;
 export const TILE_KM = 2;
@@ -184,8 +185,66 @@ export function regionLifeSignal(seed: number, body: Body, region: number): numb
   return regionFlora(seed, body, region).length;
 }
 
-/** Deposit list without positions; cheap enough to compute for every region in an orbital scan. */
+const galaxyCache = new Map<number, Galaxy>();
+function galaxyFor(seed: number): Galaxy {
+  let g = galaxyCache.get(seed);
+  if (!g) {
+    g = generateGalaxy(seed);
+    galaxyCache.clear();
+    galaxyCache.set(seed, g);
+  }
+  return g;
+}
+
+export type Frontier = "home" | "charted" | "uncharted";
+
+/** How picked-over a body's system is: the first scouts worked the home and charted stars. */
+export function frontierOf(seed: number, body: Body): { frontier: Frontier; ly: number } {
+  const sysId = body.id.split(".")[0] as string;
+  const sys = galaxyFor(seed).systems.find((s) => s.id === sysId);
+  if (!sys) return { frontier: "uncharted", ly: 0 };
+  const ly = dist(sys.pos, INTREPID_POS);
+  return { frontier: sys.home ? "home" : sys.charted ? "charted" : "uncharted", ly };
+}
+
+/**
+ * Seams left in the ground. Home and charted worlds were skimmed by the first scouts; past the
+ * charted stars the seams are richer, and grow richer the farther out you go (1.25x to 1.8x).
+ */
+export function frontierTonnage(seed: number, body: Body): number {
+  const { frontier, ly } = frontierOf(seed, body);
+  if (frontier === "home") return 0.9;
+  if (frontier === "charted") return 1;
+  return Math.min(1.8, 1.25 + 0.05 * Math.max(0, ly - 6));
+}
+
+/** Share of a world's deposits the scouts already worked out (they're simply gone). */
+export function scoutedShare(seed: number, body: Body): number {
+  const { frontier } = frontierOf(seed, body);
+  return frontier === "home" ? 0.2 : frontier === "charted" ? 0.1 : 0;
+}
+
+/** Was this deposit worked out by the first scouts? Deterministic per deposit; decided after placement. */
+export function scoutedOut(seed: number, body: Body, region: number, id: number): boolean {
+  const share = scoutedShare(seed, body);
+  return share > 0 && (hashSeed(seed, body.id, region, id, "scouted") % 1000) / 1000 < share;
+}
+
+/**
+ * Every deposit the generator rolls for a region, scouted-out ones included, with tonnage scaled for
+ * the frontier. Placement walks this full list so positions (and plant sites after them) never shift.
+ */
+export function rawRegionDeposits(seed: number, body: Body, region: number): DepositSpec[] {
+  const scale = frontierTonnage(seed, body);
+  return rolledDeposits(seed, body, region).map((d) => ({ ...d, tonnes: Math.max(5, Math.round(d.tonnes * scale)) }));
+}
+
+/** Deposit list without positions (what's actually left); cheap enough for every region in an orbital scan. */
 export function regionDeposits(seed: number, body: Body, region: number): DepositSpec[] {
+  return rawRegionDeposits(seed, body, region).filter((d) => !scoutedOut(seed, body, region, d.id));
+}
+
+function rolledDeposits(seed: number, body: Body, region: number): DepositSpec[] {
   const rng = rngFor(seed, body.id, region, "deposits");
   const entries = Object.entries(body.resources) as [CommodityId, number][];
   if (entries.length === 0) return [];
@@ -309,7 +368,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
 
   const landing = findLanding(terrain, w, h);
   const placeRng = rngFor(seed, body.id, region, "placement");
-  const deposits: Deposit[] = regionDeposits(seed, body, region).map((spec) => {
+  const rolled = rawRegionDeposits(seed, body, region);
+  const placed: Deposit[] = rolled.map((spec) => {
     for (let tries = 0; tries < 200; tries++) {
       const x = placeRng.int(1, w - 2);
       const y = placeRng.int(1, h - 2);
@@ -320,6 +380,9 @@ export function generateRegion(seed: number, body: Body, region: number): Region
     }
     return { ...spec, x: landing.x + 3, y: landing.y };
   });
+
+  // The scouts' worked-out seams are gone; the rest keep their places (and their ids).
+  const deposits: Deposit[] = placed.filter((d) => !scoutedOut(seed, body, region, d.id));
 
   const flora: FloraSite[] = regionFlora(seed, body, region).map((spec) => {
     for (let tries = 0; tries < 200; tries++) {
@@ -346,7 +409,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
     }
     return { x: landing.x + 2, y: landing.y + 2 };
   };
-  for (const spec of hiddenDeposits(seed, body, region, deposits.length)) deposits.push({ ...spec, ...spot(4, false) });
+  for (const spec of hiddenDeposits(seed, body, region, rolled.length)) deposits.push({ ...spec, ...spot(4, false) });
   for (const spec of hiddenFlora(seed, body, region, flora.length)) flora.push({ ...spec, ...spot(3, true) });
 
   return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };

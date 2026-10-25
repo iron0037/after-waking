@@ -33,7 +33,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
   science: [
     [
       ["seam-sense", "Seam Sense", "Deposits are detected at +50% sensor range."],
-      ["assayer", "Assayer", "Prospect from two hexes away, in half the time."],
+      ["assayer", "Assayer", "Takes core samples (prospecting) from two hexes away, in half the usual 2 hours. Drilling isn't affected."],
       ["rich-veins", "Rich Veins", "Every deposit yields 10% more ore."],
       ["prospectors-eye", "Prospector's Eye", "A detailed survey charts every deposit on the world before you land."],
       ["hidden-seams", "Hidden Seams", "Sensors pick up a layer of deposits other crews miss."],
