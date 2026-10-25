@@ -204,10 +204,10 @@ export const ROVER_SPECIMEN_BASE = 6;
 export const SHIP_SPECIMEN_BASE = 16;
 
 export function roverSpecimenSlots(state: GameState): number {
-  return ROVER_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0);
+  return ROVER_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0) + effectiveStats(state).specimenSlotBonus;
 }
 
 export function shipSpecimenSlots(state: GameState): number {
-  return SHIP_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0);
+  return SHIP_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0) + effectiveStats(state).specimenSlotBonus;
 }
 

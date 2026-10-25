@@ -43,6 +43,12 @@ export interface ShipStats {
   roverChargeMult: number;
   /** Multiplies the time each hex takes the rover (below 1 is faster). */
   roverDriveTime: number;
+  /** Multiplies the fuel for descents, lift-offs and hops (Lift-cell ballast). */
+  surfaceBurnMult: number;
+  /** Multiplies specimen prices at the Lyceum (Field xenolab). */
+  specimenPriceMult: number;
+  /** Extra sample cases in the rover and racks in the ship (Field xenolab). */
+  specimenSlotBonus: number;
   /** Portable refinery (AW-18): tonnes of ore processed per crew hour; 0 means none aboard. */
   refineryRateTph: number;
   /** Boat (AW-17): cargo and cell capacity; boatEnergy 0 means no boat aboard. */
@@ -69,6 +75,9 @@ export const BASE_STATS: ShipStats = {
   roverCanClimb: false,
   roverChargeMult: 1,
   roverDriveTime: 1,
+  surfaceBurnMult: 1,
+  specimenPriceMult: 1,
+  specimenSlotBonus: 0,
   refineryRateTph: 0,
   boatCargoT: 0,
   boatEnergy: 0,
@@ -240,6 +249,40 @@ export const UPGRADES: readonly Upgrade[] = [
       "Crushes, floats and dries metal ore in the hold into concentrate: 2.5 t of ore makes 1 t worth 10% more. Frees hold space and lightens the ship for the fold. About 4 t of ore an hour, crew time.",
     apply: (s) => {
       s.refineryRateTph = Math.max(s.refineryRateTph, 4);
+    },
+  },
+  {
+    id: "liftCells",
+    category: "ship",
+    name: "Lift-cell ballast",
+    vendor: "midshipmen",
+    price: 26_000,
+    description: "Gas cells grown from cloud-drifter bladders, packed into the hull's voids. Landings, lift-offs and hops burn 35% less fuel. (Research: Drifter lift cells.)",
+    apply: (s) => {
+      s.surfaceBurnMult *= 0.65;
+    },
+  },
+  {
+    id: "latticeSleeves",
+    category: "mining",
+    name: "Lattice drill sleeves",
+    vendor: "diggers",
+    price: 28_000,
+    description: "Drill sleeves grown on a reef-lace lattice: they stay sharp. +30% extraction rate. (Research: Reef-lattice sleeves.)",
+    apply: (s) => {
+      s.drillRateTph *= 1.3;
+    },
+  },
+  {
+    id: "fieldXenolab",
+    category: "sensors",
+    name: "Field xenolab",
+    vendor: "lyceum",
+    price: 24_000,
+    description: "A Lyceum-trained bench for keeping specimens healthy: they sell for 40% more, and the rover and ship each carry 3 more. (Research: The living archive.)",
+    apply: (s) => {
+      s.specimenPriceMult *= 1.4;
+      s.specimenSlotBonus += 3;
     },
   },
   {

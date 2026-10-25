@@ -116,6 +116,8 @@ export interface GameState {
   atmoReadings?: Record<string, number[]>;
   /** Research projects commissioned at the Intrepid (AW-15), by project id. */
   research?: Record<string, ResearchRecord>;
+  /** Projects whose needs are pinned to the ship status window and star map. */
+  trackedResearch?: string[];
   atmoSold?: string[];
   /** Recent dives (for contracts and the record). */
   probeHistory?: DiveRecord[];

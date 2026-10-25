@@ -502,7 +502,7 @@ export function landingBlockers(state: GameState, world: World, region: number):
 
 /** Fuel for one descent or ascent: heavier ships and stronger gravity cost more. */
 export function surfaceBurnFuel(state: GameState, body: Body): number {
-  return Math.round(0.4 * Math.max(0.05, body.gravityG) * (shipMassT(state.ship) / 1000) * 10) / 10;
+  return Math.round(0.4 * Math.max(0.05, body.gravityG) * (shipMassT(state.ship) / 1000) * effectiveStats(state).surfaceBurnMult * 10) / 10;
 }
 
 export function knowledge(state: GameState, bodyId: string, region: number): RegionKnowledge {
@@ -1231,7 +1231,7 @@ export const NEW_SPECIES_BONUS = 900;
 /** What the Lyceum pays per specimen under this key ("bodyId|species"): floating life is prized (priceMult), and the comms crew's bonus applies. */
 export function specimenUnitPrice(state: GameState, key: string): number {
   const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
-  return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice;
+  return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice * effectiveStats(state).specimenPriceMult;
 }
 
 /** Sell specimens to the Lyceum, keeping any that an active contract still needs. */

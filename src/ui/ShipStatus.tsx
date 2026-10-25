@@ -8,6 +8,8 @@ import {
   formatDuration,
   holdManifest,
   HOUR,
+  requirementProgress,
+  trackedProjects,
   refineBlockers,
   refineOre,
   vehiclesOut,
@@ -104,6 +106,29 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
               </p>
             )}
           </section>
+
+          {trackedProjects(state).length > 0 && (
+            <section>
+              <h3>Tracked research</h3>
+              {trackedProjects(state).map((p) => (
+                <div key={p.id} class="ship-research">
+                  <strong>{p.name}</strong> <span class="muted small">for the {UPGRADES_BY_ID.get(p.unlocks)?.name ?? p.unlocks}</span>
+                  <ul class="research-needs small">
+                    {p.needs.map((req, i) => {
+                      const prog = requirementProgress(state, req);
+                      return (
+                        <li key={i} class={prog.met ? "good" : ""}>
+                          {prog.met ? "✓ " : "· "}
+                          {prog.label}
+                        </li>
+                      );
+                    })}
+                    <li class="muted">· {cr(p.cost)} at the Intrepid's Research tab</li>
+                  </ul>
+                </div>
+              ))}
+            </section>
+          )}
 
           <section>
             <h3>

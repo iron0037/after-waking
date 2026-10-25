@@ -66,16 +66,27 @@ export function rollMineralSpecimen(rng: Rng, host: CommodityId, hours: number, 
   return rng.weighted(pool.map((g) => [g, RARITY_WEIGHT[g.rarity]] as const));
 }
 
-/** Handle a drilled specimen: a new compendium entry, or a duplicate sold to collectors. */
+/**
+ * Handle a drilled specimen. The first of each kind goes to the Lyceum's collection (a compendium
+ * entry) for a finder's fee; later ones sell to Exchange collectors. Either way it pays.
+ */
 export function foundMineralSpecimen(state: GameState, gem: MineralSpecimen, where: string): void {
-  if (recordFind(state, "gem", gem.id, where, gem.name)) return;
   const bounty = DUPLICATE_BOUNTY[gem.rarity];
   state.credits += bounty;
   state.stats.earned += bounty;
+  const host = COMMODITIES[gem.host].name.toLowerCase();
+  if (recordFind(state, "gem", gem.id, where, gem.name)) {
+    state.journal.push({
+      t: state.time,
+      kind: "trade",
+      text: `Mineral specimen: a ${gem.name} turned up in the ${host} cores. The Lyceum paid a ${bounty} cr finder's fee for its collection.`,
+    });
+    return;
+  }
   state.journal.push({
     t: state.time,
     kind: "trade",
-    text: `Another ${gem.name} in the cores (${COMMODITIES[gem.host].name.toLowerCase()}). Exchange collectors wired ${bounty} cr for it.`,
+    text: `Mineral specimen: another ${gem.name} in the ${host} cores. Exchange collectors wired ${bounty} cr for it.`,
   });
 }
 

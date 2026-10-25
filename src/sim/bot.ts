@@ -9,6 +9,7 @@ import {
   buyFuel,
   buyFuelOnCredit,
   buyUpgrade,
+  landingBlockers,
   deployRover,
   drill,
   drillRate,
@@ -246,7 +247,11 @@ function mineSystem(
     const regionValue = (r: number) =>
       regionSignal(state.seed, body, r, orbitalSensorTier(state, body.id), stats().drillMaxDepthM) /
       (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
-    const regions = Array.from({ length: regionCount }, (_, i) => i).sort((a, b) => regionValue(b) - regionValue(a));
+    // Ocean worlds (AW-17): only regions with an island to set down on.
+    const dry = (r: number) => !landingBlockers(state, world, r).some((b) => b.startsWith("No dry land"));
+    const regions = Array.from({ length: regionCount }, (_, i) => i)
+      .filter(dry)
+      .sort((a, b) => regionValue(b) - regionValue(a));
     // A new captain takes the region the chart pre-selects (strongest signal at their sensor tier), so no shuffle.
     for (const region of regions.slice(0, 2)) {
       if (holdFull()) break;

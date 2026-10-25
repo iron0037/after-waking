@@ -112,8 +112,23 @@ export function stationLevel(state: GameState, station: Station): number {
 
 // --- experience --------------------------------------------------------------------------
 
+/**
+ * How fast each station learns, relative to the raw awards. Science and navigation get a steady
+ * stream of small awards (every find, every burn), so they're scaled down toward the pace of the
+ * others: a busy station reaches level 3-4 in its first ten trips, 7 in about fifty.
+ */
+export const STATION_XP_RATE: Record<Station, number> = {
+  captain: 1,
+  science: 0.45,
+  navigation: 0.6,
+  engineering: 1,
+  comms: 1,
+  medical: 1,
+};
+
 /** Credit work done at a station. Logs level-ups. */
 export function awardXp(state: GameState, station: Station, amount: number): void {
+  amount *= STATION_XP_RATE[station];
   if (amount <= 0) return;
   // Mentor (medic) and Inspiring (captain) lift everyone's learning.
   const boost = 1 + (hasPerk(state, "mentor") ? 0.1 : 0) + (hasPerk(state, "inspiring") ? 0.1 : 0);

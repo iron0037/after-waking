@@ -724,3 +724,12 @@ table.data th.num {
 .ship-status .kv + h3 {
   margin-top: 12px;
 }
+
+.ship-research + .ship-research {
+  margin-top: 8px;
+}
+.ship-status .research-needs {
+  margin: 4px 0;
+  padding-left: 4px;
+  list-style: none;
+}

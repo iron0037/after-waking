@@ -17,7 +17,9 @@ export type Requirement =
   /** Atmospheric readings at this depth band or deeper, across all giants. */
   | { kind: "readings"; depth: number; count: number }
   /** Star systems you've visited. */
-  | { kind: "systems"; count: number };
+  | { kind: "systems"; count: number }
+  /** Live specimens from the ship's racks, handed over at the start: one species, or any of a rarity or rarer. */
+  | { kind: "specimens"; count: number; species?: string; minRarity?: 1 | 2 | 3 };
 
 export interface ResearchProject {
   id: string;
@@ -106,6 +108,40 @@ export const RESEARCH: readonly ResearchProject[] = [
       { kind: "cargo", commodity: "uranium", tonnes: 15 },
       { kind: "cargo", commodity: "deuterium", tonnes: 3 },
     ],
+  },
+  // --- living specimens: hard to get, so the gear is worth it ------------------------------------
+  {
+    id: "drifter-lift",
+    name: "Drifter lift cells",
+    clan: "midshipmen",
+    unlocks: "liftCells",
+    blurb: "Cloud drifters float on a gas their bladders make from nothing much. The Midshipmen want two live ones to learn the trick, and a ship that lands lighter.",
+    cost: 8_000,
+    days: 28,
+    needs: [{ kind: "specimens", species: "cloud drifter", count: 2 }],
+  },
+  {
+    id: "lattice-sleeves",
+    name: "Reef-lattice sleeves",
+    clan: "diggers",
+    unlocks: "latticeSleeves",
+    blurb: "Reef lace grows a lattice harder than the bits that cut it. The Diggers think they can grow drill sleeves the same way, given live samples to culture.",
+    cost: 10_000,
+    days: 28,
+    needs: [
+      { kind: "specimens", species: "reef lace", count: 3 },
+      { kind: "specimens", species: "kelp spire", count: 2 },
+    ],
+  },
+  {
+    id: "living-archive",
+    name: "The living archive",
+    clan: "lyceum",
+    unlocks: "fieldXenolab",
+    blurb: "The Lyceum wants to culture the rarest things you've found, and teach your crew to keep them alive in the field.",
+    cost: 10_000,
+    days: 30,
+    needs: [{ kind: "specimens", minRarity: 3, count: 4 }],
   },
 ];
 

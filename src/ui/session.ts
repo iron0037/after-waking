@@ -104,7 +104,10 @@ export class GameSession {
   /** Run a sim action. Failures become an on-screen notice. Always re-renders and autosaves. */
   act<T>(fn: (state: GameState, world: World) => Result<T>, options: ActOptions = {}): Result<T> {
     const before = this.state.time;
+    const journalBefore = this.state.journal.length;
     const result = fn(this.state, this.world);
+    // Mineral specimens turn up while drilling; say so on screen, not just in the journal.
+    for (const e of this.state.journal.slice(journalBefore)) if (e.text.startsWith("Mineral specimen:")) this.notify(e.text, "info");
     const passed = this.state.time - before;
     if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
     if (!result.ok) this.notify(result.reason, "error");

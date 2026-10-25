@@ -44,9 +44,9 @@ describe("crew sentiment", () => {
 
   it("level-ups cheer the officer", () => {
     const state = newGame({ seed: 42 });
-    const nav = officerAt(state, "navigation")!;
+    const nav = officerAt(state, "engineering")!;
     const before = nav.happiness!;
-    awardXp(state, "navigation", xpForLevel(2));
+    awardXp(state, "engineering", xpForLevel(2));
     expect(nav.happiness!).toBeGreaterThan(before);
   });
 

@@ -329,7 +329,12 @@ export function hiddenDeposits(seed: number, body: Body, region: number, firstId
   if (entries.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "hidden-deposits");
   const count = rng.chance(0.5) ? 1 : 0;
-  return Array.from({ length: count }, (_, i) => ({ ...depositSpec(rng, body, entries, rng.range(0.6, 1.4), firstId + i), hidden: true }));
+  // The seams other crews miss are the good ones: the world's pricier minerals, at a high grade.
+  const valued = entries.map(([id, a]) => [id, a * COMMODITIES[id].basePrice] as [CommodityId, number]);
+  return Array.from({ length: count }, (_, i) => {
+    const spec = depositSpec(rng, body, valued, rng.range(1.1, 1.6), firstId + i);
+    return { ...spec, tonnes: Math.round(spec.tonnes * 1.5), hidden: true };
+  });
 }
 
 /** The hidden layer of plant sites (Ecologist): one or two per region on living worlds. */

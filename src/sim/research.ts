@@ -2,6 +2,7 @@
  * Research projects (AW-15): bring a clan what it needs, pay for the lab time, and the top tier of
  * a piece of gear goes on sale at the Shipyard when the project finishes. Projects run while you fly.
  */
+import { FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
 import { MAX_ACTIVE_RESEARCH, RESEARCH, RESEARCH_BY_ID, RESEARCH_FOR_UPGRADE, type Requirement, type ResearchProject } from "../data/research";
 import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
@@ -59,7 +60,22 @@ export function requirementProgress(state: GameState, req: Requirement): Require
       const have = state.visitedSystems.length;
       return of(have, req.count, `charts from ${req.count} star systems (${have} visited)`);
     }
+    case "specimens": {
+      const have = matchingSpecimens(state, req).reduce((n, [, c]) => n + c, 0);
+      const what = req.species ? `live ${req.species}` : `live specimens of ${req.minRarity === 3 ? "rare" : "uncommon or rarer"} species`;
+      return of(have, req.count, `${req.count} ${what} (${have} in the racks)`);
+    }
   }
+}
+
+/** Specimens in the ship's racks that meet a requirement, as [key, count]. */
+function matchingSpecimens(state: GameState, req: Extract<Requirement, { kind: "specimens" }>): [string, number][] {
+  return Object.entries(state.ship.specimens ?? {}).filter(([key, n]) => {
+    if (n <= 0) return false;
+    const species = key.split("|")[1] ?? "";
+    if (req.species) return species === req.species;
+    return (FLORA_BY_NAME.get(species)?.rarity ?? 0) >= (req.minRarity ?? 1);
+  });
 }
 
 /** Why a project can't start right now (empty if it can). */
@@ -87,10 +103,22 @@ export function startResearch(state: GameState, id: string): Result<ResearchProj
   if (blockers.length > 0) return fail(blockers[0] as string);
   const p = RESEARCH_BY_ID.get(id) as ResearchProject;
   for (const req of p.needs) {
+    if (req.kind === "specimens") {
+      let left = req.count;
+      for (const [key, n] of matchingSpecimens(state, req)) {
+        const take = Math.min(left, n);
+        const racks = state.ship.specimens as Record<string, number>;
+        racks[key] = n - take;
+        if ((racks[key] ?? 0) <= 0) delete racks[key];
+        left -= take;
+        if (left <= 0) break;
+      }
+    }
     if (req.kind !== "cargo") continue;
     if (isOre(req.commodity)) takeOreEquivalent(state, req.commodity, req.tonnes);
     else removeCargo(state.ship.cargo, req.commodity, req.tonnes);
   }
+  state.trackedResearch = (state.trackedResearch ?? []).filter((t) => t !== id);
   state.credits -= p.cost;
   state.research ??= {};
   state.research[id] = { startedAt: state.time, readyAt: state.time + p.days * DAY, done: false };
@@ -124,4 +152,28 @@ export function researchFor(upgradeId: string): ResearchProject | null {
 export function upgradeUnlocked(state: GameState, upgradeId: string): boolean {
   const p = researchFor(upgradeId);
   return !p || researchStatus(state, p.id) === "done" || state.ship.upgrades.includes(upgradeId);
+}
+
+/** Pin a project's shopping list to the ship status window and star map while you're out (or unpin it). */
+export function toggleTrackResearch(state: GameState, id: string): Result<boolean> {
+  if (!RESEARCH_BY_ID.has(id)) return fail("Unknown project.");
+  if (researchStatus(state, id) !== "available") return fail("That project is already under way.");
+  const tracked = state.trackedResearch ?? [];
+  const on = !tracked.includes(id);
+  state.trackedResearch = on ? [...tracked, id] : tracked.filter((t) => t !== id);
+  return ok(on);
+}
+
+/** The projects you're collecting for. */
+export function trackedProjects(state: GameState): ResearchProject[] {
+  return (state.trackedResearch ?? []).map((id) => RESEARCH_BY_ID.get(id)).filter((p): p is ResearchProject => !!p && researchStatus(state, p.id) === "available");
+}
+
+/** Tonnes of each good your tracked projects still want, for highlighting on the star map and in the hold. */
+export function researchWants(state: GameState): Map<CommodityId, number> {
+  const out = new Map<CommodityId, number>();
+  for (const p of trackedProjects(state)) {
+    for (const req of p.needs) if (req.kind === "cargo") out.set(req.commodity, (out.get(req.commodity) ?? 0) + req.tonnes);
+  }
+  return out;
 }

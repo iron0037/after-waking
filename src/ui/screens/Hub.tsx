@@ -1,6 +1,6 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
-import { requirementProgress, researchBlockers, researchFor, researchStatus, startResearch, upgradeUnlocked } from "../../sim";
+import { requirementProgress, researchBlockers, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradeUnlocked } from "../../sim";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
 import { FLORA_BY_NAME } from "../../data/catalog";
@@ -1030,14 +1030,23 @@ function Research({ session }: { session: GameSession }) {
                 )}
                 {status === "done" && <div class="good small">The {gear?.name ?? "gear"} is on sale at the Shipyard.</div>}
                 {status === "available" && (
-                  <button
-                    class="btn"
-                    disabled={blockers.length > 0}
-                    title={blockers[0] ?? `Hand over the goods and ${cr(p.cost)}; results in ${p.days} days.`}
-                    onClick={() => session.act((s) => startResearch(s, p.id))}
-                  >
-                    Commission
-                  </button>
+                  <div class="btn-row">
+                    <button
+                      class="btn"
+                      disabled={blockers.length > 0}
+                      title={blockers[0] ?? `Hand over the goods and ${cr(p.cost)}; results in ${p.days} days.`}
+                      onClick={() => session.act((s) => startResearch(s, p.id))}
+                    >
+                      Commission
+                    </button>
+                    <button
+                      class={`btn ${(state.trackedResearch ?? []).includes(p.id) ? "primary" : ""}`}
+                      title="Pin this project's needs to the ship status window (H) and the star map while you're out"
+                      onClick={() => session.act((s) => toggleTrackResearch(s, p.id))}
+                    >
+                      {(state.trackedResearch ?? []).includes(p.id) ? "Tracking ✓" : "Track"}
+                    </button>
+                  </div>
                 )}
               </div>
             );

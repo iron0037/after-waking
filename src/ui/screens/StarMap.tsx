@@ -1,4 +1,5 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
+import { researchWants } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   prepareFold,
@@ -1025,20 +1026,27 @@ function MineralList({ session, systemId }: { session: GameSession; systemId: st
   for (const c of state.contracts ?? []) {
     if (c.status === "active" && c.kind === "deliver" && c.commodity) wanted.set(c.commodity, (wanted.get(c.commodity) ?? 0) + (c.tonnes ?? 0));
   }
+  const research = researchWants(state);
   return (
     <ul class="sm-minerals">
       {minerals.map((m) => {
         const need = wanted.get(m.commodity);
+        const forResearch = research.get(m.commodity);
         const shown = m.bodies.slice(0, MINERAL_BODIES_SHOWN);
         const rest = m.bodies.slice(MINERAL_BODIES_SHOWN);
         return (
-          <li key={m.commodity} class={need !== undefined ? "wanted" : ""}>
+          <li key={m.commodity} class={need !== undefined || forResearch !== undefined ? "wanted" : ""}>
             <div class="sm-mineral-head">
               <span class="sm-dot" style={{ background: COMMODITIES[m.commodity].color }} />
               <span class="sm-mineral-name">{COMMODITIES[m.commodity].name}</span>
               {need !== undefined && (
                 <span class="tag accent-tag" title="An active delivery contract needs this commodity">
                   ◆ contract: {tonnes(need)}
+                </span>
+              )}
+              {forResearch !== undefined && (
+                <span class="tag accent-tag" title="A research project you're tracking needs this">
+                  ◇ research: {tonnes(forResearch)}
                 </span>
               )}
             </div>
