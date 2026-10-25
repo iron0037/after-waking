@@ -1,6 +1,7 @@
 /** Canvas rendering for the system orrery. Pure drawing: no state, no side effects but the hit list. */
 import {
   bodyPosition,
+  burnPath,
   dist,
   formatDate,
   foldEdgeFraction,
@@ -8,6 +9,7 @@ import {
   SPECTRAL,
   type Body,
   type BodyProgress,
+  type BurnPath,
   type Contract,
   type FlightPlan,
   type FlightTarget,
@@ -471,8 +473,7 @@ function drawTooltip(ctx: CanvasRenderingContext2D, scene: Scene, body: Body, p:
 // --- route and ship ----------------------------------------------------------------------
 
 interface Leg {
-  startReal: Vec2;
-  endReal: Vec2;
+  path: BurnPath;
   startOff: Vec2;
   endOff: Vec2;
 }
@@ -482,11 +483,11 @@ function makeLeg(proj: Projection, scene: Scene): Leg {
   const find = (id: string) => scene.detail.bodies.find((b) => b.id === id) as Body;
   const startOff = route.startBodyId ? proj.bodyOffset(find(route.startBodyId), route.startTime) : ZERO;
   const endOff = "bodyId" in route.target ? proj.bodyOffset(find(route.target.bodyId), route.startTime + route.plan.minutes) : ZERO;
-  return { startReal: route.startReal, endReal: route.plan.arrival, startOff, endOff };
+  return { path: burnPath(route.startReal, route.plan.arrival), startOff, endOff };
 }
 
 function legPoint(proj: Projection, leg: Leg, p: number): Vec2 {
-  const s = proj.toScreen({ x: lerp(leg.startReal.x, leg.endReal.x, p), y: lerp(leg.startReal.y, leg.endReal.y, p) });
+  const s = proj.toScreen(leg.path.at(p));
   return { x: s.x + lerp(leg.startOff.x, leg.endOff.x, p), y: s.y + lerp(leg.startOff.y, leg.endOff.y, p) };
 }
 

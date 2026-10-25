@@ -402,7 +402,7 @@ export function acceptContract(state: GameState, id: string): Result<Contract> {
   // Extensions (comms): the clans allow a quarter more time.
   c.deadline = state.time + c.durationDays * DAY * (hasPerk(state, "extensions") ? 1.25 : 1);
   state.journal.push({ t: state.time, kind: "trade", text: `Signed with ${CLAN_NAMES[c.clan]}: "${c.title}". ${c.durationDays} days to deliver.` });
-  awardXp(state, "comms", 8);
+  // Experience comes when the job is done, not when it's signed.
   return ok(c);
 }
 
@@ -450,7 +450,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
   state.credits += pay;
   state.stats.earned += pay;
   state.journal.push({ t: state.time, kind: "trade", text: `Contract fulfilled: "${c.title}". ${CLAN_NAMES[c.clan]} paid ${pay.toLocaleString()} cr.` });
-  awardXp(state, "comms", 25);
+  awardXp(state, "comms", 33);
   awardXp(state, "captain", 25);
   bondClan(state, c.clan, 4);
   cheerAll(state, 2);

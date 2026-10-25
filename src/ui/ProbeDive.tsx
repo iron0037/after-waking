@@ -39,7 +39,8 @@ function Descent({ session }: { session: GameSession }) {
   const body = world.body(dive.bodyId).body;
   const link = LINK_STATUS[Math.min(LINK_STATUS.length - 1, Math.floor((dive.step / dive.events.length) * LINK_STATUS.length))];
   const km = diveDepthKm(dive.depth, dive.step);
-  const busy = session.busy;
+  // Only the time-lapse clock holds the decisions; the dive is modal, so nothing else can be animating.
+  const busy = session.timelapse !== null;
   return (
     <div class="overlay probe-overlay">
       <div class="probe-dive" role="dialog" aria-label="Probe descent">

@@ -133,7 +133,11 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     window.clearTimeout(timerRef.current);
     flightRef.current = null;
     setFlying(false);
-    session.act((s, w) => flyTo(s, w, f.route.target), { timelapse: false }); // the flight itself was animated
+    try {
+      session.act((s, w) => flyTo(s, w, f.route.target), { timelapse: false }); // the flight itself was animated
+    } finally {
+      session.setBusy(false);
+    }
     // The view keeps its zoom and pan through a burn: rebase a plain anchor onto the arrival time so
     // the bodies' flight-long drift isn't applied as a jump. A followed body is already continuous.
     const cam = cameraRef.current;

@@ -5,6 +5,7 @@
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
+import { burnPath } from "./burnpath";
 import { fuelPrice, sellCommodity, sellPrice } from "./economy";
 import { landingAccess } from "./environment";
 import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
@@ -291,10 +292,11 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
     let t = 0;
     arrival = bodyPosition(detail, body, state.time);
     for (let i = 0; i < 4; i++) {
-      t = travelMinutes(Math.hypot(arrival.x - from.x, arrival.y - from.y), stats.cruiseSpeedC) + MANEUVER_MINUTES;
+      t = travelMinutes(burnPath(from, arrival).length, stats.cruiseSpeedC) + MANEUVER_MINUTES;
       arrival = bodyPosition(detail, body, state.time + t);
     }
-    distanceAU = Math.hypot(arrival.x - from.x, arrival.y - from.y);
+    // Burns swing around the star rather than through it.
+    distanceAU = burnPath(from, arrival).length;
   }
 
   const minutes =

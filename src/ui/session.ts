@@ -118,7 +118,7 @@ export class GameSession {
   /** Make the call at the current probe decision point. After the last one, the descent plays out and a debrief follows. */
   chooseProbe(option: 0 | 1): void {
     const dive = this.state.probeDive;
-    if (!dive || this.busy) return;
+    if (!dive || this.timelapse) return;
     const bodyName = this.world.body(dive.bodyId).body.name;
     const res = this.act((s, w) => chooseProbeOption(s, w, option));
     if (!res.ok || !res.value.done || !res.value.result) return;

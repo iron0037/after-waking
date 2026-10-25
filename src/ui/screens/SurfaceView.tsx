@@ -445,8 +445,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     animRef.current = null;
     const last = pts[pts.length - 1] as Vec2;
     // The drive is already animated, so no time-lapse clock on top of it.
-    const result = session.act((s, w) => moveRoverTo(s, w, last.x, last.y), { timelapse: false });
-    session.setBusy(false);
+    let result: ReturnType<typeof moveRoverTo>;
+    try {
+      result = session.act((s, w) => moveRoverTo(s, w, last.x, last.y), { timelapse: false });
+    } finally {
+      session.setBusy(false);
+    }
     if (!result.ok) return false;
     const cut = result.value.stopped !== null || steps.length < path.length;
     if (cut) {
