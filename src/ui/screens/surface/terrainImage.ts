@@ -9,7 +9,19 @@
 import type { BodyKind, BodySurface } from "../../../sim";
 import { hexCorners, hexToPixel, REGION_SIZE, Terrain } from "../../../sim";
 import { TERRAIN_COLORS } from "../../palette";
-import { loadTextures, TEX, TEX_SCALE, texturesReady, tintedTexture } from "./terrainTextures";
+import {
+  DEPTH_STEPS,
+  depthGradient,
+  liquidRule,
+  loadTextures,
+  lushRule,
+  lushTexture,
+  TEX,
+  TEX_SCALE,
+  texturesReady,
+  tintedTexture,
+  waterDetail,
+} from "./terrainTextures";
 
 loadTextures();
 
@@ -31,6 +43,71 @@ function latticeValue(i: number, j: number): number {
   let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Spacing, in tiles, of the lattice the local sea level is measured on. */
+const SEA_NODE = 16;
+/** Tiles around a lattice node that are searched for shores (twice that if none is found). */
+const SEA_REACH = 24;
+const seaNodes = new WeakMap<BodySurface, Map<number, number>>();
+
+/**
+ * Sea level read off the map itself: the sim's liquid line drifts by up to +-0.15 across a planet, so the elevation
+ * where land meets liquid is measured (at each shore, midway between the liquid tile and its land neighbour) and
+ * averaged around a lattice node. NaN where there are no shores in reach. Depends only on the surface, never on the
+ * region being drawn, so neighbouring images agree.
+ */
+function seaNode(surface: BodySurface, ni: number, nj: number): number {
+  let cache = seaNodes.get(surface);
+  if (!cache) seaNodes.set(surface, (cache = new Map()));
+  const key = (nj + 4096) * 8192 + (ni + 4096);
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const cx = ni * SEA_NODE;
+  const cy = nj * SEA_NODE;
+  let value = Number.NaN;
+  for (let pass = 0; pass < 2 && Number.isNaN(value); pass++) {
+    const reach = SEA_REACH * (pass + 1);
+    const step = pass + 1;
+    let sum = 0;
+    let n = 0;
+    for (let y = cy - reach; y <= cy + reach; y += step) {
+      for (let x = cx - reach; x <= cx + reach; x += step) {
+        if (surface.terrainAt(x, y) !== Terrain.liquid) continue;
+        for (const [dx, dy] of NEAR) {
+          const t = surface.terrainAt(x + dx, y + dy);
+          if (t === null || t === Terrain.liquid) continue;
+          const e = surface.elevationAt(x, y);
+          const land = surface.elevationAt(x + dx, y + dy);
+          if (e === null || land === null) continue;
+          sum += (e + land) / 2;
+          n++;
+          break;
+        }
+      }
+    }
+    if (n >= 3) value = sum / n;
+  }
+  cache.set(key, value);
+  return value;
+}
+const NEAR: readonly (readonly [number, number])[] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+/** Local sea level at a tile: the shore-measured level, blended between lattice nodes (`fallback` where none is known). */
+function seaLevelAt(surface: BodySurface, gx: number, gy: number, fallback: number): number {
+  const fx = gx / SEA_NODE;
+  const fy = gy / SEA_NODE;
+  const i = Math.floor(fx);
+  const j = Math.floor(fy);
+  const ax = fx - i;
+  const ay = fy - j;
+  const node = (a: number, b: number): number => {
+    const v = seaNode(surface, a, b);
+    return Number.isNaN(v) ? fallback : v;
+  };
+  const top = node(i, j) * (1 - ax) + node(i + 1, j) * ax;
+  const bot = node(i, j + 1) * (1 - ax) + node(i + 1, j + 1) * ax;
+  return top * (1 - ay) + bot * ay;
 }
 
 function parseHex(hex: string): [number, number, number] {
@@ -89,6 +166,13 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
   if (!ctx) return out;
   const palette = TERRAIN_COLORS[kind].map(parseHex);
   const textures = [0, 1, 2, 3, 4, 5].map((t) => tintedTexture(kind, t));
+  // Verdant plains (steppe blends to lush meadow near the water) and liquid shaded by depth.
+  const lush = lushRule({ kind, life: surface.body.life, tempC: surface.body.tempC });
+  const lushTex = lush ? lushTexture(kind) : null;
+  const water = liquidRule(kind);
+  const depthColors = depthGradient(kind);
+  const waterTex = waterDetail();
+  const hasSea = kind === "terrestrial" || kind === "ocean";
   const image = ctx.createImageData(canvas.width, canvas.height);
 
   // Elevation around the region (with a pad from the neighbours, so the hillshade runs on across the seams).
@@ -188,9 +272,11 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
     for (let gx = tx0; gx <= tx1; gx++) {
       const t = surface.terrainAt(gx, gy);
       if (t === null) continue; // a gap in a partly empty last row of regions
-      const flat = t === Terrain.liquid || t === Terrain.lava ? 0.25 : 1;
+      const flat = t === Terrain.liquid || t === Terrain.lava ? 0.25 : t === Terrain.ice ? 0.6 : 1;
       const [r, g, b] = palette[t] as [number, number, number];
       const tex = textures[t] ?? null;
+      // Local sea level, for depth and for how far above the water the ground lies.
+      const sea = hasSea && (t === Terrain.liquid || (t === Terrain.plain && lush)) ? seaLevelAt(surface, gx, gy, water.level) : water.level;
       const c = hexToPixel(gx, gy, HEX);
       const x0 = Math.max(px0, Math.floor(c.x - hexW / 2));
       const x1 = Math.min(px1 - 1, Math.ceil(c.x + hexW / 2));
@@ -204,16 +290,44 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
           const e = at(px, py);
           // Light from the north-west: slopes that rise away from it catch more light.
           const slope = (at(px + D, py) - at(px - D, py) + (at(px, py + D) - at(px, py - D))) * slopeScale;
-          const shade = Math.min(1.25, Math.max(0.68, 0.72 + 0.5 * e + slope * 3 * flat));
+          let shade = Math.min(1.25, Math.max(0.68, 0.72 + 0.5 * e + slope * 3 * flat));
           const i = ((py - py0) * canvas.width + (px - px0)) * 4;
-          if (tex) {
+          if (tex && t === Terrain.liquid && waterTex) {
+            // Depth: how far the smooth elevation lies below the liquid line, from pale shallows to a dark deep. The
+            // water is lit only a little by the relief, so the depth tone is what shows.
+            const depth = Math.min(1, Math.max(0, (sea - e) / water.range));
+            const k = Math.round(depth * (DEPTH_STEPS - 1)) * 3;
+            const ti = (texRow[py - py0] as number) + (texCol[px - px0] as number);
+            const s = (1 + (drift(px, py) - 1) * 0.3) * (waterTex[ti] as number) * (0.95 + 0.05 * shade);
+            image.data[i] = Math.min(255, (depthColors[k] as number) * s);
+            image.data[i + 1] = Math.min(255, (depthColors[k + 1] as number) * s);
+            image.data[i + 2] = Math.min(255, (depthColors[k + 2] as number) * s);
+          } else if (tex) {
             // Texture sampled in planet-wide pixel space (so it runs on across hexes, regions and seams), under
             // the relief shading and a slow drift that hides the repeat.
             const ti = ((texRow[py - py0] as number) + (texCol[px - px0] as number)) * 3;
-            const s = shade * drift(px, py);
-            image.data[i] = Math.min(255, (tex[ti] as number) * s);
-            image.data[i + 1] = Math.min(255, (tex[ti + 1] as number) * s);
-            image.data[i + 2] = Math.min(255, (tex[ti + 2] as number) * s);
+            let s = drift(px, py);
+            // Ice and snow: calmer relief and drift, so extended sheets stay clean and markers stand out.
+            if (t === Terrain.ice) {
+              s = 1 + (s - 1) * 0.5;
+              shade = 1 + (shade - 1) * 0.6;
+            }
+            s *= shade;
+            let r0 = tex[ti] as number;
+            let g0 = tex[ti + 1] as number;
+            let b0 = tex[ti + 2] as number;
+            if (lushTex && lush && t === Terrain.plain) {
+              // Plains near the water are lush meadow, easing into steppe as the ground rises.
+              const w = Math.min(1, Math.max(0, (lush.to - (e - sea)) / (lush.to - lush.from)));
+              if (w > 0) {
+                r0 += ((lushTex[ti] as number) - r0) * w;
+                g0 += ((lushTex[ti + 1] as number) - g0) * w;
+                b0 += ((lushTex[ti + 2] as number) - b0) * w;
+              }
+            }
+            image.data[i] = Math.min(255, r0 * s);
+            image.data[i + 1] = Math.min(255, g0 * s);
+            image.data[i + 2] = Math.min(255, b0 * s);
           } else {
             image.data[i] = Math.min(255, r * shade);
             image.data[i + 1] = Math.min(255, g * shade);
