@@ -72,6 +72,47 @@ export const CLAN_TRAITS: Record<ClanId, ClanTraits> = {
   freebooters: { affinity: [], trait: "Freebooter: works cheap, asks no questions", wage: 0.8 },
 };
 
+/**
+ * Upbringing (AW-14): the second half of a background, after clan. It follows from when someone
+ * was born relative to the Waking (AW 0): sleepers woke at the age they went under; everyone
+ * younger than thirty was born after it, on the Intrepid's decks or out on a settlement.
+ */
+export type UpbringingId = "decks" | "settlement" | "cryoChild" | "earth";
+
+export interface Upbringing {
+  name: string;
+  /** Who they are, for the roster. */
+  text: string;
+  /** What it does, in a few words. */
+  effect: string;
+}
+
+export const UPBRINGINGS: Record<UpbringingId, Upbringing> = {
+  decks: {
+    name: "Decks-born",
+    text: "Born after the Waking and raised on the Intrepid's lower decks; knows everyone aboard.",
+    effect: "Shore leave lifts their mood 50% faster.",
+  },
+  settlement: {
+    name: "Settlement-raised",
+    text: "Born after the Waking and raised on one of the young settlements, where the sky is real and nothing comes easy.",
+    effect: "Long hauls wear on them half as much.",
+  },
+  cryoChild: {
+    name: "Cryo-child",
+    text: "Went under as a child and woke among strange stars; grew up learning everything twice.",
+    effect: "+10% experience.",
+  },
+  earth: {
+    name: "Remembers Earth",
+    text: "Went under as an adult. Remembers blue skies and why they left, and doesn't rattle easily.",
+    effect: "Loyalty slips half as fast.",
+  },
+};
+
+/** Sleepers who were at least this old when they went under remember Earth as adults. */
+export const EARTH_MEMORY_AGE = 12;
+
 export const FIRST_NAMES = [
   "Ada", "Bram", "Celia", "Dario", "Esme", "Farid", "Greta", "Hollis", "Ines", "Jory",
   "Kaito", "Lena", "Marek", "Nia", "Oren", "Priya", "Quill", "Rosa", "Silas", "Tova",

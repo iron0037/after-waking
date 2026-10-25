@@ -3,7 +3,7 @@
  * overlay for looking at the crew away from the Intrepid. Rules and numbers live in src/sim/crew.
  */
 import { useState } from "preact/hooks";
-import { CLAN_TRAITS, STATION_INFO, STATIONS, type Station } from "../data/crew";
+import { CLAN_TRAITS, STATION_INFO, STATIONS, UPBRINGINGS, type Station } from "../data/crew";
 import { PERKS_BY_ID } from "../data/perks";
 import { CLAN_NAMES } from "../data/ship";
 import {
@@ -17,6 +17,7 @@ import {
   hireRecruit,
   isMiserable,
   levelForXp,
+  upbringingOf,
   levelProgress,
   MAX_CREW_SHARE,
   MAX_LEVEL,
@@ -60,6 +61,16 @@ function LevelMeter({ xp }: { xp: number }) {
   );
 }
 
+/** Upbringing: the second half of a background (born after the Waking, or a sleeper). Hover for who they are and what it does. */
+function UpbringingTag({ m }: { m: CrewMember }) {
+  const up = UPBRINGINGS[upbringingOf(m)];
+  return (
+    <span class="tag" title={`${up.text}\n${up.effect}`}>
+      {up.name}
+    </span>
+  );
+}
+
 function ClanLine({ m }: { m: CrewMember }) {
   return (
     <div class="crew-clan">
@@ -70,6 +81,7 @@ function ClanLine({ m }: { m: CrewMember }) {
         </span>
       )}
       <span class="muted small">{CLAN_TRAITS[m.clan].trait}</span>
+      <UpbringingTag m={m} />
     </div>
   );
 }

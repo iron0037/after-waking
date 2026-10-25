@@ -159,6 +159,16 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
   - Five recruits, and the pool turns over every 30 days.
   - About half come from a clan that trains for their post; they start a level higher and learn faster.
   - Signing costs 15 days' wages. The new officer replaces the current one, who goes ashore.
+- **Upbringing [DECIDED 2026-10-25]** (the second half of a background, after clan). It follows from when someone was born relative to the Waking (AW 0), and it's fixed for life:
+
+  | Upbringing | Who | Effect |
+  |---|---|---|
+  | Decks-born | born after the Waking, raised aboard the Intrepid | shore leave lifts their mood 50% faster |
+  | Settlement-raised | born after the Waking, raised on a settlement (about a third of the Waking-born) | long hauls wear on them half as much |
+  | Cryo-child | went under before age 12 | +10% experience |
+  | Remembers Earth | went under at 12 or older | loyalty slips half as fast |
+
+  Officers range from their early twenties to about sixty, so sleepers are the majority, as they would be thirty years after the Waking.
 - **Later slices:** perk trees with three branches per station; aging, retirement and mentoring; injuries.
 - **The captain's own tree:** Trader / Explorer / Diplomat / Commander. This shapes playstyle and endings.
 - **Scope target:** 6 stations × 3 branches × about 5 perks, plus traits.

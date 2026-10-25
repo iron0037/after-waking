@@ -14,12 +14,14 @@ import {
   SURNAMES,
   type OfficerStation,
   type Station,
+  EARTH_MEMORY_AGE,
+  type UpbringingId,
 } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { fail, ok, type Result } from "./result";
 import { cheer, ensureSentiment, isMiserable } from "./sentiment";
 import { autoSpendPerks, crossTrainingLevels, hasPerk, MAX_EFFECTIVE_LEVEL } from "./perks";
-import { rngFor, type Rng } from "./rng";
+import { hashSeed, rngFor, type Rng } from "./rng";
 import type { GameState } from "./state";
 import { DAY, YEAR } from "./units";
 
@@ -58,6 +60,17 @@ export const BASE_WAGE = 30;
 export const WAGE_PER_LEVEL = 0.07;
 /** Extra experience in a clan's trained stations. */
 export const AFFINITY_XP = 1.25;
+/** Cryo-children learn a little faster. */
+export const CRYO_CHILD_XP = 1.1;
+
+/**
+ * Where someone grew up, from when they were born relative to the Waking (time 0). Fixed for life.
+ * Born before it: a sleeper, who woke at the age they went under. Born after: decks or settlement.
+ */
+export function upbringingOf(m: Pick<CrewMember, "id" | "name" | "born">): UpbringingId {
+  if (m.born < 0) return -m.born / YEAR >= EARTH_MEMORY_AGE ? "earth" : "cryoChild";
+  return hashSeed(m.id, m.name, "upbringing") % 3 === 0 ? "settlement" : "decks";
+}
 /** How often the hiring hall's pool turns over. */
 export const RECRUIT_POOL_DAYS = 30;
 export const RECRUIT_POOL_SIZE = 5;
@@ -117,7 +130,8 @@ export function awardXp(state: GameState, station: Station, amount: number): voi
   const m = officerAt(state, station);
   if (!m) return;
   const before = levelForXp(m.xp);
-  m.xp += amount * boost * (CLAN_TRAITS[m.clan].affinity.includes(station) ? AFFINITY_XP : 1);
+  m.xp +=
+    amount * boost * (CLAN_TRAITS[m.clan].affinity.includes(station) ? AFFINITY_XP : 1) * (upbringingOf(m) === "cryoChild" ? CRYO_CHILD_XP : 1);
   const after = levelForXp(m.xp);
   if (after > before) {
     state.journal.push({
@@ -272,8 +286,8 @@ function newPerson(rng: Rng, id: string, station: OfficerStation, clan: ClanId, 
     name: `${rng.pick(FIRST_NAMES)} ${rng.pick(SURNAMES)}`,
     station,
     clan,
-    // Veterans skew older.
-    born: now - Math.round((22 + level * 2.5 + rng.range(0, 10)) * YEAR),
+    // Veterans skew older; plenty of sleepers who woke as adults still sign on.
+    born: now - Math.round((22 + level * 2.5 + rng.range(0, 22)) * YEAR),
     xp: lo + Math.floor(rng.range(0, 0.5) * span),
   };
 }

@@ -12,7 +12,7 @@
  */
 import { OFFICER_STATIONS, STATION_INFO, type OfficerStation } from "../data/crew";
 import type { ClanId } from "../data/ship";
-import { levelForXp, wageOf, type CrewMember } from "./crew";
+import { levelForXp, upbringingOf, wageOf, type CrewMember } from "./crew";
 import { hasPerk } from "./perks";
 import { ok, type Result } from "./result";
 import type { GameState } from "./state";
@@ -109,14 +109,17 @@ export function tickSentiment(state: GameState, minutes: number): void {
   const leave = SHORE_LEAVE_PER_DAY * (hasPerk(state, "morale") ? 2 : 1);
   for (const m of state.crew) {
     ensureSentiment(m);
+    // Upbringing (AW-14): decks-born love shore leave, settlers shrug off long hauls, Earth's sleepers stay steady.
+    const up = upbringingOf(m);
     let h = m.happiness as number;
     // Happiness is about recent events: it relaxes back toward a neutral mood over a few weeks.
     h += (HAPPINESS_BASELINE - h) * (1 - Math.exp(-HAPPINESS_RELAX_PER_DAY * days));
-    if (docked && h < SHORE_LEAVE_CAP) h = Math.min(SHORE_LEAVE_CAP, h + leave * days);
-    if (!docked && away > LONG_HAUL_DAYS) h -= LONG_HAUL_PER_DAY * Math.min(days, away - LONG_HAUL_DAYS);
+    if (docked && h < SHORE_LEAVE_CAP) h = Math.min(SHORE_LEAVE_CAP, h + leave * (up === "decks" ? 1.5 : 1) * days);
+    if (!docked && away > LONG_HAUL_DAYS) h -= LONG_HAUL_PER_DAY * (up === "settlement" ? 0.5 : 1) * Math.min(days, away - LONG_HAUL_DAYS);
     m.happiness = clamp(h);
     const drift = ((m.happiness - 50) / 50) * LOYALTY_DRIFT_PER_DAY * days;
-    m.loyalty = clamp((m.loyalty as number) + drift * (drift > 0 && hasPerk(state, "loyalty") ? 1.5 : 1));
+    const mult = drift > 0 ? (hasPerk(state, "loyalty") ? 1.5 : 1) : up === "earth" ? 0.5 : 1;
+    m.loyalty = clamp((m.loyalty as number) + drift * mult);
   }
 }
 
