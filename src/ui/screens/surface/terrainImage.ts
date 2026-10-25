@@ -9,6 +9,9 @@
 import type { BodyKind, BodySurface } from "../../../sim";
 import { hexCorners, hexToPixel, REGION_SIZE, Terrain } from "../../../sim";
 import { TERRAIN_COLORS } from "../../palette";
+import { loadTextures, TEX, TEX_SCALE, texturesReady, tintedTexture } from "./terrainTextures";
+
+loadTextures();
 
 /** Hex circumradius, in pixels, of the offscreen images. */
 export const HEX = 14;
@@ -20,6 +23,15 @@ const ROW_H = SQRT3 / 2;
 const MARGIN = 1;
 /** Extra elevation samples beyond the margin that the hillshade's slope reads. */
 const ELEV_PAD = MARGIN + 2;
+/** Wavelength, in HEX pixels, of the slow brightness drift laid over textures so their repeat doesn't show. */
+const DRIFT = 53;
+
+/** Deterministic lattice value in [0, 1) for the slow drift. */
+function latticeValue(i: number, j: number): number {
+  let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 function parseHex(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
@@ -76,6 +88,7 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
   const ctx = canvas.getContext("2d");
   if (!ctx) return out;
   const palette = TERRAIN_COLORS[kind].map(parseHex);
+  const textures = [0, 1, 2, 3, 4, 5].map((t) => tintedTexture(kind, t));
   const image = ctx.createImageData(canvas.width, canvas.height);
 
   // Elevation around the region (with a pad from the neighbours, so the hillshade runs on across the seams).
@@ -143,12 +156,41 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
   const slopeScale = hexW / (2 * D);
   const at = (px: number, py: number): number => E[(py - py0 + D) * bw + (px - px0 + D)] as number;
 
+  // Texture lookups: texel column/row per image pixel, and the slow drift's lattice (looked up, not hashed, per pixel).
+  const texCol = new Int32Array(canvas.width);
+  const texRow = new Int32Array(canvas.height);
+  const wrap = (v: number): number => ((Math.floor(v / TEX_SCALE) % TEX) + TEX) % TEX;
+  for (let x = 0; x < canvas.width; x++) texCol[x] = wrap(px0 + x);
+  for (let y = 0; y < canvas.height; y++) texRow[y] = wrap(py0 + y) * TEX;
+  const dx0 = Math.floor(px0 / DRIFT);
+  const dy0 = Math.floor(py0 / DRIFT);
+  const dw = Math.ceil(canvas.width / DRIFT) + 2;
+  const dh = Math.ceil(canvas.height / DRIFT) + 2;
+  const lattice = new Float32Array(dw * dh);
+  for (let j = 0; j < dh; j++) for (let i = 0; i < dw; i++) lattice[j * dw + i] = latticeValue(dx0 + i, dy0 + j);
+  /** Slow brightness drift (about +-9%), value noise in planet-wide pixels. */
+  const drift = (px: number, py: number): number => {
+    const fx = px / DRIFT - dx0;
+    const fy = py / DRIFT - dy0;
+    const ix = Math.floor(fx);
+    const iy = Math.floor(fy);
+    const ax = fx - ix;
+    const ay = fy - iy;
+    const sx = ax * ax * (3 - 2 * ax);
+    const sy = ay * ay * (3 - 2 * ay);
+    const k = iy * dw + ix;
+    const top = (lattice[k] as number) + ((lattice[k + 1] as number) - (lattice[k] as number)) * sx;
+    const bot = (lattice[k + dw] as number) + ((lattice[k + dw + 1] as number) - (lattice[k + dw] as number)) * sx;
+    return 0.91 + 0.18 * (top + (bot - top) * sy);
+  };
+
   for (let gy = ty0; gy <= ty1; gy++) {
     for (let gx = tx0; gx <= tx1; gx++) {
       const t = surface.terrainAt(gx, gy);
       if (t === null) continue; // a gap in a partly empty last row of regions
       const flat = t === Terrain.liquid || t === Terrain.lava ? 0.25 : 1;
       const [r, g, b] = palette[t] as [number, number, number];
+      const tex = textures[t] ?? null;
       const c = hexToPixel(gx, gy, HEX);
       const x0 = Math.max(px0, Math.floor(c.x - hexW / 2));
       const x1 = Math.min(px1 - 1, Math.ceil(c.x + hexW / 2));
@@ -164,9 +206,19 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
           const slope = (at(px + D, py) - at(px - D, py) + (at(px, py + D) - at(px, py - D))) * slopeScale;
           const shade = Math.min(1.25, Math.max(0.68, 0.72 + 0.5 * e + slope * 3 * flat));
           const i = ((py - py0) * canvas.width + (px - px0)) * 4;
-          image.data[i] = Math.min(255, r * shade);
-          image.data[i + 1] = Math.min(255, g * shade);
-          image.data[i + 2] = Math.min(255, b * shade);
+          if (tex) {
+            // Texture sampled in planet-wide pixel space (so it runs on across hexes, regions and seams), under
+            // the relief shading and a slow drift that hides the repeat.
+            const ti = ((texRow[py - py0] as number) + (texCol[px - px0] as number)) * 3;
+            const s = shade * drift(px, py);
+            image.data[i] = Math.min(255, (tex[ti] as number) * s);
+            image.data[i + 1] = Math.min(255, (tex[ti + 1] as number) * s);
+            image.data[i + 2] = Math.min(255, (tex[ti + 2] as number) * s);
+          } else {
+            image.data[i] = Math.min(255, r * shade);
+            image.data[i + 1] = Math.min(255, g * shade);
+            image.data[i + 2] = Math.min(255, b * shade);
+          }
           image.data[i + 3] = 255;
         }
       }
@@ -240,6 +292,8 @@ interface CacheEntry {
   painted: RegionImage | null;
   /** The fog state `painted` was composed for. */
   paintedSig: string;
+  /** Whether the terrain image was drawn with textures (it is rebuilt if they finish loading later). */
+  textured: boolean;
 }
 
 /** Most region images kept at once (three canvases each, a few MB apiece). */
@@ -266,6 +320,10 @@ export class TerrainCache {
 
   private entry(region: number, force: boolean): CacheEntry | null {
     let e = this.entries.get(region);
+    if (e && !e.textured && texturesReady() && (force || this.budget > 0)) {
+      this.entries.delete(region); // built before the textures arrived: draw it again with them
+      e = undefined;
+    }
     if (e) {
       // Refresh its place in the LRU order.
       this.entries.delete(region);
@@ -275,7 +333,7 @@ export class TerrainCache {
     if (!force && this.budget <= 0) return null;
     this.budget--;
     const terrain = buildTerrainImage(this.surface, region, this.kind);
-    e = { terrain, fogged: buildFoggedImage(terrain), painted: null, paintedSig: "" };
+    e = { terrain, fogged: buildFoggedImage(terrain), painted: null, paintedSig: "", textured: texturesReady() };
     this.entries.set(region, e);
     while (this.entries.size > CACHE_LIMIT) {
       const oldest = this.entries.keys().next().value;
