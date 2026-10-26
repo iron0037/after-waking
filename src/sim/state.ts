@@ -22,6 +22,7 @@ import type { RegionKnowledge } from "./surface";
 import { formatDate, GAME_START } from "./time";
 import { DAY, YEAR, type Vec2 } from "./units";
 import { World } from "./world";
+import { WORLD_GEN_LATEST } from "./bodies";
 
 export const SAVE_VERSION = 1;
 
@@ -117,6 +118,8 @@ export interface GameState {
   atmoReadings?: Record<string, number[]>;
   /** Research projects commissioned at the Intrepid (AW-15), by project id. */
   research?: Record<string, ResearchRecord>;
+  /** Which world generator built this universe (AW-145). Old saves without it are generation 1. */
+  worldGen?: number;
   /** 2 once the save uses the slower clock (AW-142); older saves get their loan terms rescaled. */
   clock?: number;
   /** A raider's hail or a battle in progress (combat v1, M3). */
@@ -184,6 +187,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     foldReadyAt: GAME_START,
     visitedSystems: [],
     clock: 2,
+    worldGen: WORLD_GEN_LATEST,
     scannedBodies: [],
     surveyedBodies: [],
     payrollOwed: 0,
@@ -198,7 +202,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
   };
   // The first scouts charted the near stars: their scan records come with the ship's nav package,
   // and the home worlds were surveyed in detail.
-  const world = new World(seed);
+  const world = new World(seed, WORLD_GEN_LATEST);
   for (const sys of world.galaxy.systems) {
     if (!sys.charted) continue;
     for (const body of world.system(sys.id).bodies) {

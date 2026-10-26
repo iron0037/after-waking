@@ -248,6 +248,23 @@ Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives ca
 
 **Balance target.** An honest freighter that pays costs about 5% of career income; a fitted ship that fights well breaks even or profits on bounties. The bot pays by default, so the career report measures the cost.
 
+## Star Systems: World Generation 2 **[DECIDED 2026-10-26] (AW-145)**
+Generation 1 gave every star our Solar System's layout: small rocky worlds inside the frost line, giants outside. The exoplanet surveys say otherwise, so new games use generation 2. Saves remember which generator built their universe (`state.worldGen`; old saves are generation 1), so a game in progress never reshuffles.
+
+- **What the surveys found:**
+  - Small planets (super-Earths and sub-Neptunes) are the most common, mostly well inside 1 AU.
+  - They often sit in compact "peas in a pod" systems of similar, evenly spaced worlds.
+  - Red dwarfs host a couple of small planets each but rarely giants.
+  - Hot Jupiters are rare (about 1% of Sun-like stars).
+  - Giants are likelier around heavier stars.
+- **Architectures** (weights by star class, in `bodies.ts`): compact, solar-like, hot Jupiter, warm Jupiter, sparse, giants-dominated. Red dwarfs are 60% compact; A stars lean to giants. Hot Jupiters run a little above the real rate, for variety.
+- **Mini-Neptunes** (2-4 Earth radii, no surface) are a common planet type; probes can dive them like ice giants.
+- **The habitable zone scales with the star:** a world gets Earth's sunlight at sqrt(L) AU, so a red dwarf's temperate band is a few hundredths of an AU out. Radiation is measured against that distance too, so close-in red-dwarf worlds aren't all lethal.
+- **Planets are numbered in order from the star,** and the fold limit hugs the outermost world (compact systems are tiny).
+- **Home systems** stay solar-like with three easy worlds, and the Meadow is always a real planet near a mild orbit (in generation 1 it could land on a belt asteroid).
+
+Career report: no broke careers; novice and competent income about where they were.
+
 ## Settled Answers (2026-10-21)
 1. **Fold arrival:** at the system's edge (the outermost planet's orbit).
 2. **Landing:** the freighter lands. A dropship comes later for heavy freighters.

@@ -36,6 +36,14 @@ const SEED = 42;
 
 /** A landable world with a seabed deposit that's reachable by water from a shore the ship can stand on. */
 function seaScenario(): { world: World; state: GameState; body: Body; region: number; key: string; shore: Vec2 } {
+  for (const seed of [SEED, 7, 2026, 1, 2, 3, 4, 5]) {
+    const found = seaScenarioOn(seed);
+    if (found) return found;
+  }
+  throw new Error("no sea scenario on these seeds");
+}
+
+function seaScenarioOn(SEED: number): { world: World; state: GameState; body: Body; region: number; key: string; shore: Vec2 } | null {
   const world = new World(SEED);
   for (const sys of world.galaxy.systems) {
     for (const body of world.system(sys.id).bodies) {
@@ -64,7 +72,7 @@ function seaScenario(): { world: World; state: GameState; body: Body; region: nu
       }
     }
   }
-  throw new Error("no sea scenario on this seed");
+  return null;
 }
 
 describe("ocean worlds (AW-17)", () => {

@@ -25,6 +25,8 @@ export function deserialize(json: string): GameState {
   data.catalogedSpecies = [...new Set(data.catalogedSpecies.map((k) => k.split("|")[1] ?? k))];
   data.compendium ??= {};
   data.loan.prepaid ??= 0;
+  // Saves from before world generations existed were built by generation 1 (AW-145).
+  data.worldGen ??= 1;
   // The slower clock (AW-142): the Exchange note pays every 120 days at half the yearly rate.
   if ((data.clock ?? 1) < 2) {
     if (data.loan.intervalDays === 60) data.loan.intervalDays = 120;

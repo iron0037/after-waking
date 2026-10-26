@@ -187,13 +187,14 @@ export function exclusiveContract(rng: Rng, serial: number): Contract {
   };
 }
 
-const worldCache = new Map<number, World>();
-function worldFor(seed: number): World {
-  let w = worldCache.get(seed);
+const worldCache = new Map<string, World>();
+function worldFor(seed: number, gen: number): World {
+  const key = `${seed}:${gen}`;
+  let w = worldCache.get(key);
   if (!w) {
-    w = new World(seed);
+    w = new World(seed, gen);
     worldCache.clear();
-    worldCache.set(seed, w);
+    worldCache.set(key, w);
   }
   return w;
 }
@@ -204,7 +205,7 @@ function worldFor(seed: number): World {
  * down on their luck always has a way to earn. One on the board at a time.
  */
 export function standingSurvey(state: GameState, rng: Rng, serial: number): Contract | null {
-  const world = worldFor(state.seed);
+  const world = worldFor(state.seed, state.worldGen ?? 1);
   const surveyed = new Set(state.surveyedBodies ?? []);
   const claimed = new Set((state.contracts ?? []).filter((c) => c.status === "active" || c.status === "offered").flatMap((c) => c.surveyBodyIds ?? []));
   const all = world.galaxy.systems
@@ -276,7 +277,7 @@ const PROBE_SURVEY_PAY = [0, 1_500, 3_500, 6_000, 9_000];
 
 /** An atmospheric survey: dive a named giant to a depth band and bring the probe back. */
 export function probeSurveyContract(state: GameState, rng: Rng, serial: number): Contract | null {
-  const world = worldFor(state.seed);
+  const world = worldFor(state.seed, state.worldGen ?? 1);
   const range = effectiveStats(state).foldRangeLy;
   const giants = world.galaxy.systems
     .filter((s) => s.charted && distanceLy(world.galaxy, "intrepid", s.id) <= range)

@@ -99,7 +99,7 @@ export class GameSession {
 
   constructor(
     public state: GameState,
-    public world: World = new World(state.seed),
+    public world: World = new World(state.seed, state.worldGen ?? 1),
   ) {
     migrateSurfaceCoords(state, this.world);
     this.view = defaultView(state);

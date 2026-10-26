@@ -82,8 +82,12 @@ function onSurface(seed = 42): { state: GameState; world: World; bodyId: string 
   const world = new World(seed);
   const state = newGame({ seed });
   expect(fold(state, world, "s0").ok).toBe(true);
-  const body = world.system("s0").bodies.find((b) => b.easy && b.life && landingAccess(b, BASE_STATS.ratings).ok)
-    ?? world.system("s0").bodies.find((b) => b.easy && landingAccess(b, BASE_STATS.ratings).ok)!;
+  // An easy world (living if possible) whose first region has a few seams the stock drill can reach.
+  const ok = (b: { id: string }) =>
+    world.surface(b.id).deposits(0).filter((d) => !d.hidden && d.depthM <= BASE_STATS.drillMaxDepthM && d.tonnes > 40).length >= 1 &&
+    world.surface(b.id).deposits(0).filter((d) => !d.hidden).length >= 2;
+  const easy = world.system("s0").bodies.filter((b) => b.easy && landingAccess(b, BASE_STATS.ratings).ok);
+  const body = easy.find((b) => b.life && ok(b)) ?? easy.find(ok) ?? easy[0]!;
   expect(flyTo(state, world, { bodyId: body.id }).ok).toBe(true);
   return { state, world, bodyId: body.id };
 }

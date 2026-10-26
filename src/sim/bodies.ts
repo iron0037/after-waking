@@ -5,7 +5,7 @@
  */
 import { ORE_IDS, type CommodityId } from "../data/commodities";
 import { moonSuffix, roman } from "../data/names";
-import type { StarSystem } from "./galaxy";
+import type { SpectralClass, StarSystem } from "./galaxy";
 import { rngFor, type Rng } from "./rng";
 import { clamp, DAY, type Vec2 } from "./units";
 
@@ -101,9 +101,19 @@ interface Ctx {
   sys: StarSystem;
   rng: Rng;
   bodies: Body[];
+  /** World generation (see WORLD_GEN_LATEST). */
+  gen?: number;
 }
 
-export function generateSystem(galaxySeed: number, sys: StarSystem): SystemDetail {
+/**
+ * World generations. Saves remember which one built their universe, so a new generator never
+ * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
+ * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145).
+ */
+export const WORLD_GEN_LATEST = 2;
+
+export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
+  if (gen >= 2) return generateSystemV2(galaxySeed, sys);
   const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system", sys.id), bodies: [] };
   const { rng } = ctx;
   const frost = 2.7 * Math.sqrt(sys.luminosity);
@@ -130,7 +140,7 @@ export function generateSystem(galaxySeed: number, sys: StarSystem): SystemDetai
     a *= rng.range(1.45, 2.1);
   }
 
-  if (sys.home) makeHomely(ctx, galaxySeed);
+  if (sys.home) makeHomely(ctx, galaxySeed, 1);
   const outermost = Math.max(...ctx.bodies.filter((b) => b.parentId === null).map((b) => b.orbitAU));
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(1.5, outermost * 1.05), frostLineAU: frost };
 }
@@ -147,9 +157,10 @@ function orbitalPeriodDays(sys: StarSystem, a: number): number {
   return 365.25 * Math.sqrt((a * a * a) / sys.mass);
 }
 
-function makeInnerPlanet(ctx: Ctx, id: string, name: string, a: number): Body {
+function makeInnerPlanet(ctx: Ctx, id: string, name: string, a: number, radiusOverride?: number): Body {
   const { rng, sys } = ctx;
-  const radius = 0.25 + Math.pow(rng.next(), 1.5) * 1.6;
+  const rolled = 0.25 + Math.pow(rng.next(), 1.5) * 1.6;
+  const radius = radiusOverride ?? rolled;
   const gravity = radius * rng.range(0.8, 1.15);
   const teq = equilibriumK(sys, a);
 
@@ -296,7 +307,9 @@ function finishBody(ctx: Ctx, core: BodyCore): Body {
   const starAU = core.parentId === null ? core.orbitAU : ctx.bodies.find((b) => b.id === core.parentId)?.orbitAU ?? 1;
   const radiation = clamp(
     Math.round(
-      STAR_RADIATION[sys.spectral] / Math.sqrt(Math.max(0.05, starAU)) -
+      // Generation 2 measures distance against the star's habitable zone, so a red dwarf's close-in
+      // worlds aren't all lethal just for being a few hundredths of an AU out.
+      STAR_RADIATION[sys.spectral] / Math.sqrt(Math.max(0.05, (ctx.gen ?? 1) >= 2 ? starAU / Math.sqrt(sys.luminosity) : starAU)) -
         Math.log10(1 + p) * 1.2 +
         (parentIsGiant ? 1.5 : 0) +
         rng.range(-0.4, 0.4),
@@ -346,15 +359,17 @@ const HOME_ORES: readonly CommodityId[] = ["ironNickel", "copper", "titanium", "
  * Home systems were the first scouts' proving ground. Tame two or three worlds into calm,
  * landable mining grounds, and in the nearest home system, raise a garden world.
  */
-function makeHomely(ctx: Ctx, galaxySeed: number): void {
+function makeHomely(ctx: Ctx, galaxySeed: number, gen: number): void {
   const { rng, sys } = ctx;
   const solid = ctx.bodies.filter((b) => b.surface === "solid" || b.surface === "ice");
   // Prefer bodies that are already mild; moons and small worlds are easy to tame.
   const score = (b: Body) => Math.abs(b.gravityG - 0.5) + Math.max(0, b.radiation - 1) + (b.kind === "hothouse" ? 3 : 0);
   const picks = [...solid].sort((a, b) => score(a) - score(b)).slice(0, 3);
-  while (picks.length < 2) {
+  // Generation 2 promises three easy worlds per home system (new captains learn the trade there).
+  while (picks.length < (gen >= 2 ? 3 : 2)) {
     const n = ctx.bodies.filter((b) => b.parentId === null).length + 1;
-    const a = Math.max(0.4, Math.sqrt(sys.luminosity)) * rng.range(0.9, 1.4);
+    // Generation 2 sets the extra world near the star's habitable zone (1 AU is frozen dark around a red dwarf).
+    const a = gen >= 2 ? Math.sqrt(sys.luminosity) * rng.range(0.9, 1.4) : Math.max(0.4, Math.sqrt(sys.luminosity)) * rng.range(0.9, 1.4);
     const extra = finishBody(ctx, {
       id: `${sys.id}.p${n}`,
       name: `${sys.name} ${roman(n)}`,
@@ -390,7 +405,13 @@ function makeHomely(ctx: Ctx, galaxySeed: number): void {
   // The nearest home system holds the Meadow: a small living world the Lyceum studies.
   const first = ctx.sys.id === "s0";
   if (first) {
-    const garden = picks.find((b) => b.parentId === null) ?? (picks[0] as Body);
+    // Generation 2: the Meadow is a real planet (never a belt asteroid), the one nearest a mild climate.
+    const garden =
+      gen >= 2
+        ? ([...picks].filter((b) => b.parentId === null && b.kind !== "asteroid").sort((x, y) => Math.abs(x.tempC - 15) - Math.abs(y.tempC - 15))[0] ??
+          picks.find((b) => b.parentId === null) ??
+          (picks[0] as Body))
+        : (picks.find((b) => b.parentId === null) ?? (picks[0] as Body));
     garden.kind = "terrestrial";
     garden.surface = "solid";
     garden.radiusEarth = 0.8;
@@ -419,4 +440,177 @@ export function bodyPosition(detail: SystemDetail, body: Body, t: number): Vec2 
   if (body.parentId === null) return local;
   const parent = bodyPosition(detail, findBody(detail, body.parentId), t);
   return { x: parent.x + local.x, y: parent.y + local.y };
+}
+
+
+// --- generation 2: realistic architectures (AW-145) -------------------------------------------
+//
+// Kepler, K2 and radial-velocity surveys found that our Solar System's layout is one pattern among
+// several. Small planets (super-Earths and sub-Neptunes) are the most common, mostly well inside
+// 1 AU, often in compact "peas in a pod" systems of similar, evenly spaced worlds. Red dwarfs host
+// several small planets each but rarely giants. Hot Jupiters are rare (~1% of Sun-like stars; a
+// little more common here, for variety). Giants are likelier around heavier, brighter stars.
+
+export type Architecture = "compact" | "solar" | "hotJupiter" | "warmJupiter" | "sparse" | "giants";
+
+const ARCHITECTURES: Record<SpectralClass, readonly (readonly [Architecture, number])[]> = {
+  M: [["compact", 60], ["sparse", 25], ["solar", 10], ["warmJupiter", 5]],
+  K: [["compact", 40], ["solar", 32], ["sparse", 14], ["warmJupiter", 9], ["hotJupiter", 5]],
+  G: [["compact", 33], ["solar", 38], ["sparse", 13], ["warmJupiter", 10], ["hotJupiter", 6]],
+  F: [["solar", 40], ["compact", 22], ["warmJupiter", 15], ["hotJupiter", 8], ["sparse", 10], ["giants", 5]],
+  A: [["solar", 40], ["giants", 35], ["sparse", 20], ["hotJupiter", 5]],
+};
+
+type Slot = { a: number; type: "rock" | "superEarth" | "miniNeptune" | "giant" | "outer" | "belt" };
+
+/** Which architecture a system has (for the system panel and tests). */
+export function systemArchitecture(galaxySeed: number, sys: StarSystem): Architecture {
+  return rngFor(galaxySeed, "system2-arch", sys.id).weighted(ARCHITECTURES[sys.spectral]);
+}
+
+function generateSystemV2(galaxySeed: number, sys: StarSystem): SystemDetail {
+  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system2", sys.id), bodies: [], gen: 2 };
+  const { rng } = ctx;
+  // Around a star of luminosity L, a world gets Earth's sunlight at sqrt(L) AU; the frost line sits ~2.7x out.
+  const hz = Math.sqrt(sys.luminosity);
+  const frost = 2.7 * hz;
+  // Home systems are the first scouts' gentle proving grounds: solar-like, with room for easy worlds.
+  const arch: Architecture = sys.home ? "solar" : systemArchitecture(galaxySeed, sys);
+  const slots: Slot[] = [];
+  const small = (): Slot["type"] => rng.weighted([["rock", 40], ["superEarth", 35], ["miniNeptune", 25]] as const);
+
+  switch (arch) {
+    case "compact": {
+      // Peas in a pod: similar sizes, regular spacing, tucked in close.
+      const base = small();
+      let a = hz * rng.range(0.12, 0.3);
+      for (let i = rng.int(3, 7); i > 0; i--) {
+        slots.push({ a, type: rng.chance(0.75) ? base : small() });
+        a *= rng.range(1.3, 1.75);
+      }
+      if (rng.chance(sys.spectral === "M" ? 0.05 : 0.25)) slots.push({ a: frost * rng.range(1.2, 2.5), type: "giant" });
+      if (rng.chance(0.15)) slots.push({ a: a * rng.range(1.5, 3), type: "belt" });
+      break;
+    }
+    case "solar": {
+      let a = hz * rng.range(0.3, 0.6);
+      let belt = false;
+      for (let i = rng.int(3, sys.spectral === "M" ? 5 : 8); i > 0; i--) {
+        if (!belt && slots.length > 0 && rng.chance(a >= frost ? 0.25 : 0.12)) {
+          belt = true;
+          slots.push({ a, type: "belt" });
+        } else slots.push({ a, type: a >= frost ? "outer" : rng.chance(0.8) ? "rock" : "superEarth" });
+        a *= rng.range(1.45, 2.1);
+      }
+      break;
+    }
+    case "hotJupiter": {
+      slots.push({ a: hz * rng.range(0.04, 0.09), type: "giant" });
+      let a = frost * rng.range(1, 1.8);
+      for (let i = rng.int(0, 2); i > 0; i--) {
+        slots.push({ a, type: "outer" });
+        a *= rng.range(1.5, 2.2);
+      }
+      if (rng.chance(0.2)) slots.push({ a: a * rng.range(1.2, 1.8), type: "belt" });
+      break;
+    }
+    case "warmJupiter": {
+      const g = hz * rng.range(0.4, 1.5);
+      slots.push({ a: g, type: "giant" });
+      if (g > hz * 0.6 && rng.chance(0.6)) slots.push({ a: hz * rng.range(0.15, 0.35), type: small() });
+      let a = Math.max(g * rng.range(1.8, 2.5), frost);
+      for (let i = rng.int(0, 2); i > 0; i--) {
+        slots.push({ a, type: "outer" });
+        a *= rng.range(1.5, 2.2);
+      }
+      break;
+    }
+    case "sparse": {
+      let a = hz * rng.range(0.3, 1);
+      for (let i = rng.int(1, 3); i > 0; i--) {
+        slots.push({ a, type: a >= frost ? "outer" : rng.weighted([["rock", 35], ["superEarth", 30], ["miniNeptune", 25], ["giant", 10]] as const) });
+        a *= rng.range(1.8, 3.5);
+      }
+      break;
+    }
+    case "giants": {
+      if (rng.chance(0.3)) slots.push({ a: hz * rng.range(0.3, 0.7), type: "rock" });
+      let a = frost * rng.range(0.8, 1.2);
+      for (let i = rng.int(2, 4); i > 0; i--) {
+        slots.push({ a, type: rng.chance(0.65) ? "giant" : "outer" });
+        a *= rng.range(1.6, 2.4);
+      }
+      if (rng.chance(0.3)) slots.push({ a: a * rng.range(1.1, 1.5), type: "belt" });
+      break;
+    }
+  }
+
+  slots.sort((x, y) => x.a - y.a);
+  let planetNumber = 0;
+  let outerCount = 0;
+  let beltDone = false;
+  for (const slot of slots) {
+    const a = Math.max(0.012, slot.a);
+    if (slot.type === "belt") {
+      if (beltDone) continue;
+      beltDone = true;
+      addBelt(ctx, a);
+      continue;
+    }
+    planetNumber++;
+    const id = `${sys.id}.p${planetNumber}`;
+    const name = `${sys.name} ${roman(planetNumber)}`;
+    let planet: Body;
+    switch (slot.type) {
+      case "rock":
+        planet = makeInnerPlanet(ctx, id, name, a, rng.range(0.3, 1.25));
+        break;
+      case "superEarth":
+        planet = makeInnerPlanet(ctx, id, name, a, rng.range(1.25, 1.9));
+        break;
+      case "miniNeptune":
+        planet = makeMiniGiant(ctx, id, name, a, "iceGiant", rng.range(2, 3.8));
+        break;
+      case "giant":
+        // Hot Jupiters are puffed up by their star.
+        planet = makeMiniGiant(ctx, id, name, a, "gasGiant", a < hz * 0.15 ? rng.range(10, 15) : rng.range(6, 12));
+        break;
+      case "outer":
+        planet = makeOuterPlanet(ctx, id, name, a, outerCount++ === 0);
+        break;
+    }
+    ctx.bodies.push(planet);
+    addMoons(ctx, planet);
+  }
+
+  if (sys.home) makeHomely(ctx, galaxySeed, 2);
+  // Number the planets in order from the star (home-system extras are appended at the end).
+  const planets = ctx.bodies.filter((b) => b.parentId === null && b.kind !== "asteroid").sort((x, y) => x.orbitAU - y.orbitAU);
+  planets.forEach((p, i) => {
+    p.name = `${sys.name} ${roman(i + 1)}`;
+    p.moonIds.forEach((mid, j) => {
+      const moon = ctx.bodies.find((b) => b.id === mid);
+      if (moon) moon.name = `${p.name}-${moonSuffix(j)}`;
+    });
+  });
+  const outermost = Math.max(...ctx.bodies.filter((b) => b.parentId === null).map((b) => b.orbitAU));
+  // The fold limit hugs the outermost world: compact red-dwarf systems are tiny.
+  return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(outermost * 1.5, hz * 0.8, 0.06), frostLineAU: frost };
+}
+
+/** A gas giant or mini-Neptune at any distance (hot ones included). */
+function makeMiniGiant(ctx: Ctx, id: string, name: string, a: number, kind: "gasGiant" | "iceGiant", radius: number): Body {
+  const { rng, sys } = ctx;
+  return finishBody(ctx, {
+    id,
+    name,
+    kind,
+    parentId: null,
+    orbitAU: a,
+    periodDays: orbitalPeriodDays(sys, a),
+    radiusEarth: radius,
+    gravityG: kind === "gasGiant" ? rng.range(1.0, 2.8) : rng.range(0.8, 1.25),
+    pressureAtm: Infinity,
+    tempC: equilibriumK(sys, a) - 273,
+  });
 }

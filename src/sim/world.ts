@@ -3,7 +3,7 @@
  * rebuilt from GameState.seed on load.
  */
 import { BodySurface } from "./bodysurface";
-import { findBody, generateSystem, type Body, type SystemDetail } from "./bodies";
+import { findBody, generateSystem, type Body, type SystemDetail, WORLD_GEN_LATEST } from "./bodies";
 import { generateGalaxy, type Galaxy } from "./galaxy";
 import { generateRegion, type RegionMap } from "./surface";
 
@@ -16,7 +16,11 @@ export class World {
   private readonly regions = new Map<string, RegionMap>();
   private readonly surfaces = new Map<string, BodySurface>();
 
-  constructor(readonly seed: number) {
+  /** `gen`: which world generator built this universe (saves remember theirs; see WORLD_GEN_LATEST). */
+  constructor(
+    readonly seed: number,
+    readonly gen: number = WORLD_GEN_LATEST,
+  ) {
     this.galaxy = generateGalaxy(seed);
   }
 
@@ -25,7 +29,7 @@ export class World {
     if (!detail) {
       const sys = this.galaxy.systems.find((s) => s.id === systemId);
       if (!sys) throw new Error(`Unknown system ${systemId}`);
-      detail = generateSystem(this.seed, sys);
+      detail = generateSystem(this.seed, sys, this.gen);
       this.systems.set(systemId, detail);
     }
     return detail;
