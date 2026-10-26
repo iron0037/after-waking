@@ -1,0 +1,202 @@
+{
+ "model": "juggernautXL_v9Rdphoto2Lightning + pixel-art-xl-v1.1 LoRA, DPM++ SDE Karras, 8 steps, CFG 2, 768x768; ages derived with img2img from the 20s base",
+ "size": 768,
+ "negative": "3d render, photo, realistic, blurry, smooth shading, text, letters, watermark, signature, frame, border, helmet, visor, robot, android, cyborg, implant, mechanical parts, glowing eyes, glamorous, makeup, full body, multiple people, hands, landscape, scene",
+ "template": "pixel art, head and shoulders bust portrait of {who}, {age}, wearing {clothes}, three-quarter view, plain solid dark navy blue background, limited palette, soft even lighting from the left, crisp clean pixels, <lora:pixel-art-xl-v1.1:1>",
+ "ages": [
+  {
+   "band": 0,
+   "label": "20s",
+   "txt": "young adult in their twenties, {hair}",
+   "denoise": 0
+  },
+  {
+   "band": 1,
+   "label": "40s",
+   "txt": "(forty-five years old:1.3), (wrinkles on forehead:1.2), (crow feet:1.2), {style} with (grey streaks:1.3), tired eyes",
+   "denoise": 0.5
+  },
+  {
+   "band": 2,
+   "label": "50s",
+   "txt": "(fifty-five years old:1.4), (deeply lined face:1.3), (salt and pepper grey {style}:1.5), jowls, bags under eyes, weathered skin",
+   "denoise": 0.62
+  },
+  {
+   "band": 3,
+   "label": "60s+",
+   "txt": "(seventy-five years old:1.5), (very wrinkled face:1.4), (white {style}:1.6), thinning hair, sagging cheeks, age spots, elderly",
+   "denoise": 0.72
+  }
+ ],
+ "faces": [
+  {
+   "id": 0,
+   "clothes": "an olive green work jacket with a high collar",
+   "who": "a woman of West African descent, round face, broad nose",
+   "hair": "short natural black hair",
+   "style": "short natural hair"
+  },
+  {
+   "id": 1,
+   "clothes": "a grey canvas coverall with a zipped collar",
+   "who": "a man of Northern European descent, square jaw, light stubble",
+   "hair": "short sandy blond hair",
+   "style": "short hair"
+  },
+  {
+   "id": 2,
+   "clothes": "a muted rust orange work jacket",
+   "who": "a woman of East Asian descent, narrow eyes",
+   "hair": "black hair in a short bob",
+   "style": "short bob haircut"
+  },
+  {
+   "id": 3,
+   "clothes": "a dark teal coverall with a patched shoulder",
+   "who": "a man of South Asian descent",
+   "hair": "jet black hair, full black beard",
+   "style": "thick hair and a full beard"
+  },
+  {
+   "id": 4,
+   "clothes": "a mustard yellow work shirt with rolled collar",
+   "who": "a woman of Latin American descent, freckles",
+   "hair": "long dark brown hair tied back in a ponytail",
+   "style": "long hair tied back in a ponytail"
+  },
+  {
+   "id": 5,
+   "clothes": "a slate blue flight jacket",
+   "who": "a man of East African descent, high cheekbones",
+   "hair": "close cropped black hair, thin black moustache",
+   "style": "close cropped hair and a thin moustache"
+  },
+  {
+   "id": 6,
+   "clothes": "a faded green utility vest over a grey shirt",
+   "who": "a woman of Northern European descent, freckled pale skin",
+   "hair": "red hair in a messy bun",
+   "style": "hair in a messy bun"
+  },
+  {
+   "id": 7,
+   "clothes": "a sand brown work jacket with patched collar",
+   "who": "a man of Middle Eastern descent, strong brow",
+   "hair": "short curly black hair, neat short black beard",
+   "style": "short curly hair and a neat short beard"
+  },
+  {
+   "id": 8,
+   "clothes": "a maroon coverall with a mandarin collar",
+   "who": "a woman of South Asian descent, large dark eyes",
+   "hair": "long black braid over one shoulder",
+   "style": "long braid over one shoulder"
+  },
+  {
+   "id": 9,
+   "clothes": "a grey hooded work jacket",
+   "who": "a man of East Asian descent, round face, wide smile",
+   "hair": "short spiky black hair",
+   "style": "short spiky hair"
+  },
+  {
+   "id": 10,
+   "clothes": "an orange safety coverall collar",
+   "who": "a man of West African descent, wide shoulders",
+   "hair": "shaved head, short black beard",
+   "style": "shaved head and short beard"
+  },
+  {
+   "id": 11,
+   "clothes": "a navy blue worn sweater with a grey collar",
+   "who": "a woman of Southern European descent, strong nose",
+   "hair": "wavy dark brown hair to the chin",
+   "style": "wavy chin-length hair"
+  },
+  {
+   "id": 12,
+   "clothes": "a brown leather work jacket",
+   "who": "a woman of Indigenous American descent, broad cheekbones",
+   "hair": "long straight black hair",
+   "style": "long straight hair"
+  },
+  {
+   "id": 13,
+   "clothes": "a green canvas jacket with a turned-up collar",
+   "who": "a man of Latin American descent, thick eyebrows",
+   "hair": "wavy black hair, black goatee",
+   "style": "wavy hair and a goatee"
+  },
+  {
+   "id": 14,
+   "clothes": "a pale blue mechanic coverall",
+   "who": "a woman of Southeast Asian descent, gentle expression",
+   "hair": "short black hair with side-swept fringe",
+   "style": "short hair with side-swept fringe"
+  },
+  {
+   "id": 15,
+   "clothes": "a charcoal wool-lined work jacket",
+   "who": "a man of Eastern European descent, long face, prominent nose",
+   "hair": "brown hair parted at the side",
+   "style": "side-parted hair"
+  },
+  {
+   "id": 16,
+   "clothes": "a dusty red work jacket",
+   "who": "a woman of mixed African and European descent, light brown skin, freckles",
+   "hair": "curly auburn hair",
+   "style": "curly hair"
+  },
+  {
+   "id": 17,
+   "clothes": "a teal utility shirt with an open collar",
+   "who": "a man of Polynesian descent, broad face, heavy build",
+   "hair": "long black hair tied back",
+   "style": "long hair tied back"
+  },
+  {
+   "id": 18,
+   "clothes": "a grey-blue coverall with a high collar",
+   "who": "a woman of Northern European descent, pale blue eyes, sharp chin",
+   "hair": "straight blond hair cut short",
+   "style": "short straight hair"
+  },
+  {
+   "id": 19,
+   "clothes": "a mustard work jacket",
+   "who": "a man of East African descent, round glasses, clean shaven",
+   "hair": "short tight curls",
+   "style": "short tight curls"
+  },
+  {
+   "id": 20,
+   "clothes": "a forest green flight jacket",
+   "who": "a woman of Middle Eastern descent, thick eyebrows, olive skin",
+   "hair": "dark wavy hair",
+   "style": "wavy hair"
+  },
+  {
+   "id": 21,
+   "clothes": "a brown corduroy-collared work coat",
+   "who": "a man of Northern European descent, weathered tanned skin",
+   "hair": "dark brown hair, sideburns",
+   "style": "hair with sideburns"
+  },
+  {
+   "id": 22,
+   "clothes": "a purple-grey work shirt with rolled collar",
+   "who": "a woman of West African descent, wide-set eyes, warm smile",
+   "hair": "hair in short twists",
+   "style": "hair in short twists"
+  },
+  {
+   "id": 23,
+   "clothes": "a light grey coverall with a zipped collar",
+   "who": "a man of South Asian descent, heavy-lidded eyes, light stubble",
+   "hair": "short neat black hair",
+   "style": "short neat hair"
+  }
+ ]
+}

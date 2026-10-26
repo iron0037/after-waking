@@ -39,6 +39,7 @@ import {
   type Recruit,
 } from "../sim";
 import { cr } from "./format";
+import { captainSeed, Portrait } from "./portraits";
 import type { GameSession } from "./session";
 import "./crew.css";
 import "./perks.css";
@@ -250,8 +251,11 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
     return (
       <div class="panel crew-card">
         <div class="hub-card-head">
-          <div>
-            <span class="accent">{info.title}</span> <strong>{captainTitle(state.captain.name).replace(/^Captain\s+/i, "")}</strong>
+          <div class="crew-who">
+            <Portrait state={state} seed={captainSeed(state.captain)} name={state.captain.name} age={ageAt(state.captain.born, state.time)} />
+            <div>
+              <span class="accent">{info.title}</span> <strong>{captainTitle(state.captain.name).replace(/^Captain\s+/i, "")}</strong>
+            </div>
           </div>
           <span class="muted small">age {ageAt(state.captain.born, state.time)}</span>
         </div>
@@ -317,8 +321,11 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
   return (
     <div class="panel crew-card">
       <div class="hub-card-head">
-        <div>
-          <span class="accent">{info.title}</span> <strong>{m.name}</strong>
+        <div class="crew-who">
+          <Portrait state={state} seed={m.id} name={m.name} age={ageAt(m.born, state.time)} />
+          <div>
+            <span class="accent">{info.title}</span> <strong>{m.name}</strong>
+          </div>
         </div>
         <span class="muted small">age {ageAt(m.born, state.time)}</span>
       </div>
@@ -418,8 +425,11 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
   return (
     <div class="panel crew-card recruit">
       <div class="hub-card-head">
-        <div>
-          <span class="accent">{info.title}</span> <strong>{r.name}</strong>
+        <div class="crew-who">
+          <Portrait state={state} seed={r.id} name={r.name} age={ageAt(r.born, state.time)} />
+          <div>
+            <span class="accent">{info.title}</span> <strong>{r.name}</strong>
+          </div>
         </div>
         <span class="muted small">age {ageAt(r.born, state.time)}</span>
       </div>

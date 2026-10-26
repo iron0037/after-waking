@@ -71,6 +71,66 @@ export function upbringingOf(m: Pick<CrewMember, "id" | "name" | "born">): Upbri
   if (m.born < 0) return -m.born / YEAR >= EARTH_MEMORY_AGE ? "earth" : "cryoChild";
   return hashSeed(m.id, m.name, "upbringing") % 3 === 0 ? "settlement" : "decks";
 }
+/** Which face of the portrait pool somebody wears (AW-150): a hash of their id, so it never needs saving and never changes. */
+export function portraitFace(id: string, poolSize: number): number {
+  return poolSize > 0 ? hashSeed(id, "portrait") % poolSize : 0;
+}
+
+const FEMININE_NAMES = new Set(["Ada", "Celia", "Esme", "Greta", "Ines", "Lena", "Nia", "Priya", "Rosa", "Tova", "Vesna", "Yara", "Amara", "Coral", "Elif", "Gwen", "Isolde", "Kesi", "Mira"]);
+const MASCULINE_NAMES = new Set(["Bram", "Dario", "Farid", "Hollis", "Kaito", "Marek", "Oren", "Silas", "Ugo", "Xavi", "Zeno", "Bastian", "Dov", "Fenn", "Hamid", "Lior", "Nils"]);
+
+/** Which portrait pool a first name suggests, so "Ada" doesn't wear a man's face. Unknown and neutral names (Quill, Wren, a custom captain) return null: any face. */
+export function nameGender(name: string): "f" | "m" | null {
+  const first = name.replace(/^Captain\s+/i, "").split(/\s+/)[0] ?? "";
+  return FEMININE_NAMES.has(first) ? "f" : MASCULINE_NAMES.has(first) ? "m" : null;
+}
+
+/** Hiring order from an id: the starters ("c0".."c4") first, then recruits by pool and slot ("r12-3"). */
+function hireOrder(id: string): number {
+  const m = /^r(\d+)-(\d+)$/.exec(id);
+  if (m) return 1000 + Number(m[1]) * 100 + Number(m[2]);
+  const c = /^c(\d+)$/.exec(id);
+  return c ? Number(c[1]) : 999;
+}
+
+/**
+ * Faces for everybody on screen at once, so nobody shares one (AW-150): the captain first, then the
+ * crew in hiring order, then the hiring hall. Each person takes their hashed face (within their
+ * name's pool) or the next free one, so an officer keeps their face as people come and go around them.
+ */
+export function assignFaces(people: readonly { seed: string; name: string }[], faces: number, genders?: string): Map<string, number> {
+  const out = new Map<string, number>();
+  const taken = new Set<number>();
+  for (const p of people) {
+    const g = nameGender(p.name);
+    const pool = g && genders?.length === faces ? [...genders].flatMap((c, i) => (c === g ? [i] : [])) : Array.from({ length: faces }, (_, i) => i);
+    if (pool.length === 0) continue;
+    const start = portraitFace(p.seed, pool.length);
+    let face = pool[start] as number;
+    for (let k = 0; k < pool.length; k++) {
+      const f = pool[(start + k) % pool.length] as number;
+      if (!taken.has(f)) {
+        face = f;
+        break;
+      }
+    }
+    taken.add(face);
+    out.set(p.seed, face);
+  }
+  return out;
+}
+
+/** Who's on the roster, in the order faces are handed out. */
+export function portraitRoster(state: Pick<GameState, "captain" | "crew" | "recruits">, captainSeed: string): { seed: string; name: string }[] {
+  const crew = [...(state.crew ?? [])].sort((a, b) => hireOrder(a.id) - hireOrder(b.id));
+  return [{ seed: captainSeed, name: state.captain.name }, ...crew.map((m) => ({ seed: m.id, name: m.name })), ...(state.recruits ?? []).map((r) => ({ seed: r.id, name: r.name }))];
+}
+
+/** Portrait age band 0..3 (20s, 40s, 50s, 60+) for somebody of this age. The cut-offs follow how the pictures look. */
+export function portraitBand(age: number): number {
+  return age < 32 ? 0 : age < 47 ? 1 : age < 58 ? 2 : 3;
+}
+
 /** How often the hiring hall's pool turns over. */
 export const RECRUIT_POOL_DAYS = 60;
 export const RECRUIT_POOL_SIZE = 5;

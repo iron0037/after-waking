@@ -1,0 +1,16 @@
+/* Crew portraits (AW-150): cells cut from one atlas via custom properties set by <Portrait>. */
+.portrait {
+  display: block;
+  flex: none;
+  width: var(--portrait-size, 64px);
+  height: var(--portrait-size, 64px);
+  background: var(--portrait-atlas) var(--portrait-pos) / var(--portrait-atlas-size) no-repeat;
+  background-color: #263658;
+  image-rendering: pixelated;
+  border: 1px solid var(--border-bright);
+  border-radius: 3px;
+  box-sizing: content-box;
+}
+.levelup .portrait {
+  margin: 2px auto 4px;
+}

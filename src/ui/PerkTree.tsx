@@ -6,6 +6,7 @@ import { STATION_INFO, type Station } from "../data/crew";
 import { BRANCHES, PERKS, type PerkDef } from "../data/perks";
 import {
   acknowledgeLevelUp,
+  ageAt,
   bonusLine,
   captainTitle,
   formatDuration,
@@ -23,6 +24,7 @@ import {
   type LevelUp,
 } from "../sim";
 import { cr } from "./format";
+import { captainSeed, Portrait } from "./portraits";
 import type { GameSession } from "./session";
 import "./perks.css";
 
@@ -143,6 +145,7 @@ export function LevelUpPopup({ session, up }: { session: GameSession; up: LevelU
   const { state } = session;
   const officer: CrewMember | null = up.station === "captain" ? null : officerAt(state, up.station);
   const holder = perkHolder(state, up.station);
+  const person = officer ? { seed: officer.id, age: ageAt(officer.born, state.time) } : up.station === "captain" ? { seed: captainSeed(state.captain), age: ageAt(state.captain.born, state.time) } : null;
   const free = holder ? freePerkPoints(holder) : 0;
   const line = bonusLine(state, up.station);
   const waiting = (state.levelUps?.length ?? 1) - 1;
@@ -156,6 +159,7 @@ export function LevelUpPopup({ session, up }: { session: GameSession; up: LevelU
           ✦
         </div>
         <div class="levelup-kicker">Level up</div>
+        {person && <Portrait state={state} seed={person.seed} name={up.name} age={person.age} size={128} />}
         <div class="levelup-who">
           <span class="accent">{up.station === "captain" ? "" : STATION_INFO[up.station].title}</span> <strong>{up.name}</strong>
         </div>

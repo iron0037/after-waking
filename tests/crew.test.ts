@@ -12,6 +12,8 @@ import {
   levelForXp,
   newGame,
   officerAt,
+  portraitBand,
+  portraitFace,
   RECRUIT_POOL_DAYS,
   serialize,
   stationLevel,
@@ -104,6 +106,23 @@ describe("hiring hall", () => {
   });
 });
 
+describe("portraits (AW-150)", () => {
+  it("picks a stable face from the id, spread over the pool", () => {
+    expect(portraitFace("r3-2", 24)).toBe(portraitFace("r3-2", 24));
+    const faces = new Set(Array.from({ length: 200 }, (_, i) => portraitFace(`r${i}-0`, 24)));
+    expect(faces.size).toBeGreaterThan(18);
+    for (const f of faces) {
+      expect(f).toBeGreaterThanOrEqual(0);
+      expect(f).toBeLessThan(24);
+    }
+    expect(portraitFace("x", 0)).toBe(0);
+  });
+
+  it("ages the portrait in four bands", () => {
+    expect([20, 31, 32, 46, 47, 57, 58, 90].map(portraitBand)).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
+  });
+});
+
 describe("pacing", () => {
   it("officers gain a few levels over ten trips, not the whole ladder", () => {
     const report = runBot(42, 10);
@@ -111,5 +130,22 @@ describe("pacing", () => {
     console.log("levels after 10 trips:", levels, "wages/day:", dailyWages(report.state));
     for (const l of Object.values(levels)) expect(l).toBeLessThanOrEqual(7);
     expect(Math.max(...Object.values(levels))).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("portrait faces (AW-150)", () => {
+  it("nobody on the roster shares a face, and the captain keeps theirs", async () => {
+    const { assignFaces, newGame, portraitRoster, DAY, tickRecruits } = await import("../src/sim");
+    const state = newGame({ seed: 12 });
+    state.time += 61 * DAY;
+    state.nextRecruitsAt = 0;
+    tickRecruits(state);
+    const people = portraitRoster(state, "cap|1");
+    const genders = "fmfmfmfmfmfmfmfmfmfmfmfm";
+    const faces = assignFaces(people, 24, genders);
+    expect(new Set(faces.values()).size).toBe(people.length);
+    // Adding people later never changes the faces of those already handed out.
+    const fewer = assignFaces(people.slice(0, 3), 24, genders);
+    for (const [seed, f] of fewer) expect(faces.get(seed)).toBe(f);
   });
 });
