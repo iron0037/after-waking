@@ -107,6 +107,7 @@ import { cargoList, pct, tonnes } from "../format";
 import { TERRAIN_COLORS, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
 import { RescuePanel } from "../Rescue";
+import { terrainSwatch } from "./surface/terrainTextures";
 import { Canvas } from "../Canvas";
 import {
   cameraLayout,
@@ -1101,7 +1102,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           <div class="surface-legend">
             {present.map((t) => (
               <span key={t} class="legend-item">
-                <i style={{ background: TERRAIN_COLORS[body.kind][t] }} />
+                <i
+                  style={(() => {
+                    // The legend shows a sample of the real texture, once the textures are in.
+                    const url = terrainSwatch(body.kind, t);
+                    return url ? { background: `url(${url}) center / cover` } : { background: TERRAIN_COLORS[body.kind][t] };
+                  })()}
+                />
                 {TERRAIN_INFO[t].name}
                 {TERRAIN_INFO[t].passable === "climb" && !canClimb ? " ✕" : ""}
               </span>

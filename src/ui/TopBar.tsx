@@ -71,6 +71,9 @@ export function TopBar({
         </div>
       </div>
       <div class="tb-spacer" />
+      <button class="btn" onClick={onShip} title="Ship status: hold, specimens, vehicles, damage, refinery (H)">
+        Ship
+      </button>
       <button class="btn" onClick={onContracts} title="Contracts (K)">
         Contracts ({activeContracts})
       </button>

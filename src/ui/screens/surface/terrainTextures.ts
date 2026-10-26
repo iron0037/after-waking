@@ -297,3 +297,42 @@ export function waterDetail(): Float32Array | null {
   detail = lum;
   return lum;
 }
+
+const swatches = new Map<string, string>();
+
+/**
+ * A small sample of the textured terrain as a data URL, for the map legend; null until the
+ * textures load (the legend falls back to the flat palette colour).
+ */
+export function terrainSwatch(kind: BodyKind, terrain: number, size = 28): string | null {
+  const key = `${kind}:${terrain}:${size}`;
+  const hit = swatches.get(key);
+  if (hit) return hit;
+  const tex = tintedTexture(kind, terrain);
+  if (!tex || typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  const img = ctx.createImageData(size, size);
+  // Sample at the map's own scale (one texel per TEX_SCALE pixels) from the middle of the tile.
+  const x0 = Math.floor(TEX / 2 - (size / 2) / TEX_SCALE);
+  const y0 = x0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const tx = (x0 + Math.floor(x / TEX_SCALE)) % TEX;
+      const ty = (y0 + Math.floor(y / TEX_SCALE)) % TEX;
+      const s = (ty * TEX + tx) * 3;
+      const d = (y * size + x) * 4;
+      img.data[d] = tex[s] as number;
+      img.data[d + 1] = tex[s + 1] as number;
+      img.data[d + 2] = tex[s + 2] as number;
+      img.data[d + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const url = canvas.toDataURL();
+  swatches.set(key, url);
+  return url;
+}

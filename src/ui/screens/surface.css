@@ -31,9 +31,9 @@
 }
 .surface-legend i {
   display: inline-block;
-  width: 11px;
-  height: 12px;
-  /* pointy-top hex, like the map tiles */
+  width: 16px;
+  height: 18px;
+  /* pointy-top hex, like the map tiles (filled with a sample of the texture) */
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
 }
 
