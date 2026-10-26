@@ -43,6 +43,11 @@ export interface ShipStats {
   roverChargeMult: number;
   /** Multiplies the time each hex takes the rover (below 1 is faster). */
   roverDriveTime: number;
+  /** Combat (M3): hull points, laser and kinetic battery damage per hit, shields absorbed per turn. */
+  combatHull: number;
+  laserDmg: number;
+  kineticDmg: number;
+  shieldStrength: number;
   /** Multiplies the fuel for descents, lift-offs and hops (Lift-cell ballast). */
   surfaceBurnMult: number;
   /** Multiplies specimen prices at the Lyceum (Field xenolab). */
@@ -75,6 +80,10 @@ export const BASE_STATS: ShipStats = {
   roverCanClimb: false,
   roverChargeMult: 1,
   roverDriveTime: 1,
+  combatHull: 100,
+  laserDmg: 6,
+  kineticDmg: 0,
+  shieldStrength: 0,
   surfaceBurnMult: 1,
   specimenPriceMult: 1,
   specimenSlotBonus: 0,
@@ -95,13 +104,14 @@ export const BASE_STATS: ShipStats = {
 
 export type UpgradeEffect = (stats: ShipStats) => void;
 
-export type UpgradeCategory = "ship" | "rover" | "mining" | "sensors";
+export type UpgradeCategory = "ship" | "rover" | "mining" | "sensors" | "combat";
 
 export const UPGRADE_CATEGORY_NAMES: Record<UpgradeCategory, string> = {
   ship: "Ship",
   rover: "Rover",
   mining: "Mining",
   sensors: "Sensors",
+  combat: "Weapons & defences",
 };
 
 export interface Upgrade {
@@ -283,6 +293,52 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.specimenPriceMult *= 1.4;
       s.specimenSlotBonus += 3;
+    },
+  },
+  // --- weapons & defences (combat v1) -----------------------------------------------------
+  {
+    id: "laserBattery",
+    category: "combat",
+    name: "Laser battery",
+    vendor: "midshipmen",
+    price: 18_000,
+    description: "A proper laser turret in place of the cargo-loader's cutting beam: +10 damage, steady at any range.",
+    apply: (s) => {
+      s.laserDmg += 10;
+    },
+  },
+  {
+    id: "kineticBattery",
+    category: "combat",
+    name: "Kinetic battery",
+    vendor: "midshipmen",
+    price: 24_000,
+    description: "A rail battery: 20 damage a hit, deadly up close, poor at long range.",
+    apply: (s) => {
+      s.kineticDmg += 20;
+    },
+  },
+  {
+    id: "deflectors",
+    category: "combat",
+    name: "Deflector screens",
+    vendor: "helm",
+    price: 22_000,
+    description: "Field emitters that soak up to 12 damage each turn of a fight.",
+    apply: (s) => {
+      s.shieldStrength += 12;
+    },
+  },
+  {
+    id: "armorPlate",
+    category: "combat",
+    name: "Armour plate",
+    vendor: "diggers",
+    price: 16_000,
+    description: "+60 hull points in a fight. Adds 60 t of hull mass, so folds cost a little more.",
+    apply: (s) => {
+      s.combatHull += 60;
+      s.hullMassT += 60;
     },
   },
   {

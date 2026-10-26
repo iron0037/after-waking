@@ -13,6 +13,7 @@ import type { DiveRecord, ProbeDive } from "./probes";
 import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
 import { tickResearch, type ResearchRecord } from "./research";
+import type { Encounter, EncounterResult } from "./combat";
 import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
@@ -59,7 +60,7 @@ export type Location =
     };
 
 export interface YardJob {
-  kind: "install" | "retrain";
+  kind: "install" | "retrain" | "repair";
   label: string;
   readyAt: number;
   upgradeId?: string;
@@ -118,6 +119,12 @@ export interface GameState {
   research?: Record<string, ResearchRecord>;
   /** 2 once the save uses the slower clock (AW-142); older saves get their loan terms rescaled. */
   clock?: number;
+  /** A raider's hail or a battle in progress (combat v1, M3). */
+  encounter?: Encounter;
+  /** How the last encounter ended, for the debrief. */
+  lastEncounter?: EncounterResult;
+  /** The system whose departure has already been rolled for raiders (one roll per departure). */
+  interdictionClear?: string;
   /** Projects whose needs are pinned to the ship status window and star map. */
   trackedResearch?: string[];
   atmoSold?: string[];

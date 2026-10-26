@@ -1,4 +1,5 @@
 /** The player's freighter: persistent state plus stats derived from installed upgrades. */
+import type { ShipDamage } from "./combat";
 import type { CommodityId } from "../data/commodities";
 import { BASE_STATS, UPGRADES_BY_ID, type ShipStats } from "../data/ship";
 
@@ -11,6 +12,8 @@ export interface ShipState {
   cargo: Cargo;
   /** Rover cell charge while stowed; it recharges from the ship's reactor before each deployment. */
   roverEnergy?: number;
+  /** Battle damage carried until the Intrepid's yard repairs it (combat v1). */
+  damage?: ShipDamage;
   /** Boat cell charge while stowed (AW-17). */
   boatEnergy?: number;
   /** Live specimens in the containment racks, keyed "bodyId|species". */

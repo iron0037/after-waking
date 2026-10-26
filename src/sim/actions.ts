@@ -4,6 +4,7 @@
  */
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
+import { driveDamageMult, finishRepairs, maybeInterdict } from "./combat";
 import { researchFor, upgradeUnlocked } from "./research";
 import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
@@ -191,10 +192,17 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
 }
 
 export function fold(state: GameState, world: World, targetId: string): Result {
+  if (state.encounter) return fail("A raider has you under its guns.");
   const plan = foldPlan(state, world, targetId);
   if (plan.blockers.length > 0) return fail(plan.blockers[0] as string);
 
   const fromId = currentSystemId(state);
+  // Combat v1: a raider may be waiting as the drive spools up (one roll per departure).
+  if (fromId !== "intrepid") {
+    const raider = maybeInterdict(state, world, fromId);
+    if (raider) return fail(`${raider} hails you as the fold drive spools up.`);
+  }
+  state.interdictionClear = undefined;
   state.ship.fuel = Math.max(0, state.ship.fuel - plan.fuel);
   state.stats.folds++;
   // Folding is instant (lore). The drive's refit clock starts now.
@@ -315,13 +323,14 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
   }
 
   const minutes =
-    travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime + MANEUVER_MINUTES;
+    travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime * driveDamageMult(state) + MANEUVER_MINUTES;
   const fuel =
     Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
   return ok({ distanceAU, minutes, fuel, arrival });
 }
 
 export function flyTo(state: GameState, world: World, target: FlightTarget): Result<FlightPlan> {
+  if (state.encounter) return fail("A raider has you under its guns.");
   if (state.probeDive) return fail("A probe is still on its way down: see it through first.");
   const planned = flightPlan(state, world, target);
   if (!planned.ok) return planned;
@@ -491,6 +500,7 @@ export function landingBlockers(state: GameState, world: World, region: number):
   const body = orbitingBody(state, world);
   if (!body) return ["Enter orbit first."];
   const blockers: string[] = [];
+  if (state.encounter) blockers.push("A raider has you under its guns.");
   if (!state.scannedBodies.includes(body.id)) blockers.push("Scan the body before landing.");
   blockers.push(...landingAccess(body, effectiveStats(state).ratings).reasons);
   if (body.regions > 0 && (region < 0 || region >= body.regions || !Number.isInteger(region))) {
@@ -1452,6 +1462,8 @@ export function tickYard(state: GameState): void {
       }
     } else if (job.kind === "retrain" && job.station) {
       finishRetraining(state, job.station);
+    } else if (job.kind === "repair") {
+      finishRepairs(state);
     }
   }
 }

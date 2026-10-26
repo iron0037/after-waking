@@ -223,6 +223,31 @@ Your third-rate freighter can only be improved so far. Later in a career, captai
 - **Fights are 5–20 turns,** with auto-resolve for trivial encounters.
 - **Building it with agents.** Deterministic resolution means agents can test it automatically and balance it through thousands of simulated battles.
 
+### Combat v1: pirates **[DECIDED 2026-10-25] (M3)**
+The first slice of the ships-of-the-line model. Pirates only; rival captains, aliens and boarding come later.
+
+**When it happens.** As you spool the fold drive to leave a system with cargo aboard, a raider may drop out of the star's glare. The chance grows with the value of the hold and how far out you are: none at the home stars, low at the charted stars, higher in uncharted space. Leaving empty is safe. A typical career sees an interdiction every five or six trips.
+
+**The hail.** The raider's captain demands a share of the hold (about a third by value). You choose:
+- **Pay** and go: lose that share, no fight.
+- **Talk**: the comms officer tries to bargain the demand down (comms level, captain level), or bluff them off entirely. Fails into the demand or a fight.
+- **Run**: navigation level and drive state against the raider's speed. Escape folds you out; a failed run starts the fight at close range.
+- **Fight.**
+
+**The battle.** Simultaneous turns on three range bands (long, medium, close). Each turn you give four orders:
+- **Helm (navigation):** close in, hold range, open range, or evade.
+- **Guns:** fire at their drives, weapons or hull, or hold fire.
+- **Engineering:** repair your worst-hit system, or push power to shields or to the guns.
+- **Comms:** demand their surrender, offer yours, or stay quiet.
+
+Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives can't run or close; crippled weapons can't fire; blinded sensors miss more. Lasers are steady at any range, kinetic batteries hit hard up close and miss at long range. Science level sharpens aim; engineering level speeds repairs.
+
+**Endings.** Either side can **strike its colours**. Pirates strike when badly hurt or disarmed. You win their bounty (Helm pays for raiders) and salvage. If you strike, or your hull fails, they take most of the hold and your credits are safe: they want cargo, not a murder charge. You can also **escape** by opening range and folding when the drive is ready. Nobody dies in v1; damage carries over until the Intrepid's yard repairs it (credits and days).
+
+**Gear.** Midshipmen and Helm sell weapons (laser battery, kinetic battery), deflector shields and armour plate. The stock freighter carries one light laser. Captain and comms experience come from encounters; the gunnery and evasion perks already planned come alive.
+
+**Balance target.** An honest freighter that pays costs about 5% of career income; a fitted ship that fights well breaks even or profits on bounties. The bot pays by default, so the career report measures the cost.
+
 ## Settled Answers (2026-10-21)
 1. **Fold arrival:** at the system's edge (the outermost planet's orbit).
 2. **Landing:** the freighter lands. A dropship comes later for heavy freighters.

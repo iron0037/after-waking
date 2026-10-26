@@ -5,6 +5,7 @@ export * from "./boat";
 export * from "./refinery";
 export * from "./manifest";
 export * from "./research";
+export * from "./combat";
 export * from "./bodies";
 export * from "./economy";
 export * from "./environment";

@@ -39,6 +39,7 @@ import {
   type Result,
 } from "./actions";
 import type { Body } from "./bodies";
+import { answerHail } from "./combat";
 import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
@@ -57,6 +58,8 @@ export interface BotReport {
   tripsCompleted: number;
   /** Unexpected action failures: these indicate bugs or dead ends in the loop. */
   errors: string[];
+  /** Raiders who hailed on the way home (the bot pays them). */
+  raids: number;
   tripSummaries: {
     system: string;
     days: number;
@@ -93,6 +96,7 @@ export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "rove
 export function runBot(seed: number, trips: number, options: BotOptions = {}): BotReport {
   const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false, crewShare = 0 } = options;
   let rescues = 0;
+  let raids = 0;
   const world = new World(seed);
   const state = newGame({ seed });
   const rng = new Rng(seed ^ 0xb07);
@@ -144,7 +148,15 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     if (rescueQuote(state, world) && callForRescue(state, world).ok) rescues++;
     if (must("fly to edge", flyTo(state, world, { edge: true })) === null) break;
     if (state.time < state.foldReadyAt) wait(state, state.foldReadyAt - state.time);
-    if (must("fold home", fold(state, world, "intrepid")) === null) break;
+    // Combat v1: a raider may hail as the drive spools up. The bot pays and goes (the honest
+    // freighter's choice), so the career report measures what piracy costs.
+    let home = fold(state, world, "intrepid");
+    if (!home.ok && state.encounter) {
+      raids++;
+      answerHail(state, "pay");
+      home = fold(state, world, "intrepid");
+    }
+    if (must("fold home", home) === null) break;
 
     const sold = sellAll(state);
     tripsCompleted++;
@@ -165,7 +177,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     });
   }
 
-  return { state, tripsCompleted, errors, tripSummaries };
+  return { state, tripsCompleted, errors, tripSummaries, raids };
 }
 
 function avgOf<T>(xs: readonly T[], f: (x: T) => number): number {
