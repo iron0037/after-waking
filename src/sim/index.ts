@@ -6,6 +6,8 @@ export * from "./refinery";
 export * from "./manifest";
 export * from "./research";
 export * from "./combat";
+export * from "./clan";
+export * from "./nicknames";
 export * from "./bodies";
 export * from "./economy";
 export * from "./environment";

@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { clanMods, upgradePriceFor } from "./clan";
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
 import { driveDamageMult, finishRepairs, maybeInterdict } from "./combat";
@@ -188,7 +189,7 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   }
   if (ly > stats.foldRangeLy) blockers.push(`${ly.toFixed(1)} ly is beyond the drive's ${stats.foldRangeLy} ly range.`);
   if (fuel > state.ship.fuel) blockers.push(`Needs ${fuel} fuel; tanks hold ${state.ship.fuel.toFixed(1)}.`);
-  return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit), blockers };
+  return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit * clanMods(state).foldRefit), blockers };
 }
 
 export function fold(state: GameState, world: World, targetId: string): Result {
@@ -425,13 +426,13 @@ export function sensorRadius(state: GameState, bodyId: string): number {
 
 /** Tonnes per hour from a deposit: the drill, the grade, and the engineer. */
 export function drillRate(state: GameState, d: Deposit): number {
-  return effectiveStats(state).drillRateTph * DRILL_PACE * (0.4 + d.grade) * crewBonuses(state).drillRate;
+  return effectiveStats(state).drillRateTph * DRILL_PACE * (0.4 + d.grade) * crewBonuses(state).drillRate * clanMods(state).drillRate;
 }
 
 /** A slow, careful orbital pass: sharper region readings and wider rover detection on this body. */
 /** A detailed survey's duration (Close Orbit halves it). */
 export function surveyMinutes(state: GameState): number {
-  return SURVEY_MINUTES * (hasPerk(state, "close-orbit") ? 0.5 : 1);
+  return SURVEY_MINUTES * (hasPerk(state, "close-orbit") ? 0.5 : 1) * clanMods(state).scanTime;
 }
 
 /** Prospector's Eye: the survey charts every deposit on the world, so they're known before landing. */
@@ -471,7 +472,7 @@ export function scanBody(state: GameState, world: World): Result<Body> {
   const body = orbitingBody(state, world);
   if (!body) return fail("Enter orbit first.");
   if (state.scannedBodies.includes(body.id)) return ok(body);
-  advanceTime(state, SCAN_MINUTES);
+  advanceTime(state, SCAN_MINUTES * clanMods(state).scanTime);
   state.scannedBodies.push(body.id);
   awardXp(state, "science", 8);
   const top = (Object.entries(body.resources) as [CommodityId, number][])
@@ -1190,7 +1191,10 @@ export function sell(state: GameState, id: CommodityId, tonnes?: number): Result
   if (!docked.ok) return docked;
   const amount = removeCargo(state.ship.cargo, id, tonnes ?? Infinity);
   if (amount <= 0) return fail(`No ${COMMODITIES[id].name.toLowerCase()} aboard.`);
-  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.7 : 1) * crewBonuses(state).salePrice);
+  // The captain's clan: Exchange sells a little better; the Diggers tithe precious metals.
+  const mods = clanMods(state);
+  const tithe = ["platinum", "plicite", "platinumConc"].includes(id) ? 1 - mods.tithe : 1;
+  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.7 : 1) * crewBonuses(state).salePrice * mods.salePrice * tithe);
   awardXp(state, "captain", credits / 500);
   state.credits += credits;
   state.stats.earned += credits;
@@ -1262,7 +1266,7 @@ export const NEW_SPECIES_BONUS = 900;
 /** What the Lyceum pays per specimen under this key ("bodyId|species"): floating life is prized (priceMult), and the comms crew's bonus applies. */
 export function specimenUnitPrice(state: GameState, key: string): number {
   const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
-  return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice * effectiveStats(state).specimenPriceMult;
+  return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice * effectiveStats(state).specimenPriceMult * clanMods(state).specimenPrice;
 }
 
 /** Sell specimens to the Lyceum, keeping any that an active contract still needs. */
@@ -1296,7 +1300,7 @@ export function buyFuel(state: GameState, units: number): Result<number> {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
   const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
-  const price = fuelPrice(state.market);
+  const price = fuelPriceFor(state);
   const affordable = Math.floor(state.credits / price);
   const n = Math.min(Math.floor(units), Math.floor(room), affordable);
   if (n <= 0) return fail(room < 1 ? "Tanks are full." : "You can't afford any fuel.");
@@ -1317,7 +1321,7 @@ export function fuelCreditLimit(state: GameState): number {
 
 /** Units of fuel the Exchange would still advance on credit right now. */
 export function fuelCreditAvailable(state: GameState): number {
-  const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
+  const price = fuelPriceFor(state) * FUEL_CREDIT_MARKUP;
   const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
   const withinLimit = Math.floor((fuelCreditLimit(state) - state.loan.balance) / price);
   // Lifeline: whatever the limit, the Exchange tops the tanks up to enough for a short trip.
@@ -1327,7 +1331,7 @@ export function fuelCreditAvailable(state: GameState): number {
 
 /** True when the note's credit limit is used up, so only the lifeline (if that) is on offer. */
 export function fuelCreditPastLimit(state: GameState): boolean {
-  const price = fuelPrice(state.market) * FUEL_CREDIT_MARKUP;
+  const price = fuelPriceFor(state) * FUEL_CREDIT_MARKUP;
   return Math.floor((fuelCreditLimit(state) - state.loan.balance) / price) < 1;
 }
 
@@ -1340,7 +1344,7 @@ export function buyFuelOnCredit(state: GameState, units: number): Result<number>
   if (!docked.ok) return docked;
   const n = Math.min(Math.floor(units), fuelCreditAvailable(state));
   if (n <= 0) return fail(state.loan.balance >= fuelCreditLimit(state) ? "The Exchange won't extend any more credit." : "Tanks are full.");
-  const cost = Math.round(n * fuelPrice(state.market) * FUEL_CREDIT_MARKUP);
+  const cost = Math.round(n * fuelPriceFor(state) * FUEL_CREDIT_MARKUP);
   state.ship.fuel += n;
   chargeToNote(state, cost);
   log(state, "warning", `The Exchange advanced ${n} units of fuel against your note: +${cost.toLocaleString()} cr owed.`);
@@ -1402,7 +1406,7 @@ export function rescueQuote(state: GameState, world: World): RescueQuote | null 
   const net = hasPerk(state, "distress-net");
   return {
     fuel,
-    cost: Math.round(((fuel * fuelPrice(state.market) * RESCUE_FUEL_MARKUP + RESCUE_FEE + RESCUE_FEE_PER_LY * ly) * (net ? 0.75 : 1)) / 10) * 10,
+    cost: Math.round(((fuel * fuelPriceFor(state) * RESCUE_FUEL_MARKUP + RESCUE_FEE + RESCUE_FEE_PER_LY * ly) * (net ? 0.75 : 1)) / 10) * 10,
     days: Math.max(1, Math.round((3 + ly) * (net ? 0.5 : 1))),
   };
 }
@@ -1507,9 +1511,10 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   if (upgrade.requires && !queued(upgrade.requires)) {
     return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);
   }
-  if (state.credits < upgrade.price) return fail(`Costs ${upgrade.price.toLocaleString()} cr.`);
+  const price = upgradePriceFor(state, upgrade.vendor, upgrade.price);
+  if (state.credits < price) return fail(`Costs ${price.toLocaleString()} cr.`);
   if ((state.yard ?? []).some((j) => j.upgradeId === upgradeId)) return fail("Already being installed.");
-  state.credits -= upgrade.price;
+  state.credits -= price;
   // One yard bay: installs queue behind each other, but run alongside Lyceum courses and the refit.
   const installs = (state.yard ?? []).filter((j) => j.kind === "install");
   const start = Math.max(state.time, ...installs.map((j) => j.readyAt));
@@ -1538,4 +1543,9 @@ export function wait(state: GameState, minutes: number): Result {
   if (state.location.kind === "surface" && state.location.rover) return fail("Stow the rover before waiting.");
   advanceTime(state, Math.max(0, minutes));
   return ok(undefined);
+}
+
+/** Plicite fuel price for this captain (their clan may get it cheaper). */
+export function fuelPriceFor(state: GameState): number {
+  return Math.round(fuelPrice(state.market) * clanMods(state).fuelPrice);
 }

@@ -6,6 +6,7 @@
  * This module owns the rules for taking, retraining and auto-spending perks, plus the ship stats as
  * modified by perks (`effectiveStats`), which gameplay should read instead of raw `shipStats`.
  */
+import { clanMods } from "./clan";
 import type { OfficerStation, Station } from "../data/crew";
 import { BRANCHES, PERKS, PERKS_BY_ID, type PerkDef } from "../data/perks";
 import type { ClanId, ShipStats } from "../data/ship";
@@ -163,6 +164,8 @@ export function autoSpendCrew(state: GameState, rng: Rng): void {
 /** The ship's stats as the crew actually gets to use them: hardware plus perks. */
 export function effectiveStats(state: GameState): ShipStats {
   const s = shipStats(state.ship);
+  // Lyceum captains carry the Lyceum's researchers, whose berths take hold space.
+  s.cargoCapacityT += clanMods(state).cargoT;
   if (hasPerk(state, "power-management")) s.roverEnergy = Math.round(s.roverEnergy * 1.15);
   if (hasPerk(state, "rover-overhaul")) s.roverCargoT = Math.round(s.roverCargoT * 1.25);
   if (hasPerk(state, "deep-bore")) s.drillMaxDepthM = Math.round(s.drillMaxDepthM * 1.2);

@@ -3,6 +3,8 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import { clanMods } from "./clan";
+import type { ClanId } from "../data/ship";
 import type { CompendiumRecord } from "./compendium";
 import { starterContracts, tickContracts, type Contract } from "./contracts";
 import type { Station } from "../data/crew";
@@ -14,7 +16,7 @@ import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
 import { tickResearch, type ResearchRecord } from "./research";
 import type { Encounter, EncounterResult } from "./combat";
-import { dailyWages, ensureCrew, tickRecruits, type CrewMember, type LevelUp, type Recruit } from "./crew";
+import { dailyWages, ensureCrew, tickRecruits, xpForLevel, type CrewMember, type LevelUp, type Recruit } from "./crew";
 import { newMarket, stepMarket, type MarketState } from "./economy";
 import { Rng } from "./rng";
 import type { ShipState, Cargo } from "./ship";
@@ -96,7 +98,7 @@ export interface GameState {
   /** Gameplay RNG state (not world generation). */
   rngState: number;
   /** The player. `xp` is their experience at the captain's station. */
-  captain: { name: string; born: number; xp?: number; perks?: string[] };
+  captain: { name: string; born: number; xp?: number; perks?: string[]; clan?: ClanId };
   /** The five officers, one per station. */
   crew?: CrewMember[];
   /** The hiring hall aboard the Intrepid, and when its pool next turns over. */
@@ -128,6 +130,8 @@ export interface GameState {
   lastEncounter?: EncounterResult;
   /** The system whose departure has already been rolled for raiders (one roll per departure). */
   interdictionClear?: string;
+  /** The captain's own names for worlds, by body id (shown under the catalogue name). */
+  nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */
   trackedResearch?: string[];
   atmoSold?: string[];
@@ -162,17 +166,19 @@ export interface GameState {
 export interface NewGameOptions {
   seed: number;
   captainName?: string;
+  /** The captain's own clan (a small perk and a matching cost); none if left out. */
+  clan?: ClanId;
   shipName?: string;
 }
 
-export function newGame({ seed, captainName = "Captain Reyes", shipName = "Second Chance" }: NewGameOptions): GameState {
+export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan }: NewGameOptions): GameState {
   const state: GameState = {
     version: SAVE_VERSION,
     seed,
     time: GAME_START + 8 * 60,
     rngState: seed ^ 0x5eed,
-    captain: { name: captainName, born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0 },
-    credits: 6_000,
+    captain: { name: captainName.replace(/^captain\s+/i, "").trim() || "Reyes", born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0, ...(clan ? { clan } : {}) },
+    credits: 6_000 + (clan === "freebooters" ? 3_000 : 0),
     loan: {
       balance: 48_000,
       payment: 2_500,
@@ -212,6 +218,7 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
   }
   state.contracts = starterContracts(world, state.surveyedBodies);
   ensureCrew(state);
+  if (clan) clanStart(state, world, clan);
 
   log(
     state,
@@ -261,7 +268,7 @@ export function advanceTime(state: GameState, minutes: number): void {
 export const UPKEEP_RATE_PER_DAY = 0.0003;
 
 export function dailyUpkeep(state: GameState): number {
-  return state.ship.upgrades.reduce((sum, id) => sum + (UPGRADES_BY_ID.get(id)?.price ?? 0), 0) * UPKEEP_RATE_PER_DAY;
+  return (state.ship.upgrades.reduce((sum, id) => sum + (UPGRADES_BY_ID.get(id)?.price ?? 0), 0) * UPKEEP_RATE_PER_DAY) * clanMods(state).upkeep;
 }
 
 export function settlePayroll(state: GameState): void {
@@ -332,7 +339,7 @@ export function graceAvailableAt(loan: Loan): number {
 
 /** The note's rate in effect: Note Restructuring (comms) takes 2 points off. */
 export function loanRate(state: GameState): number {
-  return Math.max(0, state.loan.annualRate * (hasPerk(state, "note-restructuring") ? 2 / 3 : 1));
+  return Math.max(0, state.loan.annualRate * (hasPerk(state, "note-restructuring") ? 2 / 3 : 1) * clanMods(state).loanRate);
 }
 
 function settleLoan(state: GameState): void {
@@ -371,7 +378,8 @@ function settleLoan(state: GameState): void {
       );
     } else {
       loan.missed++;
-      const fee = Math.round(due * 0.1);
+      // Exchange captains get the relentless collectors: double the late fee.
+      const fee = Math.round(due * 0.1 * (state.captain.clan === "exchange" ? 2 : 1));
       loan.balance += fee;
       log(
         state,
@@ -383,5 +391,24 @@ function settleLoan(state: GameState): void {
       loan.balance = 0;
       log(state, "trade", `The Exchange note is paid in full. The ${state.ship.name} is yours, free and clear.`);
     }
+  }
+}
+
+/** What the captain's clan sets up at the start (AW-146). */
+function clanStart(state: GameState, world: World, clan: ClanId): void {
+  // Officers from your own clan start out a little more loyal to you.
+  for (const m of state.crew ?? []) if (m.clan === clan) m.loyalty = Math.min(100, (m.loyalty ?? 50) + 10);
+  if (clan === "helm") {
+    // Helm's charts of three more stars (the nearest uncharted ones): scanned before you arrive.
+    const from = world.galaxy.systems.find((s) => s.home)?.pos ?? { x: 0, y: 0 };
+    const extra = world.galaxy.systems
+      .filter((s) => !s.charted)
+      .sort((a, b) => Math.hypot(a.pos.x - from.x, a.pos.y - from.y) - Math.hypot(b.pos.x - from.x, b.pos.y - from.y))
+      .slice(0, 3);
+    for (const sys of extra) for (const b of world.system(sys.id).bodies) if (!state.scannedBodies.includes(b.id)) state.scannedBodies.push(b.id);
+  }
+  if (clan === "midshipmen") {
+    const eng = (state.crew ?? []).find((m) => m.station === "engineering");
+    if (eng) eng.xp = Math.max(eng.xp, xpForLevel(3));
   }
 }

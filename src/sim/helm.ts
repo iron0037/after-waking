@@ -7,6 +7,7 @@
  * the note − wages and upkeep owed). After a losing streak, or when the ship docks unable to cover
  * what it owes, Helm steps in. Helm also pays a small operator's first distress call.
  */
+import { clanMods } from "./clan";
 import { COMMODITY_IDS } from "../data/commodities";
 import type { Contract } from "./contracts";
 import { standingSurvey } from "./contracts";
@@ -62,6 +63,7 @@ export type HelmStatus =
 
 /** Whether Helm would help now, and why not if it wouldn't. */
 export function helmStatus(state: GameState): HelmStatus {
+  if (!clanMods(state).helmFund) return { eligible: false, reason: "Helm doesn't help Freebooter captains." };
   const h = helm(state);
   if (h.shunnedUntil !== undefined && state.time < h.shunnedUntil) {
     return { eligible: false, reason: "Helm isn't helping a captain who skipped the survey it asked for." };

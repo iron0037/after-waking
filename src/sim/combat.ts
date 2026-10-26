@@ -3,6 +3,7 @@
  * Pay, talk, run, or fight a short battle of simultaneous turns on three range bands.
  * Deterministic: every roll goes through the state's RNG. See docs/game_design.md (Combat v1).
  */
+import { clanMods } from "./clan";
 import {
   KINETIC_HIT,
   LASER_HIT,
@@ -122,7 +123,7 @@ export function interdictionChance(state: GameState, world: World, systemId: str
   if (!sys || sys.home) return 0;
   const ly = dist(sys.pos, INTREPID_POS);
   const base = sys.charted ? 0.25 : Math.min(0.5, 0.35 + 0.015 * Math.max(0, ly - 6));
-  return base * Math.min(1.5, holdValue(state) / 10_000);
+  return base * Math.min(1.5, holdValue(state) / 10_000) * clanMods(state).raidChance;
 }
 
 function pickRaider(rng: { weighted<T>(items: readonly (readonly [T, number])[]): T }, charted: boolean, ly: number): RaiderTemplate {

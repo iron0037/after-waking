@@ -5,6 +5,7 @@
  * This module deliberately avoids importing runtime code from state.ts (it's called from
  * advanceTime), so it writes journal entries and runs its RNG directly.
  */
+import { fuelPriceFor } from "./actions";
 import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
@@ -221,7 +222,7 @@ export function standingSurvey(state: GameState, rng: Rng, serial: number): Cont
   const targets = bodies.slice(0, 2);
   const ly = distanceLy(world.galaxy, "intrepid", s.id);
   // Round-trip fold fuel for the starter freighter (about 2 units per ly each way), with margin.
-  const fuelCost = 4 * ly * fuelPrice(state.market);
+  const fuelCost = 4 * ly * fuelPriceFor(state);
   return {
     id: `survey-${serial}`,
     clan: "helm",

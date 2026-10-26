@@ -10,6 +10,7 @@
  * runs one trip, so the captain always gets a chance to turn things around. A miserable officer
  * also works a level below themselves until things improve.
  */
+import { clanMods } from "./clan";
 import { OFFICER_STATIONS, STATION_INFO, type OfficerStation } from "../data/crew";
 import type { ClanId } from "../data/ship";
 import { levelForXp, upbringingOf, wageOf, type CrewMember } from "./crew";
@@ -106,7 +107,7 @@ export function tickSentiment(state: GameState, minutes: number): void {
   const days = minutes / DAY;
   const docked = state.location.kind === "intrepid";
   const away = (state.time - (state.lastDockedAt ?? state.time)) / DAY;
-  const leave = SHORE_LEAVE_PER_DAY * (hasPerk(state, "morale") ? 2 : 1);
+  const leave = SHORE_LEAVE_PER_DAY * (hasPerk(state, "morale") ? 2 : 1) * clanMods(state).shoreLeave;
   for (const m of state.crew) {
     ensureSentiment(m);
     // Upbringing (AW-14): decks-born love shore leave, settlers shrug off long hauls, Earth's sleepers stay steady.

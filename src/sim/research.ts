@@ -2,6 +2,7 @@
  * Research projects (AW-15): bring a clan what it needs, pay for the lab time, and the top tier of
  * a piece of gear goes on sale at the Shipyard when the project finishes. Projects run while you fly.
  */
+import { clanMods } from "./clan";
 import { FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
 import { MAX_ACTIVE_RESEARCH, RESEARCH, RESEARCH_BY_ID, RESEARCH_FOR_UPGRADE, type Requirement, type ResearchProject } from "../data/research";
@@ -93,7 +94,7 @@ export function researchBlockers(state: GameState, id: string): string[] {
     const prog = requirementProgress(state, req);
     if (!prog.met) out.push(`Needs ${prog.label}.`);
   }
-  if (state.credits < p.cost) out.push(`Costs ${p.cost.toLocaleString()} cr.`);
+  if (state.credits < researchCost(state, p)) out.push(`Costs ${researchCost(state, p).toLocaleString()} cr.`);
   return out;
 }
 
@@ -119,7 +120,7 @@ export function startResearch(state: GameState, id: string): Result<ResearchProj
     else removeCargo(state.ship.cargo, req.commodity, req.tonnes);
   }
   state.trackedResearch = (state.trackedResearch ?? []).filter((t) => t !== id);
-  state.credits -= p.cost;
+  state.credits -= researchCost(state, p);
   state.research ??= {};
   state.research[id] = { startedAt: state.time, readyAt: state.time + p.days * DAY, done: false };
   bondClan(state, p.clan, 3);
@@ -176,4 +177,9 @@ export function researchWants(state: GameState): Map<CommodityId, number> {
     for (const req of p.needs) if (req.kind === "cargo") out.set(req.commodity, (out.get(req.commodity) ?? 0) + req.tonnes);
   }
   return out;
+}
+
+/** What a project costs this captain (Covenant captains pay more for Archive work). */
+export function researchCost(state: GameState, p: ResearchProject): number {
+  return Math.round((p.cost * clanMods(state).researchCost) / 100) * 100;
 }
