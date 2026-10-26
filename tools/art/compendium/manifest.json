@@ -1,0 +1,355 @@
+{
+  "model": "juggernautXL_v9Rdphoto2Lightning + pixel-art-xl-v1.1 LoRA, DPM++ SDE Karras, 8 steps, CFG 2",
+  "size": 768,
+  "negative": "3d render, photo, realistic, blurry, smooth shading, text, letters, watermark, signature, frame, border, multiple objects, multiple copies, tiled, pot, planter, pedestal, hands, person, robot, machine, ground, horizon, scene, landscape",
+  "bg": "plain solid dark navy blue background",
+  "templates": {
+    "flora": "pixel art, field guide specimen illustration of a single alien plant: {subject}, whole plant centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "sea": "pixel art, field guide specimen illustration of a single alien sea organism: {subject}, centered, side view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "floating": "pixel art, field guide specimen illustration of a single alien floating atmospheric organism: {subject}, drifting, centered, side view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "ore": "pixel art, museum specimen card illustration of a single chunk of raw ore: {subject}, rough rock chunk centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "gem": "pixel art, museum specimen card illustration of a single hand-sized mineral specimen: {subject}, centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "flora_wild": "pixel art, field guide specimen illustration of a single wild alien plant growing straight out of a small patch of bare dark soil, no pot, no container: {subject}, whole plant centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "sea_wild": "pixel art, field guide specimen illustration of a single alien sea organism: {subject}, centered, side view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>"
+  },
+  "entries": [
+    {
+      "key": "flora:frost-lantern",
+      "kind": "flora",
+      "subject": "cluster of glowing pale cyan bulbs growing beneath clear ice, luminous bulb plants inside a block of blue ice"
+    },
+    {
+      "key": "flora:glass-reed",
+      "kind": "flora",
+      "subject": "tall translucent glass-like reed stalks, pale ice-blue, segmented like tubes"
+    },
+    {
+      "key": "flora:snowcap-lichen",
+      "kind": "flora",
+      "subject": "crusty patches of off-white snow-colored lichen growing on a small dark rock"
+    },
+    {
+      "key": "flora:needle-moss",
+      "kind": "flora",
+      "subject": "stiff spiky tuft of blue-green moss with sharp needle-like spines"
+    },
+    {
+      "key": "flora:rime-fern",
+      "kind": "flora",
+      "subject": "fern with pale blue frost-covered fronds, geometric ice crystal patterns on the fronds"
+    },
+    {
+      "key": "flora:pale-crawler",
+      "kind": "flora",
+      "subject": "flat creeping mat of pale grey-green plant with long tendrils spreading outward"
+    },
+    {
+      "key": "flora:ghost-frond",
+      "kind": "flora",
+      "subject": "a nearly transparent ghostly white frond, faint pale outline, translucent",
+      "subject_wild": "a single nearly transparent ghostly white fern frond, pale glassy translucent leaves"
+    },
+    {
+      "key": "flora:aurora-tuft",
+      "kind": "flora",
+      "subject": "a tuft of grass blades glowing bright green and violet like an aurora"
+    },
+    {
+      "key": "flora:vent-wort",
+      "kind": "flora",
+      "subject": "squat fleshy orange-brown plant growing around a small warm vent crack in ice"
+    },
+    {
+      "key": "flora:bellwort",
+      "kind": "flora",
+      "subject": "plant with hanging yellow-green bell-shaped cups holding drops of dew"
+    },
+    {
+      "key": "flora:velvet-frond",
+      "kind": "flora",
+      "subject": "soft velvety broad dark green fronds, cloth-like"
+    },
+    {
+      "key": "flora:spiral-vine",
+      "kind": "flora",
+      "subject": "green vine winding in a tight spiral around a thin pole"
+    },
+    {
+      "key": "flora:copper-frond",
+      "kind": "flora",
+      "subject": "frond with bronze copper-coloured metallic orange-brown leaves"
+    },
+    {
+      "key": "flora:amber-vine",
+      "kind": "flora",
+      "subject": "vine weeping golden amber resin, hardened amber beads on the vine"
+    },
+    {
+      "key": "flora:whisper-reed",
+      "kind": "flora",
+      "subject": "hollow pale sage-green reeds with open tops, slender stems"
+    },
+    {
+      "key": "flora:lantern-moss",
+      "kind": "flora",
+      "subject": "a clump of softly glowing lime-green moss"
+    },
+    {
+      "key": "flora:thread-grass",
+      "kind": "flora",
+      "subject": "dense tuft of very thin hair-like light green grass blades"
+    },
+    {
+      "key": "flora:hollow-cap",
+      "kind": "flora",
+      "subject": "tan fungus-like dome cap, hollow with an opening showing a single seed inside"
+    },
+    {
+      "key": "flora:silver-fern",
+      "kind": "flora",
+      "subject": "fern with silvery mirrored fronds, silver-grey leaves that flash",
+      "subject_wild": "tall slender fern with glittering silver-white fronds, bright silver-grey leaves with shiny metallic undersides, on a thin stem"
+    },
+    {
+      "key": "flora:drift-pod",
+      "kind": "flora",
+      "subject": "pale cream seed pods lifted by small gas bladders like little balloons"
+    },
+    {
+      "key": "flora:coil-bloom",
+      "kind": "flora",
+      "subject": "pink flower with petals unrolled like a coiled spring"
+    },
+    {
+      "key": "flora:cradle-tree",
+      "kind": "flora",
+      "subject": "small olive green tree whose branches curl into empty round nests"
+    },
+    {
+      "key": "flora:song-moss",
+      "kind": "flora",
+      "subject": "teal-green moss cushion with concentric ripple rings, vibrating"
+    },
+    {
+      "key": "flora:ember-cap",
+      "kind": "flora",
+      "subject": "red-orange mushroom caps glowing warm like embers"
+    },
+    {
+      "key": "flora:sunscale-lichen",
+      "kind": "flora",
+      "subject": "overlapping golden yellow scales like tiny mirrors, lichen growing on a rock"
+    },
+    {
+      "key": "flora:brine-reed",
+      "kind": "flora",
+      "subject": "grey-green reeds with white salt crystals clinging to the stems"
+    },
+    {
+      "key": "flora:heat-mat",
+      "kind": "flora",
+      "subject": "low leathery brown carpet plant cracked into a hexagon pattern",
+      "subject_wild": "flat leathery brown crust patches cracked into hexagonal plates, a low mat of brown scales growing on a small dark rock, like lichen"
+    },
+    {
+      "key": "flora:glasswing-bloom",
+      "kind": "flora",
+      "subject": "flower with transparent pale blue petals veined like insect wings"
+    },
+    {
+      "key": "flora:smoke-fern",
+      "kind": "flora",
+      "subject": "grey fern releasing a puff of grey spore haze"
+    },
+    {
+      "key": "flora:dune-runner",
+      "kind": "flora",
+      "subject": "a round tan tumbleweed ball of dry twigs",
+      "subject_wild": "a round tumbleweed: a ball of dry tangled golden-tan twigs, no stem, no roots, lying on a small sand dune"
+    },
+    {
+      "key": "flora:pyre-lily",
+      "kind": "flora",
+      "subject": "bright orange-red lily blooming with flame-shaped petals"
+    },
+    {
+      "key": "flora:mirror-palm",
+      "kind": "flora",
+      "subject": "small palm tree with silvery mirror-polished fronds",
+      "subject_wild": "short squat palm tuft close to the ground, silvery-white mirror-polished fronds fanning out"
+    },
+    {
+      "key": "flora:tide-bulb",
+      "kind": "sea",
+      "subject": "a raft of teal-green floating bladders bobbing together on the water surface"
+    },
+    {
+      "key": "flora:reef-lace",
+      "kind": "sea",
+      "subject": "pink lattice mesh coral, brittle lacy network of cells",
+      "subject_wild": "a single piece of pale pink lace coral with many small round holes, openwork perforated fan shape, side view, only one coral"
+    },
+    {
+      "key": "flora:kelp-spire",
+      "kind": "sea",
+      "subject": "tall dark green kelp stalks rising straight up from the seabed"
+    },
+    {
+      "key": "flora:brine-fan",
+      "kind": "sea",
+      "subject": "golden fan-shaped filter organism with a white salt crust at its edge"
+    },
+    {
+      "key": "flora:drift-veil",
+      "kind": "sea",
+      "subject": "a thin pale blue translucent sheet colony floating on the water with a small sail-like fin"
+    },
+    {
+      "key": "flora:abyss-lantern",
+      "kind": "sea",
+      "subject": "glowing mint-green bioluminescent deep-sea lantern organism with trailing tendrils"
+    },
+    {
+      "key": "flora:cloud-drifter",
+      "kind": "floating",
+      "subject": "cream coloured gas bladder shaped like a balloon with thin trailing filaments"
+    },
+    {
+      "key": "flora:storm-kelp",
+      "kind": "floating",
+      "subject": "long grey-green ribbons knotted around small grains of ice, drifting"
+    },
+    {
+      "key": "flora:lantern-siphon",
+      "kind": "floating",
+      "subject": "a vertical colony chain of glowing warm amber cells, lantern-like tube"
+    },
+    {
+      "key": "flora:abyssal-bloom",
+      "kind": "floating",
+      "subject": "purple violet glowing bloom organism with layered petals"
+    },
+    {
+      "key": "mineral:ironNickel",
+      "kind": "ore",
+      "subject": "rusty red-brown iron-nickel ore with grey metallic streaks"
+    },
+    {
+      "key": "mineral:copper",
+      "kind": "ore",
+      "subject": "grey rock with orange copper veins and green tarnish specks"
+    },
+    {
+      "key": "mineral:titanium",
+      "kind": "ore",
+      "subject": "pale silvery steel-grey ore with a metallic sheen"
+    },
+    {
+      "key": "mineral:rareEarths",
+      "kind": "ore",
+      "subject": "mint green crystalline ore with pale teal crystals"
+    },
+    {
+      "key": "mineral:uranium",
+      "kind": "ore",
+      "subject": "dark rock speckled with bright yellow-green glowing flecks"
+    },
+    {
+      "key": "mineral:platinum",
+      "kind": "ore",
+      "subject": "pale lavender-white metallic ore with silvery flecks"
+    },
+    {
+      "key": "mineral:waterIce",
+      "kind": "ore",
+      "subject": "a rough chunk of pale blue ice with white cracks"
+    },
+    {
+      "key": "mineral:plicite",
+      "kind": "ore",
+      "subject": "dark rock threaded with veins of glowing magenta pink crystal"
+    },
+    {
+      "key": "gem:banded-geode",
+      "kind": "gem",
+      "subject": "cut-open geode with stripes of rust red and steel-grey bands"
+    },
+    {
+      "key": "gem:meteoric-lattice",
+      "kind": "gem",
+      "subject": "polished iron-nickel meteorite slice etched with crossing crystal bands, silver-grey"
+    },
+    {
+      "key": "gem:copper-dendrite",
+      "kind": "gem",
+      "subject": "native copper grown in fern-like branches through grey rock, orange metal"
+    },
+    {
+      "key": "gem:malachite-rosette",
+      "kind": "gem",
+      "subject": "polished malachite stone with concentric bright green rings"
+    },
+    {
+      "key": "gem:rutile-needles",
+      "kind": "gem",
+      "subject": "clear quartz crystal with golden needles inside"
+    },
+    {
+      "key": "gem:star-ilmenite",
+      "kind": "gem",
+      "subject": "black crystal with a six-rayed star glint, dark grey faceted"
+    },
+    {
+      "key": "gem:monazite-pearl",
+      "kind": "gem",
+      "subject": "cluster of rounded tan golden sand pearls, heavy grains"
+    },
+    {
+      "key": "gem:bastnasite-prism",
+      "kind": "gem",
+      "subject": "honey-coloured hexagonal glassy prism crystal, orange-amber"
+    },
+    {
+      "key": "gem:pitchblende-nodule",
+      "kind": "gem",
+      "subject": "black greasy heavy nodule with a dull sheen, dark charcoal"
+    },
+    {
+      "key": "gem:autunite-plate",
+      "kind": "gem",
+      "subject": "thin flat yellow-green glowing plates stacked on rock"
+    },
+    {
+      "key": "gem:platinum-nugget",
+      "kind": "gem",
+      "subject": "water-worn heavy nugget of silvery-white platinum metal"
+    },
+    {
+      "key": "gem:iridium-bead",
+      "kind": "gem",
+      "subject": "a droplet bead of silver-blue iridium metal frozen mid-splash"
+    },
+    {
+      "key": "gem:blue-ice-core",
+      "kind": "gem",
+      "subject": "cylinder core of deep blue compressed ice"
+    },
+    {
+      "key": "gem:clathrate-bubble",
+      "kind": "gem",
+      "subject": "pale blue ice chunk with trapped gas bubbles in its lattice"
+    },
+    {
+      "key": "gem:plicite-geode",
+      "kind": "gem",
+      "subject": "cut-open geode cavity lined with magenta pink crystals, every facet aligned"
+    },
+    {
+      "key": "gem:folded-plicite",
+      "kind": "gem",
+      "subject": "light pink crystal whose lattice folds back through itself, impossible geometry, glowing"
+    }
+  ],
+  "negative_wild": "flower pot, potted plant, vase, planter, container, bowl, jar, stone ring, well",
+  "wild_from_variant": 10
+}

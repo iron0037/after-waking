@@ -6,6 +6,7 @@ import { useState } from "preact/hooks";
 import { COMMODITIES, ORE_IDS } from "../data/commodities";
 import { FLORA, MINERAL_SPECIMENS, type Rarity } from "../data/catalog";
 import { compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
+import { CompIcon, useSpriteIndex } from "./compendiumSprites";
 import type { GameSession } from "./session";
 
 type Tab = "flora" | "minerals" | "artifacts";
@@ -112,13 +113,14 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
 }
 
 function Grid({ cards, found }: { cards: Card[]; found: Record<string, CompendiumRecord> }) {
+  const sprites = useSpriteIndex();
   return (
     <div class="comp-grid">
       {cards.map((c) => {
         const rec = found[c.key];
         return rec ? (
-          <div key={c.key} class="comp-card found" title={c.blurb}>
-            <span class="comp-icon" style={{ background: c.color }} />
+          <div key={c.key} class={`comp-card found ${sprites?.sprites[c.key] ? "has-sprite" : ""}`} title={c.blurb}>
+            <CompIcon index={sprites} entryKey={c.key} color={c.color} found />
             <div class="comp-text">
               <div class="comp-name">{c.name}</div>
               {c.rarity && <div class={`comp-rarity r${c.rarity}`}>{RARITY[c.rarity]}</div>}
@@ -129,8 +131,8 @@ function Grid({ cards, found }: { cards: Card[]; found: Record<string, Compendiu
             </div>
           </div>
         ) : (
-          <div key={c.key} class="comp-card unknown">
-            <span class="comp-icon" />
+          <div key={c.key} class={`comp-card unknown ${sprites?.sprites[c.key] ? "has-sprite" : ""}`}>
+            <CompIcon index={sprites} entryKey={c.key} color={c.color} found={false} />
             <div class="comp-text">
               <div class="comp-name">???</div>
               {c.rarity && <div class={`comp-rarity r${c.rarity}`}>{RARITY[c.rarity]}</div>}

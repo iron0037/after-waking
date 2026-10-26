@@ -1,0 +1,38 @@
+/* Compendium sprites (AW-28): 64 px cells cut from one atlas via custom properties set by CompIcon. */
+
+.comp-card.has-sprite {
+  grid-template-columns: 64px 1fr;
+}
+.comp-icon.sprite {
+  width: 64px;
+  height: 64px;
+  border-radius: 4px;
+  position: relative;
+  background-color: var(--bg);
+  background-image: var(--atlas);
+  background-size: var(--atlas-size);
+  background-position: var(--atlas-pos);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+/* Not yet found: only the dark outline of the specimen, on the same panel. */
+.comp-card.unknown .comp-icon.sprite.silhouette {
+  background-image: none;
+  background-color: var(--bg);
+}
+.comp-icon.sprite.silhouette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: #26324d;
+  -webkit-mask-image: var(--atlas);
+  mask-image: var(--atlas);
+  -webkit-mask-size: var(--atlas-size);
+  mask-size: var(--atlas-size);
+  -webkit-mask-position: var(--atlas-pos);
+  mask-position: var(--atlas-pos);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  image-rendering: pixelated;
+}

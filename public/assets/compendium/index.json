@@ -1,0 +1,272 @@
+{
+ "cell": 64,
+ "cols": 11,
+ "width": 704,
+ "height": 384,
+ "sprites": {
+  "flora:frost-lantern": [
+   0,
+   0
+  ],
+  "flora:glass-reed": [
+   1,
+   0
+  ],
+  "flora:snowcap-lichen": [
+   2,
+   0
+  ],
+  "flora:needle-moss": [
+   3,
+   0
+  ],
+  "flora:rime-fern": [
+   4,
+   0
+  ],
+  "flora:pale-crawler": [
+   5,
+   0
+  ],
+  "flora:ghost-frond": [
+   6,
+   0
+  ],
+  "flora:aurora-tuft": [
+   7,
+   0
+  ],
+  "flora:vent-wort": [
+   8,
+   0
+  ],
+  "flora:bellwort": [
+   9,
+   0
+  ],
+  "flora:velvet-frond": [
+   10,
+   0
+  ],
+  "flora:spiral-vine": [
+   0,
+   1
+  ],
+  "flora:copper-frond": [
+   1,
+   1
+  ],
+  "flora:amber-vine": [
+   2,
+   1
+  ],
+  "flora:whisper-reed": [
+   3,
+   1
+  ],
+  "flora:lantern-moss": [
+   4,
+   1
+  ],
+  "flora:thread-grass": [
+   5,
+   1
+  ],
+  "flora:hollow-cap": [
+   6,
+   1
+  ],
+  "flora:silver-fern": [
+   7,
+   1
+  ],
+  "flora:drift-pod": [
+   8,
+   1
+  ],
+  "flora:coil-bloom": [
+   9,
+   1
+  ],
+  "flora:cradle-tree": [
+   10,
+   1
+  ],
+  "flora:song-moss": [
+   0,
+   2
+  ],
+  "flora:ember-cap": [
+   1,
+   2
+  ],
+  "flora:sunscale-lichen": [
+   2,
+   2
+  ],
+  "flora:brine-reed": [
+   3,
+   2
+  ],
+  "flora:heat-mat": [
+   4,
+   2
+  ],
+  "flora:glasswing-bloom": [
+   5,
+   2
+  ],
+  "flora:smoke-fern": [
+   6,
+   2
+  ],
+  "flora:dune-runner": [
+   7,
+   2
+  ],
+  "flora:pyre-lily": [
+   8,
+   2
+  ],
+  "flora:mirror-palm": [
+   9,
+   2
+  ],
+  "flora:tide-bulb": [
+   10,
+   2
+  ],
+  "flora:reef-lace": [
+   0,
+   3
+  ],
+  "flora:kelp-spire": [
+   1,
+   3
+  ],
+  "flora:brine-fan": [
+   2,
+   3
+  ],
+  "flora:drift-veil": [
+   3,
+   3
+  ],
+  "flora:abyss-lantern": [
+   4,
+   3
+  ],
+  "flora:cloud-drifter": [
+   5,
+   3
+  ],
+  "flora:storm-kelp": [
+   6,
+   3
+  ],
+  "flora:lantern-siphon": [
+   7,
+   3
+  ],
+  "flora:abyssal-bloom": [
+   8,
+   3
+  ],
+  "mineral:ironNickel": [
+   9,
+   3
+  ],
+  "mineral:copper": [
+   10,
+   3
+  ],
+  "mineral:titanium": [
+   0,
+   4
+  ],
+  "mineral:rareEarths": [
+   1,
+   4
+  ],
+  "mineral:uranium": [
+   2,
+   4
+  ],
+  "mineral:platinum": [
+   3,
+   4
+  ],
+  "mineral:waterIce": [
+   4,
+   4
+  ],
+  "mineral:plicite": [
+   5,
+   4
+  ],
+  "gem:banded-geode": [
+   6,
+   4
+  ],
+  "gem:meteoric-lattice": [
+   7,
+   4
+  ],
+  "gem:copper-dendrite": [
+   8,
+   4
+  ],
+  "gem:malachite-rosette": [
+   9,
+   4
+  ],
+  "gem:rutile-needles": [
+   10,
+   4
+  ],
+  "gem:star-ilmenite": [
+   0,
+   5
+  ],
+  "gem:monazite-pearl": [
+   1,
+   5
+  ],
+  "gem:bastnasite-prism": [
+   2,
+   5
+  ],
+  "gem:pitchblende-nodule": [
+   3,
+   5
+  ],
+  "gem:autunite-plate": [
+   4,
+   5
+  ],
+  "gem:platinum-nugget": [
+   5,
+   5
+  ],
+  "gem:iridium-bead": [
+   6,
+   5
+  ],
+  "gem:blue-ice-core": [
+   7,
+   5
+  ],
+  "gem:clathrate-bubble": [
+   8,
+   5
+  ],
+  "gem:plicite-geode": [
+   9,
+   5
+  ],
+  "gem:folded-plicite": [
+   10,
+   5
+  ]
+ }
+}
