@@ -24,15 +24,15 @@ export const MOOD_MAX = 100;
 export const MISERABLE = 25;
 /** Where happiness settles with nothing happening, and how fast it gets there (share per day). */
 export const HAPPINESS_BASELINE = 55;
-export const HAPPINESS_RELAX_PER_DAY = 0.03;
+export const HAPPINESS_RELAX_PER_DAY = 0.015;
 /** Shore leave aboard the Intrepid restores happiness up to this. */
 export const SHORE_LEAVE_CAP = 80;
 export const SHORE_LEAVE_PER_DAY = 1.5;
 /** Days away from the Intrepid before a long haul starts to wear on the crew. */
-export const LONG_HAUL_DAYS = 45;
-export const LONG_HAUL_PER_DAY = 0.4;
+export const LONG_HAUL_DAYS = 90;
+export const LONG_HAUL_PER_DAY = 0.2;
 /** Loyalty drift per day at happiness 100 (or 0): it follows sustained happiness, slowly. */
-export const LOYALTY_DRIFT_PER_DAY = 0.05;
+export const LOYALTY_DRIFT_PER_DAY = 0.025;
 /** Give notice below this combined score (young crew are a little more restless). */
 export const NOTICE_BELOW = 30;
 /** Someone on notice leaves if the score is still below this at the next docking. */

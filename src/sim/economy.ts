@@ -31,7 +31,7 @@ export function stepMarket(market: MarketState, rng: Rng, day: number): void {
   const days = Math.min(day - market.day, 3650);
   for (let i = 0; i < days; i++) {
     for (const id of COMMODITY_IDS) {
-      market.glut[id] *= 0.97;
+      market.glut[id] *= 0.985;
       // Concentrate prices follow their ore (below), so they draw nothing from the stream.
       if ((CONC_IDS as readonly string[]).includes(id)) continue;
       market.mult[id] = clamp(market.mult[id] + 0.08 * (1 - market.mult[id]) + rng.gaussian(0, 0.035), 0.5, 1.8);

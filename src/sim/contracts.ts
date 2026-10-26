@@ -80,7 +80,7 @@ export function starterContracts(world: World, preSurveyed: readonly string[]): 
       commodity: "ironNickel",
       tonnes: 60,
       reward: 4_500,
-      durationDays: 150,
+      durationDays: 300,
       deadline: null,
       status: "offered",
       starter: true,
@@ -101,7 +101,7 @@ export function starterContracts(world: World, preSurveyed: readonly string[]): 
       bodyId: meadow.id,
       count: 4,
       reward: 5_000,
-      durationDays: 180,
+      durationDays: 360,
       deadline: null,
       status: "offered",
       starter: true,
@@ -122,7 +122,7 @@ export function starterContracts(world: World, preSurveyed: readonly string[]): 
       text: `Helm wants the ${sys.name} charts completed. Fly detailed orbital surveys of ${targets.map((b) => b.name).join(" and ")}.`,
       surveyBodyIds: targets.map((b) => b.id),
       reward: 3_500,
-      durationDays: 150,
+      durationDays: 300,
       deadline: null,
       status: "offered",
       starter: true,
@@ -166,7 +166,7 @@ export function deliveryContract(rng: Rng, now: number, serial: number): Contrac
     tonnes,
     // A premium on the goods plus a haulage fee per tonne, so bulk jobs (iron, copper, ice) pay for the hold space.
     reward: Math.round((tonnes * (price * rng.range(1.3, 1.6) + HAULAGE_PER_T) + 1_000) / 50) * 50,
-    durationDays: rng.int(90, 160),
+    durationDays: rng.int(180, 320),
     deadline: null,
     status: "offered",
   };
@@ -229,7 +229,7 @@ export function standingSurvey(state: GameState, rng: Rng, serial: number): Cont
     text: `Helm pays steady money for orbital surveys. Fly detailed surveys of ${targets.map((b) => b.name).join(" and ")}. No landing needed.`,
     surveyBodyIds: targets.map((b) => b.id),
     reward: Math.round((fuelCost * 1.5 + 2_000) / 50) * 50,
-    durationDays: 90,
+    durationDays: 180,
     deadline: null,
     status: "offered",
   };
@@ -266,7 +266,7 @@ export function gasDeliveryContract(rng: Rng, serial: number): Contract {
     commodity: gas,
     tonnes,
     reward: Math.round((tonnes * COMMODITIES[gas].basePrice * 1.6 + 800) / 50) * 50,
-    durationDays: rng.int(90, 150),
+    durationDays: rng.int(180, 300),
     deadline: null,
     status: "offered",
   };
@@ -297,7 +297,7 @@ export function probeSurveyContract(state: GameState, rng: Rng, serial: number):
     bodyId: b.id,
     depth,
     reward: Math.round((PROBE_SURVEY_PAY[depth] ?? 0) + 250 * ly),
-    durationDays: rng.int(100, 160),
+    durationDays: rng.int(200, 320),
     deadline: null,
     status: "offered",
   };
@@ -317,7 +317,7 @@ export function tickContracts(state: GameState): void {
       cheerAll(state, -2);
     }
   }
-  state.nextContractAt ??= state.time + 20 * DAY;
+  state.nextContractAt ??= state.time + 40 * DAY;
   while (state.time >= state.nextContractAt) {
     const rng = new Rng(state.rngState);
     const offered = state.contracts.filter((c) => c.status === "offered").length;
@@ -335,7 +335,7 @@ export function tickContracts(state: GameState): void {
     if (hasPerk(state, "preferred-captain") && rng.chance(0.5) && !state.contracts.some((c) => c.status === "offered" && c.exclusive)) {
       state.contracts.push(exclusiveContract(rng, state.contracts.length + 1));
     }
-    state.nextContractAt += rng.range(15, 30) * DAY;
+    state.nextContractAt += rng.range(30, 60) * DAY;
     state.rngState = rng.state;
   }
   // Once there's a probe bay aboard, there's always a probe job on the board.

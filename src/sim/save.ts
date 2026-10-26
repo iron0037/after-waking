@@ -25,6 +25,12 @@ export function deserialize(json: string): GameState {
   data.catalogedSpecies = [...new Set(data.catalogedSpecies.map((k) => k.split("|")[1] ?? k))];
   data.compendium ??= {};
   data.loan.prepaid ??= 0;
+  // The slower clock (AW-142): the Exchange note pays every 120 days at half the yearly rate.
+  if ((data.clock ?? 1) < 2) {
+    if (data.loan.intervalDays === 60) data.loan.intervalDays = 120;
+    if (data.loan.annualRate === 0.06) data.loan.annualRate = 0.03;
+    data.clock = 2;
+  }
   ensureCrew(data);
   // Goods added after a save was made start at normal prices.
   for (const id of COMMODITY_IDS) {

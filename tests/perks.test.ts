@@ -200,7 +200,7 @@ describe("perks that change the ship's numbers", () => {
     expect(shipSpecimenSlots(state)).toBe(18);
     expect(routeEnergyMult(state)).toBe(0.9);
     expect(fuelCreditLimit(state)).toBe(135_000);
-    expect(loanRate(state)).toBeCloseTo(0.04, 5);
+    expect(loanRate(state)).toBeCloseTo(0.02, 5);
     const r = state.recruits![0]!;
     expect(signingFee(state, r)).toBe(Math.round(r.fee / 2));
   });
@@ -320,7 +320,7 @@ describe("surface perks", () => {
     loc.rover.x = d.x + 1;
     loc.rover.energy = 10_000;
     const before = knowledge(state, bodyId, 0).extracted[d.id] ?? 0;
-    const r = drill(state, world, d.key, 2);
+    const r = drill(state, world, d.key, 20); // long enough for the 10% to show after rounding (AW-142 slowed drilling)
     expect(r.ok).toBe(true);
     if (r.ok) {
       const worked = (knowledge(state, bodyId, 0).extracted[d.id] ?? 0) - before;

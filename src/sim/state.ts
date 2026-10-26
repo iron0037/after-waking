@@ -116,6 +116,8 @@ export interface GameState {
   atmoReadings?: Record<string, number[]>;
   /** Research projects commissioned at the Intrepid (AW-15), by project id. */
   research?: Record<string, ResearchRecord>;
+  /** 2 once the save uses the slower clock (AW-142); older saves get their loan terms rescaled. */
+  clock?: number;
   /** Projects whose needs are pinned to the ship status window and star map. */
   trackedResearch?: string[];
   atmoSold?: string[];
@@ -164,15 +166,17 @@ export function newGame({ seed, captainName = "Captain Reyes", shipName = "Secon
     loan: {
       balance: 48_000,
       payment: 2_500,
-      intervalDays: 60,
-      nextDue: GAME_START + 60 * DAY,
+      intervalDays: 120,
+      nextDue: GAME_START + 120 * DAY,
       missed: 0,
-      annualRate: 0.06,
+      prepaid: 0,
+      annualRate: 0.03,
     },
     ship: { name: shipName, upgrades: [], fuel: 40, cargo: {} },
     location: { kind: "intrepid" },
     foldReadyAt: GAME_START,
     visitedSystems: [],
+    clock: 2,
     scannedBodies: [],
     surveyedBodies: [],
     payrollOwed: 0,
@@ -243,7 +247,7 @@ export function advanceTime(state: GameState, minutes: number): void {
 
 /** Pay the crew what they're owed, as far as credits allow. Called whenever time passes at the Intrepid. */
 /** Daily upkeep on installed equipment: more gear, more to maintain (a share of its price per day). */
-export const UPKEEP_RATE_PER_DAY = 0.0006;
+export const UPKEEP_RATE_PER_DAY = 0.0003;
 
 export function dailyUpkeep(state: GameState): number {
   return state.ship.upgrades.reduce((sum, id) => sum + (UPGRADES_BY_ID.get(id)?.price ?? 0), 0) * UPKEEP_RATE_PER_DAY;
@@ -317,7 +321,7 @@ export function graceAvailableAt(loan: Loan): number {
 
 /** The note's rate in effect: Note Restructuring (comms) takes 2 points off. */
 export function loanRate(state: GameState): number {
-  return Math.max(0, state.loan.annualRate - (hasPerk(state, "note-restructuring") ? 0.02 : 0));
+  return Math.max(0, state.loan.annualRate * (hasPerk(state, "note-restructuring") ? 2 / 3 : 1));
 }
 
 function settleLoan(state: GameState): void {

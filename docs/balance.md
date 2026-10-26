@@ -110,3 +110,21 @@ The user found no reason to leave the safe, nearby worlds, so the first scouts' 
 - **Hard content later on.** Worlds farther out should be richer but harsher (environment ratings, hostile life, combat in M3), so an established captain still has frontier challenges. Generation currently doesn't scale richness with distance. Changing that would alter existing worlds, so it waits for a save-version bump or new regions.
 - **Crew sentiment (AW-100)** adds another spiral risk: unpaid wages leading to unhappy crew who quit. It needs its own way back, such as crew accepting deferred wages for a while and loyalty buffering bad stretches.
 - **The bot doesn't take contracts or prepay the loan,** so real players have more income and more options than the bot shows.
+
+## The slower clock (2026-10-25, AW-142)
+Trips were about 29 days, the bottom of the 1-3 month target, so a few dozen trips was only three years. Work now takes longer and days cost less:
+
+| Change | Before | After |
+|---|---|---|
+| Extraction pace (`DRILL_PACE`) | 1 | 0.35 (rover energy per hour scaled to match, so energy per tonne is unchanged) |
+| Prospecting / drill setup / sampling | 2 h / 3 h / 1 h | 3 h / 5 h / 1.5 h |
+| Fold refit | 4 d + 1.5 d per ly | 6 d + 2.25 d per ly (rush 300 cr/day) |
+| Wages (base) | 30 cr/day | 15 cr/day; signing fee 30 days' wages, Helm stipend 60 days |
+| Equipment upkeep | 0.06% of price per day | 0.03% |
+| Exchange note | 2,500 every 60 days at 6% a year | 2,500 every 120 days at 3% (old saves migrated; Note Restructuring cuts a third) |
+| Contract deadlines / posting | 90-180 days, every 15-30 days | doubled |
+| Sentiment drift, long-haul threshold | per day | halved / doubled |
+| Market gluts recover | 3% a day | 1.5% a day |
+| Hiring hall turnover | 30 days | 60 days |
+
+Career report: trips now average 45-50 days; money per trip about where it was; no broke careers in either profile. The bot's "worth the wages" threshold dropped from 60 to 30 cr/h with the wages.

@@ -55,7 +55,7 @@ export interface Recruit extends CrewMember {
 
 export const MAX_LEVEL = 10;
 /** Daily wage of a level-1 officer, before clan adjustments. */
-export const BASE_WAGE = 30;
+export const BASE_WAGE = 15;
 /** Wage growth per level above 1. */
 export const WAGE_PER_LEVEL = 0.07;
 /** Extra experience in a clan's trained stations. */
@@ -72,10 +72,10 @@ export function upbringingOf(m: Pick<CrewMember, "id" | "name" | "born">): Upbri
   return hashSeed(m.id, m.name, "upbringing") % 3 === 0 ? "settlement" : "decks";
 }
 /** How often the hiring hall's pool turns over. */
-export const RECRUIT_POOL_DAYS = 30;
+export const RECRUIT_POOL_DAYS = 60;
 export const RECRUIT_POOL_SIZE = 5;
 /** Signing bonus, in days of the recruit's wage. */
-export const SIGNING_DAYS = 15;
+export const SIGNING_DAYS = 30;
 
 // --- levels ------------------------------------------------------------------------------
 

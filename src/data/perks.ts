@@ -103,7 +103,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     [
       ["deal-maker", "Deal Maker", "+2 effective Comms levels for contract pay."],
       ["extensions", "Extensions", "Contracts allow 25% more time."],
-      ["note-restructuring", "Note Restructuring", "The Exchange cuts your loan rate by 2 points."],
+      ["note-restructuring", "Note Restructuring", "The Exchange cuts your loan rate by a third (3% a year becomes 2%)."],
       ["favors-owed", "Favors Owed", "A clan forgives one failed contract.", "clan reputation (M4)"],
       ["preferred-captain", "Preferred Captain", "Clans offer you exclusive, high-value contracts."],
     ],

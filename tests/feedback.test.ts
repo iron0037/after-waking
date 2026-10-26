@@ -32,16 +32,16 @@ describe("loan prepayment (SCRUM-41)", () => {
     const state = newGame({ seed: 3 });
     payLoan(state, state.loan.payment);
     state.credits = 0; // broke on the due date
-    advanceTime(state, 61 * DAY);
+    advanceTime(state, 121 * DAY);
     expect(state.loan.missed).toBe(0);
     expect(state.loan.prepaid).toBe(0);
   });
 
   it("still auto-debits from credits when nothing was prepaid", () => {
     const state = newGame({ seed: 3 });
-    state.credits = 30_000; // covers ~61 days of wages (paid daily while docked) plus the installment
+    state.credits = 30_000; // covers ~121 days of wages (paid daily while docked) plus the installment
     const balance = state.loan.balance;
-    advanceTime(state, 61 * DAY);
+    advanceTime(state, 121 * DAY);
     expect(state.loan.missed).toBe(0);
     expect(state.loan.balance).toBeLessThan(balance + 1_000);
   });

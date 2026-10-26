@@ -64,9 +64,15 @@ export const MANEUVER_MINUTES = 20;
 export const DESCENT_MINUTES = 2 * HOUR;
 export const ASCENT_MINUTES = HOUR;
 export const SCAN_MINUTES = HOUR;
-export const PROSPECT_MINUTES = 2 * HOUR;
-export const DRILL_SETUP_MINUTES = 3 * HOUR;
-export const DRILL_ENERGY_PER_HOUR = 1.5;
+export const PROSPECT_MINUTES = 3 * HOUR;
+export const DRILL_SETUP_MINUTES = 5 * HOUR;
+/** Rover energy per drilling hour; scaled with DRILL_PACE so a tonne costs the same energy. */
+export const DRILL_ENERGY_PER_HOUR = 0.525;
+/**
+ * The slower clock (AW-142): extraction runs at about a third of the old pace, so a trip takes
+ * 45-50 days instead of ~30. Per-day costs and rates were halved to match, keeping money per trip.
+ */
+export const DRILL_PACE = 0.35;
 export const ROVER_STOW_MINUTES = 30;
 export const PROSPECT_ENERGY = 4;
 export const DRILL_SETUP_ENERGY = 6;
@@ -117,8 +123,8 @@ export function foldRefitMinutes(ly: number): number {
   return DAY * (REFIT_BASE_DAYS + REFIT_DAYS_PER_LY * ly);
 }
 
-export const REFIT_BASE_DAYS = 4;
-export const REFIT_DAYS_PER_LY = 1.5;
+export const REFIT_BASE_DAYS = 6;
+export const REFIT_DAYS_PER_LY = 2.25;
 
 // --- where are we ------------------------------------------------------------------------
 
@@ -410,7 +416,7 @@ export function sensorRadius(state: GameState, bodyId: string): number {
 
 /** Tonnes per hour from a deposit: the drill, the grade, and the engineer. */
 export function drillRate(state: GameState, d: Deposit): number {
-  return effectiveStats(state).drillRateTph * (0.4 + d.grade) * crewBonuses(state).drillRate;
+  return effectiveStats(state).drillRateTph * DRILL_PACE * (0.4 + d.grade) * crewBonuses(state).drillRate;
 }
 
 /** A slow, careful orbital pass: sharper region readings and wider rover detection on this body. */
@@ -1016,7 +1022,7 @@ function pickIncident(rng: Rng, kind: "breakdown" | "storm" | "quake", atFractio
   }
 }
 
-export const SAMPLE_MINUTES = 60;
+export const SAMPLE_MINUTES = 90;
 export const SAMPLE_ENERGY = 3;
 
 /** A spotted flora site, by key, with its region's knowledge. */
@@ -1451,7 +1457,7 @@ export function tickYard(state: GameState): void {
 }
 
 /** Yard crews at the Intrepid will scrub the drive around the clock, for a price per day saved. */
-export const REFIT_RUSH_CR_PER_DAY = 400;
+export const REFIT_RUSH_CR_PER_DAY = 300;
 
 export function rushRefitCost(state: GameState, days: number): number {
   const left = Math.max(0, state.foldReadyAt - state.time) / DAY;

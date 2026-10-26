@@ -237,7 +237,7 @@ function mineSystem(
     .slice(0, 3);
 
   for (const body of targets) {
-    if (holdFull() || state.time - arrived > 60 * DAY) return;
+    if (holdFull() || state.time - arrived > 120 * DAY) return;
     if (must(`fly to ${body.name}`, flyTo(state, world, { bodyId: body.id })) === null) return;
     must(`scan ${body.name}`, scanBody(state, world));
     if (survey && !novice && !state.surveyedBodies.includes(body.id)) must(`survey ${body.name}`, surveyBody(state, world));
@@ -296,8 +296,8 @@ function workRegion(
       .map((d) => ({ d, path: findPath(surface, rover, d, roverMobility(state)) }))
       .filter((c) => c.path !== null)
       .map((c) => ({ ...c, score: valuePerHour(c.d, c.path!.length) }))
-      // Not worth the crew's wages (25 cr/h for six on shift) unless the bed is nearly full anyway.
-      .filter((c) => c.score >= 60 || cargoTonnes(rover.cargo) > stats.roverCargoT * 0.7)
+      // Not worth the crew's wages (about 12 cr/h for six on shift, after AW-142) unless the bed is nearly full anyway.
+      .filter((c) => c.score >= 30 || cargoTonnes(rover.cargo) > stats.roverCargoT * 0.7)
       .sort((a, b) => b.score - a.score);
 
     const homeCost = (from: { x: number; y: number }) =>

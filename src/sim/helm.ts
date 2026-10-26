@@ -24,9 +24,9 @@ export const HELM_LOSING_STREAK = 2;
 /** Assists in any 12 months. */
 export const HELM_ASSISTS_PER_YEAR = 2;
 /** The stipend covers this many days of wages and upkeep. */
-export const HELM_STIPEND_DAYS = 30;
+export const HELM_STIPEND_DAYS = 60;
 /** Days to fly the survey Helm asks for in return. */
-export const HELM_OBLIGATION_DAYS = 150;
+export const HELM_OBLIGATION_DAYS = 300;
 /** How long Helm shuns a captain who skips an obligation. */
 export const HELM_SHUN_YEARS = 2;
 

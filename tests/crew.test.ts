@@ -30,7 +30,7 @@ describe("crew roster", () => {
     expect(new Set(state.crew!.map((m) => m.station))).toEqual(new Set(OFFICER_STATIONS));
     for (const s of OFFICER_STATIONS) expect(stationLevel(state, s)).toBe(1);
     expect(stationLevel(state, "captain")).toBe(1);
-    expect(dailyWages(state)).toBeGreaterThan(110);
+    expect(dailyWages(state)).toBeGreaterThan(55); // halved with the slower clock (AW-142)
     expect(dailyWages(state)).toBeLessThan(170);
     expect(state.recruits!.length).toBeGreaterThan(0);
   });

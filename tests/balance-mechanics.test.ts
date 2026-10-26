@@ -66,11 +66,11 @@ describe("ways back from a bad run", () => {
     const state = newGame({ seed: 42 });
     state.credits = 0;
     state.ship.upgrades = [];
-    advanceTime(state, 61 * DAY);
+    advanceTime(state, 121 * DAY);
     state.credits = 0;
     expect(state.loan.missed).toBe(0);
     expect(state.loan.graceAt).toBeDefined();
-    advanceTime(state, 60 * DAY);
+    advanceTime(state, 120 * DAY);
     state.credits = 0;
     advanceTime(state, 1);
     expect(state.loan.missed).toBe(1);

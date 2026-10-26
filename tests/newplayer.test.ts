@@ -138,7 +138,7 @@ describe("starter contracts", () => {
   it("posts new delivery work over time and lapses overdue contracts", () => {
     const state = newGame({ seed: 5 });
     expect(acceptContract(state, "starter-iron").ok).toBe(true);
-    wait(state, 200 * 24 * 60);
+    wait(state, 400 * 24 * 60);
     expect(state.contracts.find((c) => c.id === "starter-iron")!.status).toBe("failed");
     expect(state.contracts.filter((c) => c.id.startsWith("deliver-")).length).toBeGreaterThan(0);
   });
