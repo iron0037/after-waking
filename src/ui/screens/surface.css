@@ -280,3 +280,17 @@
   padding-top: 8px;
   border-top: 1px solid var(--border-bright);
 }
+
+/* How much "Work this deposit" hauls */
+.haul-target {
+  display: block;
+  margin-top: 4px;
+}
+.haul-target select {
+  font: inherit;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+}

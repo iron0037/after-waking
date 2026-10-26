@@ -733,3 +733,17 @@ table.data th.num {
   padding-left: 4px;
   list-style: none;
 }
+
+.jettison-form input {
+  width: 64px;
+  font: inherit;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+.danger-btn {
+  border-color: var(--danger);
+  color: #ffd0d0;
+}

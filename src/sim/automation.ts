@@ -37,7 +37,8 @@ export type WorkStop =
   | "hold full"
   | "unreachable"
   | "low energy"
-  | "time limit";
+  | "time limit"
+  | "target reached";
 
 export interface WorkReport {
   /** Rover round trips completed (drill, haul, unload). */
@@ -70,7 +71,7 @@ function rover(state: GameState): RoverState | null {
  * home, haul back, unload, repeat. Storms, quakes and breakdowns cost time and are reported,
  * but only stop the run if they leave the rover unable to get home safely.
  */
-export function workDeposit(state: GameState, world: World, key: SiteKey): Result<WorkReport> {
+export function workDeposit(state: GameState, world: World, key: SiteKey, maxTonnes = Infinity): Result<WorkReport> {
   const loc = state.location;
   if (loc.kind !== "surface") return fail("Not on a surface.");
   const surface = world.surface(loc.bodyId);
@@ -127,6 +128,11 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
       if (!haulHome()) return finish("low energy", "The rover can't get home on its remaining energy. Recall it.");
       return finish("deposit depleted", `The ${name} deposit is worked out.`);
     }
+    // The captain asked for this much and no more.
+    if (cargoTonnes(state.ship.cargo) - startHold >= maxTonnes - 0.5) {
+      if (!haulHome()) return finish("low energy", "The rover can't get home on its remaining energy. Recall it.");
+      return finish("target reached", `Hauled the ${Math.round(maxTonnes)} t you asked for.`);
+    }
     if (holdRoom() <= 0.5) {
       if (!haulHome()) return finish("low energy", "The rover can't get home on its remaining energy. Recall it.");
       return finish("hold full", "The ship's hold is full.");
@@ -160,7 +166,7 @@ export function workDeposit(state: GameState, world: World, key: SiteKey): Resul
     const homePath = findPath(surface, rover(state) as RoverState, dock() as { x: number; y: number }, mobility);
     const budget = ((rover(state) as RoverState).energy - energyOf(state, homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
     const bedRoom = vehicleCargoT(state, vehicle) - cargoTonnes((rover(state) as RoverState).cargo);
-    const loadCap = Math.min(bedRoom, holdRoom());
+    const loadCap = Math.min(bedRoom, holdRoom(), maxTonnes - (cargoTonnes(state.ship.cargo) - startHold) - cargoTonnes((rover(state) as RoverState).cargo));
     if (budget > 0.5 && loadCap > 0.5) {
       const rate = drillRate(state, deposit);
       const drilled = drill(state, world, key, Math.min(budget, loadCap / rate));

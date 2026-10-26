@@ -966,7 +966,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (r.ok) session.notify(`Recharged the ${noun}'s cells in ${formatDuration(r.value.hours * HOUR)}.`);
   };
 
-  const doWork = async (mark: DepositMark): Promise<void> => {
+  const doWork = async (mark: DepositMark, maxTonnes = Infinity): Promise<void> => {
     const dep = mark.d;
     const blockers = workBlockers(state, world, mark.know, dep);
     if (blockers[0]) {
@@ -977,7 +977,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const rightVehicle = rover !== null && vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, dep), "deposit") === null;
     if (rightVehicle && rover && hexDistance(rover, dep) <= 1 && !(await driveTo(dep, true, true))) return;
     const name = COMMODITIES[dep.commodity].name.toLowerCase();
-    const r = session.act((s, w) => workDeposit(s, w, dep.key));
+    const r = session.act((s, w) => workDeposit(s, w, dep.key, maxTonnes));
     if (!r.ok) return;
     const rep = r.value;
     const done = rep.stop === "deposit depleted";
@@ -986,7 +986,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       rep.tonnes > 0 || rep.loads > 0
         ? `Crew hauled ${tonnes(rep.tonnes)} of ${name} in ${loads} over ${formatDuration(rep.minutes)}`
         : `Crew spent ${formatDuration(rep.minutes)} on the ${name} deposit and hauled nothing`;
-    session.notify(`${head} — ${done ? "deposit worked out." : rep.detail}`, done || rep.stop === "hold full" ? "info" : "error");
+    session.notify(`${head} — ${done ? "deposit worked out." : rep.detail}`, done || rep.stop === "hold full" || rep.stop === "target reached" ? "info" : "error");
     if (rep.incidents.length > 0) session.notify(`Along the way: ${rep.incidents.join(" ")}`, "error");
   };
 
@@ -1050,7 +1050,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         else doLaunch(false);
       }
     } else if (key === "f") {
-      if (selected) void doWork(selected);
+      if (selected) void doWork(selected, lastHaulTarget > 0 ? lastHaulTarget : Infinity);
       else session.notify("Select a deposit first.", "error");
     }
   };
@@ -1335,7 +1335,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             atSite={atSite(selected.d)}
             goTo={() => driveTo(selected.d, true, true)}
             drive={() => void driveTo(selected.d, true)}
-            work={() => void doWork(selected)}
+            work={(max) => void doWork(selected, max)}
             busy={busy}
           />
         ) : (
@@ -1728,6 +1728,9 @@ function FloraPanel({
   );
 }
 
+/** The last haul amount picked on a deposit panel (0 = until the hold is full). UI preference only. */
+let lastHaulTarget = 0;
+
 function DepositPanel({
   session,
   dep,
@@ -1747,9 +1750,11 @@ function DepositPanel({
   /** Drives the rover onto the deposit (if it isn't there yet); resolves true once it is. */
   goTo: () => Promise<boolean>;
   drive: () => void;
-  work: () => void;
+  work: (maxTonnes?: number) => void;
   busy: boolean;
 }) {
+  // How much to haul: "until full" by default; the choice sticks between deposits.
+  const [haulTarget, setHaulTarget] = useState<number>(lastHaulTarget);
   const stats = effectiveStats(session.state);
   const commodity = COMMODITIES[dep.commodity];
   const status = depositStatus(know, dep);
@@ -1861,11 +1866,29 @@ function DepositPanel({
         <button
           class="btn primary big work-btn"
           disabled={busy || workBlock.length > 0}
-          title={workBlock[0] ?? "Crew prospects, drills and hauls loads home until the deposit is worked out or the hold is full (F)"}
-          onClick={work}
+          title={workBlock[0] ?? "Crew prospects, drills and hauls loads home until the deposit is worked out, the hold is full, or they've hauled the amount you picked (F)"}
+          onClick={() => work(haulTarget > 0 ? haulTarget : undefined)}
         >
           Work this deposit
         </button>
+        <label class="haul-target small muted" title="Stop once this much has been hauled into the hold">
+          Haul{" "}
+          <select
+            value={String(haulTarget)}
+            onChange={(e) => {
+              const v = Number((e.target as HTMLSelectElement).value);
+              lastHaulTarget = v;
+              setHaulTarget(v);
+            }}
+          >
+            <option value="0">until the hold is full</option>
+            {[20, 50, 100, 200, 300].map((t) => (
+              <option key={t} value={String(t)}>
+                up to {t} t
+              </option>
+            ))}
+          </select>
+        </label>
         {workBlock.length > 0 ? (
           <p class="danger small act-note">{workBlock[0]}</p>
         ) : (

@@ -1198,6 +1198,21 @@ export function reservedCargo(state: GameState): Partial<Record<CommodityId, num
   return out;
 }
 
+/**
+ * Dump cargo from the hold: out of the airlock in space, onto the ground on a surface. For a hold
+ * filled with the wrong ore, or to lighten the ship for a fold home. (At the Intrepid, sell it.)
+ */
+export function jettisonCargo(state: GameState, id: CommodityId, tonnes?: number): Result<number> {
+  if (state.location.kind === "intrepid") return fail("Docked at the Intrepid: sell it instead.");
+  const have = state.ship.cargo[id] ?? 0;
+  const amount = Math.round(Math.min(have, tonnes ?? have) * 10) / 10;
+  if (amount < 0.1) return fail("Nothing to jettison.");
+  removeCargo(state.ship.cargo, id, amount);
+  advanceTime(state, 20);
+  log(state, "warning", `Jettisoned ${amount} t of ${COMMODITIES[id].name.toLowerCase()}${state.location.kind === "surface" ? " onto the ground" : " out of the airlock"}.`);
+  return ok(amount);
+}
+
 /** How much of a commodity can be sold without dipping into tonnage held for contracts. */
 export function sellableTonnes(state: GameState, id: CommodityId): number {
   // Concentrate (AW-18) covers whatever a delivery still needs after the raw ore.

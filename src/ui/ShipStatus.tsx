@@ -2,12 +2,15 @@
  * Ship status window (AW-130): the hold, specimens, vehicles and gear at a glance, from any screen.
  * Also where the portable refinery (AW-18) is run. Numbers come from src/sim (holdManifest).
  */
+import { useState } from "preact/hooks";
+import type { CommodityId } from "../data/commodities";
 import { UPGRADES_BY_ID } from "../data/ship";
 import {
   effectiveStats,
   formatDuration,
   holdManifest,
   HOUR,
+  jettisonCargo,
   requirementProgress,
   trackedProjects,
   refineBlockers,
@@ -23,6 +26,9 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
   const m = holdManifest(state);
   const out = vehiclesOut(state);
   const hasRefinery = stats.refineryRateTph > 0;
+  // Jettison: a small inline form on one row at a time (amount defaults to all of it).
+  const [dumping, setDumping] = useState<{ id: CommodityId; t: string } | null>(null);
+  const canDump = state.location.kind !== "intrepid";
   const bodyName = (id: string) => {
     try {
       return session.world.body(id).body.name;
@@ -62,6 +68,7 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
                       For contracts
                     </th>
                     {hasRefinery && <th class="num">Refinery</th>}
+                    {canDump && <th />}
                   </tr>
                 </thead>
                 <tbody>
@@ -90,6 +97,44 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
                               </button>
                             ) : (
                               <span class="muted">-</span>
+                            )}
+                          </td>
+                        )}
+                        {canDump && (
+                          <td class="num">
+                            {dumping?.id === r.id ? (
+                              <span class="jettison-form">
+                                <input
+                                  type="number"
+                                  min="0.1"
+                                  step="1"
+                                  max={String(r.tonnes)}
+                                  value={dumping.t}
+                                  onInput={(e) => setDumping({ id: r.id, t: (e.target as HTMLInputElement).value })}
+                                />{" "}
+                                t{" "}
+                                <button
+                                  class="btn danger-btn"
+                                  disabled={session.busy || !(Number(dumping.t) > 0)}
+                                  onClick={() => {
+                                    session.act((s) => jettisonCargo(s, r.id, Number(dumping.t)));
+                                    setDumping(null);
+                                  }}
+                                >
+                                  Dump
+                                </button>{" "}
+                                <button class="btn" onClick={() => setDumping(null)}>
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                class="btn"
+                                title={state.location.kind === "surface" ? "Dump it on the ground: frees hold space and lightens the ship" : "Vent it out of the airlock: frees hold space and lightens the ship for the fold"}
+                                onClick={() => setDumping({ id: r.id, t: String(Math.round(r.tonnes * 10) / 10) })}
+                              >
+                                Jettison
+                              </button>
                             )}
                           </td>
                         )}
