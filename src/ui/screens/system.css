@@ -333,3 +333,38 @@
   margin-right: 4px;
   vertical-align: middle;
 }
+
+.sys-nick-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+.sys-nick-btn {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.sys-nick-btn:hover {
+  color: var(--cyan);
+  border-color: var(--border-bright);
+}
+.sys-nick-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 2px 0;
+}
+.sys-nick-edit input {
+  flex: 1;
+  min-width: 0;
+  width: 120px;
+}
+.sys-nick-edit .btn {
+  padding: 3px 8px;
+}

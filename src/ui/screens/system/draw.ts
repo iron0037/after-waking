@@ -1,5 +1,6 @@
 /** Canvas rendering for the system orrery. Pure drawing: no state, no side effects but the hit list. */
 import {
+  bodyNickname,
   bodyPosition,
   burnPath,
   dist,
@@ -374,6 +375,17 @@ function drawContractMark(ctx: CanvasRenderingContext2D, p: Vec2, r: number): vo
   ctx.restore();
 }
 
+interface LabelBox {
+  id: string;
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+const boxesOverlap = (a: Pick<LabelBox, "x0" | "x1" | "y0" | "y1">, b: Pick<LabelBox, "x0" | "x1" | "y0" | "y1">): boolean =>
+  a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
 function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string, Vec2>, proj: Projection, w: number): void {
   const { state, detail } = scene;
   const orbitingId = state.location.kind === "space" ? state.location.orbiting : null;
@@ -381,6 +393,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string
   ctx.font = FONT(11);
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
+  const drawn: { b: Body; x: number; y: number; flip: boolean; focus: boolean; box: LabelBox }[] = [];
   for (const b of detail.bodies) {
     const focus = b.id === scene.selectedId || b.id === scene.hoverId || b.id === orbitingId;
     // Moons announce themselves once you zoom in, or whenever their parent is in focus.
@@ -398,6 +411,34 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string
     ctx.strokeText(b.name, x, y);
     ctx.fillStyle = focus ? UI.text : state.scannedBodies.includes(b.id) ? rgba(UI.text, 0.85) : rgba(UI.muted, 0.95);
     ctx.fillText(b.name, x, y);
+    const tw = ctx.measureText(b.name).width;
+    drawn.push({ b, x, y, flip, focus, box: { id: b.id, x0: flip ? x - tw : x, x1: flip ? x : x + tw, y0: y - 7, y1: y + 7 } });
+  }
+
+  // The captain's own names for worlds: a smaller grey second line, only where it doesn't collide with another label or world.
+  ctx.font = FONT(10);
+  for (const { b, x, y, flip, focus, box } of drawn) {
+    const nick = bodyNickname(state, b);
+    if (!nick || b.kind === "asteroid") continue;
+    if (b.parentId && !focus) continue;
+    const tw = ctx.measureText(nick).width;
+    const ny = y + 13;
+    const nbox = { x0: flip ? x - tw : x, x1: flip ? x : x + tw, y0: ny - 6, y1: ny + 6 };
+    if (nbox.x0 < 4 || nbox.x1 > w - 4) continue;
+    if (drawn.some((o) => o.box.id !== box.id && boxesOverlap(nbox, o.box))) continue;
+    const crowded = detail.bodies.some((o) => {
+      if (o.id === b.id) return false;
+      const op = pos.get(o.id) as Vec2;
+      const or = discRadius(o, proj.zoom) + 2;
+      return boxesOverlap(nbox, { x0: op.x - or, x1: op.x + or, y0: op.y - or, y1: op.y + or });
+    });
+    if (crowded) continue;
+    ctx.textAlign = flip ? "right" : "left";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = rgba(UI.space, 0.85);
+    ctx.strokeText(nick, x, ny);
+    ctx.fillStyle = rgba(UI.muted, focus ? 1 : 0.9);
+    ctx.fillText(nick, x, ny);
   }
   ctx.restore();
 }

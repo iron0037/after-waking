@@ -408,7 +408,12 @@ function clanStart(state: GameState, world: World, clan: ClanId): void {
     for (const sys of extra) for (const b of world.system(sys.id).bodies) if (!state.scannedBodies.includes(b.id)) state.scannedBodies.push(b.id);
   }
   if (clan === "midshipmen") {
+    // A seasoned Midshipman engineer, one of your own.
     const eng = (state.crew ?? []).find((m) => m.station === "engineering");
-    if (eng) eng.xp = Math.max(eng.xp, xpForLevel(3));
+    if (eng) {
+      if (eng.clan !== "midshipmen") eng.loyalty = Math.min(100, (eng.loyalty ?? 50) + 10);
+      eng.clan = "midshipmen";
+      eng.xp = Math.max(eng.xp, xpForLevel(3));
+    }
   }
 }

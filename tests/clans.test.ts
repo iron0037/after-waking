@@ -44,6 +44,7 @@ describe("starting clan (AW-146)", () => {
   it("Midshipmen: own gear 10% off, a seasoned engineer, pricier upkeep", () => {
     const s = newGame({ seed: 3, clan: "midshipmen" });
     expect(levelForXp(officerAt(s, "engineering")!.xp)).toBeGreaterThanOrEqual(3);
+    expect(officerAt(s, "engineering")!.clan).toBe("midshipmen");
     s.credits = 100_000;
     const coil = UPGRADES_BY_ID.get("auxTanks")!;
     expect(coil.vendor).toBe("midshipmen");

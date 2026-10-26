@@ -1,4 +1,4 @@
-import { activeRegion, ageAt, compendiumTotals, crewAlerts, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, captainTitle, compendiumTotals, crewAlerts, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
 import { STATION_INFO } from "../data/crew";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
@@ -35,7 +35,7 @@ export function TopBar({
       <div class="tb-block">
         <div class="tb-label">{formatDate(state.time)}</div>
         <div class="tb-value">
-          {state.captain.name}, {ageAt(state.captain.born, state.time)}
+          {captainTitle(state.captain.name)}, {ageAt(state.captain.born, state.time)}
         </div>
       </div>
       <div class="tb-block">

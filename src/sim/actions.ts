@@ -3,6 +3,7 @@
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
 import { clanMods, upgradePriceFor } from "./clan";
+import { bodyNickname } from "./nicknames";
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
 import { driveDamageMult, finishRepairs, maybeInterdict } from "./combat";
@@ -943,7 +944,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
   log(state, "info", `${vehicleOf(rover) === "boat" ? "Dredged" : "Drilled"} ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
 
-  const where = placeName(world, bodyId);
+  const where = placeName(world, bodyId, state);
   if (tonnes > 0) recordFind(state, "mineral", d.commodity, where, COMMODITIES[d.commodity].name);
   const fortune = hasPerk(state, "fortune-favors");
   const gem = withRng(state, (rng) => rollMineralSpecimen(rng, d.commodity, hours, fortune ? 2 : 1));
@@ -980,9 +981,10 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
 }
 
 /** "Juniper IV (the Meadow)" */
-export function placeName(world: World, bodyId: string): string {
+export function placeName(world: World, bodyId: string, state?: Pick<GameState, "nicknames">): string {
   const { body } = world.body(bodyId);
-  return body.nickname ? `${body.name} (${body.nickname})` : body.name;
+  const nick = state ? bodyNickname(state, body) : body.nickname;
+  return nick ? `${body.name} (${nick})` : body.name;
 }
 
 interface Incident {
@@ -1075,7 +1077,7 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   awardXp(state, "science", 2);
   cheerStation(state, "medical", 1);
   const entry = FLORA_BY_NAME.get(site.species);
-  if (entry) recordFind(state, "flora", entry.id, placeName(world, bodyId), entry.name);
+  if (entry) recordFind(state, "flora", entry.id, placeName(world, bodyId, state), entry.name);
   return ok(site);
 }
 

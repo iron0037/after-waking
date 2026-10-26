@@ -445,6 +445,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             detail={detail}
             time={state.time}
             shipPos={shipReal}
+            nicknames={state.nicknames}
             scanned={state.scannedBodies}
             orbitingId={orbitingId}
             selectedId={selected?.id ?? null}
@@ -459,7 +460,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
         {selected ? (
           <section class="panel sys-selected">
-            <BodyHeader body={selected} detail={detail} scanned={scanned} />
+            <BodyHeader body={selected} detail={detail} scanned={scanned} session={session} />
             <Exploration
               state={state}
               progress={progress.get(selected.id) ?? bodyProgress(state, selected)}

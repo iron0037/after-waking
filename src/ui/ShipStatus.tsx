@@ -14,6 +14,7 @@ import {
   playerSide,
   shipDamage,
   requirementProgress,
+  researchCost,
   trackedProjects,
   refineBlockers,
   refineOre,
@@ -172,7 +173,7 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
                         </li>
                       );
                     })}
-                    <li class="muted">· {cr(p.cost)} at the Intrepid's Research tab</li>
+                    <li class="muted">· {cr(researchCost(state, p))} at the Intrepid's Research tab</li>
                   </ul>
                 </div>
               ))}

@@ -1,6 +1,6 @@
 /** Every body in the system, moons indented under their parents. */
 import { useEffect, useRef } from "preact/hooks";
-import { bodyPosition, dist, type BodyProgress, type Contract, type SystemDetail, type Vec2 } from "../../../sim";
+import { bodyNickname, bodyPosition, dist, type BodyProgress, type Contract, type SystemDetail, type Vec2 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
 import { fmtAU, progressLabel, shortKind } from "./util";
 
@@ -8,6 +8,8 @@ export interface BodyListProps {
   detail: SystemDetail;
   time: number;
   shipPos: Vec2;
+  /** The captain's names for worlds (state.nicknames). */
+  nicknames: Record<string, string> | undefined;
   scanned: string[];
   orbitingId: string | null;
   selectedId: string | null;
@@ -20,7 +22,7 @@ export interface BodyListProps {
   onHover: (id: string | null) => void;
 }
 
-export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedId, hoverId, progress, targets, landable, onSelect, onHover }: BodyListProps) {
+export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId, selectedId, hoverId, progress, targets, landable, onSelect, onHover }: BodyListProps) {
   const box = useRef<HTMLDivElement>(null);
 
   // Keep the selected row visible when the selection came from the map.
@@ -48,6 +50,7 @@ export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedI
         <tbody>
           {detail.bodies.map((b) => {
             const here = b.id === orbitingId;
+            const nick = bodyNickname({ nicknames }, b);
             const d = dist(shipPos, bodyPosition(detail, b, time));
             const prog = progress.get(b.id);
             const jobs = targets.get(b.id) ?? [];
@@ -57,7 +60,7 @@ export function BodyList({ detail, time, shipPos, scanned, orbitingId, selectedI
                 <td class={b.parentId ? "sys-moon" : ""}>
                   <span class="sys-dot" style={{ background: BODY_COLOR[b.kind] }} />
                   {b.name}
-                  {b.nickname && <span class="muted"> · {b.nickname}</span>}
+                  {nick && <span class="muted"> · {nick}</span>}
                   {scanned.includes(b.id) && <span class="sys-scanned" title="Scanned" />}
                   {scanned.includes(b.id) && landable.has(b.id) && (
                     <span class="good" title="Your ship can land here and mine">

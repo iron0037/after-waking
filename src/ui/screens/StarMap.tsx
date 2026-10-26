@@ -1,5 +1,5 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
-import { researchWants } from "../../sim";
+import { bodyNickname, researchWants } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   prepareFold,
@@ -1107,7 +1107,7 @@ function BodyList({ session, systemId }: { session: GameSession; systemId: strin
           <span class="sm-dot" style={{ background: BODY_COLOR[body.kind] }} />
           <span class="sm-body-name">
             {body.name}
-            {body.nickname && <span class="muted"> · {body.nickname}</span>}
+            {bodyNickname(session.state, body) && <span class="muted"> · {bodyNickname(session.state, body)}</span>}
             {body.easy && (
               <>
                 {" "}

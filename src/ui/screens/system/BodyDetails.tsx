@@ -1,13 +1,17 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import type { Ratings } from "../../../data/ship";
+import { useEffect, useRef, useState } from "preact/hooks";
 import {
+  bodyNickname,
   contractProgress,
   DAY,
   formatDuration,
   formatPressure,
   KIND_LABEL,
+  NICKNAME_MAX,
   RADIATION_LABEL,
+  setNickname,
   TECTONICS_LABEL,
   WEATHER_LABEL,
   type Body,
@@ -18,6 +22,7 @@ import {
 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
 import { pct } from "../../format";
+import type { GameSession } from "../../session";
 import { fmtAU } from "./util";
 
 const SURFACE_LABEL = { solid: "Solid", ice: "Ice crust", liquid: "Global ocean", none: "None (gaseous)" } as const;
@@ -31,15 +36,70 @@ export function orbitSummary(detail: SystemDetail, body: Body): string {
   return `Orbits ${detail.system.name} at ${fmtAU(body.orbitAU)} AU · period ${period}`;
 }
 
-export function BodyHeader({ body, detail, scanned }: { body: Body; detail: SystemDetail; scanned: boolean }) {
+/** The captain's own name for a world, shown under the catalogue name with a "Name it" control. */
+function NicknameLine({ session, body }: { session: GameSession; body: Body }) {
+  const current = bodyNickname(session.state, body);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!editing) return;
+    input.current?.focus();
+    input.current?.select();
+  }, [editing]);
+  const begin = () => {
+    setDraft(current ?? "");
+    setEditing(true);
+  };
+  const save = () => {
+    const res = session.act((s) => setNickname(s, body.id, draft));
+    if (res.ok) setEditing(false);
+  };
+  if (editing) {
+    return (
+      <div class="sys-nick-edit">
+        <input
+          ref={input}
+          value={draft}
+          maxLength={NICKNAME_MAX}
+          placeholder="Name this world"
+          aria-label="World nickname"
+          onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") save();
+            else if (e.key === "Escape") setEditing(false);
+          }}
+        />
+        <button class="btn" onClick={save} title="Save (Enter). Leave it empty to clear your name for this world.">
+          Save
+        </button>
+        <button class="btn" onClick={() => setEditing(false)} title="Cancel (Esc)">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div class="sys-nick-line">
+      {current && <span class="muted sys-nick">{current}</span>}
+      <button class="sys-nick-btn" onClick={begin} title={current ? "Rename this world" : "Give this world a name of your own"}>
+        {"✎"}
+        {current ? "" : " Name it"}
+      </button>
+    </div>
+  );
+}
+
+export function BodyHeader({ body, detail, scanned, session }: { body: Body; detail: SystemDetail; scanned: boolean; session: GameSession }) {
   return (
     <div class="sys-body-head">
       <span class="sys-swatch" style={{ background: BODY_COLOR[body.kind] }} />
       <div>
         <h2 class="sys-body-name">
           {body.name}
-          {body.nickname && <span class="muted sys-nick"> · {body.nickname}</span>}
         </h2>
+        <NicknameLine session={session} body={body} />
         <div class="muted small">
           {KIND_LABEL[body.kind]} · {body.radiusEarth.toFixed(2)} R⊕ {scanned && <span class="tag">scanned</span>}
           {body.easy && <span class="tag sys-calm-tag">calm</span>}

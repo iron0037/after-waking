@@ -1,6 +1,6 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
-import { requirementProgress, researchBlockers, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradeUnlocked } from "../../sim";
+import { clanMods, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
 import { FLORA_BY_NAME } from "../../data/catalog";
@@ -35,7 +35,7 @@ import {
   UPKEEP_RATE_PER_DAY,
   formatDate,
   formatDuration,
-  fuelPrice,
+  fuelPriceFor,
   HELM_LOSING_STREAK,
   helmStatus,
   loanOutlook,
@@ -212,7 +212,7 @@ function Market({ session }: { session: GameSession }) {
   const heldBack = held - sellable;
   const estimate = COMMODITY_IDS.reduce((sum, id) => sum + sellableTonnes(state, id) * sellPrice(state.market, id) * salePrice, 0);
   const crewCutNow = crewCut(state, estimate);
-  const price = fuelPrice(state.market);
+  const price = fuelPriceFor(state);
   const room = Math.floor(stats.fuelCapacity - state.ship.fuel);
   const affordable = Math.floor(state.credits / price);
   const canBuy = room >= 1 && affordable >= 1;
@@ -937,7 +937,10 @@ function Shipyard({ session }: { session: GameSession }) {
               {UPGRADES.filter((u) => u.category === cat).map((u) => {
                 const installed = state.ship.upgrades.includes(u.id);
                 const job = (state.yard ?? []).find((j) => j.kind === "install" && j.upgradeId === u.id);
-                const short = u.price - state.credits;
+                const upkeepMult = clanMods(state).upkeep;
+                const basePrice = u.price;
+                const price = upgradePriceFor(state, u.vendor, basePrice);
+                const short = price - state.credits;
                 const req = u.requires ? UPGRADES.find((x) => x.id === u.requires) : undefined;
                 // A queued install counts toward a requirement, as the sim allows ordering the next tier behind it.
                 const missing = !!u.requires && !state.ship.upgrades.includes(u.requires) && !queuedIds.has(u.requires);
@@ -955,7 +958,9 @@ function Shipyard({ session }: { session: GameSession }) {
                         <span class="tag accent-tag">Installing</span>
                       ) : (
                         <span class="hub-price">
-                          <span class="accent">{cr(u.price)}</span>
+                          <span>
+                            {price < basePrice && <s class="muted small hub-was">{cr(basePrice)}</s>} <span class="accent">{cr(price)}</span>
+                          </span>
                           <span class="muted small">+ {UPGRADE_INSTALL_DAYS} days in the yard</span>
                         </span>
                       )}
@@ -974,7 +979,7 @@ function Shipyard({ session }: { session: GameSession }) {
                     </div>
                     <div class="muted small">{u.description}</div>
                     <div class="muted small" title={`Installed gear costs ${(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day to keep running.`}>
-                      Upkeep {cr(u.price * UPKEEP_RATE_PER_DAY)} / day
+                      Upkeep {cr(u.price * UPKEEP_RATE_PER_DAY * upkeepMult)} / day
                     </div>
                     {job && (
                       <div class="accent small">
@@ -992,7 +997,7 @@ function Shipyard({ session }: { session: GameSession }) {
                             ? `Requires ${reqName} first.`
                             : short > 0
                               ? `You need ${cr(short)} more.`
-                              : `Install for ${cr(u.price)}. ${UPGRADE_INSTALL_DAYS} days in the yard.`
+                              : `Install for ${cr(price)}. ${UPGRADE_INSTALL_DAYS} days in the yard.`
                         }
                         onClick={() => session.act((s) => buyUpgrade(s, u.id))}
                       >
@@ -1047,7 +1052,7 @@ function Research({ session }: { session: GameSession }) {
                     <span class="tag accent-tag">Under way</span>
                   ) : (
                     <span class="hub-price">
-                      <span class="accent">{cr(p.cost)}</span>
+                      <span class="accent">{cr(researchCost(state, p))}</span>
                       <span class="muted small">{p.days} days</span>
                     </span>
                   )}
@@ -1081,7 +1086,7 @@ function Research({ session }: { session: GameSession }) {
                     <button
                       class="btn"
                       disabled={blockers.length > 0}
-                      title={blockers[0] ?? `Hand over the goods and ${cr(p.cost)}; results in ${p.days} days.`}
+                      title={blockers[0] ?? `Hand over the goods and ${cr(researchCost(state, p))}; results in ${p.days} days.`}
                       onClick={() => session.act((s) => startResearch(s, p.id))}
                     >
                       Commission

@@ -6,6 +6,7 @@
  */
 import { useEffect, useReducer } from "preact/hooks";
 import type { Station } from "../data/crew";
+import type { ClanId } from "../data/ship";
 import type { ProbeDepth } from "../data/probes";
 import {
   chooseProbeOption,
@@ -105,8 +106,8 @@ export class GameSession {
     this.view = defaultView(state);
   }
 
-  static fresh(seed: number, captainName?: string): GameSession {
-    const session = new GameSession(newGame({ seed, captainName }));
+  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string): GameSession {
+    const session = new GameSession(newGame({ seed, captainName, clan, shipName }));
     session.save();
     return session;
   }

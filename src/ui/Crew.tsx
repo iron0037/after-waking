@@ -3,12 +3,14 @@
  * overlay for looking at the crew away from the Intrepid. Rules and numbers live in src/sim/crew.
  */
 import { useState } from "preact/hooks";
+import { CAPTAIN_CLANS } from "../data/clans";
 import { CLAN_TRAITS, STATION_INFO, STATIONS, UPBRINGINGS, type Station } from "../data/crew";
 import { PERKS_BY_ID } from "../data/perks";
 import { CLAN_NAMES } from "../data/ship";
 import {
   ageAt,
   bonusLine,
+  captainTitle,
   dailyWages,
   dailyUpkeep,
   freePerkPoints,
@@ -249,12 +251,19 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
       <div class="panel crew-card">
         <div class="hub-card-head">
           <div>
-            <span class="accent">{info.title}</span> <strong>{state.captain.name.replace(/^Captain\s+/i, "")}</strong>
+            <span class="accent">{info.title}</span> <strong>{captainTitle(state.captain.name).replace(/^Captain\s+/i, "")}</strong>
           </div>
           <span class="muted small">age {ageAt(state.captain.born, state.time)}</span>
         </div>
         <div class="muted small">That's you. Captains draw no wage; the Exchange takes its cut elsewhere.</div>
         <LevelMeter xp={state.captain.xp ?? 0} />
+        {state.captain.clan && (
+          <div class="crew-clan small" title={`${CAPTAIN_CLANS[state.captain.clan].perk}\n${CAPTAIN_CLANS[state.captain.clan].cost}`}>
+            <span class="tag">{CLAN_NAMES[state.captain.clan]} clan</span>
+            <div class="good">{CAPTAIN_CLANS[state.captain.clan].perk}</div>
+            <div class="muted">{CAPTAIN_CLANS[state.captain.clan].cost}</div>
+          </div>
+        )}
         <dl class="kv crew-kv">
           <dt>Wage</dt>
           <dd class="muted">none</dd>

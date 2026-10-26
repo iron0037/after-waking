@@ -431,8 +431,8 @@ table.data th.num {
 .title-screen {
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow-y: auto;
+  padding: 16px 0;
   background:
     linear-gradient(180deg, #05070fcc 0%, #05070f55 40%, #05070fdd 100%),
     url("/assets/title.png") center / cover no-repeat,
@@ -446,7 +446,8 @@ table.data th.num {
   backdrop-filter: blur(2px);
 }
 .title-card {
-  width: min(640px, 92vw);
+  width: min(880px, 94vw);
+  margin: auto;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -471,8 +472,17 @@ table.data th.num {
 }
 .new-game {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+.new-game-fields {
+  display: flex;
   gap: 12px;
   align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .new-game label {
   display: flex;
@@ -481,6 +491,91 @@ table.data th.num {
   text-align: left;
   font-size: 12px;
   color: var(--muted);
+}
+.new-game-fields input {
+  width: 190px;
+}
+.name-row {
+  display: flex;
+  gap: 4px;
+}
+.name-row input {
+  flex: 1;
+  min-width: 0;
+  width: 150px;
+}
+.btn.reroll {
+  padding: 4px 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+.new-game-preview {
+  margin: 0;
+  color: var(--text);
+}
+.clan-pick-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.clan-pick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+.clan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  text-align: left;
+  background: #0d1424cc;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.clan-card:hover {
+  border-color: var(--border-bright);
+  background: #131c32;
+}
+.clan-card.selected {
+  border-color: var(--accent);
+  background: #3a2a1066;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.clan-card-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent);
+}
+.clan-card-line b {
+  font-weight: normal;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  margin-right: 4px;
+}
+.clan-card-line.is-perk b {
+  color: var(--good);
+}
+.clan-card-line.is-cost b {
+  color: var(--danger);
+}
+.clan-card-line.is-cost {
+  color: var(--muted);
+}
+.crew-clan {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
 }
 
 /* --- compendium ------------------------------------------------------------------------- */
