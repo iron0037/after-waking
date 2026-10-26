@@ -40,6 +40,9 @@ import {
   helmStatus,
   loanOutlook,
   loanRate,
+  repairQuote,
+  repairShip,
+  shipDamage,
   marketForecast,
   reservedCargo,
   sellableTonnes,
@@ -60,7 +63,7 @@ import {
   wait,
   type Contract,
 } from "../../sim";
-import { bandPhrase, cr, pct, tonnes } from "../format";
+import { bandPhrase, cr, damageSummary, pct, tonnes } from "../format";
 import { ContractAlso, contractBodyNames } from "../Contracts";
 import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
@@ -802,8 +805,52 @@ function Shipyard({ session }: { session: GameSession }) {
   const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => UPGRADES.some((u) => u.category === c));
   const queuedIds = new Set((state.yard ?? []).flatMap((j) => (j.kind === "install" && j.upgradeId ? [j.upgradeId] : [])));
 
+  const repair = repairQuote(state);
+  const damage = damageSummary(shipDamage(state));
+  const repairing = (state.yard ?? []).find((j) => j.kind === "repair");
+  const repairWhy = !repair
+    ? ""
+    : repairing
+      ? "The yard is already on it."
+      : state.credits < repair.cost
+        ? `Repairs cost ${cr(repair.cost)}; you need ${cr(repair.cost - state.credits)} more.`
+        : "";
+
   return (
     <div class="hub-grid">
+      {(repair || repairing) && (
+        <section class="panel hub-wide hub-repair">
+          <div class="hub-section-head">
+            <h2>Repairs</h2>
+            <span class="muted small">Battle damage</span>
+          </div>
+          {repair ? (
+            <>
+              <p class="small">
+                The ship is carrying battle damage: <strong class="accent">{damage}</strong>.
+                {shipDamage(state).drives > 0 && <span class="muted"> Drive damage slows you in flight.</span>}
+              </p>
+              <div class="hub-actions">
+                <span>
+                  <span class="accent">{cr(repair.cost)}</span> <span class="muted small">+ {repair.days} day{repair.days === 1 ? "" : "s"} in the yard</span>
+                </span>
+                <button
+                  class="btn primary"
+                  disabled={repairWhy !== ""}
+                  title={repairWhy || `The yard patches everything for ${cr(repair.cost)}. ${repair.days} day${repair.days === 1 ? "" : "s"}.`}
+                  onClick={() => session.act((s) => repairShip(s))}
+                >
+                  Repair
+                </button>
+                {repairWhy && !repairing && <span class="danger small">{repairWhy}</span>}
+              </div>
+            </>
+          ) : null}
+          {repairing && (
+            <div class="accent small">Yard crews are on the repairs: ready in {formatDuration(Math.max(0, repairing.readyAt - state.time))}</div>
+          )}
+        </section>
+      )}
       <Section id="yard-ship" title={state.ship.name} level={2} summary={`${tonnes(stats.cargoCapacityT)} hold · drill ${stats.drillMaxDepthM} m`}>
         <h3>Ship</h3>
         <dl class="kv">
@@ -1206,6 +1253,8 @@ function Depart({ session }: { session: GameSession }) {
   const readyAt = departureReadyAt(state);
   const waitMinutes = Math.max(0, Math.ceil(readyAt - state.time));
   const pending = refitLeft > 0 || jobs.length > 0;
+  const hurt = damageSummary(shipDamage(state));
+  const repairingNow = jobs.some((j) => j.kind === "repair");
   const rushOne = rushRefitCost(state, 1);
   const rushThree = rushRefitCost(state, 3);
   const rushAll = rushRefitCost(state, refitLeft / DAY);
@@ -1247,7 +1296,7 @@ function Depart({ session }: { session: GameSession }) {
               {jobs.map((j, i) => (
                 <li key={`${j.kind}-${j.upgradeId ?? j.station}-${i}`} class="danger">
                   <span class="mark">✘</span>
-                  {j.kind === "install" ? `Yard: installing ${j.label}` : `Lyceum: ${j.label}`} · ready in{" "}
+                  {j.kind === "install" ? `Yard: installing ${j.label}` : j.kind === "repair" ? `Yard: ${j.label}` : `Lyceum: ${j.label}`} · ready in{" "}
                   {formatDuration(Math.max(0, j.readyAt - state.time))}
                 </li>
               ))}
@@ -1278,6 +1327,13 @@ function Depart({ session }: { session: GameSession }) {
             Fuel {state.ship.fuel.toFixed(1)} / {stats.fuelCapacity}
             {!fuelOk && <span class="muted"> (under half a tank; the Market sells plicite)</span>}
           </li>
+          {hurt && (
+            <li class="accent">
+              <span class="mark">!</span>
+              Battle damage: {hurt}
+              <span class="muted">{repairingNow ? " (the yard is repairing it)" : " (repair it in the Shipyard)"}</span>
+            </li>
+          )}
           <li class={held <= 0.05 ? "good" : "accent"}>
             <span class="mark">{held <= 0.05 ? "✔" : "!"}</span>
             {held <= 0.05 ? "Hold empty, ready for ore" : `${tonnes(held)} still in the hold`}

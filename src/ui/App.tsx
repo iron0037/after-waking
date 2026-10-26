@@ -3,6 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
+import { EncounterOverlay } from "./Encounter";
 import { Journal } from "./Journal";
 import { ProbeDiveOverlay } from "./ProbeDive";
 import { LevelUpPopup, PerkTreeModal } from "./PerkTree";
@@ -31,6 +32,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.target instanceof HTMLInputElement || session.busy) return;
+      // A raider has the floor: no hotkeys until the encounter (and its debrief) is settled.
+      if (session.state.encounter || session.encounterDebrief) return;
       if (ev.key === "j" || ev.key === "J") setJournalOpen((o) => !o);
       // C is a hex movement key on the surface (down-right), so the compendium lives on B ("book").
       else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
@@ -52,7 +55,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   }, [session]);
 
   // Level-ups wait for animations (flights, drives, time-lapses) to finish, and for any tree the player has open.
-  const levelUp = session.busy || session.timelapse || session.perkTree || session.probeReport ? null : (session.state.levelUps?.[0] ?? null);
+  const levelUp = session.busy || session.timelapse || session.perkTree || session.probeReport || session.state.encounter || session.encounterDebrief ? null : (session.state.levelUps?.[0] ?? null);
   const latest = session.state.journal.slice(-2).reverse();
 
   return (
@@ -79,6 +82,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {shipOpen && <ShipStatus session={session} onClose={() => setShipOpen(false)} />}
       {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
       <ProbeDiveOverlay session={session} />
+      <EncounterOverlay session={session} />
       {session.perkTree && <PerkTreeModal session={session} station={session.perkTree} onClose={() => session.openPerkTree(null)} />}
       {levelUp && <LevelUpPopup session={session} up={levelUp} />}
       {session.timelapse && <TimeLapseClock lapse={session.timelapse} />}

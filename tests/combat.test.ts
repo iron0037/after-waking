@@ -11,6 +11,7 @@ import {
   interdictionChance,
   maybeInterdict,
   newGame,
+  orderAdvice,
   playerSide,
   repairQuote,
   repairShip,
@@ -141,5 +142,26 @@ describe("pirates (combat v1)", () => {
     expect(repairShip(state).ok).toBe(true);
     advanceTime(state, (q.days + 0.1) * DAY);
     expect(state.ship.damage).toBeUndefined();
+  });
+});
+
+describe("order advice (UI hints)", () => {
+  it("flags orders that would be wasted", () => {
+    const world = new World(SEED);
+    const state = hailed(world);
+    expect(orderAdvice(state).helm).toEqual({}); // no battle yet
+    answerHail(state, "fight");
+    let a = orderAdvice(state);
+    expect(a.engineering.repair).toBeDefined(); // undamaged
+    expect(a.engineering.shields).toBeDefined(); // stock ship has no deflectors
+    expect(a.guns.hull).toBeUndefined();
+    state.ship.damage = { hull: 0, drives: 100, weapons: 100, sensors: 0 };
+    state.encounter!.enemy.damage.drives = 100;
+    a = orderAdvice(state);
+    expect(a.helm.open).toBeDefined();
+    expect(a.guns.hull).toBeDefined();
+    expect(a.engineering.repair).toBeUndefined();
+    state.ship.damage = { hull: 0, drives: 0, weapons: 0, sensors: 0 };
+    expect(orderAdvice(state).guns.drives).toBeDefined(); // their drives are already wrecked
   });
 });

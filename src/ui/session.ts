@@ -16,7 +16,9 @@ import {
   serialize,
   World,
   type DiveResult,
+  type EncounterResult,
   type GameState,
+  type Orders,
   type Result,
 } from "../sim";
 
@@ -53,6 +55,17 @@ export interface ProbeReport {
   result: DiveResult;
 }
 
+/** A finished raider encounter on its way to the debrief (UI only; the sim has already settled it). */
+export interface EncounterDebrief {
+  result: EncounterResult;
+  raiderName: string;
+  captain: string;
+  /** The whole exchange, oldest first. */
+  log: string[];
+}
+
+export const DEFAULT_ORDERS: Orders = { helm: "hold", guns: "hull", engineering: "guns", comms: "quiet" };
+
 export interface Notice {
   id: number;
   text: string;
@@ -71,6 +84,12 @@ export class GameSession {
   }
   /** The dive that just ended, until the player closes the debrief. */
   probeReport: ProbeReport | null = null;
+  /** The encounter that just ended, until the player closes the debrief. */
+  encounterDebrief: EncounterDebrief | null = null;
+  /** The star the captain was folding to when a raider hailed (so the debrief can offer to carry on). */
+  pendingFold: string | null = null;
+  /** The last battle orders given: they carry over turn to turn. */
+  orders: Orders = { ...DEFAULT_ORDERS };
   /** Whose perk tree is open (UI only; any screen can open it). */
   perkTree: Station | null = null;
   /** Set by "go to the hiring hall"; the Hub picks it up (switching to the Crew tab and scrolling) and clears it. */
@@ -105,12 +124,24 @@ export class GameSession {
   act<T>(fn: (state: GameState, world: World) => Result<T>, options: ActOptions = {}): Result<T> {
     const before = this.state.time;
     const journalBefore = this.state.journal.length;
+    const encounterBefore = this.state.encounter;
     const result = fn(this.state, this.world);
+    const encounterAfter = this.state.encounter;
+    // An encounter that ended during this action: keep its story for the debrief.
+    if (encounterBefore && !encounterAfter && this.state.lastEncounter) {
+      this.encounterDebrief = {
+        result: this.state.lastEncounter,
+        raiderName: encounterBefore.raiderName,
+        captain: encounterBefore.captain,
+        log: [...encounterBefore.log],
+      };
+    }
     // Mineral specimens turn up while drilling; say so on screen, not just in the journal.
     for (const e of this.state.journal.slice(journalBefore)) if (e.text.startsWith("Mineral specimen:")) this.notify(e.text, "info");
     const passed = this.state.time - before;
     if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
-    if (!result.ok) this.notify(result.reason, "error");
+    // A raider's hail fails the fold, but it isn't an error: the encounter window says it all.
+    if (!result.ok && !(encounterAfter && !encounterBefore)) this.notify(result.reason, "error");
     const valid = validViews(this.state);
     if (!valid.includes(this.view)) this.view = defaultView(this.state);
     this.save();
@@ -152,6 +183,12 @@ export class GameSession {
 
   closeProbeReport(): void {
     this.probeReport = null;
+    this.emit();
+  }
+
+  closeEncounterDebrief(): void {
+    this.encounterDebrief = null;
+    this.pendingFold = null;
     this.emit();
   }
 

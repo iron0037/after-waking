@@ -11,13 +11,15 @@ import {
   holdManifest,
   HOUR,
   jettisonCargo,
+  playerSide,
+  shipDamage,
   requirementProgress,
   trackedProjects,
   refineBlockers,
   refineOre,
   vehiclesOut,
 } from "../sim";
-import { cr, pct, tonnes } from "./format";
+import { cr, damageSummary, pct, tonnes } from "./format";
 import type { GameSession } from "./session";
 
 export function ShipStatus({ session, onClose }: { session: GameSession; onClose: () => void }) {
@@ -26,6 +28,8 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
   const m = holdManifest(state);
   const out = vehiclesOut(state);
   const hasRefinery = stats.refineryRateTph > 0;
+  const fight = playerSide(state);
+  const hurt = damageSummary(shipDamage(state));
   // Jettison: a small inline form on one row at a time (amount defaults to all of it).
   const [dumping, setDumping] = useState<{ id: CommodityId; t: string } | null>(null);
   const canDump = state.location.kind !== "intrepid";
@@ -224,6 +228,28 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
                 {stats.drillMaxDepthM} m, {stats.drillRateTph} t/h
               </dd>
             </dl>
+            <h3>Combat</h3>
+            <dl class="kv">
+              <dt>Hull</dt>
+              <dd class={fight.hull < fight.hullMax ? "accent" : ""}>
+                {Math.round(fight.hull)} / {fight.hullMax}
+              </dd>
+              {(["drives", "weapons", "sensors"] as const).map((k) => (
+                <>
+                  <dt>{k.charAt(0).toUpperCase() + k.slice(1)}</dt>
+                  <dd class={fight.damage[k] >= 100 ? "danger" : fight.damage[k] > 0 ? "accent" : "good"}>
+                    {fight.damage[k] >= 100 ? "out" : fight.damage[k] > 0 ? `${Math.round(fight.damage[k])}% damaged` : "sound"}
+                  </dd>
+                </>
+              ))}
+              <dt>Laser</dt>
+              <dd>{fight.laser > 0 ? `${fight.laser} per hit` : "none"}</dd>
+              <dt>Kinetic</dt>
+              <dd>{fight.kinetic > 0 ? `${fight.kinetic} per hit` : "none"}</dd>
+              <dt>Shields</dt>
+              <dd>{fight.shields > 0 ? `${fight.shields} per turn` : "none"}</dd>
+            </dl>
+            {hurt && <p class="small accent">Battle damage: {hurt}. The Shipyard aboard the Intrepid repairs it.</p>}
             <h3>Installed</h3>
             {state.ship.upgrades.length === 0 ? (
               <p class="muted">Stock freighter. The Shipyard aboard the Intrepid fits upgrades.</p>

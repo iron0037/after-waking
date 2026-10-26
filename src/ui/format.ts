@@ -25,6 +25,14 @@ export function pct(value: number, max: number): number {
   return max <= 0 ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
 }
 
+/** Battle damage in a phrase: "hull -30, drives 40%". Empty when the ship is whole. */
+export function damageSummary(d: { hull: number; drives: number; weapons: number; sensors: number }): string {
+  const parts: string[] = [];
+  if (d.hull > 0) parts.push(`hull -${Math.round(d.hull)}`);
+  for (const s of ["drives", "weapons", "sensors"] as const) if (d[s] > 0) parts.push(`${s} ${Math.round(d[s])}%`);
+  return parts.join(", ");
+}
+
 /** A probe depth band in a sentence: "the middle decks", "the abyss". */
 export function bandPhrase(depth: number): string {
   const name = DEPTHS[depth - 1]?.name ?? "depths";

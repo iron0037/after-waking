@@ -335,6 +335,8 @@ export function StarMap({ session }: { session: GameSession }) {
       if (prepared && !prepared.ok) return;
       session.whenIdle(() => {
         const result = session.act((s, w) => fold(s, w, id));
+        // A raider hailed as the drive spooled up: remember where we were going, for the debrief.
+        if (!result.ok && session.state.encounter) session.pendingFold = id;
         if (result.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
       });
     }, FLASH_MS);

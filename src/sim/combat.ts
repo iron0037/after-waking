@@ -205,7 +205,7 @@ export function answerHail(state: GameState, choice: HailChoice): Result<Encount
     case "run": {
       awardXp(state, "navigation", 8);
       const r = withRng(state, (rng) => rng.next());
-      if (r < odds.run) return ok(finish(state, "escaped", `Hard burn for open space: you outrun the ${e.raiderName} and fold clear.`, 0, 0));
+      if (r < odds.run) return ok(finish(state, "escaped", `Hard burn for open space: you outrun the ${e.raiderName}. The way out is clear; fold when ready.`, 0, 0));
       startBattle(e, 0, `The ${e.raiderName} cuts you off. They're on you at close range.`);
       return ok(null);
     }
@@ -278,7 +278,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   if (move > 0 && before === 2) {
     if ((winner === "me" || winner === "both") && mine > 0 && me.damage.drives < 100) {
       awardXp(state, "navigation", 10);
-      return ok({ lines, result: finish(state, "escaped", `You open the range past their guns and fold clear of the ${e.raiderName}.`, 0, 0) });
+      return ok({ lines, result: finish(state, "escaped", `You open the range past their guns and lose the ${e.raiderName} in the glare. The way out is clear; fold when ready.`, 0, 0) });
     }
     if ((winner === "them" || winner === "both") && theirs > 0) {
       return ok({ lines, result: finish(state, "driven off", `Badly hurt, the ${e.raiderName} breaks off and runs. No bounty, but the hold is yours.`, 0, 0) });
@@ -397,6 +397,41 @@ function takeShare(state: GameState, share: number): number {
     lost += removeCargo(state.ship.cargo, id, Math.round(t * share * 10) / 10);
   }
   return lost;
+}
+
+// --- order advice (for the UI) ------------------------------------------------------------------
+
+/** For each order, why it would be wasted right now (absent = worth considering). The UI dims these. */
+export type OrderAdvice = { [K in keyof Orders]: Partial<Record<Orders[K], string>> };
+
+export function orderAdvice(state: GameState): OrderAdvice {
+  const advice: OrderAdvice = { helm: {}, guns: {}, engineering: {}, comms: {} };
+  const e = state.encounter;
+  if (!e || e.stage !== "battle") return advice;
+  const me = playerSide(state);
+  const them = e.enemy;
+  const noGuns = me.damage.weapons >= 100 || me.laser + me.kinetic <= 0;
+
+  if (me.damage.drives >= 100) {
+    advice.helm.close = "Your drives are dead: you can't manoeuvre.";
+    advice.helm.open = "Your drives are dead: you can't manoeuvre.";
+  } else if (e.range === 0) {
+    advice.helm.close = "Already at close range.";
+  }
+
+  if (noGuns) {
+    for (const t of ["hull", "drives", "weapons", "sensors"] as const) advice.guns[t] = "Your weapons are out.";
+  } else {
+    for (const t of SYSTEMS) if (them.damage[t] >= 100) advice.guns[t] = `Their ${t} are already wrecked.`;
+  }
+
+  if (!SYSTEMS.some((s) => me.damage[s] >= 10) && me.hull >= me.hullMax) advice.engineering.repair = "Nothing aboard needs repair.";
+  if (me.shields <= 0) advice.engineering.shields = "No deflector screens fitted.";
+  if (noGuns) advice.engineering.guns = "Your weapons are out.";
+
+  const beaten = them.hull / them.hullMax < e.nerve || them.damage.weapons >= 70;
+  if (!beaten) advice.comms.demand = "They aren't beaten yet: they'll laugh at a demand.";
+  return advice;
 }
 
 // --- repairs at the Intrepid ------------------------------------------------------------------
