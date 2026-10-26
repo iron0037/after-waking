@@ -1,5 +1,5 @@
 /**
- * Seamless terrain textures for the surface map (public/assets/terrain/atlas.webp: a 4x3 grid of 192 px tiles,
+ * Seamless terrain textures for the surface map (public/assets/terrain/atlas.webp: a 4x4 grid of 192 px tiles, each with an 8 px wrapped margin,
  * generated with Stable Diffusion + the pixel-art LoRA and tiled with the "tiling" option; see docs/art_pipeline.md).
  *
  * One texture set serves every world: each (body kind, terrain) pair picks a texture and recolours it so its
@@ -21,15 +21,18 @@ export const TEX = 192;
 /** HEX pixels per texture pixel when the map is painted (above 1 stretches the texture, so its detail reads at the default zoom). */
 export const TEX_SCALE = 1.5;
 const COLS = 4;
+/** Each tile sits in the atlas with PAD pixels of its own wrapped edge around it, so lossy compression never bleeds a neighbour's colour in. */
+const PAD = 8;
+const CELL = TEX + 2 * PAD;
 
 /**
  * Atlas order, row by row. "steppe" is the quiet everyday grassland, "grass" the lush meadow (verdant ground only),
  * "frost" a soft, low-contrast snow and ice, and "water" a calm, flat sheet that depth shading is laid over.
  */
 const NAMES = [
-  "grass", "shrub", "sand", "hardpan",
+  "grass", "steppe", "shrub", "hardpan",
   "dust", "frost", "rubble", "rock",
-  "basalt", "steppe", "water", "lava",
+  "basalt", "sand", "water", "lava",
   "scree", "peaks",
 ] as const;
 type TexName = (typeof NAMES)[number];
@@ -50,8 +53,8 @@ const TEXTURE_FOR: Record<BodyKind, readonly [TexName, TexName, TexName, TexName
 
 /** How much of the texture's contrast to keep, per terrain (bright palettes clip if pushed). */
 const AMOUNT: readonly number[] = [0.75, 0.75, 0.8, 0.22, 0.5, 1];
-/** Ordinary plains on worlds that use the steppe tile: kept quiet, so ground cover doesn't shout. */
-const STEPPE_AMOUNT = 0.28;
+/** Ordinary plains on worlds that use the steppe tile: a flat few-tone meadow (its own contrast is already low), so ground cover doesn't shout. */
+const STEPPE_AMOUNT = 1;
 /** Shrubland keeps a bit less of its (very leafy) contrast than rock and rubble do. */
 const SHRUB_AMOUNT = 0.6;
 /** The ice worlds' own rock tiles: frozen scree on rough ground, snow-capped ranges on mountains. */
@@ -60,9 +63,9 @@ const PEAKS_AMOUNT = 0.6;
 /** Steppe leans toward this dry olive, so it reads apart from the lush meadow. */
 const STEPPE_TINT = [150, 156, 92] as const;
 /** The lush meadow tile is toned down from the full-strength grass the first pass painted everywhere. */
-const LUSH_AMOUNT = 0.45;
+const LUSH_AMOUNT = 0.55;
 /** Share of its colour that grassland gives up toward grey (steppe, then meadow), so it sits back on the map. */
-const STEPPE_DESAT = 0.22;
+const STEPPE_DESAT = 0.12;
 const LUSH_DESAT = 0.1;
 /** Ice and snow are painted darker and greyer than their palette colour (ice worlds most), so markers stand out on them. */
 const ICE_TONE = 0.8;
@@ -111,7 +114,7 @@ export function loadTextures(): void {
       ctx.drawImage(img, 0, 0);
       const out: Decoded[] = [];
       for (let n = 0; n < NAMES.length; n++) {
-        const data = ctx.getImageData((n % COLS) * TEX, Math.floor(n / COLS) * TEX, TEX, TEX).data;
+        const data = ctx.getImageData((n % COLS) * CELL + PAD, Math.floor(n / COLS) * CELL + PAD, TEX, TEX).data;
         const rgb = new Uint8ClampedArray(TEX * TEX * 3);
         const sum = [0, 0, 0];
         for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
