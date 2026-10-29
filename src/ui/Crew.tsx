@@ -42,6 +42,7 @@ import {
 } from "../sim";
 import { cr } from "./format";
 import { captainSeed, Portrait, PortraitPicker } from "./portraits";
+import { useArchiveTopic } from "./ArchivePanel";
 import type { GameSession } from "./session";
 import "./crew.css";
 import "./perks.css";
@@ -380,6 +381,7 @@ const SHARE_CHOICES = [0, 0.05, 0.1, 0.15, MAX_CREW_SHARE];
 
 /** The captain and the five officers, with the daily payroll. `onHall` runs before jumping to the hiring hall (the overlay closes itself). */
 export function Roster({ session, onHall }: { session: GameSession; onHall?: () => void }) {
+  useArchiveTopic(session, "crew");
   const { state } = session;
   const share = state.crewShare ?? 0;
   const wages = dailyWages(state);

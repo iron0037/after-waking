@@ -106,6 +106,7 @@ import {
 import { cargoList, pct, tonnes } from "../format";
 import { TERRAIN_COLORS, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
+import { useArchiveTopic } from "../ArchivePanel";
 import { RescuePanel } from "../Rescue";
 import { terrainSwatch } from "./surface/terrainTextures";
 import { Canvas } from "../Canvas";
@@ -399,6 +400,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const nearRegions = regionAndNeighbours(surface, active);
   const discovered = knownDeposits(state, surface, loc.bodyId, nearRegions);
   const floraFound = knownFlora(state, surface, loc.bodyId, nearRegions);
+  // The Archive explains these where they show: the dashed sensor ring and drive controls (rover out), and a seam below the drill.
+  useArchiveTopic(session, "sensor-ring", rover !== null);
+  useArchiveTopic(session, "rover", rover !== null);
+  useArchiveTopic(session, "drill-depth", discovered.some(({ d }) => d.depthM > stats.drillMaxDepthM));
   const selectedFound = selectedKey ? surfaceDeposit(state, world, selectedKey) : null;
   const selected: DepositMark | null = selectedFound ? { d: selectedFound.deposit, know: selectedFound.know } : null;
   const floraFoundSel = floraKey ? surfaceFlora(state, world, floraKey) : null;

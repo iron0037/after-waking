@@ -70,6 +70,7 @@ import { ContractAlso, contractBodyNames } from "../Contracts";
 import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
+import { useArchiveTopic } from "../ArchivePanel";
 import "./hub.css";
 
 type Tab = "market" | "jobs" | "shipyard" | "research" | "crew" | "exchange" | "depart";
@@ -203,6 +204,7 @@ function Forecast({ now, next }: { now: number; next: number }) {
 }
 
 function Market({ session }: { session: GameSession }) {
+  useArchiveTopic(session, "market");
   const { state } = session;
   const stats = effectiveStats(state);
   const forecast = marketForecast(state);
@@ -714,6 +716,7 @@ function HelmFund({ session }: { session: GameSession }) {
 }
 
 function Jobs({ session }: { session: GameSession }) {
+  useArchiveTopic(session, "contracts");
   const contracts = session.state.contracts ?? [];
   const active = contracts.filter((c) => c.status === "active");
   const offered = contracts.filter((c) => c.status === "offered");
@@ -1057,6 +1060,7 @@ function Shipyard({ session }: { session: GameSession }) {
 
 function Research({ session }: { session: GameSession }) {
   useSession(session);
+  useArchiveTopic(session, "research");
   const { state } = session;
   const running = RESEARCH.filter((p) => researchStatus(state, p.id) === "running").length;
   return (

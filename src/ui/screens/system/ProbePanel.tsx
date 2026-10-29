@@ -14,14 +14,16 @@ import {
 } from "../../../sim";
 import { COMMODITIES } from "../../../data/commodities";
 import { DEPTHS } from "../../../data/probes";
+import { useArchiveTopic } from "../../ArchivePanel";
 import { cr, tonnes } from "../../format";
 import type { GameSession } from "../../session";
 import "../../probes.css";
 
 export function ProbePanel({ session, body, orbiting, scanned, busy }: { session: GameSession; body: Body; orbiting: boolean; scanned: boolean; busy: boolean }) {
   const { state, world } = session;
-  if (!isGiant(body)) return null;
   const stats = effectiveStats(state);
+  useArchiveTopic(session, "probe", isGiant(body) && stats.probeCapacity > 0);
+  if (!isGiant(body)) return null;
 
   if (stats.probeCapacity === 0) {
     return (

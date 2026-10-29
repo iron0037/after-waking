@@ -5,6 +5,7 @@
  * Components never mutate GameState directly: they call session.act(...) with a sim action.
  */
 import { useEffect, useReducer } from "preact/hooks";
+import type { ArchiveTrigger } from "../data/archive";
 import type { Station } from "../data/crew";
 import type { ClanId } from "../data/ship";
 import type { ProbeDepth } from "../data/probes";
@@ -104,6 +105,8 @@ export class GameSession {
   perkTree: Station | null = null;
   /** Set by "go to the hiring hall"; the Hub picks it up (switching to the Crew tab and scrolling) and clears it. */
   hallRequested = false;
+  /** Screens showing something the Archive explains (AW-24): trigger -> how many mounted components raise it. */
+  private topics = new Map<ArchiveTrigger, number>();
   private listeners = new Set<() => void>();
   private noticeId = 0;
 
@@ -115,8 +118,8 @@ export class GameSession {
     this.view = defaultView(state);
   }
 
-  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string, face?: number): GameSession {
-    const session = new GameSession(newGame({ seed, captainName, clan, shipName, face }));
+  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string, face?: number, guidance = true): GameSession {
+    const session = new GameSession(newGame({ seed, captainName, clan, shipName, face, guidance }));
     session.save();
     return session;
   }
@@ -282,6 +285,24 @@ export class GameSession {
     } catch {
       /* storage unavailable: the game still runs, it just can't be resumed */
     }
+  }
+
+  /** A screen starts showing something the Archive explains. Pair with dropTopic (see useArchiveTopic). */
+  raiseTopic(trigger: ArchiveTrigger): void {
+    this.topics.set(trigger, (this.topics.get(trigger) ?? 0) + 1);
+    this.emit();
+  }
+
+  dropTopic(trigger: ArchiveTrigger): void {
+    const n = (this.topics.get(trigger) ?? 0) - 1;
+    if (n > 0) this.topics.set(trigger, n);
+    else this.topics.delete(trigger);
+    this.emit();
+  }
+
+  /** The screen triggers that hold right now. */
+  screenTopics(): ArchiveTrigger[] {
+    return [...this.topics.keys()];
   }
 
   /** Force subscribers to redraw (e.g. after an animation frame changes UI-only state). */

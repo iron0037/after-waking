@@ -1,0 +1,203 @@
+/* The Archive's guidance card (AW-24), and its section of the Journal. Cool and technical, unlike the amber panels. */
+
+.archive-panel {
+  background: linear-gradient(180deg, #0d1a2b 0%, #0a1322 100%);
+  border: 1px solid #2c5a70;
+  border-left: 3px solid var(--cyan);
+  box-shadow: 0 0 0 1px #05070f inset;
+  animation: archive-in 0.35s ease-out both;
+}
+/* Normally a strip between the screen and the journal footer: it takes room, so it never covers a control. */
+.archive-dock {
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  gap: 4px 18px;
+  align-items: start;
+  padding: 9px 14px 8px;
+  border-width: 1px 0 1px 3px;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+/* Over a window (encounter, journal, dive...): a card in the left margin, above the dimmed overlay. */
+.archive-float {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  width: min(260px, calc(100vw - 20px));
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  z-index: 60; /* above the encounter (43), level-up (45) and notices (50) */
+  padding: 10px 12px 9px;
+  border-radius: 3px;
+  box-shadow: 0 6px 22px #000a;
+}
+.archive-float .archive-side {
+  margin-top: 10px;
+}
+@keyframes archive-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .archive-panel {
+    animation: none;
+  }
+}
+@media (max-width: 900px) {
+  .archive-dock {
+    grid-template-columns: 1fr;
+    max-height: 42vh;
+  }
+  .archive-float {
+    top: 8px;
+    bottom: auto;
+    left: 8px;
+    max-height: 40vh;
+  }
+}
+
+.archive-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  color: var(--cyan);
+  opacity: 0.85;
+}
+.archive-glyph {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.archive-rule {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, #2c5a70, transparent);
+}
+.archive-title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.archive-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b9c9de;
+}
+.archive-gloss {
+  margin: 6px 0 0;
+  padding: 5px 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  border-left: 2px solid #36507a;
+  background: #ffffff06;
+}
+.archive-gloss-label {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6f86a8;
+}
+.archive-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.archive-dock .archive-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+.archive-float .archive-actions {
+  justify-content: space-between;
+}
+.archive-actions .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.archive-silence {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+.archive-silence:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text);
+}
+.archive-note {
+  margin: 4px 0 0;
+  font-size: 10.5px;
+  color: #5d6f8c;
+  text-align: right;
+}
+
+/* --- Journal: the Archive section -------------------------------------------------------- */
+
+.journal-tabs {
+  display: flex;
+  gap: 6px;
+}
+.archive-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid #2c5a70;
+  border-left: 3px solid var(--cyan);
+  border-radius: 3px;
+  background: #0a1322;
+}
+.archive-controls .grow {
+  flex: 1;
+  min-width: 180px;
+}
+.archive-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.archive-log li {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #2c5a70;
+  border-radius: 3px;
+  background: var(--panel-2);
+}
+.archive-log h4 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.archive-log p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #b9c9de;
+}
+.archive-log .archive-gloss {
+  margin-top: 6px;
+}
+.chip.active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}

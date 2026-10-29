@@ -130,6 +130,11 @@ export interface GameState {
   lastEncounter?: EncounterResult;
   /** The system whose departure has already been rolled for raiders (one roll per departure). */
   interdictionClear?: string;
+  /** The Archive's guidance (AW-24): entries read, and whether it's speaking at all (on unless false). */
+  archiveSeen?: string[];
+  guidance?: boolean;
+  /** How far along the Awaken path (M5); nothing advances it yet. */
+  awakening?: number;
   /** The captain's own names for worlds, by body id (shown under the catalogue name). */
   nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */
@@ -171,12 +176,16 @@ export interface NewGameOptions {
   /** The captain's portrait, chosen on the new-game screen. */
   face?: number;
   shipName?: string;
+  /** The Archive's first-run guidance; on unless turned off on the new-game screen. */
+  guidance?: boolean;
 }
 
-export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan, face }: NewGameOptions): GameState {
+export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan, face, guidance = true }: NewGameOptions): GameState {
   const state: GameState = {
     version: SAVE_VERSION,
     seed,
+    guidance,
+    archiveSeen: [],
     time: GAME_START + 8 * 60,
     rngState: seed ^ 0x5eed,
     captain: { name: captainName.replace(/^captain\s+/i, "").trim() || "Reyes", born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0, ...(clan ? { clan } : {}), ...(face !== undefined ? { face } : {}) },

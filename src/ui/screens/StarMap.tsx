@@ -40,6 +40,7 @@ import { tonnes } from "../format";
 import { Canvas } from "../Canvas";
 import { BODY_COLOR, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
+import { useArchiveTopic } from "../ArchivePanel";
 import "./starmap.css";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, monospace';
@@ -97,6 +98,7 @@ function contractTargets(session: GameSession): Map<string, Contract[]> {
 
 export function StarMap({ session }: { session: GameSession }) {
   useSession(session);
+  useArchiveTopic(session, "starmap");
   const { state, world } = session;
   const fromId = currentSystemId(state);
   const docked = state.location.kind === "intrepid";

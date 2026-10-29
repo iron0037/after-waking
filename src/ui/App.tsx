@@ -1,3 +1,4 @@
+import { ArchivePanel } from "./ArchivePanel";
 import { ShipStatus } from "./ShipStatus";
 import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
@@ -70,6 +71,10 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
 
   // Level-ups wait for animations (flights, drives, time-lapses) to finish, and for any tree the player has open.
   const levelUp = session.busy || session.timelapse || session.perkTree || session.probeReport || session.state.encounter || session.encounterDebrief ? null : (session.state.levelUps?.[0] ?? null);
+  // With a window open over the game, the Archive floats above it instead of docking above the journal footer.
+  const windowOpen =
+    journalOpen || compendiumOpen || contractsOpen || shipOpen || crewOpen || !!session.perkTree || !!levelUp || !!session.state.encounter ||
+    !!session.encounterDebrief || !!session.probeReport || !!session.state.probeDive;
   const latest = session.state.journal.slice(-2).reverse();
 
   return (
@@ -83,6 +88,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
         {session.view === "system" && <SystemView session={session} />}
         {session.view === "surface" && <SurfaceView session={session} />}
       </main>
+      <ArchivePanel session={session} floating={windowOpen} />
       <footer class="journal-strip" onClick={() => setJournalOpen(true)} title="Open journal (J)">
         {latest.map((e, i) => (
           <div key={i} class={`strip-entry kind-${e.kind}`}>

@@ -5,6 +5,7 @@
 import { FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, GAS_IDS } from "../data/commodities";
 import { currentProbeEvent, depthBand, diveDepthKm, optionHint, READING_PRICE_PER_DEPTH, sellPrice } from "../sim";
+import { useArchiveTopic } from "./ArchivePanel";
 import { bandPhrase, cr, tonnes } from "./format";
 import type { GameSession, ProbeReport } from "./session";
 import "./probes.css";
@@ -23,6 +24,7 @@ const OUTCOME_TEXT: Record<ProbeReport["result"]["outcome"], { title: string; te
 };
 
 export function ProbeDiveOverlay({ session }: { session: GameSession }) {
+  useArchiveTopic(session, "probe", session.probeReport !== null || session.state.probeDive != null);
   const report = session.probeReport;
   if (report?.stage === "signal") return <SignalLost report={report} />;
   if (report) return <Debrief session={session} report={report} />;

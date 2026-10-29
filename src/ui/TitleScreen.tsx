@@ -77,10 +77,11 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
   const [shipName, setShipName] = useState(DEFAULT_SHIP);
   const [clan, setClan] = useState<ClanId | null>(null);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1_000_000)));
+  const [guidance, setGuidance] = useState(true);
 
   const start = () => {
     const n = Number.parseInt(seed, 10);
-    onStart(GameSession.fresh(Number.isFinite(n) ? n : 1, name.trim() || FALLBACK_NAME, clan ?? undefined, shipName.trim() || DEFAULT_SHIP, face ?? undefined));
+    onStart(GameSession.fresh(Number.isFinite(n) ? n : 1, name.trim() || FALLBACK_NAME, clan ?? undefined, shipName.trim() || DEFAULT_SHIP, face ?? undefined, guidance));
   };
 
   return (
@@ -150,6 +151,14 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
               </button>
             ))}
           </div>
+
+          <label class="new-game-check">
+            <input type="checkbox" checked={guidance} onChange={(e) => setGuidance((e.target as HTMLInputElement).checked)} />
+            <span>
+              Archive guidance (recommended for new captains)
+              <span class="muted small"> The Archive annotates each new procedure once. Silence it any time from the Journal.</span>
+            </span>
+          </label>
 
           <button class="btn big primary" onClick={start}>
             Begin

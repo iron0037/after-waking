@@ -25,8 +25,12 @@ import { Canvas } from "../../Canvas";
 import { UI } from "../../palette";
 import { surfaceMap } from "./planetArt";
 import { rgba, roughCredits } from "./util";
+import { useArchiveTopic } from "../../ArchivePanel";
+import type { GameSession } from "../../session";
 
 export interface RegionPickerProps {
+  /** For the Archive: the chart raises its topic while it is on screen. */
+  session: GameSession;
   body: Body;
   state: GameState;
   world: World;
@@ -82,7 +86,8 @@ function regionAt(layout: Layout, u: number, v: number): number {
 
 // --- component ---------------------------------------------------------------------------
 
-export function RegionPicker({ body, state, world, sensorTier, reachM, selected, landable = true, onSelect, action }: RegionPickerProps) {
+export function RegionPicker({ session, body, state, world, sensorTier, reachM, selected, landable = true, onSelect, action }: RegionPickerProps) {
+  useArchiveTopic(session, "region-chart");
   const [hover, setHover] = useState<number | null>(null);
   const sizeRef = useRef({ w: 1, h: 1 });
   const seed = state.seed;

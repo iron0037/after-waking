@@ -101,6 +101,13 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
 ## Meta Layer Ideas (Awaken) **[PROPOSED, light touch]**
 - Clues appear in the game's own UI: a tooltip that's subtly wrong, a star-map coordinate grid that's suspiciously perfect, a log entry stamped with a timestamp from the future.
 - Late game: the Archive "help" text starts answering questions you didn't ask.
+
+**The Archive as first-run guidance (AW-24) [DECIDED 2026-10-29].**
+- Each subject is explained once, the first time it comes up. The entries are in `src/data/archive.ts`; the rules for when each appears are in `src/sim/archive.ts`.
+- **Subjects:** the Intrepid, folding, contracts, region signal, the sensor ring, drill depth, specimens, probes, raiders, the loan, and the rest.
+- **Voice:** a formal technical record with the occasional plain Lyceum gloss. Nothing in it thinks.
+- **Where it shows:** a strip below the screen, floating above any open window. It can be silenced, and the Journal's Archive tab re-reads the entries.
+- **On the Awaken path,** `state.awakening` swaps in each entry's `strange` text. Nothing advances it yet; that comes with M5.
 - The ending can briefly break the fourth wall, without becoming a gimmick that cheapens the other endings.
 
 ## Time Scale and Aging **[DECIDED: a win takes 5–50 game years]**

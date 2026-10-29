@@ -567,6 +567,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       </div>
                     )}
                     <RegionPicker
+                      session={session}
                       body={selected}
                       state={state}
                       world={world}

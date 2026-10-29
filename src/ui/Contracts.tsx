@@ -2,6 +2,7 @@
 import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
 import { completeContract, contractBenefits, contractPayout, contractProgress, DAY, formatDuration, type Contract, type GameState } from "../sim";
+import { useArchiveTopic } from "./ArchivePanel";
 import { bandPhrase, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -131,6 +132,7 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
 }
 
 export function Contracts({ session, onClose }: { session: GameSession; onClose: () => void }) {
+  useArchiveTopic(session, "contracts");
   const all = session.state.contracts ?? [];
   const active = all.filter((c) => c.status === "active");
   const offered = all.filter((c) => c.status === "offered");
