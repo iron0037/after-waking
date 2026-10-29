@@ -99,6 +99,42 @@ export function texturesReady(): boolean {
   return atlas !== null && enabled;
 }
 
+/** Where the atlas image lives, relative to the page. */
+export const ATLAS_PATH = "./assets/terrain/atlas.webp";
+
+/**
+ * Cuts the decoded atlas (RGBA pixels, `width` wide) into its textures. DOM-free: the main thread feeds it from an
+ * Image + canvas, and the terrain worker from an ImageBitmap + OffscreenCanvas. Returns false if the atlas is too small.
+ */
+export function setAtlasPixels(rgba: Uint8ClampedArray | Uint8Array, width: number, height: number): boolean {
+  const rows = Math.ceil(NAMES.length / COLS);
+  if (width < COLS * CELL || height < rows * CELL) return false;
+  const out: Decoded[] = [];
+  for (let n = 0; n < NAMES.length; n++) {
+    const ox = (n % COLS) * CELL + PAD;
+    const oy = Math.floor(n / COLS) * CELL + PAD;
+    const rgb = new Uint8ClampedArray(TEX * TEX * 3);
+    const sum = [0, 0, 0];
+    let j = 0;
+    for (let y = 0; y < TEX; y++) {
+      let i = ((oy + y) * width + ox) * 4;
+      for (let x = 0; x < TEX; x++, i += 4, j += 3) {
+        for (let c = 0; c < 3; c++) {
+          const v = rgba[i + c] as number;
+          rgb[j + c] = v;
+          sum[c] = (sum[c] as number) + v;
+        }
+      }
+    }
+    const px = TEX * TEX;
+    out.push({ rgb, mean: [(sum[0] as number) / px, (sum[1] as number) / px, (sum[2] as number) / px] });
+  }
+  atlas = out;
+  tinted.clear();
+  detail = null;
+  return true;
+}
+
 /** Starts loading the atlas (once). Safe to call anywhere; does nothing outside a browser. */
 export function loadTextures(): void {
   if (atlas || loading || typeof Image === "undefined" || typeof document === "undefined") return;
@@ -112,22 +148,7 @@ export function loadTextures(): void {
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) return;
       ctx.drawImage(img, 0, 0);
-      const out: Decoded[] = [];
-      for (let n = 0; n < NAMES.length; n++) {
-        const data = ctx.getImageData((n % COLS) * CELL + PAD, Math.floor(n / COLS) * CELL + PAD, TEX, TEX).data;
-        const rgb = new Uint8ClampedArray(TEX * TEX * 3);
-        const sum = [0, 0, 0];
-        for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-          for (let c = 0; c < 3; c++) {
-            const v = data[i + c] as number;
-            rgb[j + c] = v;
-            sum[c] = (sum[c] as number) + v;
-          }
-        }
-        const px = TEX * TEX;
-        out.push({ rgb, mean: [(sum[0] as number) / px, (sum[1] as number) / px, (sum[2] as number) / px] });
-      }
-      atlas = out;
+      setAtlasPixels(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
     } catch {
       // Stay on flat colours.
     }
@@ -135,7 +156,27 @@ export function loadTextures(): void {
   img.onerror = () => {
     loading = false;
   };
-  img.src = "./assets/terrain/atlas.webp";
+  img.src = ATLAS_PATH;
+}
+
+/**
+ * Worker-side atlas load: fetch `url`, decode with createImageBitmap, read the pixels from an OffscreenCanvas and
+ * hand them to `setAtlasPixels`. Resolves true if the textures are ready afterwards.
+ */
+export async function loadTexturesOffscreen(url: string): Promise<boolean> {
+  if (atlas) return true;
+  try {
+    const blob = await (await fetch(url)).blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.drawImage(bitmap, 0, 0);
+    const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    return setAtlasPixels(data, bitmap.width, bitmap.height);
+  } catch {
+    return false;
+  }
 }
 
 function parseHex(hex: string): [number, number, number] {

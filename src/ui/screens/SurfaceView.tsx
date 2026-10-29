@@ -630,7 +630,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
     // Terrain: each region in view, fogged where the sensors haven't swept (fog comes from each region's knowledge).
     const regions = visibleRegions(L, surface.layout);
-    const cache = terrainCache(surface, body.kind);
+    const cache = terrainCache(surface, body.kind, { seed: state.seed, gen: state.worldGen ?? 1 });
     cache.beginFrame(1);
     const knowMemo = new Map<number, RegionKnowledge | null>();
     const know = (r: number): RegionKnowledge | null => {
