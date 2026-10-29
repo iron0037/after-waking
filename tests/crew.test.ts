@@ -149,3 +149,16 @@ describe("portrait faces (AW-150)", () => {
     for (const [seed, f] of fewer) expect(faces.get(seed)).toBe(f);
   });
 });
+
+describe("the captain's chosen portrait (AW-151)", () => {
+  it("is kept, and nobody else gets that face", async () => {
+    const { assignFaces, newGame, portraitRoster, setCaptainFace } = await import("../src/sim");
+    const state = newGame({ seed: 12, face: 7 });
+    expect(state.captain.face).toBe(7);
+    const faces = assignFaces(portraitRoster(state, "cap"), 24, "fmfmfmfmfmfmfmfmfmfmfmfm");
+    expect(faces.get("cap")).toBe(7);
+    expect([...faces.entries()].filter(([s, f]) => s !== "cap" && f === 7)).toHaveLength(0);
+    expect(setCaptainFace(state, null).ok).toBe(true);
+    expect(state.captain.face).toBeUndefined();
+  });
+});

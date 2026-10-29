@@ -48,7 +48,7 @@ function loadPortraits(): Promise<PortraitIndex | null> {
 }
 void loadPortraits();
 
-function usePortraitIndex(): PortraitIndex | null {
+export function usePortraitIndex(): PortraitIndex | null {
   const [index, setIndex] = useState<PortraitIndex | null>(loaded);
   useEffect(() => {
     if (loaded) return;
@@ -79,6 +79,7 @@ export function Portrait({
   size = 64,
   class: cls,
   state,
+  face: forced,
 }: {
   seed: string;
   name: string;
@@ -87,6 +88,8 @@ export function Portrait({
   class?: string;
   /** Pass the game state so faces are unique across the roster. */
   state?: Pick<GameState, "captain" | "crew" | "recruits">;
+  /** Show this face, whoever it is (the portrait picker). */
+  face?: number;
 }) {
   const index = usePortraitIndex();
   if (!index) return null;
@@ -94,7 +97,7 @@ export function Portrait({
   const g = nameGender(name);
   const pool = g && index.genders?.length === index.faces ? [...index.genders].flatMap((c, i) => (c === g ? [i] : [])) : [];
   const hashed = pool.length > 0 ? pool[portraitFace(seed, pool.length)]! : portraitFace(seed, index.faces);
-  const face = (state && rosterFace(state, index, seed)) ?? hashed;
+  const face = forced ?? (state && rosterFace(state, index, seed)) ?? hashed;
   const band = Math.min(index.bands - 1, portraitBand(age));
   const k = size / index.cell;
   const style = {
@@ -108,3 +111,24 @@ export function Portrait({
 
 /** The captain has no id, so their face comes from name and birth. */
 export const captainSeed = (c: { name: string; born: number }): string => `${c.name}|${c.born}`;
+
+/**
+ * Pick a portrait: every face at the given age, plus "Assigned for me" (null). Used on the
+ * new-game screen and from the captain's card.
+ */
+export function PortraitPicker({ age, value, onPick }: { age: number; value: number | null; onPick: (face: number | null) => void }) {
+  const index = usePortraitIndex();
+  if (!index) return <p class="muted small">Loading portraits…</p>;
+  return (
+    <div class="portrait-picker" role="radiogroup" aria-label="Portrait">
+      <button type="button" role="radio" aria-checked={value === null} class={`portrait-choice any ${value === null ? "selected" : ""}`} onClick={() => onPick(null)} title="Let the game pick">
+        ?
+      </button>
+      {Array.from({ length: index.faces }, (_, f) => (
+        <button type="button" key={f} role="radio" aria-checked={value === f} class={`portrait-choice ${value === f ? "selected" : ""}`} onClick={() => onPick(f)}>
+          <Portrait seed={`pick-${f}`} name="" age={age} face={f} size={48} />
+        </button>
+      ))}
+    </div>
+  );
+}

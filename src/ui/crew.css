@@ -127,3 +127,30 @@
   background: var(--danger);
   color: #fff;
 }
+
+/* The captain's portrait picker (AW-151) */
+.captain-portrait {
+  position: relative;
+}
+.portrait-edit {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+.portrait-edit:hover .portrait {
+  outline: 1px solid var(--accent);
+}
+.portrait-popover {
+  position: absolute;
+  z-index: 10;
+  top: 70px;
+  left: 0;
+  width: min(560px, 80vw);
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #000a;
+}

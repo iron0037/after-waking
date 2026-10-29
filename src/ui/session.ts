@@ -106,8 +106,8 @@ export class GameSession {
     this.view = defaultView(state);
   }
 
-  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string): GameSession {
-    const session = new GameSession(newGame({ seed, captainName, clan, shipName }));
+  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string, face?: number): GameSession {
+    const session = new GameSession(newGame({ seed, captainName, clan, shipName, face }));
     session.save();
     return session;
   }

@@ -14,3 +14,32 @@
 .levelup .portrait {
   margin: 2px auto 4px;
 }
+
+/* Portrait picker (new game, captain's card) */
+.portrait-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.portrait-choice {
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-2);
+  cursor: pointer;
+  line-height: 0;
+}
+.portrait-choice:hover {
+  border-color: var(--border-bright);
+}
+.portrait-choice.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.portrait-choice.any {
+  width: 54px;
+  height: 54px;
+  font-size: 22px;
+  line-height: 48px;
+  color: var(--muted);
+}

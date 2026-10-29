@@ -98,10 +98,17 @@ function hireOrder(id: string): number {
  * crew in hiring order, then the hiring hall. Each person takes their hashed face (within their
  * name's pool) or the next free one, so an officer keeps their face as people come and go around them.
  */
-export function assignFaces(people: readonly { seed: string; name: string }[], faces: number, genders?: string): Map<string, number> {
+export function assignFaces(people: readonly { seed: string; name: string; fixed?: number }[], faces: number, genders?: string): Map<string, number> {
   const out = new Map<string, number>();
   const taken = new Set<number>();
+  // A face somebody chose (the captain's) is theirs; everybody else works around it.
   for (const p of people) {
+    if (p.fixed === undefined || p.fixed < 0 || p.fixed >= faces) continue;
+    out.set(p.seed, p.fixed);
+    taken.add(p.fixed);
+  }
+  for (const p of people) {
+    if (out.has(p.seed)) continue;
     const g = nameGender(p.name);
     const pool = g && genders?.length === faces ? [...genders].flatMap((c, i) => (c === g ? [i] : [])) : Array.from({ length: faces }, (_, i) => i);
     if (pool.length === 0) continue;
@@ -121,9 +128,9 @@ export function assignFaces(people: readonly { seed: string; name: string }[], f
 }
 
 /** Who's on the roster, in the order faces are handed out. */
-export function portraitRoster(state: Pick<GameState, "captain" | "crew" | "recruits">, captainSeed: string): { seed: string; name: string }[] {
+export function portraitRoster(state: Pick<GameState, "captain" | "crew" | "recruits">, captainSeed: string): { seed: string; name: string; fixed?: number }[] {
   const crew = [...(state.crew ?? [])].sort((a, b) => hireOrder(a.id) - hireOrder(b.id));
-  return [{ seed: captainSeed, name: state.captain.name }, ...crew.map((m) => ({ seed: m.id, name: m.name })), ...(state.recruits ?? []).map((r) => ({ seed: r.id, name: r.name }))];
+  return [{ seed: captainSeed, name: state.captain.name, fixed: state.captain.face }, ...crew.map((m) => ({ seed: m.id, name: m.name })), ...(state.recruits ?? []).map((r) => ({ seed: r.id, name: r.name }))];
 }
 
 /** Portrait age band 0..3 (20s, 40s, 50s, 60+) for somebody of this age. The cut-offs follow how the pictures look. */
@@ -451,4 +458,15 @@ export function ensureCrew(state: GameState): void {
     state.nextRecruitsAt = state.time;
     tickRecruits(state);
   }
+}
+
+/** Choose the captain's portrait (a face index from the portrait atlas), or clear it to be assigned one. */
+export function setCaptainFace(state: GameState, face: number | null): Result<number | null> {
+  if (face === null) {
+    delete state.captain.face;
+    return ok(null);
+  }
+  if (!Number.isInteger(face) || face < 0) return fail("No such portrait.");
+  state.captain.face = face;
+  return ok(face);
 }

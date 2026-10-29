@@ -37,9 +37,10 @@ import {
   type CrewMember,
   type MoodLevel,
   type Recruit,
+  setCaptainFace,
 } from "../sim";
 import { cr } from "./format";
-import { captainSeed, Portrait } from "./portraits";
+import { captainSeed, Portrait, PortraitPicker } from "./portraits";
 import type { GameSession } from "./session";
 import "./crew.css";
 import "./perks.css";
@@ -244,6 +245,33 @@ function MoodWarnings({ m }: { m: CrewMember }) {
   );
 }
 
+/** The captain's portrait; click it to pick another (AW-151). */
+function CaptainPortrait({ session }: { session: GameSession }) {
+  const { state } = session;
+  const [open, setOpen] = useState(false);
+  const age = ageAt(state.captain.born, state.time);
+  return (
+    <span class="captain-portrait">
+      <button class="portrait-edit" title="Change your portrait" onClick={() => setOpen((o) => !o)}>
+        <Portrait state={state} seed={captainSeed(state.captain)} name={state.captain.name} age={age} />
+      </button>
+      {open && (
+        <div class="portrait-popover">
+          <div class="muted small">Your portrait</div>
+          <PortraitPicker
+            age={age}
+            value={state.captain.face ?? null}
+            onPick={(f) => {
+              session.act((s) => setCaptainFace(s, f));
+              setOpen(false);
+            }}
+          />
+        </div>
+      )}
+    </span>
+  );
+}
+
 function PersonCard({ session, station, onHall }: { session: GameSession; station: Station; onHall?: () => void }) {
   const { state } = session;
   const info = STATION_INFO[station];
@@ -252,7 +280,7 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
       <div class="panel crew-card">
         <div class="hub-card-head">
           <div class="crew-who">
-            <Portrait state={state} seed={captainSeed(state.captain)} name={state.captain.name} age={ageAt(state.captain.born, state.time)} />
+            <CaptainPortrait session={session} />
             <div>
               <span class="accent">{info.title}</span> <strong>{captainTitle(state.captain.name).replace(/^Captain\s+/i, "")}</strong>
             </div>

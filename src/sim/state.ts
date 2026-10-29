@@ -98,7 +98,7 @@ export interface GameState {
   /** Gameplay RNG state (not world generation). */
   rngState: number;
   /** The player. `xp` is their experience at the captain's station. */
-  captain: { name: string; born: number; xp?: number; perks?: string[]; clan?: ClanId };
+  captain: { name: string; born: number; xp?: number; perks?: string[]; clan?: ClanId; /** Chosen portrait (AW-151); otherwise one is assigned. */ face?: number };
   /** The five officers, one per station. */
   crew?: CrewMember[];
   /** The hiring hall aboard the Intrepid, and when its pool next turns over. */
@@ -168,16 +168,18 @@ export interface NewGameOptions {
   captainName?: string;
   /** The captain's own clan (a small perk and a matching cost); none if left out. */
   clan?: ClanId;
+  /** The captain's portrait, chosen on the new-game screen. */
+  face?: number;
   shipName?: string;
 }
 
-export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan }: NewGameOptions): GameState {
+export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan, face }: NewGameOptions): GameState {
   const state: GameState = {
     version: SAVE_VERSION,
     seed,
     time: GAME_START + 8 * 60,
     rngState: seed ^ 0x5eed,
-    captain: { name: captainName.replace(/^captain\s+/i, "").trim() || "Reyes", born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0, ...(clan ? { clan } : {}) },
+    captain: { name: captainName.replace(/^captain\s+/i, "").trim() || "Reyes", born: GAME_START - 28 * YEAR - 117 * DAY, xp: 0, ...(clan ? { clan } : {}), ...(face !== undefined ? { face } : {}) },
     credits: 6_000 + (clan === "freebooters" ? 3_000 : 0),
     loan: {
       balance: 48_000,

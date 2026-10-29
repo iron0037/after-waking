@@ -842,3 +842,34 @@ table.data th.num {
   border-color: var(--danger);
   color: #ffd0d0;
 }
+
+/* Title menu (AW-151) */
+.title-menu {
+  text-align: center;
+}
+.title-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  margin-top: 18px;
+}
+.title-buttons .btn {
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.title-save {
+  color: var(--muted);
+  font-weight: normal;
+}
+.new-game-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.new-game-head h2 {
+  margin: 0;
+}
