@@ -1,4 +1,4 @@
-import { activeRegion, ageAt, captainTitle, compendiumTotals, crewAlerts, crewFreePoints, effectiveStats, formatDate, formatDuration, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, captainTitle, compendiumTotals, crewAlerts, crewFreePoints, dist, effectiveStats, formatDate, formatDuration, INTREPID_POS, siteHere, type GameState, type World } from "../sim";
 import { STATION_INFO } from "../data/crew";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
@@ -106,6 +106,10 @@ export function TopBar({
 function locationLabel(state: GameState, world: World): string {
   const loc = state.location;
   if (loc.kind === "intrepid") return "Docked at the Intrepid";
+  if (loc.kind === "deep") {
+    const site = siteHere(state, world);
+    return site ? `Deep space · ${site.name}` : `Deep space · ${dist(loc.pos, INTREPID_POS).toFixed(1)} ly from the Intrepid`;
+  }
   const sys = world.system(loc.systemId).system;
   if (loc.kind === "surface") return `${world.body(loc.bodyId).body.name}, region ${activeRegion(state, world) + 1}`;
   if (loc.orbiting) return `Orbiting ${world.body(loc.orbiting).body.name}`;

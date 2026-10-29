@@ -71,6 +71,19 @@ export const RESEARCH: readonly ResearchProject[] = [
     needs: [{ kind: "surveys", count: 10 }],
   },
   {
+    id: "long-baseline",
+    name: "Long-baseline interferometry",
+    clan: "lyceum",
+    unlocks: "longBaselineArray",
+    blurb: "Stretch a deep-field array's eye across a kilometre of boom and it sees five light-years out. The Lyceum needs charts from many stars to calibrate it, and xenon for the thrusters that hold the booms true.",
+    cost: 15_000,
+    days: 28,
+    needs: [
+      { kind: "systems", count: 20 },
+      { kind: "cargo", commodity: "xenon", tonnes: 2 },
+    ],
+  },
+  {
     id: "deep-atmosphere",
     name: "Deep-atmosphere modelling",
     clan: "lyceum",

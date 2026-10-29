@@ -68,6 +68,14 @@ Epilogue slides would reflect everything you achieved.
   - At 5 clues, the Covenant says every thread leads outward to the edge of the Verge. That is the hand-off to deep space and the Awaken finale.
 
 ### Deep space and the Return ending **[DECIDED 2026-10-29, to build]**
+- **v1 as built (AW-165):**
+  - **The deep location:** `state.location = { kind: "deep", pos }`, in light-years. Fold targets are ids: `deepId(pos)` = `"deep:x,y"`.
+  - **Blind folds:** 60% of the drive's range and ×1.25 fuel. A fold from deep space to a star or the Intrepid gets its full range.
+  - **Where you can't fold:** within 0.6 ly of a star or of the Intrepid, or beyond 40 ly from the Intrepid.
+  - **Deep-field array:** 45k cr from the Lyceum, sweeping 3 ly per day-long scan with faint returns out to 1.5× that. The long-baseline array (70k cr) sweeps 5 ly; it's gated by the "Long-baseline interferometry" research (20 systems charted, 2 t xenon).
+  - **Sweeps run** from deep space or from any star system.
+  - **Rescue:** the tender reaches deep space and charges by the light-year.
+  - **Sites so far:** the anomaly's mouth only, 16–26 ly out and at least 2 ly from any star (`src/sim/deepspace.ts`).
 - **Blind folds.**
   - You can fold to an empty point in interstellar space. With no star to lock onto, a blind fold reaches only about 60% of the drive's range and costs extra plicite.
   - The drive still refits after every hop, and there's no refuelling out there, so the tanks set how far an expedition can roam.

@@ -329,7 +329,16 @@ export function validViews(state: GameState): View[] {
       return ["system", "starmap"];
     case "surface":
       return ["surface"];
+    case "deep":
+      // Between the stars there is only the chart (AW-165).
+      return ["starmap"];
   }
+}
+
+/** Where the captain lands after a fold: the hub if docked, the chart between the stars, else the system. */
+export function arrivalView(state: GameState): View {
+  const kind = state.location.kind;
+  return kind === "intrepid" ? "hub" : kind === "deep" ? "starmap" : "system";
 }
 
 export function defaultView(state: GameState): View {

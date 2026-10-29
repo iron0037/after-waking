@@ -19,6 +19,7 @@ export type ArchiveTrigger =
   | "start"
   | "intrepid"
   | "system"
+  | "deep"
   | "orbit"
   | "orbit-scanned"
   | "surface"
@@ -101,6 +102,14 @@ export const ARCHIVE: readonly ArchiveEntry[] = [
     title: "Flight within a system",
     text:
       "Folds end at a system's edge; no ship may fold near a star's well. Within the system the drive gives a quarter of light-speed, so a crossing takes hours. Select a world to see the burn's time and fuel. To leave, return to the edge and fold once the drive is refitted.",
+  },
+  {
+    id: "deep",
+    trigger: "deep",
+    title: "Between the stars",
+    text:
+      "No star's well holds the ship here, so the drive may fold again as soon as it is refitted. With no star to lock onto, a fold into empty space reaches only part of the drive's range and burns more plicite; a fold toward a star or the Intrepid reaches its full range. There is no fuel out here but what you carry.",
+    gloss: "Count your plicite before every hop. The tender comes this far, but it charges by the light-year.",
   },
   {
     id: "orbit",

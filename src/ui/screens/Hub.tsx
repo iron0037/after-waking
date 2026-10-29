@@ -970,6 +970,12 @@ function Shipyard({ session }: { session: GameSession }) {
           </dd>
           <dt>Sensors</dt>
           <dd>Tier {stats.sensorTier}</dd>
+          {stats.deepScanLy > 0 && (
+            <>
+              <dt>Deep-field reach</dt>
+              <dd>{stats.deepScanLy} ly</dd>
+            </>
+          )}
         </dl>
         <h3 class="hub-gap">Drill &amp; rover</h3>
         <dl class="kv">

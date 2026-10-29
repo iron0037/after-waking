@@ -33,6 +33,8 @@ export interface ShipStats {
   /** In-system cruise speed as a fraction of c. */
   cruiseSpeedC: number;
   sensorTier: number;
+  /** Deep-field array reach, in light-years (0: none fitted). */
+  deepScanLy: number;
   drillMaxDepthM: number;
   /** Tonnes per hour from a grade-1.0 deposit. */
   drillRateTph: number;
@@ -73,6 +75,7 @@ export const BASE_STATS: ShipStats = {
   foldRangeLy: 8,
   cruiseSpeedC: 0.25,
   sensorTier: 1,
+  deepScanLy: 0,
   drillMaxDepthM: 250,
   drillRateTph: 1.2,
   roverCargoT: 20,
@@ -443,6 +446,32 @@ export const UPGRADES: readonly Upgrade[] = [
     description: "Sensor tier 3: exact region readings and the widest rover detection.",
     apply: (s) => {
       s.sensorTier = Math.max(s.sensorTier, 3);
+    },
+  },
+  {
+    id: "deepFieldArray",
+    category: "sensors",
+    name: "Deep-field array",
+    vendor: "lyceum",
+    price: 45_000,
+    description:
+      "Sweeps interstellar space for whatever lies between the stars: 3 ly around the ship in a day-long scan, from deep space or any star system. Faint returns out to 4.5 ly.",
+    apply: (s) => {
+      s.deepScanLy = Math.max(s.deepScanLy, 3);
+      s.hullMassT += 10;
+    },
+  },
+  {
+    id: "longBaselineArray",
+    category: "sensors",
+    requires: "deepFieldArray",
+    name: "Long-baseline array",
+    vendor: "lyceum",
+    price: 70_000,
+    description: "A deep-field array with booms a kilometre long: sweeps 5 ly per scan, faint returns out to 7.5 ly.",
+    apply: (s) => {
+      s.deepScanLy = Math.max(s.deepScanLy, 5);
+      s.hullMassT += 10;
     },
   },
   {

@@ -5,6 +5,14 @@ import {
   prepareFold,
   clamp,
   currentSystemId,
+  BLIND_FOLD_FUEL,
+  BLIND_FOLD_RANGE,
+  deepId,
+  dist,
+  fuelToGetHome,
+  knownDeepSites,
+  SITE_REACH_LY,
+  type DeepSite,
   orbitalSensorTier,
   bodyValueEstimate,
   isWaitBlocker,
@@ -39,7 +47,9 @@ import { COMMODITIES } from "../../data/commodities";
 import { tonnes } from "../format";
 import { Canvas } from "../Canvas";
 import { BODY_COLOR, UI } from "../palette";
-import { useSession, type GameSession } from "../session";
+import { arrivalView, useSession, type GameSession } from "../session";
+import { DeepSweepPanel } from "../DeepSweep";
+import { RescuePanel } from "../Rescue";
 import { useArchiveTopic } from "../ArchivePanel";
 import "./starmap.css";
 import "../covenant.css";
@@ -47,6 +57,9 @@ import "../covenant.css";
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, monospace';
 const FLASH_MS = 600;
 const PAD = 70;
+/** The anomaly's eerie pale violet, distinct from the Covenant's dusty one. */
+const ANOMALY = "#c792ff";
+const SITE_HIT = 13;
 
 /** A selectable point on the chart: a star or the Intrepid. */
 interface Node {
@@ -124,6 +137,7 @@ export function StarMap({ session }: { session: GameSession }) {
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   const [selected, setSelected] = useState<string | null>(() => {
+    if (state.location.kind === "deep") return null; // out here the question is where to fold blind, not which star is nearest
     const here = positionOf(world.galaxy, currentSystemId(state));
     let best: Node | null = null;
     let bestD = Infinity;
@@ -136,6 +150,18 @@ export function StarMap({ session }: { session: GameSession }) {
     return best?.id ?? null;
   });
   const [hovered, setHovered] = useState<string | null>(null);
+  /** A point in deep space picked as a blind-fold target (AW-165), in chart coordinates. */
+  const [deepPoint, setDeepPoint] = useState<Vec2 | null>(null);
+  const pick = (id: string | null) => {
+    setDeepPoint(null);
+    setSelected(id);
+  };
+  const pickPoint = (p: Vec2) => {
+    setSelected(null);
+    setDeepPoint(positionOf(world.galaxy, deepId(p)));
+  };
+  const inDeep = state.location.kind === "deep";
+  const sites = knownDeepSites(state, world);
 
   const view = useRef<ViewState>({ scale: 1, cx: 0, cy: 0, fit: 0, userMoved: false });
   const size = useRef({ w: 0, h: 0 });
@@ -158,7 +184,17 @@ export function StarMap({ session }: { session: GameSession }) {
   }
   /** Stars whose Fold Plotter label fits without covering another label; the hovered and selected stars always get one. */
   const plotLabels = new Set<string>();
-  const target = selected ? (byId.get(selected) ?? null) : null;
+  const deepTarget: Node | null = deepPoint
+    ? (() => {
+        const near = sites.find((x) => dist(x.site.pos, deepPoint) <= SITE_REACH_LY);
+        return { id: deepId(deepPoint), name: near ? (near.level === "known" ? near.site.name : "Faint return") : "Empty space", pos: deepPoint, star: null };
+      })()
+    : null;
+  const target = deepTarget ?? (selected ? (byId.get(selected) ?? null) : null);
+  const blind = !!deepTarget;
+  const deepSite = deepTarget ? sites.find((x) => dist(x.site.pos, deepTarget.pos) <= SITE_REACH_LY) : undefined;
+  const hereSite = inDeep ? (sites.find((x) => x.level === "known" && dist(x.site.pos, here) <= SITE_REACH_LY)?.site ?? null) : null;
+  const rangeLy = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
   const plan = target ? foldPlan(state, world, target.id) : null;
 
   // Departure: what a one-click "fold when ready" would do, and whether it can.
@@ -202,11 +238,12 @@ export function StarMap({ session }: { session: GameSession }) {
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
-    for (const n of nodes) {
-      minX = Math.min(minX, n.pos.x);
-      maxX = Math.max(maxX, n.pos.x);
-      minY = Math.min(minY, n.pos.y);
-      maxY = Math.max(maxY, n.pos.y);
+    const points = [...nodes.map((n) => n.pos), ...sites.map((x) => x.site.pos), ...(inDeep ? [here] : [])];
+    for (const q of points) {
+      minX = Math.min(minX, q.x);
+      maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y);
+      maxY = Math.max(maxY, q.y);
     }
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
@@ -227,7 +264,18 @@ export function StarMap({ session }: { session: GameSession }) {
       const d = Math.hypot(sx - x, sy - y);
       if (d <= reach && d < bestD) [best, bestD] = [n.id, d];
     }
+    if (best !== null) return best;
+    for (const { site } of sites) {
+      const [sx, sy] = toScreen(site.pos);
+      const d = Math.hypot(sx - x, sy - y);
+      if (d <= SITE_HIT && d < bestD) [best, bestD] = [`site:${site.id}`, d];
+    }
     return best;
+  };
+
+  const fromScreen = (x: number, y: number): Vec2 => {
+    const v = view.current;
+    return { x: v.cx + (x - size.current.w / 2) / v.scale, y: v.cy + (y - size.current.h / 2) / v.scale };
   };
 
   // --- input ------------------------------------------------------------------------------
@@ -291,7 +339,22 @@ export function StarMap({ session }: { session: GameSession }) {
       back();
       return;
     }
-    setSelected(hit);
+    if (hit?.startsWith("site:")) {
+      const found = sites.find((x) => `site:${x.site.id}` === hit);
+      if (found) pickPoint(found.site.pos);
+      return;
+    }
+    if (hit !== null) {
+      pick(hit);
+      return;
+    }
+    // Empty space: a point to fold to blind. Clicking the ship itself just clears.
+    const [sx, sy] = toScreen(here);
+    if (inDeep && Math.hypot(sx - x, sy - y) <= 14) {
+      pick(null);
+      return;
+    }
+    pickPoint(fromScreen(x, y));
   };
 
   const centerOnShip = () => {
@@ -308,7 +371,10 @@ export function StarMap({ session }: { session: GameSession }) {
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") setSelected(null);
+      if (ev.key === "Escape") {
+        setSelected(null);
+        setDeepPoint(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -325,7 +391,9 @@ export function StarMap({ session }: { session: GameSession }) {
 
   // --- actions ----------------------------------------------------------------------------
 
-  const back = () => session.go(docked ? "hub" : "system");
+  const back = () => {
+    if (!inDeep) session.go(docked ? "hub" : "system");
+  };
 
   const doFold = (auto: boolean) => {
     if (!target || session.busy || !plan || !canDepart || (!auto && plan.blockers.length > 0)) return;
@@ -343,7 +411,10 @@ export function StarMap({ session }: { session: GameSession }) {
         const result = session.act((s, w) => fold(s, w, id));
         // A raider hailed as the drive spooled up: remember where we were going, for the debrief.
         if (!result.ok && session.state.encounter) session.pendingFold = id;
-        if (result.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
+        if (result.ok) {
+          setDeepPoint(null);
+          session.go(arrivalView(session.state));
+        }
       });
     }, FLASH_MS);
   };
@@ -365,6 +436,7 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.fillRect(0, 0, w, h);
 
     drawGrid(ctx, w, h, v);
+    drawSwept(ctx);
 
     const [hx, hy] = toScreen(here);
 
@@ -385,6 +457,35 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.textAlign = "center";
     ctx.fillText(`fold range ${stats.foldRangeLy} ly`, hx, clamp(hy - rangePx - 6, 14, h - 8));
     ctx.restore();
+
+    // blind range: how far a fold to an empty point reaches (no star to lock onto), drawn as a dotted amber ring
+    const blindPx = stats.foldRangeLy * BLIND_FOLD_RANGE * v.scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(hx, hy, blindPx, 0, Math.PI * 2);
+    ctx.setLineDash([1.5, 5]);
+    ctx.lineCap = "round";
+    ctx.lineWidth = blind ? 2.5 : 1.75;
+    ctx.strokeStyle = blind ? "rgba(255, 179, 71, 0.85)" : "rgba(255, 179, 71, 0.5)";
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = `11px ${FONT}`;
+    ctx.fillStyle = "rgba(255, 179, 71, 0.75)";
+    ctx.textAlign = "center";
+    ctx.fillText(`blind range ${(stats.foldRangeLy * BLIND_FOLD_RANGE).toFixed(1)} ly`, hx, clamp(hy + blindPx + 14, 14, h - 8));
+    ctx.restore();
+
+    // the array's own reach around the ship
+    if (stats.deepScanLy > 0 && stats.deepScanLy * v.scale >= 5) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(hx, hy, stats.deepScanLy * v.scale, 0, Math.PI * 2);
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = "rgba(199, 146, 255, 0.55)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // course line
     if (target && plan && target.id !== fromId) {
@@ -445,9 +546,11 @@ export function StarMap({ session }: { session: GameSession }) {
       if (n.star) drawStar(ctx, n, w);
     }
     drawIntrepid(ctx);
+    for (const x of sites) drawSite(ctx, x.site, x.level, t);
 
     // you are here
-    const base = fromId === "intrepid" ? INTREPID_W / 2 + 6 : starRadius(byId.get(fromId)?.star as StarSystem) + 9;
+    const fromStar = byId.get(fromId)?.star;
+    const base = fromId === "intrepid" ? INTREPID_W / 2 + 6 : fromStar ? starRadius(fromStar) + 9 : 10;
     const phase = (t / 1700) % 1;
     ctx.save();
     ctx.strokeStyle = UI.ship;
@@ -460,6 +563,7 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.arc(hx, hy, base + phase * 16, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+    if (inDeep) drawShipMark(ctx, hx, hy);
 
     // hover and selection
     const hoverNode = hovered ? byId.get(hovered) : undefined;
@@ -475,7 +579,27 @@ export function StarMap({ session }: { session: GameSession }) {
       ctx.restore();
     }
     if (hoverNode) drawTooltip(ctx, hoverNode, w, h);
-    if (target) {
+    const hoverSite = hovered?.startsWith("site:") ? sites.find((x) => `site:${x.site.id}` === hovered) : undefined;
+    if (hoverSite) drawSiteTooltip(ctx, hoverSite.site, hoverSite.level, w, h);
+    if (target && deepTarget) {
+      const [x, y] = toScreen(target.pos);
+      const ok = plan ? plan.blockers.every(isSoftBlocker) : true;
+      ctx.save();
+      ctx.strokeStyle = ok ? UI.accent : UI.danger;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        ctx.moveTo(x + dx * 5, y + dy * 5);
+        ctx.lineTo(x + dx * 16, y + dy * 16);
+      }
+      ctx.stroke();
+      ctx.font = `11px ${FONT}`;
+      ctx.fillStyle = ok ? UI.accent : UI.danger;
+      ctx.textAlign = "left";
+      ctx.fillText(`${deepTarget.name} (${target.pos.x.toFixed(1)}, ${target.pos.y.toFixed(1)})`, x + 20, y + 4);
+      ctx.restore();
+    } else if (target) {
       const [x, y] = toScreen(target.pos);
       const half = target.star ? starRadius(target.star) + 10 : 20;
       const halfW = target.star ? half : INTREPID_W / 2 + 6;
@@ -499,6 +623,142 @@ export function StarMap({ session }: { session: GameSession }) {
       ctx.fillStyle = `rgba(255, 255, 255, ${(p * p).toFixed(3)})`;
       ctx.fillRect(0, 0, w, h);
     }
+  };
+
+  /** Swept space: every sweep circle in one path, so overlaps merge instead of stacking darker. */
+  const drawSwept = (ctx: CanvasRenderingContext2D) => {
+    const scans = state.deepScans ?? [];
+    if (scans.length === 0) return;
+    const v = view.current;
+    ctx.save();
+    ctx.beginPath();
+    for (const c of scans) {
+      const [sx, sy] = toScreen(c);
+      ctx.moveTo(sx + c.r * v.scale, sy);
+      ctx.arc(sx, sy, c.r * v.scale, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = "rgba(143, 120, 210, 0.16)";
+    ctx.fill();
+    ctx.restore();
+  };
+
+  const drawShipMark = (ctx: CanvasRenderingContext2D, x: number, y: number) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(3.5, 4);
+    ctx.lineTo(0, 2);
+    ctx.lineTo(-3.5, 4);
+    ctx.closePath();
+    ctx.fillStyle = UI.ship;
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.font = `bold 11px ${FONT}`;
+    ctx.fillStyle = UI.ship;
+    ctx.textAlign = "center";
+    ctx.fillText(state.ship.name, x, y + 28);
+    ctx.restore();
+  };
+
+  const drawSite = (ctx: CanvasRenderingContext2D, site: DeepSite, level: "known" | "faint", t: number) => {
+    const [x, y] = toScreen(site.pos);
+    const isHover = hovered === `site:${site.id}`;
+    ctx.save();
+    if (level === "faint") {
+      ctx.strokeStyle = UI.cyan;
+      ctx.globalAlpha = isHover ? 0.9 : 0.55;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.arc(x, y, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = isHover ? 1 : 0.85;
+      ctx.fillStyle = UI.cyan;
+      ctx.font = `bold 13px ${FONT}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("?", x, y + 1);
+      ctx.restore();
+      return;
+    }
+    if (site.kind === "anomaly") {
+      // a lens with no mass behind it: a slow pulse, a thin ring, and a turning lens shape
+      const pulse = 0.5 + 0.5 * Math.sin(t / 900);
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, 22);
+      glow.addColorStop(0, `rgba(199, 146, 255, ${(0.22 + pulse * 0.18).toFixed(3)})`);
+      glow.addColorStop(1, "rgba(199, 146, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 22, y - 22, 44, 44);
+      ctx.strokeStyle = ANOMALY;
+      ctx.lineWidth = isHover ? 2 : 1.25;
+      ctx.beginPath();
+      ctx.arc(x, y, 9 + pulse * 1.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(x, y, 6.5, 2.4, t / 3500, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 1.6, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+    } else {
+      ctx.fillStyle = ANOMALY;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 6);
+      ctx.lineTo(x + 6, y);
+      ctx.lineTo(x, y + 6);
+      ctx.lineTo(x - 6, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.font = `${isHover ? "bold " : ""}12px ${FONT}`;
+    ctx.fillStyle = ANOMALY;
+    ctx.textAlign = "left";
+    ctx.fillText(site.name, x + 16, y + 4);
+    ctx.restore();
+  };
+
+  const drawSiteTooltip = (ctx: CanvasRenderingContext2D, site: DeepSite, level: "known" | "faint", w: number, h: number) => {
+    const [x, y] = toScreen(site.pos);
+    const d = `${dist(site.pos, here).toFixed(1)} ly from ${inDeep ? "the ship" : fromId === "intrepid" ? "the Intrepid" : "here"}`;
+    ctx.save();
+    ctx.font = `11px ${FONT}`;
+    const maxW = 280;
+    const wrap = (text: string): string[] => {
+      const out: string[] = [];
+      let line = "";
+      for (const word of text.split(" ")) {
+        if (line && ctx.measureText(`${line} ${word}`).width > maxW) {
+          out.push(line);
+          line = word;
+        } else line = line ? `${line} ${word}` : word;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+    const lines: { text: string; color: string }[] =
+      level === "known"
+        ? [{ text: site.name, color: ANOMALY }, { text: d, color: UI.muted }, ...wrap(site.report).map((text) => ({ text, color: UI.text }))]
+        : [{ text: "A faint return: something is out there", color: UI.cyan }, { text: d, color: UI.muted }];
+    const bw = Math.max(...lines.map((l) => ctx.measureText(l.text).width)) + 14;
+    const bh = 8 + lines.length * 14;
+    const bx = clamp(x + 16, 6, w - bw - 6);
+    const by = clamp(y + 14, 6, h - bh - 6);
+    ctx.fillStyle = "rgba(17, 24, 41, 0.94)";
+    ctx.strokeStyle = "#5a4a80";
+    ctx.beginPath();
+    ctx.rect(bx, by, bw, bh);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = "left";
+    lines.forEach((l, i) => {
+      ctx.fillStyle = l.color;
+      ctx.fillText(l.text, bx + 7, by + 14 + i * 14);
+    });
+    ctx.restore();
   };
 
   const nodeRadius = (n: Node): number => (n.star ? starRadius(n.star) : INTREPID_HIT);
@@ -777,8 +1037,11 @@ export function StarMap({ session }: { session: GameSession }) {
           <div>
             <span class="good">⌂</span> home systems: calm, surveyed by the first scouts
           </div>
+          <div>
+            <span class="sm-blind">···</span> blind range · <span class="sm-anomaly">◎</span> deep site · <span class="sm-faint">?</span> faint return
+          </div>
         </div>
-        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: select · Esc: clear</div>
+        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · Esc: clear</div>
       </div>
 
       <aside class="side">
@@ -787,8 +1050,8 @@ export function StarMap({ session }: { session: GameSession }) {
             <h3>Fold plan: {target.name}</h3>
             <dl class="kv">
               <dt>Distance</dt>
-              <dd class={plan.ly > stats.foldRangeLy ? "danger" : ""}>
-                {plan.ly.toFixed(1)} / {stats.foldRangeLy} ly range
+              <dd class={plan.ly > rangeLy ? "danger" : ""}>
+                {plan.ly.toFixed(1)} / {rangeLy.toFixed(1)} ly {blind ? "blind range" : "range"}
               </dd>
               <dt>Fuel</dt>
               <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
@@ -816,11 +1079,12 @@ export function StarMap({ session }: { session: GameSession }) {
             <div class="btn-row sm-fold">
               {plan.blockers.length === 0 ? (
                 <button class="btn primary big" disabled={session.busy} onClick={() => doFold(false)}>
-                  Fold now
+                  {blind ? "Fold here" : "Fold now"}
                 </button>
               ) : canDepart ? (
                 <button class="btn primary big" disabled={session.busy} onClick={() => doFold(true)}>
-                  Fold when ready{autoLabel ? ` (${autoLabel})` : ""}
+                  {blind ? "Fold here when ready" : "Fold when ready"}
+                  {autoLabel ? ` (${autoLabel})` : ""}
                 </button>
               ) : (
                 <button class="btn primary big" disabled>
@@ -828,6 +1092,12 @@ export function StarMap({ session }: { session: GameSession }) {
                 </button>
               )}
             </div>
+            {blind && (
+              <p class="muted small sm-auto-note">
+                A blind fold has no star to lock onto: the drive reaches {Math.round(BLIND_FOLD_RANGE * 100)}% of its range and burns{" "}
+                {Math.round((BLIND_FOLD_FUEL - 1) * 100)}% more plicite.
+              </p>
+            )}
             {softBlockers.length > 0 && canDepart && (
               <p class="muted small sm-auto-note">
                 {needsEdge ? "Folds start at the system edge, so the ship flies out first. " : ""}
@@ -838,13 +1108,57 @@ export function StarMap({ session }: { session: GameSession }) {
           </section>
         )}
 
-        <div class="btn-row sm-top">
-          <button class="btn" onClick={back} disabled={session.busy}>
-            ◂ Back to {docked ? "the Intrepid" : "the system"}
-          </button>
-        </div>
+        {inDeep ? (
+          <>
+            <section class="panel sm-deep">
+              <h3>Between the stars</h3>
+              <dl class="kv">
+                <dt>Position</dt>
+                <dd>
+                  {here.x.toFixed(1)}, {here.y.toFixed(1)} ly
+                </dd>
+                <dt>From the Intrepid</dt>
+                <dd>{dist(here, INTREPID_POS).toFixed(1)} ly</dd>
+                <dt>Fuel to get home</dt>
+                <dd class={fuelToGetHome(state, world) > state.ship.fuel ? "danger" : ""}>
+                  {fuelToGetHome(state, world)} of {state.ship.fuel.toFixed(1)}
+                </dd>
+              </dl>
+              {hereSite && <p class="small sm-site-report">{hereSite.report}</p>}
+            </section>
+            <RescuePanel session={session} busy={session.busy} />
+          </>
+        ) : (
+          <div class="btn-row sm-top">
+            <button class="btn" onClick={back} disabled={session.busy}>
+              ◂ Back to {docked ? "the Intrepid" : "the system"}
+            </button>
+          </div>
+        )}
+        <DeepSweepPanel session={session} />
 
-        {target ? (
+        {deepTarget ? (
+          <section class="panel">
+            <h2>{deepTarget.name}</h2>
+            <dl class="kv">
+              <dt>Type</dt>
+              <dd>Interstellar space</dd>
+              <dt>Position</dt>
+              <dd>
+                {deepTarget.pos.x.toFixed(1)}, {deepTarget.pos.y.toFixed(1)} ly
+              </dd>
+              <dt>From the Intrepid</dt>
+              <dd>{dist(deepTarget.pos, INTREPID_POS).toFixed(1)} ly</dd>
+              <dt>Distance</dt>
+              <dd>{distanceLy(world.galaxy, fromId, deepTarget.id).toFixed(1)} ly</dd>
+            </dl>
+            {deepSite && (
+              <p class="small sm-site-report">
+                {deepSite.level === "known" ? deepSite.site.report : "A faint return on the deep-field array: something is out there. Fold close and sweep to identify it."}
+              </p>
+            )}
+          </section>
+        ) : target ? (
           <>
             <section class="panel">
               <h2>{target.name}</h2>
@@ -909,7 +1223,8 @@ export function StarMap({ session }: { session: GameSession }) {
             <h2>Navigation</h2>
             <p class="muted">
               Pick a star on the chart or from the list below. The dashed circle is how far the fold drive can reach from where you
-              are.
+              are. Click empty space to plan a blind fold into the dark: it reaches only {Math.round(BLIND_FOLD_RANGE * 100)}% as far
+              (the dotted amber ring).
             </p>
           </section>
         )}
@@ -923,11 +1238,11 @@ export function StarMap({ session }: { session: GameSession }) {
                   key={n.id}
                   tabIndex={0}
                   class={`${selected === n.id ? "sel" : ""} ${hovered === n.id ? "hov" : ""}`}
-                  onClick={() => !session.busy && setSelected(n.id)}
+                  onClick={() => !session.busy && pick(n.id)}
                   onKeyDown={(ev) => {
                     if (ev.key === "Enter" || ev.key === " ") {
                       ev.preventDefault();
-                      if (!session.busy) setSelected(n.id);
+                      if (!session.busy) pick(n.id);
                     }
                   }}
                   onMouseEnter={() => setHovered(n.id)}

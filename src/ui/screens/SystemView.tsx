@@ -33,6 +33,7 @@ import {
 } from "../../sim";
 import { useSession, type GameSession } from "../session";
 import { RescuePanel } from "../Rescue";
+import { DeepSweepPanel } from "../DeepSweep";
 import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
@@ -465,6 +466,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           )}
           {edgeFuelShort && edgeRes.ok && <div class="danger small">The edge burn needs {edgeRes.value.fuel} fuel.</div>}
         </section>
+
+        <DeepSweepPanel session={session} busy={busy} />
 
         {errand && (
           <section class="panel covenant-card">

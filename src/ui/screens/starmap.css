@@ -188,3 +188,31 @@
 .sm-minerals .small.accent {
   margin-left: 17px;
 }
+
+/* Deep space (AW-165) */
+.deep-sweep .btn {
+  width: 100%;
+}
+.ds-note {
+  margin: 6px 0 0;
+}
+.sm-deep {
+  border-color: #6e5a96;
+}
+.sm-deep h3 {
+  margin-top: 0;
+}
+.sm-anomaly {
+  color: #c792ff;
+}
+.sm-faint {
+  color: var(--cyan);
+  font-weight: bold;
+}
+.sm-site-report {
+  margin: 8px 0 0;
+}
+.sm-blind {
+  color: #ffb347;
+  letter-spacing: 1px;
+}

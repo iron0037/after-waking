@@ -133,7 +133,24 @@ export function distanceLy(galaxy: Galaxy, fromId: string, toId: string): number
 }
 
 export function positionOf(galaxy: Galaxy, id: string): Vec2 {
-  return id === "intrepid" ? INTREPID_POS : findSystem(galaxy, id).pos;
+  if (id === "intrepid") return INTREPID_POS;
+  const deep = parseDeepId(id);
+  return deep ?? findSystem(galaxy, id).pos;
+}
+
+/** A point in interstellar space as a fold target id (AW-165): "deep:x,y" in light-years. */
+export function deepId(p: Vec2): string {
+  return `deep:${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+}
+
+export function parseDeepId(id: string): Vec2 | null {
+  if (!id.startsWith("deep:")) return null;
+  const [x, y] = id.slice(5).split(",").map(Number);
+  return x === undefined || y === undefined || Number.isNaN(x) || Number.isNaN(y) ? null : { x, y };
+}
+
+export function isDeepId(id: string): boolean {
+  return id.startsWith("deep:");
 }
 
 function lerp([a, b]: [number, number], t: number): number {

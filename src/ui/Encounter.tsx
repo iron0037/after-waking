@@ -39,7 +39,7 @@ import {
 } from "../sim";
 import { cr, damageSummary, pct, tonnes } from "./format";
 import { Portrait } from "./portraits";
-import type { GameSession } from "./session";
+import { arrivalView, type GameSession } from "./session";
 import "./encounter.css";
 
 export function EncounterOverlay({ session }: { session: GameSession }) {
@@ -663,7 +663,7 @@ function Debrief({ session }: { session: GameSession }) {
     if (!target || !settled()) return;
     session.closeEncounterDebrief();
     const r = session.act((s, w) => fold(s, w, target));
-    if (r.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
+    if (r.ok) session.go(arrivalView(session.state));
   };
 
   // A contact in flight: carry on with the burn from where the ship sits (animated by the system screen).

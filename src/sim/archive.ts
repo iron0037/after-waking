@@ -27,6 +27,7 @@ export function archiveStateTriggers(state: GameState): ArchiveTrigger[] {
     if (loc.orbiting && state.scannedBodies.includes(loc.orbiting)) out.push("orbit-scanned");
   }
   if (loc.kind === "surface") out.push("surface");
+  if (loc.kind === "deep") out.push("deep");
   const stats = effectiveStats(state);
   if (cargoTonnes(state.ship.cargo) >= stats.cargoCapacityT * 0.9) out.push("hold-full");
   if (state.ship.fuel < stats.fuelCapacity * 0.2 && loc.kind !== "intrepid") out.push("fuel-low");

@@ -43,6 +43,8 @@ export interface RoverState {
 
 export type Location =
   | { kind: "intrepid" }
+  /** Between the stars (AW-165): a point in interstellar space, in light-years. */
+  | { kind: "deep"; pos: Vec2 }
   /** In a star system. While orbiting, the ship's position follows the body. */
   | { kind: "space"; systemId: string; pos: Vec2; orbiting: string | null }
   /** Landed. `rover` is null while the rover is stowed aboard. */
@@ -142,6 +144,10 @@ export interface GameState {
   errands?: Partial<Record<ErrandKind, ErrandState>>;
   futureLog?: { t: number; text: string };
   awakenFinale?: number;
+  /** Deep-field sweeps (AW-165): circles of interstellar space searched, in light-years. */
+  deepScans?: { x: number; y: number; r: number; t: number }[];
+  /** What the array has picked out between the stars: identified, or a faint return. */
+  deepKnown?: Record<string, "known" | "faint">;
   /** The captain's own names for worlds, by body id (shown under the catalogue name). */
   nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */

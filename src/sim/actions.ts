@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
@@ -15,7 +16,7 @@ import { burnPath } from "./burnpath";
 import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf, vehiclesOut } from "./vehicles";
 import { fuelPrice, sellCommodity, sellPrice } from "./economy";
 import { landingAccess } from "./environment";
-import { distanceLy, positionOf, SPECTRAL } from "./galaxy";
+import { deepId, distanceLy, INTREPID_POS, isDeepId, positionOf, SPECTRAL } from "./galaxy";
 import { canEnter, findPath, type Mobility } from "./pathfinding";
 import type { BodySurface, SiteKey, SurfaceDeposit, SurfaceFlora } from "./bodysurface";
 import { hexDistance } from "./hex";
@@ -53,7 +54,7 @@ import {
   type RegionMap,
 } from "./surface";
 import { formatDuration } from "./time";
-import { DAY, HOUR, travelMinutes, type Vec2 } from "./units";
+import { DAY, dist, HOUR, travelMinutes, type Vec2 } from "./units";
 import type { World } from "./world";
 
 export type { Result } from "./result";
@@ -133,13 +134,15 @@ export const REFIT_DAYS_PER_LY = 2.25;
 // --- where are we ------------------------------------------------------------------------
 
 /** "intrepid" or the id of the system the ship is in. */
+/** Where the ship is, as a fold origin: a system id, "intrepid", or a deep-space point id. */
 export function currentSystemId(state: GameState): string {
-  return state.location.kind === "intrepid" ? "intrepid" : state.location.systemId;
+  const loc = state.location;
+  return loc.kind === "intrepid" ? "intrepid" : loc.kind === "deep" ? deepId(loc.pos) : loc.systemId;
 }
 
 export function shipPosition(state: GameState, world: World): Vec2 | null {
   const loc = state.location;
-  if (loc.kind === "intrepid") return null;
+  if (loc.kind === "intrepid" || loc.kind === "deep") return null;
   if (loc.kind === "surface") {
     const { detail, body } = world.body(loc.bodyId);
     return bodyPosition(detail, body, state.time);
@@ -171,8 +174,12 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   const stats = effectiveStats(state);
   const ly = from === targetId ? 0 : distanceLy(world.galaxy, from, targetId);
   const crew = crewBonuses(state);
-  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * 10) / 10;
+  // A blind fold (AW-165): no star to lock onto, so it's shorter-ranged and thirstier.
+  const blind = isDeepId(targetId);
+  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? BLIND_FOLD_FUEL : 1) * 10) / 10;
+  const range = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
   const blockers: string[] = [];
+  if (blind) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
 
   if (from === targetId) blockers.push("You're already here.");
   if (state.location.kind === "surface") blockers.push("Launch from the surface first.");
@@ -189,7 +196,13 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   if (state.location.kind === "intrepid" && yardReadyAt(state) > state.time) {
     blockers.push(`Yard work in progress: done in ${formatDuration(yardReadyAt(state) - state.time)}.`);
   }
-  if (ly > stats.foldRangeLy) blockers.push(`${ly.toFixed(1)} ly is beyond the drive's ${stats.foldRangeLy} ly range.`);
+  if (ly > range) {
+    blockers.push(
+      blind
+        ? `${ly.toFixed(1)} ly is beyond a blind fold's ${range.toFixed(1)} ly (with no star to lock onto, the drive reaches ${Math.round(BLIND_FOLD_RANGE * 100)}% of its ${stats.foldRangeLy} ly).`
+        : `${ly.toFixed(1)} ly is beyond the drive's ${stats.foldRangeLy} ly range.`,
+    );
+  }
   if (fuel > state.ship.fuel) blockers.push(`Needs ${fuel} fuel; tanks hold ${state.ship.fuel.toFixed(1)}.`);
   return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit * clanMods(state).foldRefit), blockers };
 }
@@ -215,6 +228,10 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   awardXp(state, "navigation", 15 + 3 * plan.ly);
 
   if (fromId === "intrepid") helmOnDeparture(state);
+  if (isDeepId(targetId)) {
+    arriveDeep(state, world, positionOf(world.galaxy, targetId), plan.ly);
+    return ok(undefined);
+  }
   if (targetId === "intrepid") {
     state.location = { kind: "intrepid" };
     advanceTime(state, DOCKING_MINUTES);
@@ -1400,6 +1417,9 @@ export function fuelToGetHome(state: GameState, world: World): number {
   const stats = effectiveStats(state);
   const crew = crewBonuses(state);
   const mass = shipMassT(state.ship, stats);
+  if (loc.kind === "deep") {
+    return Math.round(FOLD_FUEL_PER_T_LY * mass * dist(loc.pos, INTREPID_POS) * crew.foldFuel * 10) / 10;
+  }
   const detail = world.system(loc.systemId);
   const pos = shipPosition(state, world) as Vec2;
   const toEdge = Math.max(0, detail.edgeAU - Math.hypot(pos.x, pos.y));
@@ -1432,7 +1452,7 @@ export function rescueQuote(state: GameState, world: World): RescueQuote | null 
   if (state.ship.fuel >= need) return null;
   const room = effectiveStats(state).fuelCapacity - state.ship.fuel;
   const fuel = Math.max(1, Math.min(Math.floor(room), Math.ceil(need - state.ship.fuel + 2)));
-  const ly = distanceLy(world.galaxy, loc.systemId, "intrepid");
+  const ly = distanceLy(world.galaxy, currentSystemId(state), "intrepid");
   // Distress Net: the comms officer raises a tender sooner and haggles the bill down.
   const net = hasPerk(state, "distress-net");
   return {
