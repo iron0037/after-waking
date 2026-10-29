@@ -1,5 +1,5 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
-import { bodyNickname, researchWants } from "../../sim";
+import { bodyNickname, covenantErrands, researchWants } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   prepareFold,
@@ -42,6 +42,7 @@ import { BODY_COLOR, UI } from "../palette";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
 import "./starmap.css";
+import "../covenant.css";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, monospace';
 const FLASH_MS = 600;
@@ -103,6 +104,9 @@ export function StarMap({ session }: { session: GameSession }) {
   const fromId = currentSystemId(state);
   const docked = state.location.kind === "intrepid";
   const targets = contractTargets(session);
+  /** Stars where an active Covenant errand waits: system id -> what it asks. */
+  const covenantStars = new Map<string, string>();
+  for (const o of covenantErrands(state, world)) if (o.state?.status === "active" && o.systemId) covenantStars.set(o.systemId, o.title);
   const paint = new Map<string, Paint>();
   for (const s of world.galaxy.systems) {
     if (!s.charted && !state.visitedSystems.includes(s.id)) continue;
@@ -619,6 +623,24 @@ export function StarMap({ session }: { session: GameSession }) {
       ctx.restore();
     }
 
+    if (covenantStars.has(n.id)) {
+      // The Covenant's mark: a faint dotted violet ring with a dot, understated.
+      ctx.save();
+      ctx.strokeStyle = UI.covenant;
+      ctx.fillStyle = UI.covenant;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y, r + 15, 0, Math.PI * 2);
+      ctx.setLineDash([2, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(x + r + 15, y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     if (state.visitedSystems.includes(n.id)) {
       const mx = x + r + 4;
       const my = y - r - 4;
@@ -693,6 +715,8 @@ export function StarMap({ session }: { session: GameSession }) {
       { text: n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d, color: UI.muted },
     ];
     if (fp) lines.push({ text: `fold: ${fp.fuel} fuel, refit ${formatDuration(fp.refitMinutes)}`, color: UI.cyan });
+    const covenantAsk = covenantStars.get(n.id);
+    if (covenantAsk) lines.push({ text: `◌ Covenant: ${covenantAsk}`, color: UI.covenant });
     const jobs = targets.get(n.id) ?? [];
     for (const job of jobs.slice(0, 3)) lines.push({ text: `! ${job.title}`, color: UI.accent });
     if (jobs.length > 3) lines.push({ text: `! +${jobs.length - 3} more jobs here`, color: UI.accent });
@@ -913,6 +937,11 @@ export function StarMap({ session }: { session: GameSession }) {
                     {n.name}
                     {n.star?.home && <span class="good" title="Home system"> ⌂</span>}
                     {state.visitedSystems.includes(n.id) && <span class="good" title="Visited"> ◆</span>}
+                    {covenantStars.has(n.id) && (
+                      <span class="sm-covenant" title={`The Covenant's errand: ${covenantStars.get(n.id)}`}>
+                        ◌
+                      </span>
+                    )}
                     {targets.has(n.id) && (
                       <span class="sm-bang" title={`Contract work here: ${(targets.get(n.id) ?? []).map((c) => c.title).join("; ")}`}>
                         !

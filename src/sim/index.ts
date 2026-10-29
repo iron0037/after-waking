@@ -8,6 +8,7 @@ export * from "./research";
 export * from "./combat";
 export * from "./clan";
 export * from "./archive";
+export * from "./covenant";
 export * from "./nicknames";
 export * from "./bodies";
 export * from "./economy";

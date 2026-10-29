@@ -3,6 +3,7 @@
  * up. Some triggers are read from the state here; screens raise the rest (what's on screen). The
  * entries themselves live in src/data/archive.ts.
  */
+import { CLUES_FOR_STRANGE } from "../data/clues";
 import { ARCHIVE, ARCHIVE_BY_ID, type ArchiveEntry, type ArchiveTrigger } from "../data/archive";
 import { fail, ok, type Result } from "./result";
 import { cargoTonnes } from "./ship";
@@ -85,5 +86,5 @@ export function awakening(state: GameState): number {
 
 /** What an entry says to this captain: its usual text, or the strange one on the Awaken path. */
 export function archiveText(state: GameState, entry: ArchiveEntry): string {
-  return awakening(state) >= 1 && entry.strange ? entry.strange : entry.text;
+  return awakening(state) >= CLUES_FOR_STRANGE && entry.strange ? entry.strange : entry.text;
 }

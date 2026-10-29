@@ -50,7 +50,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["sensor-calibration", "Sensor Calibration", "+1 sensor tier for orbital region readings."],
       ["plicite-chemistry", "Plicite Chemistry", "+2 effective Engineering levels for fold-drive refits."],
       ["field-theory", "Field Theory", "Better shields and sensors in combat.", "M3 combat"],
-      ["anomaly-theory", "Anomaly Theory", "Detects the \"glitches\" the Covenant asks about.", "the Awaken path"],
+      ["anomaly-theory", "Anomaly Theory", "Orbital scans sometimes catch a world's surface repeating like floor tiles: evidence for the Covenant."],
     ],
   ],
   navigation: [
@@ -112,7 +112,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["long-ears", "Long Ears", "+1 sensor tier for orbital region readings."],
       ["distress-net", "Distress Net", "Rescue tenders arrive in half the time and charge 25% less."],
       ["early-warning", "Early Warning", "Encounters are detected sooner.", "M3 combat"],
-      ["listening-post", "Listening Post", "Picks up the Covenant's \"impossible\" signals.", "the Awaken path"],
+      ["listening-post", "Listening Post", "Arriving at uncharted stars, sometimes picks up the Covenant's \"impossible\" signal."],
     ],
     [
       ["clan-dialects", "Clan Dialects", "Reputation gains +25%.", "clan reputation (M4)"],
@@ -165,7 +165,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["read-the-room", "Read the Room", "See crew happiness and loyalty as exact 0–100 scores, not just low, medium or high."],
       ["fortune-favors", "Fortune Favors", "Rare mineral specimens are twice as likely, and a quarter of incidents turn up a specimen."],
       ["read-the-enemy", "Read the Enemy", "A hint of the enemy's next move in combat.", "M3 combat"],
-      ["sixth-sense", "Sixth Sense", "Notice the world's \"seams\" first.", "the Awaken path"],
+      ["sixth-sense", "Sixth Sense", "Sometimes notices the world's \"seams\" on landing: evidence for the Covenant."],
     ],
   ],
 };

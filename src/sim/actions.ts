@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
@@ -221,6 +222,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     const departWorth = state.helm?.departWorth;
     sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
     helmOnDocked(state);
+    covenantOnDocked(state);
     return ok(undefined);
   }
 
@@ -243,6 +245,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     `Folded ${plan.ly.toFixed(1)} ly to ${sys.name}, a ${SPECTRAL[sys.spectral].label}${firstVisit ? " (first visit)" : ""}. ` +
       `Arrived at the system edge, ${detail.edgeAU.toFixed(1)} AU out. ${detail.bodies.length} bodies on sensors.`,
   );
+  noticeArrival(state, world, targetId);
   return ok(undefined);
 }
 
@@ -490,6 +493,7 @@ export function scanBody(state: GameState, world: World): Result<Body> {
   advanceTime(state, SCAN_MINUTES * clanMods(state).scanTime);
   state.scannedBodies.push(body.id);
   awardXp(state, "science", 8);
+  noticeScan(state, body.id);
   const top = (Object.entries(body.resources) as [CommodityId, number][])
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
@@ -564,6 +568,7 @@ export function land(state: GameState, world: World, region: number): Result {
   revealAt(state, world, body.id, state.location.ship as Vec2);
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
   senseRegionDeposits(state, world, body.id, region);
+  noticeLanding(state, body.id, region);
   return ok(undefined);
 }
 

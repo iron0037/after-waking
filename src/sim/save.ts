@@ -1,3 +1,4 @@
+import { noticeFind } from "./covenant";
 /** Save files are the GameState as JSON. The universe regenerates from the seed. */
 import { gasDeliveryReward } from "./contracts";
 import { COMMODITY_IDS } from "../data/commodities";
@@ -36,6 +37,11 @@ export function deserialize(json: string): GameState {
   }
   // Saves from before world generations existed were built by generation 1 (AW-145).
   data.worldGen ??= 1;
+  // The Covenant's dossier (AW-25): finds made before it existed still count as evidence.
+  for (const key of Object.keys(data.compendium ?? {})) {
+    const [kind, id] = key.split(":");
+    if (kind && id) noticeFind(data, kind, id);
+  }
   // The slower clock (AW-142): the Exchange note pays every 120 days at half the yearly rate.
   if ((data.clock ?? 1) < 2) {
     if (data.loan.intervalDays === 60) data.loan.intervalDays = 120;

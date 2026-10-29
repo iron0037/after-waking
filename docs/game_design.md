@@ -47,6 +47,53 @@ Six separate victory paths is too many to build well. **[PROPOSED]** structure: 
 
 Epilogue slides would reflect everything you achieved.
 
+### The Awaken clue trail (AW-25) **[DECIDED 2026-10-29]**
+- **The dossier.** The Covenant keeps a dossier of evidence (`src/data/clues.ts`, `src/sim/covenant.ts`). There are seven clues:
+  - **Folded plicite:** the mineral specimen. Plicite is "made to be found".
+  - **Song moss:** the plant that hums at 432 Hz, an old Earth tuning standard.
+  - **The fold curve:** the Covenant's recorder, carried through three folds, shows fold fuel fits the formula to the twelfth decimal.
+  - **The missing world:** the first-year catalogue lists a world the charts don't. Its orbit is empty and perfectly clean.
+  - **The impossible signal:** a 432 Hz carrier repeating the Intrepid's pre-anomaly maintenance codes.
+  - **The seams:** terrain that repeats hex for hex.
+  - **A log from the future:** your own journal entry, dated years ahead.
+- **Where clues come from:**
+  - **Finds:** the two specimens, plus three perks that now work: Anomaly Theory (science, on scans), Listening Post (comms, arriving at uncharted stars) and Sixth Sense (captain, on landing).
+  - **Errands** from the Covenant's listeners at the Intrepid, which pay a small stipend:
+    - Carry the recorder.
+    - Search a star's empty orbit.
+    - Listen at an uncharted star for a day.
+  - **Who gets errands, and when:** Covenant captains are offered the first errand at once. Everyone else gets it after a first clue or a few trips.
+- **Effects:**
+  - At 3 clues, the Archive's help turns strange and the future log appears in the journal.
+  - At 5 clues, the Covenant says every thread leads outward to the edge of the Verge. That is the hand-off to deep space and the Awaken finale.
+
+### Deep space and the Return ending **[DECIDED 2026-10-29, to build]**
+- **Blind folds.**
+  - You can fold to an empty point in interstellar space. With no star to lock onto, a blind fold reaches only about 60% of the drive's range and costs extra plicite.
+  - The drive still refits after every hop, and there's no refuelling out there, so the tanks set how far an expedition can roam.
+  - Deep-space points have no gravity well, so you can fold again as soon as the drive is ready.
+- **Deep-field array.**
+  - An expensive scanner sweeps a radius of a few light-years, taking a day at a time.
+  - Scans are stored as circles and shaded on the star map, marking what you've already searched.
+  - Finds inside the radius are identified; finds a little beyond it show as faint "?" returns, like the Seam Sense readings on surfaces.
+- **What's out there:**
+  - **The anomaly's mouth:** the wormhole, for the Return ending.
+  - **Rogue planets:** starless worlds you can land on and mine.
+  - **Derelicts:** salvage, logs and clues.
+  - **Plicite drifts:** fuel you can mine far from port.
+  - **Pirate bases:** where raiders come from, and a big prize.
+  - **The edge:** past the Verge, the scanner returns a perfectly regular nothing. This is the Awaken finale.
+- **Rumours** are sold at the Intrepid, and at outposts later.
+  - Each one names an area that may or may not hold what it claims.
+  - Buying several lets you narrow the area down.
+  - The Intrepid's own log of where it came out of the anomaly is a free, true first lead. The mouth has drifted since.
+- **Return** happens in stages:
+  1. Find the mouth.
+  2. Study it, with a probe dive into the anomaly and then a Lyceum research project.
+  3. Stockpile the plicite needed to move the Intrepid.
+  4. Fold the city-ship through and play the epilogue.
+  - "The anomaly closing" gives the path a window.
+
 ## Systems Map (Starflight → ours)
 | Starflight system | Ours | Modern improvement |
 |---|---|---|

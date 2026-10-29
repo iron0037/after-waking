@@ -60,6 +60,8 @@ export interface Scene {
   /** Exploration progress per body, and active contracts that still have work there. */
   progress: Map<string, BodyProgress>;
   targets: Map<string, Contract[]>;
+  /** The Covenant's missing world: the empty orbit to draw faintly (AU), while that errand is active here. */
+  ghostAU?: number | null;
 }
 
 export interface HitTarget {
@@ -92,6 +94,7 @@ export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, 
   drawBackdrop(ctx, w, h, scene.view);
   drawScaleRings(ctx, proj, detail, w, h);
   drawOrbits(ctx, proj, scene);
+  if (scene.ghostAU) drawGhostOrbit(ctx, proj, scene.ghostAU);
   drawFoldLimit(ctx, proj, detail, foldEdgeFraction(state));
   drawStar(ctx, proj, detail);
 
@@ -183,6 +186,26 @@ function drawOrbits(ctx: CanvasRenderingContext2D, proj: Projection, scene: Scen
     }
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/** The empty lane the Covenant's catalogue says should hold a world: a faint dashed ring with a small note. */
+function drawGhostOrbit(ctx: CanvasRenderingContext2D, proj: Projection, au: number): void {
+  const r = proj.radiusPx(au);
+  if (r < 8) return;
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 9]);
+  ctx.strokeStyle = rgba(UI.covenant, 0.38);
+  ctx.beginPath();
+  ctx.arc(proj.cx, proj.cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = FONT(10);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = rgba(UI.covenant, 0.6);
+  ctx.fillText("catalogue: world V?", proj.cx, proj.cy - r - 3);
   ctx.restore();
 }
 

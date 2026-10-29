@@ -1,6 +1,8 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
+import { acceptErrand, covenantErrands, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
 import { clanMods, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
 import { FLORA_BY_NAME } from "../../data/catalog";
@@ -72,6 +74,7 @@ import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
 import "./hub.css";
+import "../covenant.css";
 
 type Tab = "market" | "jobs" | "shipyard" | "research" | "crew" | "exchange" | "depart";
 
@@ -715,6 +718,61 @@ function HelmFund({ session }: { session: GameSession }) {
   );
 }
 
+/** The Covenant's listeners, who turn up on the Concourse once there is something to ask (AW-25). */
+function CovenantListeners({ session }: { session: GameSession }) {
+  const { state, world } = session;
+  const offers = covenantErrands(state, world);
+  if (offers.length === 0) return null;
+  const docked = state.location.kind === "intrepid";
+  return (
+    <section class="panel covenant-listeners">
+      <h3>
+        <span class="covenant-glyph" aria-hidden="true" /> The Covenant's listeners
+      </h3>
+      <p class="covenant-whisper small">A table at the back of the Concourse, two chairs pulled out. Nobody sits with them for long.</p>
+      <div class="covenant-errands">
+        {offers.map((o) => (
+          <ErrandRow key={o.def.kind} session={session} offer={o} docked={docked} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ErrandRow({ session, offer, docked }: { session: GameSession; offer: ErrandOffer; docked: boolean }) {
+  const { def, state: st } = offer;
+  const star = offer.systemId ? session.world.galaxy.systems.find((x) => x.id === offer.systemId)?.name : null;
+  let status: ComponentChildren;
+  if (st?.status === "done") {
+    status = <span class="covenant-done">Done</span>;
+  } else if (st) {
+    status =
+      def.kind === "recorder" ? (
+        <span class="covenant-under">
+          Under way: {recorderFolds(session.state)}/{RECORDER_FOLDS} folds. Bring it back aboard.
+        </span>
+      ) : (
+        <span class="covenant-under">Under way: {star ?? "a far star"}</span>
+      );
+  } else {
+    status = (
+      <button class="btn covenant-btn" disabled={!docked} title="Take the errand" onClick={() => session.act((s, w) => acceptErrand(s, w, def.kind))}>
+        Accept
+      </button>
+    );
+  }
+  return (
+    <div class={`covenant-errand ${st?.status ?? "offered"}`}>
+      <div class="hub-card-head">
+        <strong>{offer.title}</strong>
+        <span class="covenant-pay" title="Paid when the errand is done">{cr(def.stipend)}</span>
+      </div>
+      <div class="covenant-ask small">{offer.ask}</div>
+      <div class="covenant-status small">{status}</div>
+    </div>
+  );
+}
+
 function Jobs({ session }: { session: GameSession }) {
   useArchiveTopic(session, "contracts");
   const contracts = session.state.contracts ?? [];
@@ -738,6 +796,8 @@ function Jobs({ session }: { session: GameSession }) {
       </section>
 
       <HelmFund session={session} />
+
+      <CovenantListeners session={session} />
 
       <section>
         <h2>On offer</h2>

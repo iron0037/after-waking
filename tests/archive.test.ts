@@ -57,7 +57,7 @@ describe("the Archive's guidance", () => {
     const state = newGame({ seed: 1 });
     const welcome = ARCHIVE[0]!;
     expect(archiveText(state, welcome)).toBe(welcome.text);
-    state.awakening = 1;
+    state.awakening = 3;
     expect(archiveText(state, welcome)).toBe(welcome.strange);
   });
 

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "preact/hooks";
-import { archiveRead, archiveText, formatDate, guidanceOn, resetArchive, setGuidance, type JournalKind } from "../sim";
+import { archiveRead, archiveText, awakenFinaleReached, clueCount, covenantErrands, dossier, formatDate, guidanceOn, hasClue, reportFutureLog, resetArchive, setGuidance, type JournalKind } from "../sim";
+import { CLUES, FINALE_TEXT } from "../data/clues";
 import { useSession, type GameSession } from "./session";
 import "./archive.css";
+import "./covenant.css";
 
 const KINDS: { kind: JournalKind; label: string }[] = [
   { kind: "discovery", label: "Discoveries" },
@@ -13,7 +15,7 @@ const KINDS: { kind: JournalKind; label: string }[] = [
 
 export function Journal({ session, onClose }: { session: GameSession; onClose: () => void }) {
   useSession(session);
-  const [section, setSection] = useState<"log" | "archive">("log");
+  const [section, setSection] = useState<"log" | "archive" | "dossier">("log");
   const [query, setQuery] = useState("");
   const [hidden, setHidden] = useState<Set<JournalKind>>(new Set());
   const entries = useMemo(() => {
@@ -23,6 +25,12 @@ export function Journal({ session, onClose }: { session: GameSession; onClose: (
       .slice()
       .reverse();
   }, [session.state.journal.length, query, hidden]);
+
+  const { state } = session;
+  const showDossier = clueCount(state) > 0 || covenantErrands(state, session.world).length > 0;
+  // The impossible entry sits above the rest, newest of all (its date has not happened yet).
+  const future = state.futureLog;
+  const futureShown = !!future && (!query.trim() || future.text.toLowerCase().includes(query.trim().toLowerCase()));
 
   const toggle = (kind: JournalKind) => {
     const next = new Set(hidden);
@@ -56,9 +64,16 @@ export function Journal({ session, onClose }: { session: GameSession; onClose: (
           <button role="tab" aria-selected={section === "archive"} class={`chip ${section === "archive" ? "active" : ""}`} onClick={() => setSection("archive")}>
             Archive
           </button>
+          {showDossier && (
+            <button role="tab" aria-selected={section === "dossier"} class={`chip chip-covenant ${section === "dossier" ? "active" : ""}`} onClick={() => setSection("dossier")}>
+              Dossier ({clueCount(state)}/{CLUES.length})
+            </button>
+          )}
         </div>
         {section === "archive" ? (
           <ArchiveSection session={session} />
+        ) : section === "dossier" && showDossier ? (
+          <DossierSection session={session} />
         ) : (
           <>
             <div class="chips">
@@ -69,6 +84,19 @@ export function Journal({ session, onClose }: { session: GameSession; onClose: (
               ))}
             </div>
             <ol class="journal-list">
+              {futureShown && future && (
+                <li class="future-log">
+                  <span class="when">{formatDate(future.t)}</span>
+                  <span class="what">
+                    {future.text}
+                    {!hasClue(state, "future-log") && (
+                      <button class="btn covenant-btn future-report" onClick={() => session.act((s) => reportFutureLog(s), { timelapse: false })}>
+                        Report to the Covenant
+                      </button>
+                    )}
+                  </span>
+                </li>
+              )}
               {entries.map((e, i) => (
                 <li key={i} class={`kind-${e.kind}`}>
                   <span class="when">{formatDate(e.t)}</span>
@@ -80,6 +108,48 @@ export function Journal({ session, onClose }: { session: GameSession; onClose: (
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The Covenant's dossier: what has been found, what the Covenant makes of it, and what is still only a hint. */
+function DossierSection({ session }: { session: GameSession }) {
+  const { state } = session;
+  const entries = dossier(state);
+  const found = entries.filter((e) => e.foundAt !== null).length;
+  return (
+    <div class="dossier">
+      {awakenFinaleReached(state) && (
+        <div class="dossier-finale">
+          <span class="dossier-finale-label">Where the threads lead</span>
+          <p>{FINALE_TEXT}</p>
+        </div>
+      )}
+      <div class="dossier-count">
+        <span class="covenant-glyph" aria-hidden="true" /> {found} of {entries.length}
+        <span class="muted small"> clues in the Covenant's dossier</span>
+      </div>
+      <ul class="dossier-list">
+        {entries.map(({ clue, foundAt }) =>
+          foundAt !== null ? (
+            <li key={clue.id} class="dossier-clue found">
+              <div class="dossier-head">
+                <h4>{clue.title}</h4>
+                <span class="when">{formatDate(foundAt)}</span>
+              </div>
+              <p>{clue.found}</p>
+              <blockquote class="dossier-quote">{clue.covenant}</blockquote>
+            </li>
+          ) : (
+            <li key={clue.id} class="dossier-clue unfound">
+              <div class="dossier-head">
+                <h4>?</h4>
+              </div>
+              <p class="muted">{clue.hint}</p>
+            </li>
+          ),
+        )}
+      </ul>
     </div>
   );
 }

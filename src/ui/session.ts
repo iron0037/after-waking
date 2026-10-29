@@ -6,10 +6,12 @@
  */
 import { useEffect, useReducer } from "preact/hooks";
 import type { ArchiveTrigger } from "../data/archive";
+import { CLUES_BY_ID } from "../data/clues";
 import type { Station } from "../data/crew";
 import type { ClanId } from "../data/ship";
 import type { ProbeDepth } from "../data/probes";
 import {
+  clueCount,
   chooseProbeOption,
   deserialize,
   depthBand,
@@ -76,7 +78,7 @@ export const DEFAULT_ORDERS: Orders = { helm: "hold", guns: "hull", engineering:
 export interface Notice {
   id: number;
   text: string;
-  kind: "error" | "info";
+  kind: "error" | "info" | "covenant";
 }
 
 export class GameSession {
@@ -138,6 +140,7 @@ export class GameSession {
     const before = this.state.time;
     const journalBefore = this.state.journal.length;
     const encounterBefore = this.state.encounter;
+    const cluesBefore = clueCount(this.state);
     const result = fn(this.state, this.world);
     const encounterAfter = this.state.encounter;
     // An encounter that ended during this action: keep its story for the debrief.
@@ -152,6 +155,8 @@ export class GameSession {
     }
     // Mineral specimens turn up while drilling; say so on screen, not just in the journal.
     for (const e of this.state.journal.slice(journalBefore)) if (e.text.startsWith("Mineral specimen:")) this.notify(e.text, "info");
+    // A new clue for the Covenant's dossier gets its own, quieter notice.
+    for (const c of (this.state.clues ?? []).slice(cluesBefore)) this.notify(`Covenant dossier: ${CLUES_BY_ID.get(c.id)?.title ?? c.id}`, "covenant");
     const passed = this.state.time - before;
     if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
     // A raider's hail fails the fold, but it isn't an error: the encounter window says it all.
@@ -276,7 +281,7 @@ export class GameSession {
     setTimeout(() => {
       this.notices = this.notices.filter((n) => n.id !== id);
       this.emit();
-    }, Math.min(12_000, (kind === "error" ? 6000 : 3500) + text.length * 40)); // long reports stay up longer
+    }, Math.min(12_000, (kind === "error" ? 6000 : kind === "covenant" ? 5000 : 3500) + text.length * 40)); // long reports stay up longer
   }
 
   save(): void {

@@ -1,0 +1,221 @@
+/* The Covenant (AW-25): errands at the Intrepid, the dossier in the journal, the future log. Dusty violet, quiet. */
+
+.covenant-glyph {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border: 1px solid var(--covenant);
+  border-radius: 50%;
+  position: relative;
+  top: 0;
+  opacity: 0.85;
+}
+.covenant-glyph::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--covenant);
+}
+
+.panel.covenant-listeners,
+.panel.covenant-card {
+  background: linear-gradient(180deg, #17142a 0%, #120f22 100%);
+  border-color: #3b3360;
+  border-left: 3px solid var(--covenant-dim);
+}
+.covenant-listeners h3,
+.covenant-card h3 {
+  color: var(--covenant);
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.covenant-whisper {
+  margin: 0 0 10px;
+  color: var(--covenant-dim);
+  font-style: italic;
+}
+.covenant-errands {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.covenant-errand {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 8px;
+  border-top: 1px solid #2b2548;
+}
+.covenant-errand:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.covenant-errand strong {
+  color: #d9ccf3;
+}
+.covenant-pay {
+  color: var(--covenant);
+  white-space: nowrap;
+}
+.covenant-ask {
+  color: #a79dc4;
+  font-style: italic;
+}
+.covenant-errand.done .covenant-ask,
+.covenant-errand.done strong {
+  opacity: 0.6;
+}
+.covenant-done {
+  color: var(--covenant-dim);
+}
+.covenant-under {
+  color: var(--covenant);
+}
+.btn.covenant-btn {
+  border-color: var(--covenant-dim);
+  color: #d9ccf3;
+  background: #1d1835;
+  align-self: flex-start;
+}
+.btn.covenant-btn:hover:not(:disabled) {
+  border-color: var(--covenant);
+  background: #28214a;
+}
+.covenant-card .btn {
+  margin-top: 6px;
+}
+.sm-covenant {
+  color: var(--covenant);
+  margin-left: 5px;
+}
+
+/* Journal: the Dossier tab */
+.chip.chip-covenant {
+  border-color: var(--covenant-dim);
+  color: var(--covenant);
+}
+.chip.chip-covenant.active {
+  background: #28214a;
+}
+.dossier {
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 4px;
+}
+.dossier-count {
+  margin: 4px 0 10px;
+  color: var(--covenant);
+  font-size: 15px;
+}
+.dossier-finale {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #1d1835;
+  border: 1px solid var(--covenant-dim);
+  border-left: 3px solid var(--covenant);
+  border-radius: 3px;
+  box-shadow: 0 0 18px #b6a2e01f;
+}
+.dossier-finale-label {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--covenant);
+}
+.dossier-finale p {
+  margin: 6px 0 0;
+  color: #e4daf8;
+  line-height: 1.5;
+}
+.dossier-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dossier-clue {
+  padding: 8px 12px;
+  border: 1px solid #2b2548;
+  border-left: 3px solid var(--covenant-dim);
+  border-radius: 3px;
+  background: #130f24;
+}
+.dossier-clue.unfound {
+  border-style: dashed;
+  border-left-style: solid;
+  opacity: 0.8;
+}
+.dossier-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.dossier-head h4 {
+  margin: 0;
+  color: #d9ccf3;
+}
+.dossier-clue.unfound h4 {
+  color: var(--covenant-dim);
+}
+.dossier-head .when {
+  color: var(--muted);
+  font-size: 12px;
+}
+.dossier-clue p {
+  margin: 4px 0;
+}
+.dossier-quote {
+  margin: 6px 0 2px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--covenant-dim);
+  color: #a79dc4;
+  font-style: italic;
+}
+
+/* The log entry that has not happened yet */
+.journal-list li.future-log {
+  background: #16122a;
+  border-left: 2px solid var(--covenant-dim);
+}
+.journal-list li.future-log .when {
+  color: var(--covenant);
+  animation: future-flicker 7s steps(1, end) infinite;
+}
+.journal-list li.future-log .what {
+  color: #cfc4ea;
+}
+.future-report {
+  display: block;
+  margin-top: 6px;
+}
+@keyframes future-flicker {
+  0%,
+  93%,
+  96%,
+  100% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.35;
+  }
+  95% {
+    opacity: 0.8;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .journal-list li.future-log .when {
+    animation: none;
+  }
+}
+
+/* Notice: the dossier grew */
+.notice.notice-covenant {
+  background: #1d1835;
+  border-color: var(--covenant-dim);
+  color: #e4daf8;
+}

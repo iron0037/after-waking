@@ -3,6 +3,8 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import type { ClueId, ErrandKind } from "../data/clues";
+import type { ErrandState } from "./covenant";
 import { clanMods } from "./clan";
 import type { ClanId } from "../data/ship";
 import type { CompendiumRecord } from "./compendium";
@@ -133,8 +135,13 @@ export interface GameState {
   /** The Archive's guidance (AW-24): entries read, and whether it's speaking at all (on unless false). */
   archiveSeen?: string[];
   guidance?: boolean;
-  /** How far along the Awaken path (M5); nothing advances it yet. */
+  /** How far along the Awaken path (M5): the number of clues in the Covenant's dossier. */
   awakening?: number;
+  /** The Covenant's dossier (AW-25): clues found, errands taken, the impossible journal entry, and when the trail pointed onward. */
+  clues?: { id: ClueId; t: number }[];
+  errands?: Partial<Record<ErrandKind, ErrandState>>;
+  futureLog?: { t: number; text: string };
+  awakenFinale?: number;
   /** The captain's own names for worlds, by body id (shown under the catalogue name). */
   nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */

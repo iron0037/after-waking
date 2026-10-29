@@ -8,6 +8,7 @@ import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
 import { FLORA, MINERAL_SPECIMENS, type CompendiumKind, type MineralSpecimen } from "../data/catalog";
 import type { Rng } from "./rng";
 import type { GameState } from "./state";
+import { noticeFind } from "./covenant";
 
 export interface CompendiumRecord {
   /** When it was first found. */
@@ -27,6 +28,7 @@ export function recordFind(state: GameState, kind: CompendiumKind, id: string, w
   if (state.compendium[key]) return false;
   state.compendium[key] = { t: state.time, where };
   state.journal.push({ t: state.time, kind: "discovery", text: `New compendium entry: ${name}, found on ${where}.` });
+  noticeFind(state, kind, id);
   return true;
 }
 

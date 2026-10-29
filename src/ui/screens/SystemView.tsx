@@ -6,6 +6,9 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   bodyProgress,
   clamp,
+  doErrand,
+  errandHere,
+  ghostOrbitAU,
   flightPlan,
   flyTo,
   formatDuration,
@@ -51,6 +54,7 @@ import { RegionPicker, bestRegion } from "./system/RegionPicker";
 import { prefetchSurface } from "./surface/terrainImage";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
+import "../covenant.css";
 
 /** The camera: a view plus the body it rides along with as game time passes (see ViewAnchor). */
 interface Camera {
@@ -111,6 +115,9 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   // Recomputed per render (not per animation frame): exploration rings and contract markers.
   const progress = new Map(detail.bodies.map((b) => [b.id, bodyProgress(state, b)] as const));
   const targets = contractTargets(state);
+  // The Covenant's errand here, if there is one; the missing-world kind also draws its empty orbit.
+  const errand = errandHere(state, world);
+  const ghostAU = errand?.def.kind === "missing-world" ? ghostOrbitAU(world, systemId) : null;
 
   const selected: Body | null = selectedId ? (detail.bodies.find((b) => b.id === selectedId) ?? null) : null;
   const orbitingSel = selected !== null && selected.id === orbitingId;
@@ -340,6 +347,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       heading: headingRef.current,
       progress,
       targets,
+      ghostAU,
     });
     hitsRef.current = result.hits;
     headingRef.current = result.heading;
@@ -457,6 +465,23 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           )}
           {edgeFuelShort && edgeRes.ok && <div class="danger small">The edge burn needs {edgeRes.value.fuel} fuel.</div>}
         </section>
+
+        {errand && (
+          <section class="panel covenant-card">
+            <h3>
+              <span class="covenant-glyph" aria-hidden="true" /> The Covenant's errand
+            </h3>
+            <div class="small">{errand.title}</div>
+            <button
+              class="btn covenant-btn"
+              disabled={busy || !!state.encounter}
+              title={`Takes about ${formatDuration((errand.def.hours ?? 4) * 60)}`}
+              onClick={() => session.act((s, w) => doErrand(s, w))}
+            >
+              {errand.def.action} <span class="muted">({formatDuration((errand.def.hours ?? 4) * 60)})</span>
+            </button>
+          </section>
+        )}
 
         <section>
           <h3>

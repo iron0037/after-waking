@@ -13,6 +13,8 @@
   --cyan: #5fd4ff;
   --good: #7ee787;
   --danger: #ff6b6b;
+  --covenant: #b6a2e0;
+  --covenant-dim: #8b7cb0;
   --font: "Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace;
   --side-width: 360px;
 }

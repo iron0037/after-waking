@@ -13,6 +13,8 @@ export const UI = {
   danger: "#ff6b6b",
   ship: "#ffe08a",
   intrepid: "#9fe8ff",
+  /** The Covenant's dusty violet: dossier, errands, the ghost orbit. */
+  covenant: "#b6a2e0",
 } as const;
 
 export const BODY_COLOR: Record<BodyKind, string> = {
