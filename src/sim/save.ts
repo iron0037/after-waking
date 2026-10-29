@@ -1,4 +1,5 @@
 /** Save files are the GameState as JSON. The universe regenerates from the seed. */
+import { gasDeliveryReward } from "./contracts";
 import { COMMODITY_IDS } from "../data/commodities";
 import { ensureCrew } from "./crew";
 import { SAVE_VERSION, type GameState } from "./state";
@@ -25,6 +26,14 @@ export function deserialize(json: string): GameState {
   data.catalogedSpecies = [...new Set(data.catalogedSpecies.map((k) => k.split("|")[1] ?? k))];
   data.compendium ??= {};
   data.loan.prepaid ??= 0;
+  // Methane jobs used to ask for 20-40 t, far beyond what probes bring back (AW-157).
+  for (const c of data.contracts ?? []) {
+    if (c.kind === "deliver" && c.commodity === "methane" && (c.tonnes ?? 0) > 6 && (c.status === "offered" || c.status === "active")) {
+      c.tonnes = 6;
+      c.title = c.title.replace(/\d+ t of/, "6 t of");
+      c.reward = Math.max(c.reward, gasDeliveryReward("methane", 6));
+    }
+  }
   // Saves from before world generations existed were built by generation 1 (AW-145).
   data.worldGen ??= 1;
   // The slower clock (AW-142): the Exchange note pays every 120 days at half the yearly rate.

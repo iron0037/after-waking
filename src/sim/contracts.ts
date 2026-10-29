@@ -237,12 +237,23 @@ export function standingSurvey(state: GameState, rng: Rng, serial: number): Cont
   };
 }
 
-const GAS_DEMAND: readonly (readonly [GasId, ClanId, number, [number, number]])[] = [
-  ["deuterium", "lyceum", 40, [4, 8]],
-  ["xenon", "midshipmen", 30, [3, 6]],
-  ["helium3", "exchange", 15, [1, 3]],
-  ["methane", "diggers", 15, [20, 40]],
+/**
+ * Gas jobs, sized to what probes bring back (about 1-2.5 t of a given gas per good dive, so three
+ * or four dives a job), with a per-tonne dive fee on top of the goods: probe dives cost hours and
+ * risk a probe, and cheap gases (methane) would otherwise never pay for the dives (AW-157).
+ */
+const GAS_DEMAND: readonly (readonly [GasId, ClanId, number, [number, number], number])[] = [
+  ["deuterium", "lyceum", 40, [3, 6], 200],
+  ["xenon", "midshipmen", 30, [2, 5], 200],
+  ["helium3", "exchange", 15, [1, 3], 0],
+  ["methane", "diggers", 15, [3, 6], 600],
 ];
+
+/** What a gas delivery pays: a premium on the goods plus the dive fee. */
+export function gasDeliveryReward(gas: GasId, tonnes: number): number {
+  const fee = GAS_DEMAND.find((d) => d[0] === gas)?.[4] ?? 0;
+  return Math.round((tonnes * (COMMODITIES[gas].basePrice * 1.6 + fee) + 800) / 50) * 50;
+}
 
 const GAS_FLAVOR: Partial<Record<ClanId, string>> = {
   lyceum: "The Lyceum's fusion trials need heavy hydrogen, and they need it before the next council review.",
@@ -267,7 +278,7 @@ export function gasDeliveryContract(rng: Rng, serial: number): Contract {
     text: GAS_FLAVOR[clan] ?? "",
     commodity: gas,
     tonnes,
-    reward: Math.round((tonnes * COMMODITIES[gas].basePrice * 1.6 + 800) / 50) * 50,
+    reward: gasDeliveryReward(gas, tonnes),
     durationDays: rng.int(180, 300),
     deadline: null,
     status: "offered",
