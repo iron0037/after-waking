@@ -57,6 +57,8 @@ import {
   shipStats,
   SPECIMEN_PRICE,
   specimenCount,
+  specimenHolds,
+  specimenQuote,
   specimenUnitPrice,
   unsoldReadings,
   sellReadings,
@@ -410,9 +412,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
   const { state, world } = session;
   const specimens = state.ship.specimens ?? {};
   const held = specimenCount(specimens);
-  const reserved = new Set(
-    (state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId),
-  );
+  const holds = specimenHolds(state);
   const rows = Object.entries(specimens)
     .filter(([, n]) => n > 0)
     .map(([key, count]) => {
@@ -423,21 +423,24 @@ function SpecimenDesk({ session }: { session: GameSession }) {
       } catch {
         /* unknown body: show the raw id */
       }
+      const hold = holds.get(key);
       return {
         key,
         species: rest.join("|"),
         bodyName,
         count,
-        reserved: reserved.has(bodyId),
+        reserved: !!hold?.contract,
+        research: hold?.contract ? 0 : Math.min(count, hold?.research ?? 0),
+        projects: hold?.projects ?? [],
         isNew: !state.catalogedSpecies.includes(key.split("|")[1] ?? key),
         unit: Math.round(specimenUnitPrice(state, key)),
         floating: (FLORA_BY_NAME.get(rest.join("|"))?.priceMult ?? 1) > 1,
+        rackPrice: specimenQuote(state, [key]).total,
       };
     })
     .sort((a, b) => a.bodyName.localeCompare(b.bodyName) || a.species.localeCompare(b.species));
-  const sellable = rows.filter((r) => !r.reserved);
+  const quote = specimenQuote(state);
   const specimenPrice = Math.round(SPECIMEN_PRICE * crewBonuses(state).specimenPrice);
-  const estimate = sellable.reduce((sum, r) => sum + Math.round(r.count * specimenUnitPrice(state, r.key)) + (r.isNew ? NEW_SPECIES_BONUS : 0), 0);
   const readings = unsoldReadings(state).map((r) => {
     let name = r.bodyId;
     try {
@@ -467,6 +470,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
               <th class="num">Count</th>
               <th class="num">Each</th>
               <th />
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -479,15 +483,42 @@ function SpecimenDesk({ session }: { session: GameSession }) {
                 <td>
                   {r.reserved ? (
                     <span class="tag good" title="Reserved for an active specimen contract; the desk won't buy these.">
-                      held for contract
+                      Kept for contract
                     </span>
-                  ) : r.floating ? (
-                    <span class="tag accent-tag" title="Drifting life from a giant's atmosphere: the Lyceum pays several times a plant sample.">
-                      floating life{r.isNew ? ` +${cr(NEW_SPECIES_BONUS)} new` : ""}
-                    </span>
-                  ) : r.isNew ? (
-                    <span class="tag accent-tag">new species +{cr(NEW_SPECIES_BONUS)}</span>
-                  ) : null}
+                  ) : (
+                    <>
+                      {r.research > 0 && (
+                        <span
+                          class="tag"
+                          title={`Tracked research needs these: ${r.projects.join(", ")}. "Sell all" leaves them aboard.`}
+                        >
+                          {r.research === r.count ? "All" : r.research} kept for {r.projects.join(", ")}
+                        </span>
+                      )}
+                      {r.floating ? (
+                        <span class="tag accent-tag" title="Drifting life from a giant's atmosphere: the Lyceum pays several times a plant sample.">
+                          floating life{r.isNew ? ` +${cr(NEW_SPECIES_BONUS)} new` : ""}
+                        </span>
+                      ) : r.isNew ? (
+                        <span class="tag accent-tag">new species +{cr(NEW_SPECIES_BONUS)}</span>
+                      ) : null}
+                    </>
+                  )}
+                </td>
+                <td class="num">
+                  {!r.reserved && (
+                    <button
+                      class="btn"
+                      title={
+                        r.research > 0
+                          ? `Sell all ${r.count}, including the ${r.research} kept for ${r.projects.join(", ")}`
+                          : `Sell all ${r.count} for about ${cr(r.rackPrice)}`
+                      }
+                      onClick={() => session.act((s) => sellSpecimens(s, [r.key]))}
+                    >
+                      {r.research > 0 ? "Sell anyway" : "Sell"} {cr(r.rackPrice)}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -499,14 +530,19 @@ function SpecimenDesk({ session }: { session: GameSession }) {
       <div class="hub-actions">
         <button
           class="btn primary"
-          disabled={sellable.length === 0}
-          title={sellable.length === 0 ? "Nothing here the desk can buy." : "Sell every unreserved specimen"}
+          disabled={quote.count === 0}
+          title={
+            quote.count === 0
+              ? "Nothing here the desk will sell in bulk."
+              : "Sell every specimen that isn't kept for a contract or tracked research"
+          }
           onClick={() => session.act((s) => sellSpecimens(s))}
         >
-          Sell specimens
+          Sell all{quote.count > 0 ? ` ${cr(quote.total)}` : ""}
         </button>
         <span class="muted small">
-          {sellable.length > 0 ? `about ${cr(estimate)}. ` : ""}
+          {quote.count > 0 ? `${quote.count} specimen${quote.count === 1 ? "" : "s"}. ` : ""}
+          {rows.some((r) => r.reserved || r.research > 0) ? "Specimens kept for contracts and tracked research stay aboard. " : ""}
           {cr(specimenPrice)} for a plant sample (floating life from the giants pays several times that); the first sale of a new species
           pays a bonus of {cr(NEW_SPECIES_BONUS)}.
         </span>

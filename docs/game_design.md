@@ -248,6 +248,19 @@ Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives ca
 
 **Balance target.** An honest freighter that pays costs about 5% of career income; a fitted ship that fights well breaks even or profits on bounties. The bot pays by default, so the career report measures the cost.
 
+**v1.1 (playtest 10, AW-160/161/162) [DECIDED 2026-10-29].**
+- **Raiders size you up.** Fighting power is (laser×0.7 + kinetic×0.6 + shields×0.8) × √(hull/100). A raider weaker than your ship attacks only with probability (ratio)³. A battered ship looks weaker.
+- **Battle experience follows orders.**
+  - Helm maneuvers train the navigator, with a bonus for a clean evade.
+  - Hits train the captain (command) and science (targeting).
+  - Engineering power orders and repairs train the engineer; demands train comms.
+  - The debrief lists each station's gains.
+- **Taking a prize.** When a raider strikes, you board her:
+  - Salvage, as before.
+  - Helm's bounty for the captain: 2,000 / 4,000 / 7,000 cr by raider class.
+  - Part of their plunder, if your hold has room.
+  - Their crew: turn all of them in at 400 cr a head, or offer the one or two promising ones a berth. Those Freebooters wait a year in the hiring hall at half the signing fee, a little more loyal than most.
+
 ## Star Systems: World Generation 2 **[DECIDED 2026-10-26] (AW-145)**
 Generation 1 gave every star our Solar System's layout: small rocky worlds inside the frost line, giants outside. The exoplanet surveys say otherwise, so new games use generation 2. Saves remember which generator built their universe (`state.worldGen`; old saves are generation 1), so a game in progress never reshuffles.
 

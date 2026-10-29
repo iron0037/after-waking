@@ -12,6 +12,7 @@ import {
   chooseProbeOption,
   deserialize,
   depthBand,
+  levelForXp,
   migrateSurfaceCoords,
   newGame,
   serialize,
@@ -61,6 +62,8 @@ export interface EncounterDebrief {
   result: EncounterResult;
   raiderName: string;
   captain: string;
+  /** Levels each station had when the encounter began (for "reached level N" in the debrief). */
+  levelsBefore?: Partial<Record<Station, number>>;
   /** The whole exchange, oldest first. */
   log: string[];
 }
@@ -134,6 +137,7 @@ export class GameSession {
         result: this.state.lastEncounter,
         raiderName: encounterBefore.raiderName,
         captain: encounterBefore.captain,
+        levelsBefore: encounterBefore.xpStart ? Object.fromEntries(Object.entries(encounterBefore.xpStart).map(([st, xp]) => [st, levelForXp(xp ?? 0)])) : undefined,
         log: [...encounterBefore.log],
       };
     }

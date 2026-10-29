@@ -4,28 +4,39 @@
  * so a reload resumes it. The debrief is UI state (session.encounterDebrief) until the captain continues.
  */
 import { useEffect, useRef, useState } from "preact/hooks";
-import { KINETIC_HIT, LASER_HIT, RANGE_NAMES } from "../data/combat";
+import { HEAD_BOUNTY, KINETIC_HIT, LASER_HIT, RANGE_NAMES } from "../data/combat";
+import { COMMODITIES, type CommodityId } from "../data/commodities";
+import { STATION_INFO, STATIONS, type Station } from "../data/crew";
 import {
+  ageAt,
   answerHail,
+  cargoTonnes,
+  claimPrize,
   combatTurn,
+  effectiveStats,
   fold,
   foldPlan,
   hailOdds,
   holdValue,
+  levelForXp,
+  officerAt,
   orderAdvice,
   playerSide,
   shipDamage,
   type CombatSide,
   type EncounterOutcome,
   type Orders,
+  type Prize,
+  type Recruit,
 } from "../sim";
 import { cr, damageSummary, pct, tonnes } from "./format";
+import { Portrait } from "./portraits";
 import type { GameSession } from "./session";
 import "./encounter.css";
 
 export function EncounterOverlay({ session }: { session: GameSession }) {
   const e = session.state.encounter;
-  if (e) return e.stage === "hail" ? <Hail session={session} /> : <Battle session={session} />;
+  if (e) return e.stage === "hail" ? <Hail session={session} /> : e.stage === "prize" ? <PrizeScreen session={session} /> : <Battle session={session} />;
   if (session.encounterDebrief) return <Debrief session={session} />;
   return null;
 }
@@ -318,6 +329,114 @@ function SidePanel({ title, side, you = false }: { title: string; side: CombatSi
   );
 }
 
+// --- the prize --------------------------------------------------------------------------------
+
+const lootName = (id: string) => COMMODITIES[id as CommodityId]?.name ?? id;
+
+function PrizeScreen({ session }: { session: GameSession }) {
+  const { state } = session;
+  const e = state.encounter;
+  const p: Prize | undefined = e?.prize;
+  // Enter hammered through the last turn must not settle the prize unseen: ignore clicks for a moment after it opens.
+  const born = useRef(performance.now());
+  const settled = () => performance.now() - born.current > 450;
+  if (!e || !p) return null;
+  const room = Math.max(0, effectiveStats(state).cargoCapacityT - cargoTonnes(state.ship.cargo));
+  const lootEntries = Object.entries(p.loot).filter(([, t]) => (t ?? 0) > 0);
+  const lootT = lootEntries.reduce((sum, [, t]) => sum + (t ?? 0), 0);
+  const base = p.salvage + p.captainBounty;
+  const turnInPay = base + p.captives * HEAD_BOUNTY;
+  const keep = p.promising.length;
+  const recruitPay = base + (p.captives - keep) * HEAD_BOUNTY;
+  const names = p.promising.map((r) => r.name);
+  const nameList = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : (names[0] ?? "");
+  const choose = (choice: "turnIn" | "recruit") => {
+    if (settled()) session.act((s) => claimPrize(s, choice));
+  };
+  return (
+    <div class="overlay enc-overlay">
+      <div class="enc-box enc-prize" role="dialog" aria-label="Prize">
+        <div class="enc-kicker">
+          {cap(e.raiderName)} · Captain {e.captain}
+        </div>
+        <h2 class="good">She strikes</h2>
+        <div class="enc-log" aria-live="polite">
+          {e.log.slice(-3).map((line, i, all) => (
+            <p key={i} class={`small ${i === all.length - 1 ? "" : "muted"}`}>
+              {line}
+            </p>
+          ))}
+        </div>
+        <dl class="kv enc-results">
+          <dt>Salvage</dt>
+          <dd class="good">{cr(p.salvage)}</dd>
+          <dt>Captain {e.captain}</dt>
+          <dd class="good">{cr(p.captainBounty)} bounty, handed over alive</dd>
+          <dt>Their hold</dt>
+          <dd>
+            {lootEntries.length > 0 ? lootEntries.map(([id, t]) => `${Math.round((t ?? 0) * 10) / 10} t ${lootName(id)}`).join(", ") : <span class="muted">empty</span>}
+            {lootEntries.length > 0 && (
+              <div class={`small ${lootT > room ? "accent" : "muted"}`}>
+                Goes in your hold if there's room ({tonnes(room)} free{lootT > room ? "; some will be left behind" : ""}).
+              </div>
+            )}
+          </dd>
+          <dt>Crew in irons</dt>
+          <dd>
+            {p.captives} besides the captain
+            {keep > 0 && <span class="muted"> · {keep} look{keep === 1 ? "s" : ""} promising</span>}
+          </dd>
+        </dl>
+        {keep > 0 && (
+          <div class="enc-captives">
+            {p.promising.map((r) => (
+              <CaptiveCard key={r.id} session={session} r={r} />
+            ))}
+          </div>
+        )}
+        <div class="enc-choices">
+          <button class="btn enc-choice" onClick={() => choose("turnIn")}>
+            <strong>Turn them all in</strong>
+            <span class="muted small">
+              Helm pays {cr(HEAD_BOUNTY)} a head for {p.captives} crew.
+            </span>
+            <span class="good small">You collect {cr(turnInPay)} in all.</span>
+          </button>
+          {keep > 0 && (
+            <button class="btn enc-choice enc-recruit" onClick={() => choose("recruit")}>
+              <strong>Offer a berth to {nameList}</strong>
+              <span class="muted small">
+                They wait a year in the Intrepid's hiring hall at half the usual signing fee. The other {p.captives - keep} go to Helm for {cr(HEAD_BOUNTY)} a head.
+              </span>
+              <span class="good small">You collect {cr(recruitPay)} now.</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CaptiveCard({ session, r }: { session: GameSession; r: Recruit }) {
+  const { state } = session;
+  const info = STATION_INFO[r.station];
+  const age = ageAt(r.born, state.time);
+  return (
+    <div class="enc-captive">
+      <Portrait state={state} seed={r.id} name={r.name} age={age} />
+      <div class="enc-captive-body">
+        <div>
+          <strong>{r.name}</strong> <span class="muted small">age {age}</span>
+        </div>
+        <div class="small">
+          <span class="accent">{info.title}</span> · level {levelForXp(r.xp)}
+        </div>
+        <div class="small muted">Freebooters · signing fee {cr(r.fee)}</div>
+      </div>
+    </div>
+  );
+}
+
 // --- the debrief ------------------------------------------------------------------------------
 
 const OUTCOME: Record<EncounterOutcome, { title: string; cls: string }> = {
@@ -330,6 +449,35 @@ const OUTCOME: Record<EncounterOutcome, { title: string; cls: string }> = {
   overwhelmed: { title: "Overwhelmed", cls: "danger" },
 };
 
+/** What the encounter taught each station: who learned, how much, and who reached a new level. */
+function Experience({ session, xp, levelsBefore }: { session: GameSession; xp?: Partial<Record<Station, number>>; levelsBefore?: Partial<Record<Station, number>> }) {
+  const { state } = session;
+  const rows = STATIONS.flatMap((st) => {
+    const gained = xp?.[st] ?? 0;
+    if (gained <= 0) return [];
+    const who = st === "captain" ? { name: state.captain.name, xp: state.captain.xp ?? 0 } : officerAt(state, st);
+    const before = levelsBefore?.[st];
+    const level = who ? levelForXp(who.xp) : 0;
+    return [{ st, gained, name: who?.name ?? null, level: before !== undefined && level > before ? level : 0 }];
+  });
+  if (rows.length === 0) return null;
+  return (
+    <div class="enc-xp">
+      <div class="enc-xp-head small muted">Experience</div>
+      <ul class="enc-xp-list">
+        {rows.map((r) => (
+          <li key={r.st} class="small">
+            <span class="accent">{STATION_INFO[r.st].title}</span>
+            {r.name && <span class="muted"> {r.name}</span>}
+            <span class="good"> +{r.gained} xp</span>
+            {r.level > 0 && <strong class="good"> · reached level {r.level}</strong>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Debrief({ session }: { session: GameSession }) {
   const { state, world } = session;
   const d = session.encounterDebrief;
@@ -340,6 +488,8 @@ function Debrief({ session }: { session: GameSession }) {
   const o = OUTCOME[d.result.outcome];
   const damage = shipDamage(state);
   const hurt = damageSummary(damage);
+  const loot = Object.entries(d.result.loot ?? {}).filter(([, t]) => (t ?? 0) > 0);
+  const recruited = d.result.recruited ?? [];
 
   // The fold that was interrupted: offer to carry on with it when the ship can.
   const target = session.pendingFold;
@@ -380,6 +530,22 @@ function Debrief({ session }: { session: GameSession }) {
               <dd class="good">none</dd>
             </>
           )}
+          {loot.length > 0 && (
+            <>
+              <dt>Plunder</dt>
+              <dd class="good">
+                {loot.map(([id, t]) => `${t} t ${lootName(id)}`).join(", ")} <span class="muted small">(in your hold)</span>
+              </dd>
+            </>
+          )}
+          {recruited.length > 0 && (
+            <>
+              <dt>Recruited</dt>
+              <dd>
+                <span class="good">{recruited.join(", ")}</span> <span class="muted small">waiting in the hiring hall</span>
+              </dd>
+            </>
+          )}
           {hurt && (
             <>
               <dt>Battle damage</dt>
@@ -392,6 +558,7 @@ function Debrief({ session }: { session: GameSession }) {
             {damage.drives > 0 ? "Drive damage slows you in flight. " : ""}The Intrepid's Shipyard repairs battle damage for credits and a few days.
           </p>
         )}
+        <Experience session={session} xp={d.result.xp} levelsBefore={d.levelsBefore} />
         {d.log.length > 1 && (
           <details class="enc-replay">
             <summary class="small muted">What happened</summary>

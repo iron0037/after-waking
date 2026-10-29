@@ -51,6 +51,9 @@ export interface LevelUp {
 /** Someone in the hiring hall. The fee is a signing bonus paid up front. */
 export interface Recruit extends CrewMember {
   fee: number;
+  /** Taken from a raider and offered a berth instead of a cell (combat v1.1): waits in the hall a year. */
+  formerRaider?: boolean;
+  keepUntil?: number;
 }
 
 export const MAX_LEVEL = 10;
@@ -414,8 +417,23 @@ export function tickRecruits(state: GameState): void {
   if (state.nextRecruitsAt === undefined) return;
   if (state.time < state.nextRecruitsAt) return;
   const pool = Math.floor(state.time / (RECRUIT_POOL_DAYS * DAY));
-  state.recruits = rollPool(state, pool);
+  // Former raiders you offered a berth wait for you (a year) while the rest of the hall turns over.
+  const waiting = (state.recruits ?? []).filter((r) => r.formerRaider && state.time < (r.keepUntil ?? 0));
+  state.recruits = [...waiting, ...rollPool(state, pool)];
   state.nextRecruitsAt = (pool + 1) * RECRUIT_POOL_DAYS * DAY;
+}
+
+/**
+ * A promising hand from a beaten raider's crew: a Freebooter of some experience, grateful for the
+ * berth (more loyal, half the usual signing fee). Waits in the hiring hall for a year.
+ */
+export function raiderRecruit(rng: Rng, id: string, now: number): Recruit {
+  const station = rng.pick(OFFICER_STATIONS);
+  const person = newPerson(rng, id, station, "freebooters", rng.int(2, 4), now);
+  autoSpendPerks(person, rng);
+  ensureSentiment(person, true);
+  person.loyalty = Math.min(100, (person.loyalty ?? 50) + 15);
+  return { ...person, fee: Math.round((SIGNING_DAYS * wageOf(person)) / 2), formerRaider: true, keepUntil: now + 365 * DAY };
 }
 
 /** Sign a recruit: pays the signing bonus; whoever held that station leaves the ship. */
@@ -432,7 +450,7 @@ export function hireRecruit(state: GameState, recruitId: string): Result<{ hired
   const fee = signingFee(state, r);
   if (state.credits < fee) return fail(`Signing ${r.name} costs ${fee.toLocaleString()} cr.`);
   state.credits -= fee;
-  const { fee: _fee, ...hired } = r;
+  const { fee: _fee, formerRaider: _raider, keepUntil: _keep, ...hired } = r;
   ensureSentiment(hired, true);
   const replaced = officerAt(state, r.station);
   state.crew = [...(state.crew ?? []).filter((m) => m.station !== r.station), hired];

@@ -5,6 +5,7 @@
  */
 import { clanMods } from "./clan";
 import {
+  HEAD_BOUNTY,
   KINETIC_HIT,
   LASER_HIT,
   RAIDER_CAPTAINS,
@@ -16,7 +17,10 @@ import {
   type ShipSystem,
 } from "../data/combat";
 import type { CommodityId } from "../data/commodities";
-import { awardXp, stationLevel } from "./crew";
+import { awardXp, officerAt, raiderRecruit, stationLevel, type Recruit } from "./crew";
+import { STATIONS, type Station } from "../data/crew";
+import { addCargo } from "./ship";
+import { COMMODITIES, ORE_IDS, GAS_IDS } from "../data/commodities";
 import { sellPrice } from "./economy";
 import { INTREPID_POS } from "./galaxy";
 import { effectiveStats } from "./perks";
@@ -48,8 +52,21 @@ export interface CombatSide {
 
 export type EncounterOutcome = "paid" | "talked off" | "escaped" | "won" | "driven off" | "surrendered" | "overwhelmed";
 
+/** What you take when a raider strikes to you: salvage, their captain, their hold, their crew. */
+export interface Prize {
+  salvage: number;
+  captainBounty: number;
+  loot: Partial<Record<CommodityId, number>>;
+  /** Raider crew besides the captain; the promising ones could serve aboard a ship of yours. */
+  captives: number;
+  promising: Recruit[];
+}
+
 export interface Encounter {
-  stage: "hail" | "battle";
+  stage: "hail" | "battle" | "prize";
+  prize?: Prize;
+  /** Everybody's experience when the encounter began, to report what the fight taught them. */
+  xpStart?: Partial<Record<Station, number>>;
   raider: string;
   raiderName: string;
   captain: string;
@@ -73,6 +90,11 @@ export interface EncounterResult {
   text: string;
   cargoLost: number;
   bounty: number;
+  /** Experience each station gained over the encounter. */
+  xp?: Partial<Record<Station, number>>;
+  /** Plunder taken from a beaten raider's hold, and former raiders sent to the hiring hall. */
+  loot?: Partial<Record<CommodityId, number>>;
+  recruited?: string[];
 }
 
 export interface Orders {
@@ -143,7 +165,14 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
   const sys = world.galaxy.systems.find((s) => s.id === fromId);
   if (!sys) return null;
   const ly = dist(sys.pos, INTREPID_POS);
-  const picked = withRng(state, (rng) => (rng.next() < chance ? { r: pickRaider(rng, sys.charted, ly), cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.15, 0.3) } : null));
+  const picked = withRng(state, (rng) => {
+    if (rng.next() >= chance) return null;
+    const r = pickRaider(rng, sys.charted, ly);
+    // Raiders size you up first: a ship that outguns them is rarely worth the risk.
+    const ratio = sidePower({ hull: r.hull, hullMax: r.hull, laser: r.laser, kinetic: r.kinetic, shields: r.shields, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } }) / sidePower(playerSide(state));
+    if (ratio < 1 && rng.next() > ratio * ratio * ratio) return null;
+    return { r, cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.15, 0.3) };
+  });
   if (!picked) return null;
   const { r, cap, demand } = picked;
   state.encounter = {
@@ -159,6 +188,7 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
     turn: 0,
     talked: false,
     systemId: fromId,
+    xpStart: xpSnapshot(state),
     log: [`A ${r.name} drops out of the glare of ${sys.name}. Captain ${cap} hails: "Heave to and hand over ${Math.round(demand * 100)}% of that hold, and nobody gets hurt."`],
   };
   log(state, "warning", `Interdicted leaving ${sys.name}: a ${r.name} under ${cap} demands a share of the hold.`);
@@ -300,7 +330,14 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   const dealt = applyHits(them, myHits, orders.guns === "hold" ? "hull" : orders.guns, them.shields);
   const taken = applyHits(me, theirHits, theirGuns, myShields);
   if (orders.guns !== "hold") say(dealt > 0 ? `Your guns hit for ${Math.round(dealt)}${orders.guns !== "hull" ? ` (their ${orders.guns})` : ""}.` : "Your shots go wide.");
-  if (dealt > 0) awardXp(state, "science", 2);
+  // Every order trains whoever gave it: the captain commands the guns, science lays them on target,
+  // the navigator flies, the engineer fights the fires, comms works the channel.
+  if (myHits.length > 0) {
+    awardXp(state, "captain", 2 * myHits.length);
+    awardXp(state, "science", 2 * myHits.length);
+  }
+  if (orders.helm !== "hold") awardXp(state, "navigation", 3 + (orders.helm === "evade" && theirHits.length === 0 ? 2 : 0));
+  if (orders.engineering !== "repair") awardXp(state, "engineering", 2);
   say(taken > 0 ? `They hit you for ${Math.round(taken)}${theirGuns !== "hull" ? ` (your ${theirGuns})` : ""}.` : "Their fire misses.");
 
   // 4. Repairs.
@@ -372,21 +409,104 @@ function applyHits(side: CombatSide, hits: number[], target: FireTarget, shields
   return total;
 }
 
-function won(state: GameState, text: string): EncounterResult {
+/**
+ * They strike: board and take the prize (combat v1.1). The encounter stays open at the "prize" stage
+ * until the captain decides what to do with the raider crew (claimPrize). Returns null: not over yet.
+ */
+function won(state: GameState, text: string): EncounterResult | null {
   const e = state.encounter as Encounter;
-  state.credits += e.bounty;
-  state.stats.earned += e.bounty;
   awardXp(state, "captain", 40);
-  return finish(state, "won", `${text} Helm pays a ${e.bounty.toLocaleString()} cr bounty for the ${e.raiderName}.`, 0, e.bounty);
+  const template = raiderById(e.raider);
+  const prize = withRng(state, (rng) => {
+    const loot: Partial<Record<CommodityId, number>> = {};
+    const lootT = template ? rng.range(template.lootT[0], template.lootT[1]) : 5;
+    // Their plunder: a few goods taken off other captains, valuable ones more often.
+    const goods = [...ORE_IDS.filter((id) => id !== "waterIce"), ...GAS_IDS];
+    const picks = rng.int(1, 3);
+    for (let i = 0; i < picks; i++) {
+      const id = rng.weighted(goods.map((g) => [g, Math.sqrt(COMMODITIES[g].basePrice)] as const));
+      const t = Math.round((lootT / picks) * (COMMODITIES[id].basePrice > 400 ? 0.25 : 1) * 10) / 10;
+      loot[id] = (loot[id] ?? 0) + t;
+    }
+    const captives = template ? rng.int(template.crew[0], template.crew[1]) : 2;
+    const promisingCount = Math.min(captives, rng.chance(0.5) ? 2 : 1);
+    const promising = Array.from({ length: promisingCount }, (_, i) => raiderRecruit(rng, `x${Math.floor(state.time)}-${i}`, state.time));
+    return { salvage: e.bounty, captainBounty: template?.captainBounty ?? 1_000, loot, captives, promising };
+  });
+  e.stage = "prize";
+  e.prize = prize;
+  e.log.push(`${text} You board her: ${e.captain} and ${prize.captives} crew in irons, and a hold to search.`);
+  return null;
+}
+
+export type PrizeChoice = "turnIn" | "recruit";
+
+/**
+ * Settle a taken raider. Salvage, the captain's bounty and their hold are yours either way; the crew
+ * are either all handed to Helm for the head bounty, or the promising ones are offered a berth and
+ * wait for you in the hiring hall (half the signing fee; no head bounty for them).
+ */
+export function claimPrize(state: GameState, choice: PrizeChoice): Result<EncounterResult> {
+  const e = state.encounter;
+  if (!e || e.stage !== "prize" || !e.prize) return fail("There's no prize to settle.");
+  const p = e.prize;
+  const capacity = effectiveStats(state).cargoCapacityT;
+  const loot: Partial<Record<CommodityId, number>> = {};
+  for (const [id, t] of Object.entries(p.loot) as [CommodityId, number][]) {
+    const added = addCargo(state.ship.cargo, id, t, capacity);
+    if (added > 0.05) loot[id] = Math.round(added * 10) / 10;
+  }
+  const recruited = choice === "recruit" ? p.promising : [];
+  if (recruited.length > 0) state.recruits = [...(state.recruits ?? []), ...recruited];
+  const heads = p.captives - recruited.length;
+  const pay = p.salvage + p.captainBounty + heads * HEAD_BOUNTY;
+  state.credits += pay;
+  state.stats.earned += pay;
+  if (recruited.length > 0) awardXp(state, "comms", 10);
+  const lootText = Object.keys(loot).length > 0 ? ` Their hold gave up ${Object.entries(loot).map(([id, t]) => `${t} t of ${COMMODITIES[id as CommodityId].name.toLowerCase()}`).join(", ")}.` : "";
+  const crewText =
+    recruited.length > 0
+      ? ` ${recruited.map((r) => r.name).join(" and ")} took your offer of a berth instead of a cell; they'll be waiting at the Intrepid's hiring hall.`
+      : "";
+  const result = finish(
+    state,
+    "won",
+    `Helm pays ${pay.toLocaleString()} cr: ${p.salvage.toLocaleString()} for the ${e.raiderName}, ${p.captainBounty.toLocaleString()} for ${e.captain}${heads > 0 ? `, and ${(heads * HEAD_BOUNTY).toLocaleString()} for ${heads} of the crew` : ""}.${lootText}${crewText}`,
+    0,
+    pay,
+  );
+  result.loot = loot;
+  result.recruited = recruited.map((r) => r.name);
+  return ok(result);
+}
+
+/** A side's rough fighting strength, for raiders deciding whether you're worth the risk. */
+export function sidePower(side: CombatSide): number {
+  return Math.max(0.1, (side.laser * 0.7 + side.kinetic * 0.6 + side.shields * 0.8) * Math.sqrt(Math.max(1, side.hull) / 100));
+}
+
+function xpSnapshot(state: GameState): Partial<Record<Station, number>> {
+  const out: Partial<Record<Station, number>> = { captain: state.captain.xp ?? 0 };
+  for (const s of STATIONS) if (s !== "captain") out[s] = officerAt(state, s)?.xp ?? 0;
+  return out;
 }
 
 function finish(state: GameState, outcome: EncounterOutcome, text: string, cargoLost: number, bounty: number): EncounterResult {
   const e = state.encounter;
   if (e) e.log.push(text);
   state.encounter = undefined;
-  const result = { outcome, text, cargoLost, bounty };
-  state.lastEncounter = result;
   awardXp(state, "captain", 10);
+  // What the encounter taught each of them.
+  const xp: Partial<Record<Station, number>> = {};
+  if (e?.xpStart) {
+    const now = xpSnapshot(state);
+    for (const s of STATIONS) {
+      const gained = Math.round((now[s] ?? 0) - (e.xpStart[s] ?? 0));
+      if (gained > 0) xp[s] = gained;
+    }
+  }
+  const result: EncounterResult = { outcome, text, cargoLost, bounty, xp };
+  state.lastEncounter = result;
   log(state, outcome === "won" || outcome === "escaped" || outcome === "talked off" || outcome === "driven off" ? "info" : "warning", text);
   return result;
 }

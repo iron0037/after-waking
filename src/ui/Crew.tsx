@@ -9,6 +9,7 @@ import { PERKS_BY_ID } from "../data/perks";
 import { CLAN_NAMES } from "../data/ship";
 import {
   ageAt,
+  formatDate,
   bonusLine,
   captainTitle,
   dailyWages,
@@ -462,6 +463,13 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
         <span class="muted small">age {ageAt(r.born, state.time)}</span>
       </div>
       <ClanLine m={r} />
+      {r.formerRaider && (
+        <div class="crew-clan">
+          <span class="tag accent-tag" title="Taken from a beaten raider and offered a berth instead of a cell. They'll wait in the hiring hall for you, and the signing fee is halved.">
+            Former raider · waits until {formatDate(r.keepUntil ?? state.time).replace(/ · \d\d:\d\d$/, "")}
+          </span>
+        </div>
+      )}
       <LevelMeter xp={r.xp} />
       <dl class="kv crew-kv">
         <dt>Signing fee</dt>

@@ -7,7 +7,7 @@ import { bodyNickname } from "./nicknames";
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
 import { driveDamageMult, finishRepairs, maybeInterdict } from "./combat";
-import { researchFor, upgradeUnlocked } from "./research";
+import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
 import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { burnPath } from "./burnpath";
@@ -1272,15 +1272,24 @@ export function specimenUnitPrice(state: GameState, key: string): number {
 }
 
 /** Sell specimens to the Lyceum, keeping any that an active contract still needs. */
-export function sellSpecimens(state: GameState): Result<number> {
+/**
+ * Sell specimens to the Lyceum. With no keys, sells everything that isn't spoken for (samples a
+ * contract needs, and those a tracked research project needs). With keys ("body|species"), sells
+ * just those racks: the captain's explicit choice, so research holds don't apply, but contracts do.
+ */
+export function sellSpecimens(state: GameState, keys?: readonly string[]): Result<number> {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
-  const reserved = new Set((state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId));
+  const holds = specimenHolds(state);
   let total = 0;
   let sold = 0;
   const specimens = state.ship.specimens ?? {};
-  for (const [key, n] of Object.entries(specimens)) {
-    if (reserved.has(key.split("|")[0])) continue;
+  for (const [key, have] of Object.entries(specimens)) {
+    if (keys && !keys.includes(key)) continue;
+    const hold = holds.get(key);
+    if (hold?.contract) continue;
+    const n = have - (keys ? 0 : (hold?.research ?? 0));
+    if (n <= 0) continue;
     // The Lyceum pays a bonus for the first specimen of each species, wherever it came from.
     const species = key.split("|")[1] ?? key;
     const bonus = state.catalogedSpecies.includes(species) ? 0 : NEW_SPECIES_BONUS;
@@ -1288,9 +1297,10 @@ export function sellSpecimens(state: GameState): Result<number> {
     total += Math.round(n * specimenUnitPrice(state, key)) + bonus;
     awardXp(state, "medical", n);
     sold += n;
-    delete specimens[key];
+    if (have - n <= 0) delete specimens[key];
+    else specimens[key] = have - n;
   }
-  if (sold === 0) return fail("No specimens to sell (samples reserved for contracts are kept).");
+  if (sold === 0) return fail("No specimens to sell (samples kept for contracts and tracked research stay aboard).");
   state.credits += total;
   state.stats.earned += total;
   settlePayroll(state);
@@ -1550,4 +1560,66 @@ export function wait(state: GameState, minutes: number): Result {
 /** Plicite fuel price for this captain (their clan may get it cheaper). */
 export function fuelPriceFor(state: GameState): number {
   return Math.round(fuelPrice(state.market) * clanMods(state).fuelPrice);
+}
+
+/** Why specimens in a rack are being kept: all of them for a contract, or a count for tracked research. */
+export interface SpecimenHold {
+  contract: boolean;
+  research: number;
+  projects: string[];
+}
+
+/** Racks ("body|species") that are spoken for, so "sell all" leaves them aboard. */
+export function specimenHolds(state: GameState): Map<string, SpecimenHold> {
+  const out = new Map<string, SpecimenHold>();
+  const get = (key: string) => {
+    let h = out.get(key);
+    if (!h) out.set(key, (h = { contract: false, research: 0, projects: [] }));
+    return h;
+  };
+  const contractBodies = new Set((state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId));
+  const racks = state.ship.specimens ?? {};
+  for (const key of Object.keys(racks)) if (contractBodies.has(key.split("|")[0] ?? "")) get(key).contract = true;
+  for (const p of trackedProjects(state)) {
+    for (const req of p.needs) {
+      if (req.kind !== "specimens") continue;
+      let left = req.count;
+      for (const [key, n] of matchingSpecimens(state, req)) {
+        const h = get(key);
+        if (h.contract) continue;
+        const take = Math.min(left, n - h.research);
+        if (take <= 0) continue;
+        h.research += take;
+        if (!h.projects.includes(p.name)) h.projects.push(p.name);
+        left -= take;
+        if (left <= 0) break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * What `sellSpecimens(state, keys)` would pay and how many specimens it would take, without selling:
+ * same selection rules (contract racks never; research holds only when selling everything), and the
+ * new-species bonus paid once per species.
+ */
+export function specimenQuote(state: GameState, keys?: readonly string[]): { total: number; count: number } {
+  const holds = specimenHolds(state);
+  const seen = new Set(state.catalogedSpecies);
+  let total = 0;
+  let count = 0;
+  for (const [key, have] of Object.entries(state.ship.specimens ?? {})) {
+    if (keys && !keys.includes(key)) continue;
+    const hold = holds.get(key);
+    if (hold?.contract) continue;
+    const n = have - (keys ? 0 : (hold?.research ?? 0));
+    if (n <= 0) continue;
+    const species = key.split("|")[1] ?? key;
+    const bonus = seen.has(species) ? 0 : NEW_SPECIES_BONUS;
+    seen.add(species);
+    total += Math.round(n * specimenUnitPrice(state, key)) + bonus;
+    count += n;
+  }
+  return { total, count };
 }

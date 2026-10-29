@@ -70,7 +70,7 @@ export function requirementProgress(state: GameState, req: Requirement): Require
 }
 
 /** Specimens in the ship's racks that meet a requirement, as [key, count]. */
-function matchingSpecimens(state: GameState, req: Extract<Requirement, { kind: "specimens" }>): [string, number][] {
+export function matchingSpecimens(state: GameState, req: Extract<Requirement, { kind: "specimens" }>): [string, number][] {
   return Object.entries(state.ship.specimens ?? {}).filter(([key, n]) => {
     if (n <= 0) return false;
     const species = key.split("|")[1] ?? "";

@@ -372,3 +372,54 @@
     transition: none;
   }
 }
+
+/* prize: the captured crew and what you take */
+.enc-prize {
+  width: min(640px, 96vw);
+}
+.enc-captives {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.enc-captive {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: #0005;
+}
+.enc-captive-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.enc-prize .enc-choices {
+  grid-template-columns: 1fr;
+}
+.btn.enc-choice.enc-recruit {
+  border-color: var(--cyan);
+}
+
+/* debrief: what the crew learned */
+.enc-xp {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #0005;
+}
+.enc-xp-head {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 4px;
+}
+.enc-xp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
