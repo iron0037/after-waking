@@ -9,13 +9,19 @@ import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { STATION_INFO, STATIONS, type Station } from "../data/crew";
 import {
   ageAt,
+  answerContact,
   answerHail,
+  autoOrders,
+  autoStep,
   cargoTonnes,
   claimPrize,
   combatTurn,
+  contactOdds,
   effectiveStats,
+  flightPlan,
   fold,
   foldPlan,
+  formatDuration,
   hailOdds,
   holdValue,
   levelForXp,
@@ -23,7 +29,9 @@ import {
   orderAdvice,
   playerSide,
   shipDamage,
+  type AutoMode,
   type CombatSide,
+  type ContactChoice,
   type EncounterOutcome,
   type Orders,
   type Prize,
@@ -36,9 +44,153 @@ import "./encounter.css";
 
 export function EncounterOverlay({ session }: { session: GameSession }) {
   const e = session.state.encounter;
-  if (e) return e.stage === "hail" ? <Hail session={session} /> : e.stage === "prize" ? <PrizeScreen session={session} /> : <Battle session={session} />;
+  const stage = e?.stage;
+  const mode = session.autoCombat;
+  const live = !!e;
+
+  // Leaving it to the officers: one step every so often, across the contact, hail and battle stages alike.
+  // Each state change (a turn, a new stage) re-arms the timer, so the loop paces itself behind the screen.
+  const progress = e ? `${e.stage}:${e.turn}:${e.log.length}` : "";
+  useEffect(() => {
+    if (!mode) return;
+    if (!live || stage === "prize") {
+      session.setAutoCombat(null); // it's over, or the prize wants the captain
+      return;
+    }
+    const timer = window.setTimeout(
+      () => {
+        const r = session.act((s) => autoStep(s, mode));
+        if (!r.ok) session.setAutoCombat(null);
+      },
+      stage === "battle" ? AUTO_BATTLE_MS : AUTO_STEP_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [session, mode, live, stage, progress]);
+  useEffect(() => () => session.setAutoCombat(null), [session]);
+
+  if (e) {
+    return e.stage === "contact" ? (
+      <Contact session={session} />
+    ) : e.stage === "hail" ? (
+      <Hail session={session} />
+    ) : e.stage === "prize" ? (
+      <PrizeScreen session={session} />
+    ) : (
+      <Battle session={session} />
+    );
+  }
   if (session.encounterDebrief) return <Debrief session={session} />;
   return null;
+}
+
+// --- leaving it to the officers (auto-combat) ---------------------------------------------------
+
+const AUTO_STEP_MS = 650;
+const AUTO_BATTLE_MS = 500;
+
+const AUTO_LABEL: Record<AutoMode, string> = { fight: "Fighting it out", run: "Breaking away" };
+
+/**
+ * Two buttons to hand the encounter to the officers or, while they have it, the mode and "Take command".
+ * The loop itself lives in EncounterOverlay, so it carries on across the contact, hail and battle screens.
+ */
+function AutoRow({ session }: { session: GameSession }) {
+  const mode = session.autoCombat;
+  if (mode) {
+    const takeCommand = () => {
+      const e = session.state.encounter;
+      // Carry the officers' last orders over, so the manual screen picks up where they left off.
+      if (e && e.stage === "battle") Object.assign(session.orders, autoOrders(session.state, mode));
+      session.setAutoCombat(null);
+    };
+    return (
+      <div class="enc-auto on" role="status">
+        <span class="enc-auto-mode small">
+          <span class="enc-auto-dot" aria-hidden="true" /> Officers in command: <strong>{AUTO_LABEL[mode]}</strong>
+        </span>
+        <button class="btn big primary enc-take" autoFocus onClick={takeCommand}>
+          Take command
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div class="enc-auto">
+      <div class="btn-row">
+        <button class="btn enc-auto-btn" onClick={() => session.setAutoCombat("fight")} title="Your officers answer the hail and give the battle orders, turn by turn, to win.">
+          Fight it out
+        </button>
+        <button class="btn enc-auto-btn" onClick={() => session.setAutoCombat("run")} title="Your officers run if they can, and if they can't, cripple the drives and open the range.">
+          Break away
+        </button>
+      </div>
+      <div class="muted small">Your officers give the orders; take command any time.</div>
+    </div>
+  );
+}
+
+// --- the contact ------------------------------------------------------------------------------
+
+function Contact({ session }: { session: GameSession }) {
+  const { state } = session;
+  const e = state.encounter;
+  if (!e) return null;
+  const auto = !!session.autoCombat;
+  const odds = contactOdds(state);
+  const answer = (c: ContactChoice) => {
+    if (!auto) session.act((s) => answerContact(s, c));
+  };
+  return (
+    <div class="overlay enc-overlay">
+      <div class="enc-box" role="dialog" aria-label="Raider contact">
+        <div class="enc-head">
+          <div class="enc-kicker">Contact · {e.raiderName}</div>
+          <div class={`small ${e.spottedFirst ? "good" : "danger"}`}>{e.spottedFirst ? "You saw them first" : "They saw you first"}</div>
+        </div>
+        <div class="enc-log">
+          {e.log.map((line, i) => (
+            <p key={i} class={i === 0 ? "enc-hail" : "small muted"}>
+              {line}
+            </p>
+          ))}
+        </div>
+        <div class="muted small">
+          At a quarter light-speed nobody can fight: to shoot, you both have to drop to combat speed, and they have to match your burn to catch you.
+        </div>
+        <div class="enc-sides">
+          <SidePanel title={state.ship.name} side={playerSide(state)} you />
+          <SidePanel title={cap(e.raiderName)} side={e.enemy} />
+        </div>
+        <div class="enc-choices">
+          {odds.slip !== null && (
+            <button class="btn enc-choice" disabled={auto} onClick={() => answer("slip")}>
+              <strong>
+                Steer wide <span class="enc-odds">{Math.round(odds.slip * 100)}%</span>
+              </strong>
+              <span class="muted small">
+                Swing around them and run quiet. Costs about {formatDuration(e.detourMinutes ?? 30)} extra. If they spot your flare, they hail you.
+              </span>
+            </button>
+          )}
+          <button class="btn enc-choice" disabled={auto} onClick={() => answer("run")}>
+            <strong>
+              Hold your burn <span class="enc-odds">{Math.round(odds.run * 100)}%</span>
+            </strong>
+            <span class="muted small">Stay at a quarter light-speed and make them chase. If they match it, the fight starts at medium range.</span>
+          </button>
+          <button class="btn enc-choice" disabled={auto} onClick={() => answer("hail")}>
+            <strong>{e.spottedFirst ? "Hail them" : "Answer the hail"}</strong>
+            <span class="muted small">Drop to combat speed and talk. They make their demand.</span>
+          </button>
+          <button class="btn enc-choice enc-fight" disabled={auto} onClick={() => answer("engage")}>
+            <strong>Drop to combat speed and attack</strong>
+            <span class="muted small">Run out the guns. The battle opens at long range.</span>
+          </button>
+        </div>
+        <AutoRow session={session} />
+      </div>
+    </div>
+  );
 }
 
 // --- the hail ---------------------------------------------------------------------------------
@@ -50,7 +202,10 @@ function Hail({ session }: { session: GameSession }) {
   const odds = hailOdds(state);
   const percent = Math.round(e.demand * 100);
   const worth = holdValue(state) * e.demand;
-  const answer = (c: "pay" | "talk" | "run" | "fight") => session.act((s) => answerHail(s, c));
+  const auto = !!session.autoCombat;
+  const answer = (c: "pay" | "talk" | "run" | "fight") => {
+    if (!auto) session.act((s) => answerHail(s, c));
+  };
   return (
     <div class="overlay enc-overlay">
       <div class="enc-box" role="dialog" aria-label="Raider hail">
@@ -66,11 +221,11 @@ function Hail({ session }: { session: GameSession }) {
           They want <strong class="danger">~{percent}% of the hold</strong>, about <strong class="accent">{cr(worth)}</strong> at today's prices.
         </div>
         <div class="enc-choices">
-          <button class="btn enc-choice" onClick={() => answer("pay")}>
+          <button class="btn enc-choice" disabled={auto} onClick={() => answer("pay")}>
             <strong>Pay</strong>
             <span class="muted small">Hand it over and go on your way. No fight, no risk.</span>
           </button>
-          <button class="btn enc-choice" disabled={e.talked} onClick={() => answer("talk")}>
+          <button class="btn enc-choice" disabled={e.talked || auto} onClick={() => answer("talk")}>
             <strong>
               Talk <span class="enc-odds">{e.talked ? "tried" : `${Math.round(odds.talk * 100)}%`}</span>
             </strong>
@@ -78,17 +233,18 @@ function Hail({ session }: { session: GameSession }) {
               {e.talked ? "They've heard enough talk." : "Comms bargains the price down, or talks them off. If it fails, they open fire."}
             </span>
           </button>
-          <button class="btn enc-choice" onClick={() => answer("run")}>
+          <button class="btn enc-choice" disabled={auto} onClick={() => answer("run")}>
             <strong>
               Run <span class="enc-odds">{Math.round(odds.run * 100)}%</span>
             </strong>
             <span class="muted small">Burn for open space. If they catch you, it starts at close range.</span>
           </button>
-          <button class="btn enc-choice enc-fight" onClick={() => answer("fight")}>
+          <button class="btn enc-choice enc-fight" disabled={auto} onClick={() => answer("fight")}>
             <strong>Fight</strong>
             <span class="muted small">Run out the guns. The battle opens at long range.</span>
           </button>
         </div>
+        <AutoRow session={session} />
       </div>
     </div>
   );
@@ -148,7 +304,9 @@ function Battle({ session }: { session: GameSession }) {
   const { state } = session;
   const e = state.encounter;
   const [hint, setHint] = useState<string | null>(null);
-  const orders = session.orders;
+  const auto = session.autoCombat;
+  // While the officers have the battle, show the orders they will give next instead of the captain's.
+  const orders: Orders = auto ? autoOrders(state, auto) : session.orders;
   const advice = orderAdvice(state);
 
   const set = (key: OrderKey, id: string) => {
@@ -157,7 +315,7 @@ function Battle({ session }: { session: GameSession }) {
   };
   const execute = () => {
     const enc = session.state.encounter;
-    if (!enc || enc.stage !== "battle") return;
+    if (!enc || enc.stage !== "battle" || session.autoCombat) return;
     session.act((s) => combatTurn(s, { ...session.orders }));
   };
 
@@ -174,7 +332,7 @@ function Battle({ session }: { session: GameSession }) {
 
   if (!e) return null;
   const me = playerSide(state);
-  const striking = orders.comms === "strike";
+  const striking = !auto && orders.comms === "strike";
   const wasted = ORDER_GROUPS.flatMap((g) => {
     const why = (advice[g.key] as Record<string, string | undefined>)[orders[g.key]];
     return why ? [why] : [];
@@ -216,9 +374,10 @@ function Battle({ session }: { session: GameSession }) {
                   return (
                     <button
                       key={o.id}
-                      class={`enc-seg-btn ${on ? "on" : ""} ${why ? "wasted" : ""} ${o.id === "strike" ? "strike" : ""}`}
+                      class={`enc-seg-btn ${on ? "on" : ""} ${on && auto ? "auto" : ""} ${why ? "wasted" : ""} ${o.id === "strike" ? "strike" : ""}`}
                       aria-pressed={on}
                       title={text}
+                      disabled={!!auto}
                       onClick={() => set(g.key, o.id)}
                       onMouseEnter={() => setHint(text)}
                       onMouseLeave={() => setHint(null)}
@@ -234,14 +393,17 @@ function Battle({ session }: { session: GameSession }) {
           ))}
         </div>
         <div class={`enc-hint small ${hint ? "" : wasted.length > 0 ? "accent" : "muted"}`}>
-          {hint ?? (wasted.length > 0 ? `Wasted: ${wasted.join(" ")}` : "Hover an order to see what it does. Enter fires the turn.")}
+          {hint ?? (auto ? "The highlighted orders are the ones your officers will give this turn." : wasted.length > 0 ? `Wasted: ${wasted.join(" ")}` : "Hover an order to see what it does. Enter fires the turn.")}
         </div>
 
-        <div class="btn-row enc-actions">
-          <button class={`btn big enc-execute ${striking ? "danger" : "primary"}`} onClick={execute}>
-            {striking ? "Strike colours" : "Execute turn"} <span class="enc-key">Enter</span>
-          </button>
-        </div>
+        {!auto && (
+          <div class="btn-row enc-actions">
+            <button class={`btn big enc-execute ${striking ? "danger" : "primary"}`} onClick={execute}>
+              {striking ? "Strike colours" : "Execute turn"} <span class="enc-key">Enter</span>
+            </button>
+          </div>
+        )}
+        <AutoRow session={session} />
       </div>
     </div>
   );
@@ -443,6 +605,7 @@ const OUTCOME: Record<EncounterOutcome, { title: string; cls: string }> = {
   paid: { title: "Paid off", cls: "accent" },
   "talked off": { title: "Talked off", cls: "good" },
   escaped: { title: "Escaped", cls: "good" },
+  "slipped past": { title: "Slipped past", cls: "good" },
   won: { title: "Victory", cls: "good" },
   "driven off": { title: "They broke off", cls: "good" },
   surrendered: { title: "Colours struck", cls: "danger" },
@@ -501,6 +664,17 @@ function Debrief({ session }: { session: GameSession }) {
     session.closeEncounterDebrief();
     const r = session.act((s, w) => fold(s, w, target));
     if (r.ok) session.go(session.state.location.kind === "intrepid" ? "hub" : "system");
+  };
+
+  // A contact in flight: carry on with the burn from where the ship sits (animated by the system screen).
+  const resume = d.result.resume;
+  const resumePlan = resume ? flightPlan(state, world, resume) : null;
+  const resumeShort = resumePlan?.ok === true && resumePlan.value.fuel > state.ship.fuel;
+  const canResume = !!resume && resumePlan?.ok === true && !resumeShort;
+  const resumeOn = () => {
+    if (!resume || !settled()) return;
+    session.closeEncounterDebrief();
+    session.requestResume(resume);
   };
 
   return (
@@ -572,9 +746,25 @@ function Debrief({ session }: { session: GameSession }) {
           </details>
         )}
         <div class="btn-row enc-actions">
-          <button class={`btn big ${canFold ? "" : "primary"}`} autoFocus onClick={() => settled() && session.closeEncounterDebrief()}>
+          <button class={`btn big ${canFold || !!resume ? "" : "primary"}`} autoFocus onClick={() => settled() && session.closeEncounterDebrief()}>
             Continue
           </button>
+          {resume && (
+            <button
+              class="btn big primary"
+              disabled={!canResume}
+              onClick={resumeOn}
+              title={
+                canResume
+                  ? `Pick the burn back up: ${formatDuration(resumePlan.value.minutes)}, ${resumePlan.value.fuel} fuel from here.`
+                  : resumeShort
+                    ? `The rest of the burn needs ${resumePlan?.ok ? resumePlan.value.fuel : ""} fuel; tanks hold ${state.ship.fuel.toFixed(1)}.`
+                    : "Can't resume that burn from here."
+              }
+            >
+              Continue to {d.result.resumeName ?? "your destination"}
+            </button>
+          )}
           {canFold && (
             <button class="btn big primary" onClick={foldOn} title="Spool the fold drive again. The raider won't be back for this departure.">
               Fold to {targetName}

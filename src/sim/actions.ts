@@ -6,7 +6,7 @@ import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
-import { driveDamageMult, finishRepairs, maybeInterdict } from "./combat";
+import { driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
 import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
 import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
@@ -294,6 +294,8 @@ export interface FlightPlan {
   minutes: number;
   fuel: number;
   arrival: Vec2;
+  /** A raider lurking on the route (AW-20): the burn stops this far along and the encounter opens. */
+  contact?: RouteContact;
 }
 
 export function flightPlan(state: GameState, world: World, target: FlightTarget): Result<FlightPlan> {
@@ -328,7 +330,8 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
     travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime * driveDamageMult(state) + MANEUVER_MINUTES;
   const fuel =
     Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
-  return ok({ distanceAU, minutes, fuel, arrival });
+  const contact = routeContact(state, world, loc.systemId, distanceAU, "edge" in target ? "edge" : target.bodyId);
+  return ok({ distanceAU, minutes, fuel, arrival, ...(contact ? { contact } : {}) });
 }
 
 export function flyTo(state: GameState, world: World, target: FlightTarget): Result<FlightPlan> {
@@ -341,6 +344,17 @@ export function flyTo(state: GameState, world: World, target: FlightTarget): Res
 
   const loc = state.location;
   if (loc.kind !== "space") return fail("Not in flight.");
+  // A raider on the route: the burn stops where they're met, and the encounter takes over.
+  if (plan.contact) {
+    const f = plan.contact.fraction;
+    const from = shipPosition(state, world) as Vec2;
+    state.ship.fuel -= Math.round(plan.fuel * f * 100) / 100;
+    advanceTime(state, plan.minutes * f);
+    loc.pos = burnPath(from, plan.arrival).at(f);
+    loc.orbiting = null;
+    const dest = "bodyId" in target ? world.body(target.bodyId).body.name : "the system edge";
+    return fail(startContact(state, world, loc.systemId, plan.contact, target, dest, plan.minutes));
+  }
   state.ship.fuel -= plan.fuel;
   advanceTime(state, plan.minutes);
   awardXp(state, "navigation", 3 + Math.min(10, 2 * plan.distanceAU));

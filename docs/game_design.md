@@ -261,6 +261,19 @@ Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives ca
   - Part of their plunder, if your hold has room.
   - Their crew: turn all of them in at 400 cr a head, or offer the one or two promising ones a berth. Those Freebooters wait a year in the hiring hall at half the signing fee, a little more loyal than most.
 
+**v1.2: contacts in flight and auto-combat (AW-20, AW-163) [DECIDED 2026-10-29].**
+- **Contacts in flight.** A raider can be waiting on an in-system route as well as at the fold.
+  - Each leg with cargo aboard rolls 35% of the system's departure chance, scaled by the leg's length (full at 2 AU or more).
+  - The burn stops 30–75% of the way along, wherever they're met. The roll is fixed for the route and the day, so the flight plan knows where the ship will stop.
+  - One raider per system visit: after an in-flight contact, the departure fold is clear.
+- **Who sees whom.** Your sensors see them first with a chance that grows with the sensor array and the science officer, and shrinks with sensor damage. At a quarter light-speed nobody can fight; they have to match your burn. You choose:
+  - **Steer wide** (only if you saw them first): costs a quarter of the leg's time; navigation and science improve the odds. If it fails, they hail.
+  - **Hold your burn**: the run, easier if you saw them first. If it fails, the battle starts at medium range.
+  - **Hail them** (or answer their hail): drop to combat speed and take the usual hail (pay, talk, run, fight).
+  - **Drop to combat speed and attack**: battle at long range. Hunting raiders for prizes is allowed.
+  - Afterwards, the debrief offers to continue the flight.
+- **Auto-combat.** **Fight it out** and **Break away** leave the encounter to the officers, turn by turn, with the log scrolling. **Take command** returns control at any point. Auto-fight stops at the prize, so the captives are still the captain's call.
+
 ## Star Systems: World Generation 2 **[DECIDED 2026-10-26] (AW-145)**
 Generation 1 gave every star our Solar System's layout: small rocky worlds inside the frost line, giants outside. The exoplanet surveys say otherwise, so new games use generation 2. Saves remember which generator built their universe (`state.worldGen`; old saves are generation 1), so a game in progress never reshuffles.
 

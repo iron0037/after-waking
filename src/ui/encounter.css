@@ -423,3 +423,71 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* contacts met in flight, and leaving it to the officers (AW-20) */
+.enc-auto {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-bright);
+}
+.enc-auto .btn-row {
+  gap: 8px;
+}
+.btn.enc-auto-btn {
+  min-width: 130px;
+}
+.enc-auto.on {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  background: #5ad1e610;
+}
+.enc-auto-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--cyan);
+}
+.enc-auto-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: enc-pulse 1.1s ease-in-out infinite;
+}
+.btn.enc-take {
+  min-width: 200px;
+}
+.enc-seg-btn.auto {
+  background: #0f3340;
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.enc-seg-btn:disabled {
+  cursor: default;
+}
+.enc-seg-btn:disabled:hover:not(.on) {
+  background: var(--panel-2);
+  border-color: var(--border-bright);
+}
+.btn.enc-choice:disabled {
+  opacity: 0.55;
+}
+@keyframes enc-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .enc-auto-dot {
+    animation: none;
+  }
+}

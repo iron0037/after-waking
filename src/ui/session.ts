@@ -18,7 +18,9 @@ import {
   serialize,
   World,
   type DiveResult,
+  type AutoMode,
   type EncounterResult,
+  type FlightTarget,
   type GameState,
   type Orders,
   type Result,
@@ -92,6 +94,10 @@ export class GameSession {
   encounterDebrief: EncounterDebrief | null = null;
   /** The star the captain was folding to when a raider hailed (so the debrief can offer to carry on). */
   pendingFold: string | null = null;
+  /** The officers are playing the encounter out (AW-20): which way they lean, or null when the captain is in command. */
+  autoCombat: AutoMode | null = null;
+  /** A burn the captain asked to pick back up after a contact; the system screen starts it (animated) and clears this. */
+  resumeRequest: FlightTarget | null = null;
   /** The last battle orders given: they carry over turn to turn. */
   orders: Orders = { ...DEFAULT_ORDERS };
   /** Whose perk tree is open (UI only; any screen can open it). */
@@ -194,6 +200,21 @@ export class GameSession {
   closeEncounterDebrief(): void {
     this.encounterDebrief = null;
     this.pendingFold = null;
+    this.emit();
+  }
+
+  /** Leave the encounter to the officers ("fight" or "run"), or take command back with null. */
+  setAutoCombat(mode: AutoMode | null): void {
+    if (this.autoCombat === mode) return;
+    this.autoCombat = mode;
+    this.emit();
+  }
+
+  /** Pick a burn back up after a contact: the system screen runs it with the usual animation. */
+  requestResume(target: FlightTarget): void {
+    if (this.state.location.kind !== "space") return;
+    this.resumeRequest = target;
+    this.view = "system";
     this.emit();
   }
 

@@ -65,6 +65,8 @@ interface Flight {
   label: string;
   startMs: number;
   durMs: number;
+  /** How far along the route the animation goes: 1, or less when a raider is waiting (AW-20). */
+  stop: number;
 }
 
 export function SystemView({ session }: { session: GameSession }) {
@@ -159,8 +161,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       return;
     }
     const label = "bodyId" in target ? session.world.body(target.bodyId).body.name : "the system edge";
+    // A raider on the route stops the burn short; only the animation knows (route previews stay spoiler-free).
+    const stop = plan.contact ? plan.contact.fraction : 1;
     // 0.8 s of real time per game hour (min ~1 s, max ~10 s). The camera eases, so outer legs look slower.
-    const durMs = clamp(plan.minutes / 60, 1.2, 12) * 800;
+    const durMs = clamp((plan.minutes * stop) / 60, 1.2, 12) * 800;
     flightRef.current = {
       route: {
         target,
@@ -172,6 +176,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       label,
       startMs: performance.now(),
       durMs,
+      stop,
     };
     setHoverEdge(false);
     setHoverId(null);
@@ -179,6 +184,14 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     setFlying(true);
     timerRef.current = window.setTimeout(finishFlight, durMs);
   };
+
+  // A burn the debrief asked to pick back up after a contact (AW-20).
+  useEffect(() => {
+    const target = session.resumeRequest;
+    if (!target || session.busy || flying || session.state.encounter) return;
+    session.resumeRequest = null;
+    startFlight(target);
+  });
 
   // Leaving mid-burn cancels it; the sim was never advanced, so nothing is lost.
   useEffect(
@@ -305,10 +318,10 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     let route = idleRoute;
     if (f) {
       const raw = clamp((performance.now() - f.startMs) / f.durMs, 0, 1);
-      const eased = raw * raw * (3 - 2 * raw);
+      const eased = raw * raw * (3 - 2 * raw) * f.stop; // f.stop < 1: the ship halts partway along the route
       const { plan, startTime } = f.route;
       time = startTime + eased * plan.minutes;
-      flight = { progress: eased, raw, rate: ((plan.minutes * 60) / (f.durMs / 1000)) * 6 * raw * (1 - raw), label: f.label };
+      flight = { progress: eased, raw, rate: ((plan.minutes * f.stop * 60) / (f.durMs / 1000)) * 6 * raw * (1 - raw), label: f.label };
       route = f.route;
     }
     drawTimeRef.current = time;

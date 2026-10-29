@@ -29,6 +29,8 @@ import { removeCargo } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
 import { DAY, dist } from "./units";
 import type { World } from "./world";
+import type { FlightTarget } from "./actions";
+import { rngFor } from "./rng";
 
 const SYSTEMS: readonly ShipSystem[] = ["drives", "weapons", "sensors"];
 
@@ -50,7 +52,7 @@ export interface CombatSide {
   damage: Record<ShipSystem, number>;
 }
 
-export type EncounterOutcome = "paid" | "talked off" | "escaped" | "won" | "driven off" | "surrendered" | "overwhelmed";
+export type EncounterOutcome = "paid" | "talked off" | "escaped" | "slipped past" | "won" | "driven off" | "surrendered" | "overwhelmed";
 
 /** What you take when a raider strikes to you: salvage, their captain, their hold, their crew. */
 export interface Prize {
@@ -63,7 +65,14 @@ export interface Prize {
 }
 
 export interface Encounter {
-  stage: "hail" | "battle" | "prize";
+  /** contact: met in flight, nobody has slowed yet (AW-20). hail: they've made their demand. */
+  stage: "contact" | "hail" | "battle" | "prize";
+  /** In-system contacts: where you were headed, and whether your sensors saw them first. */
+  resume?: FlightTarget;
+  destName?: string;
+  spottedFirst?: boolean;
+  /** Extra flight time a wide berth costs. */
+  detourMinutes?: number;
   prize?: Prize;
   /** Everybody's experience when the encounter began, to report what the fight taught them. */
   xpStart?: Partial<Record<Station, number>>;
@@ -95,6 +104,9 @@ export interface EncounterResult {
   /** Plunder taken from a beaten raider's hold, and former raiders sent to the hiring hall. */
   loot?: Partial<Record<CommodityId, number>>;
   recruited?: string[];
+  /** Met in flight: the flight to pick back up, and its name. */
+  resume?: FlightTarget;
+  resumeName?: string;
 }
 
 export interface Orders {
@@ -168,9 +180,7 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
   const picked = withRng(state, (rng) => {
     if (rng.next() >= chance) return null;
     const r = pickRaider(rng, sys.charted, ly);
-    // Raiders size you up first: a ship that outguns them is rarely worth the risk.
-    const ratio = sidePower({ hull: r.hull, hullMax: r.hull, laser: r.laser, kinetic: r.kinetic, shields: r.shields, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } }) / sidePower(playerSide(state));
-    if (ratio < 1 && rng.next() > ratio * ratio * ratio) return null;
+    if (!willAttack(r, state, rng.next())) return null;
     return { r, cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.15, 0.3) };
   });
   if (!picked) return null;
@@ -182,7 +192,7 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
     captain: cap,
     bounty: r.bounty,
     nerve: r.nerve,
-    enemy: { hull: r.hull, hullMax: r.hull, laser: r.laser, kinetic: r.kinetic, shields: r.shields, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } },
+    enemy: raiderSide(r),
     demand,
     range: 2,
     turn: 0,
@@ -193,6 +203,219 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
   };
   log(state, "warning", `Interdicted leaving ${sys.name}: a ${r.name} under ${cap} demands a share of the hold.`);
   return `A ${r.name}`;
+}
+
+// --- contacts in flight (AW-20) -----------------------------------------------------------------
+
+/** Share of a departure's raid chance that each in-system leg carries (scaled by the leg's length). */
+export const IN_SYSTEM_RAID_SHARE = 0.35;
+
+export interface RouteContact {
+  /** How far along the burn they're met (0..1). */
+  fraction: number;
+  raider: string;
+}
+
+/**
+ * Is a raider lurking on this route? Deterministic for the day, the route and the visit, so the flight
+ * plan can show where the burn will stop (and the same route today meets the same raider).
+ * One raider per system visit: after an encounter here, the rest of the visit is clear.
+ */
+export function routeContact(state: GameState, world: World, systemId: string, distanceAU: number, routeKey: string): RouteContact | null {
+  if (state.encounter || state.interdictionClear === systemId) return null;
+  const chance = interdictionChance(state, world, systemId) * IN_SYSTEM_RAID_SHARE * Math.min(1, distanceAU / 2);
+  if (chance <= 0) return null;
+  const sys = world.galaxy.systems.find((s) => s.id === systemId);
+  if (!sys) return null;
+  const rng = rngFor(state.seed, "contact", systemId, routeKey, state.stats.folds, Math.floor(state.time / DAY));
+  if (rng.next() >= chance) return null;
+  const r = pickRaider(rng, sys.charted, dist(sys.pos, INTREPID_POS));
+  if (!willAttack(r, state, rng.next())) return null;
+  return { fraction: rng.range(0.3, 0.75), raider: r.id };
+}
+
+/** Raiders size you up first: a ship that outguns them is rarely worth the risk. */
+function willAttack(r: RaiderTemplate, state: GameState, roll: number): boolean {
+  const ratio = sidePower(raiderSide(r)) / sidePower(playerSide(state));
+  return ratio >= 1 || roll <= ratio * ratio * ratio;
+}
+
+function raiderSide(r: RaiderTemplate): CombatSide {
+  return { hull: r.hull, hullMax: r.hull, laser: r.laser, kinetic: r.kinetic, shields: r.shields, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } };
+}
+
+/** Chance your sensors see a raider before it sees you: the array, the science officer, sensor damage. */
+export function spotChance(state: GameState): number {
+  const sensors = effectiveStats(state).sensorTier;
+  return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200, 0.1, 0.85);
+}
+
+/** The flight stops where the raider is met; the encounter opens at the contact stage. Returns the alert text. */
+export function startContact(state: GameState, world: World, systemId: string, contact: RouteContact, target: FlightTarget, destName: string, legMinutes: number): string {
+  const r = raiderById(contact.raider) as RaiderTemplate;
+  const sys = world.galaxy.systems.find((s) => s.id === systemId);
+  const rolled = withRng(state, (rng) => ({ cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.15, 0.3), spotted: rng.next() < spotChance(state) }));
+  state.interdictionClear = systemId;
+  const intro = rolled.spotted
+    ? `Long-range contact on your course to ${destName}: a ${r.name}, running dark and holding station. They haven't seen you yet.`
+    : `Proximity alarm: a ${r.name} has matched your course to ${destName}, guns out. Captain ${rolled.cap} hails: "Drop to combat speed and hand over ${Math.round(rolled.demand * 100)}% of that hold."`;
+  state.encounter = {
+    stage: "contact",
+    resume: target,
+    destName,
+    spottedFirst: rolled.spotted,
+    detourMinutes: Math.round(legMinutes * 0.25),
+    raider: r.id,
+    raiderName: r.name,
+    captain: rolled.cap,
+    bounty: r.bounty,
+    nerve: r.nerve,
+    enemy: raiderSide(r),
+    demand: rolled.demand,
+    range: 2,
+    turn: 0,
+    talked: false,
+    systemId,
+    xpStart: xpSnapshot(state),
+    log: [intro],
+  };
+  log(state, "warning", `Raider contact in ${sys?.name ?? "the system"}: a ${r.name} on the way to ${destName}.`);
+  return rolled.spotted ? `Contact: a ${r.name} ahead on your course.` : `A ${r.name} has matched your course.`;
+}
+
+export type ContactChoice = "slip" | "run" | "hail" | "engage";
+
+/** Odds for each answer to a contact, for the UI. Slipping past needs you to have seen them first. */
+export function contactOdds(state: GameState): { slip: number | null; run: number } {
+  const e = state.encounter;
+  if (!e || e.stage !== "contact") return { slip: null, run: 0 };
+  const slip = e.spottedFirst
+    ? clamp(0.5 + 0.05 * stationLevel(state, "navigation") + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200, 0.1, 0.92)
+    : null;
+  // At a quarter light-speed nothing can fight; they have to match your burn, which is easier if they saw you coming.
+  const run = clamp(hailOdds(state).run + (e.spottedFirst ? 0.15 : 0), 0.05, 0.92);
+  return { slip, run };
+}
+
+/**
+ * Answer a contact in flight:
+ * - slip: steer a wide berth around them (only if you saw them first); costs a quarter of the leg.
+ * - run: hold your cruise burn and make them catch you; failing that, they force a fight.
+ * - hail: drop to combat speed and talk (they make their demand: the usual hail).
+ * - engage: drop to combat speed and run out the guns at long range.
+ */
+export function answerContact(state: GameState, choice: ContactChoice): Result<EncounterResult | null> {
+  const e = state.encounter;
+  if (!e || e.stage !== "contact") return fail("There's no contact to answer.");
+  const odds = contactOdds(state);
+  const toHail = (text: string) => {
+    e.stage = "hail";
+    e.log.push(text);
+  };
+  switch (choice) {
+    case "slip": {
+      if (odds.slip === null) return fail("They've already seen you.");
+      advanceTime(state, e.detourMinutes ?? 30);
+      awardXp(state, "navigation", 8);
+      awardXp(state, "science", 3);
+      if (withRng(state, (rng) => rng.next()) < odds.slip) {
+        return ok(finish(state, "slipped past", `You swing wide and run quiet. The ${e.raiderName} never sees you. ${clearText(e)}`, 0, 0));
+      }
+      toHail(`They spot your drive flare. The ${e.raiderName} matches course, and Captain ${e.captain} hails: "Nice try. ${Math.round(e.demand * 100)}% of the hold."`);
+      return ok(null);
+    }
+    case "run": {
+      awardXp(state, "navigation", 8);
+      if (withRng(state, (rng) => rng.next()) < odds.run) {
+        return ok(finish(state, "escaped", `You hold your burn at a quarter light-speed and the ${e.raiderName} can't match it. ${clearText(e)}`, 0, 0));
+      }
+      startBattle(e, 1, `The ${e.raiderName} matches your burn and forces you down to combat speed. They open fire at medium range.`);
+      return ok(null);
+    }
+    case "hail":
+      advanceTime(state, 10);
+      toHail(
+        e.spottedFirst
+          ? `You drop to combat speed and hail. Captain ${e.captain} of the ${e.raiderName} answers: "Generous of you to stop. ${Math.round(e.demand * 100)}% of the hold."`
+          : `You drop to combat speed and answer. Captain ${e.captain} repeats the demand: ${Math.round(e.demand * 100)}% of the hold.`,
+      );
+      return ok(null);
+    case "engage":
+      advanceTime(state, 10);
+      startBattle(e, 2, e.spottedFirst ? `You drop to combat speed and come at them out of the dark, guns run out at long range.` : `You drop to combat speed and run out your guns. Long range.`);
+      return ok(null);
+  }
+}
+
+function clearText(e: Encounter): string {
+  return e.resume ? `Back on course for ${e.destName}.` : "The way out is clear; fold when ready.";
+}
+
+// --- leaving it to the officers ---------------------------------------------------------------
+
+export type AutoMode = "fight" | "run";
+
+/** The orders your officers give if you leave the battle to them (auto-fight or auto-run). */
+export function autoOrders(state: GameState, mode: AutoMode): Orders {
+  const e = state.encounter;
+  const me = playerSide(state);
+  if (!e) return { helm: "hold", guns: "hold", engineering: "repair", comms: "quiet" };
+  const them = e.enemy;
+  const noGuns = me.damage.weapons >= 100 || me.laser + me.kinetic <= 0;
+  const drivesDead = me.damage.drives >= 100;
+  const worst = SYSTEMS.reduce((a, b) => (me.damage[b] > me.damage[a] ? b : a));
+  const target = (t: FireTarget): FireTarget => (t !== "hull" && them.damage[t] >= 100 ? "hull" : t);
+  if (mode === "run") {
+    return {
+      helm: drivesDead ? "evade" : "open",
+      guns: noGuns ? "hold" : target("drives"),
+      engineering: me.damage.drives >= 10 ? "repair" : me.shields > 0 ? "shields" : "repair",
+      comms: "quiet",
+    };
+  }
+  const beaten = them.hull / them.hullMax < e.nerve || them.damage.weapons >= 70;
+  const losing = me.hull / me.hullMax < 0.25 && them.hull / them.hullMax > 0.5;
+  // Laser-armed ships stay out of a kinetic battery's reach; kinetic ships close in.
+  const helm: Orders["helm"] = drivesDead
+    ? "hold"
+    : losing
+      ? "open"
+      : me.kinetic > 0 && e.range > 0
+        ? "close"
+        : me.kinetic === 0 && them.kinetic > 0 && e.range < 2
+          ? "open"
+          : "hold";
+  const outgunned = them.laser + them.kinetic > (me.laser + me.kinetic) * 1.3;
+  return {
+    helm,
+    guns: noGuns ? "hold" : target(outgunned && them.damage.weapons < 70 ? "weapons" : "hull"),
+    engineering: noGuns || me.damage[worst] >= 40 ? "repair" : me.shields > 0 && outgunned ? "shields" : "guns",
+    comms: beaten ? "demand" : "quiet",
+  };
+}
+
+/**
+ * One step of an encounter left to the officers: answer the contact or hail, or fight a turn.
+ * Stops (fails) at the prize: what to do with captives is the captain's call.
+ */
+export function autoStep(state: GameState, mode: AutoMode): Result<EncounterResult | null> {
+  const e = state.encounter;
+  if (!e) return fail("There's no encounter.");
+  switch (e.stage) {
+    case "contact": {
+      if (mode === "fight") return answerContact(state, "engage");
+      const odds = contactOdds(state);
+      return answerContact(state, odds.slip !== null && odds.slip >= odds.run ? "slip" : "run");
+    }
+    case "hail":
+      return answerHail(state, mode === "fight" ? "fight" : "run");
+    case "battle": {
+      const r = combatTurn(state, autoOrders(state, mode));
+      return r.ok ? ok(r.value.result) : fail(r.reason);
+    }
+    case "prize":
+      return fail("The prize is yours to settle.");
+  }
 }
 
 // --- the hail -------------------------------------------------------------------------------
@@ -236,7 +459,7 @@ export function answerHail(state: GameState, choice: HailChoice): Result<Encount
     case "run": {
       awardXp(state, "navigation", 8);
       const r = withRng(state, (rng) => rng.next());
-      if (r < odds.run) return ok(finish(state, "escaped", `Hard burn for open space: you outrun the ${e.raiderName}. The way out is clear; fold when ready.`, 0, 0));
+      if (r < odds.run) return ok(finish(state, "escaped", `Hard burn for open space: you outrun the ${e.raiderName}. ${clearText(e)}`, 0, 0));
       startBattle(e, 0, `The ${e.raiderName} cuts you off. They're on you at close range.`);
       return ok(null);
     }
@@ -309,7 +532,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   if (move > 0 && before === 2) {
     if ((winner === "me" || winner === "both") && mine > 0 && me.damage.drives < 100) {
       awardXp(state, "navigation", 10);
-      return ok({ lines, result: finish(state, "escaped", `You open the range past their guns and lose the ${e.raiderName} in the glare. The way out is clear; fold when ready.`, 0, 0) });
+      return ok({ lines, result: finish(state, "escaped", `You open the range past their guns and lose the ${e.raiderName} in the glare. ${clearText(e)}`, 0, 0) });
     }
     if ((winner === "them" || winner === "both") && theirs > 0) {
       return ok({ lines, result: finish(state, "driven off", `Badly hurt, the ${e.raiderName} breaks off and runs. No bounty, but the hold is yours.`, 0, 0) });
@@ -505,7 +728,7 @@ function finish(state: GameState, outcome: EncounterOutcome, text: string, cargo
       if (gained > 0) xp[s] = gained;
     }
   }
-  const result: EncounterResult = { outcome, text, cargoLost, bounty, xp };
+  const result: EncounterResult = { outcome, text, cargoLost, bounty, xp, ...(e?.resume ? { resume: e.resume, resumeName: e.destName } : {}) };
   state.lastEncounter = result;
   log(state, outcome === "won" || outcome === "escaped" || outcome === "talked off" || outcome === "driven off" ? "info" : "warning", text);
   return result;

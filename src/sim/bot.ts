@@ -14,6 +14,7 @@ import {
   drill,
   drillRate,
   flyTo,
+  type FlightTarget,
   fold,
   foldPlan,
   knowledge,
@@ -39,7 +40,7 @@ import {
   type Result,
 } from "./actions";
 import type { Body } from "./bodies";
-import { answerHail } from "./combat";
+import { answerContact, answerHail } from "./combat";
 import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
@@ -146,7 +147,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
 
     // Stranded (it happens to new captains): call the Exchange for a tender.
     if (rescueQuote(state, world) && callForRescue(state, world).ok) rescues++;
-    if (must("fly to edge", flyTo(state, world, { edge: true })) === null) break;
+    if (must("fly to edge", flyPaying(state, world, { edge: true })) === null) break;
     if (state.time < state.foldReadyAt) wait(state, state.foldReadyAt - state.time);
     // Combat v1: a raider may hail as the drive spools up. The bot pays and goes (the honest
     // freighter's choice), so the career report measures what piracy costs.
@@ -177,6 +178,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     });
   }
 
+  raids += state.journal.filter((j) => j.text.startsWith("Raider contact")).length;
   return { state, tripsCompleted, errors, tripSummaries, raids };
 }
 
@@ -250,7 +252,7 @@ function mineSystem(
 
   for (const body of targets) {
     if (holdFull() || state.time - arrived > 120 * DAY) return;
-    if (must(`fly to ${body.name}`, flyTo(state, world, { bodyId: body.id })) === null) return;
+    if (must(`fly to ${body.name}`, flyPaying(state, world, { bodyId: body.id })) === null) return;
     must(`scan ${body.name}`, scanBody(state, world));
     if (survey && !novice && !state.surveyedBodies.includes(body.id)) must(`survey ${body.name}`, surveyBody(state, world));
 
@@ -359,4 +361,13 @@ function returnAndUnload(state: GameState, world: World, must: <T>(label: string
 
 function clampTo(v: number, size: number): number {
   return Math.max(1, Math.min(size - 2, v));
+}
+
+/** Fly; if a raider meets us on the way (AW-20), answer the hail, pay, and carry on: the honest freighter. */
+function flyPaying(state: GameState, world: World, target: FlightTarget): Result<unknown> {
+  const r = flyTo(state, world, target);
+  if (r.ok || !state.encounter) return r;
+  answerContact(state, "hail");
+  answerHail(state, "pay");
+  return flyTo(state, world, target);
 }
