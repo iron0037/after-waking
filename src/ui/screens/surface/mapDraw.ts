@@ -181,7 +181,21 @@ function regionPaths(size: number): { grid: Path2D; border: Path2D } {
 }
 
 function blit(ctx: CanvasRenderingContext2D, L: Layout, img: RegionImage): void {
-  ctx.drawImage(img.canvas, L.ox + img.x * L.k, L.oy + img.y * L.k, img.canvas.width * L.k, img.canvas.height * L.k);
+  // A thumbnail (far zoom) is a smaller canvas standing for a full-size image (`w` x `h` HEX pixels).
+  ctx.drawImage(img.canvas, L.ox + img.x * L.k, L.oy + img.y * L.k, (img.w ?? img.canvas.width) * L.k, (img.h ?? img.canvas.height) * L.k);
+}
+
+/** A brief notice over the map while the region the ship is in is still being drawn. */
+export function drawPreparing(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  ctx.save();
+  ctx.fillStyle = "rgba(5, 7, 15, 0.82)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.font = `14px ${FONT}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = UI.muted;
+  ctx.fillText("Preparing the surface…", w / 2, h / 2);
+  ctx.restore();
 }
 
 /** Strokes `path` (relative to a region's origin) once for each region in `regions`. */

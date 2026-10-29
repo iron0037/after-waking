@@ -120,6 +120,7 @@ import {
   drawUnknowns,
   type UnknownMark,
   drawHoverTile,
+  drawPreparing,
   drawRegionBorders,
   drawRoute,
   drawRover,
@@ -631,7 +632,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // Terrain: each region in view, fogged where the sensors haven't swept (fog comes from each region's knowledge).
     const regions = visibleRegions(L, surface.layout);
     const cache = terrainCache(surface, body.kind, { seed: state.seed, gen: state.worldGen ?? 1 });
-    cache.beginFrame(1);
+    cache.beginFrame(1, L.k * (window.devicePixelRatio || 1));
     const knowMemo = new Map<number, RegionKnowledge | null>();
     const know = (r: number): RegionKnowledge | null => {
       if (!knowMemo.has(r)) knowMemo.set(r, peekKnowledge(state, loc.bodyId, r));
@@ -770,6 +771,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
 
     if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, hopping ? hopTooltip(hover.tile) : tooltipLines(hover.tile));
+
+    // The region the ship is in is still being built: say so rather than showing a half-blank map.
+    if (regions.some((r) => r.region === active) && !painted.some((img) => img.region === active)) drawPreparing(ctx, w, h);
   };
 
   const isShipTile = (tile: Vec2): boolean => tile.x === ship.x && tile.y === ship.y;

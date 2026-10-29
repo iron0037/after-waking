@@ -48,6 +48,7 @@ import {
 } from "./system/projection";
 import { ProbePanel } from "./system/ProbePanel";
 import { RegionPicker, bestRegion } from "./system/RegionPicker";
+import { prefetchSurface } from "./surface/terrainImage";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
 
@@ -337,6 +338,13 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const planFuelShort = planRes?.ok === true && planRes.value.fuel > state.ship.fuel;
   const access = selected ? landingAccess(selected, stats.ratings) : null;
   const landBlockers = canPickRegion && access?.ok ? landingBlockers(state, world, region) : [];
+  // Start drawing the region about to be landed in (and its neighbours) now, so the surface is ready when it opens.
+  const prefetchBodyId = canPickRegion && access?.ok && selected ? selected.id : null;
+  useEffect(() => {
+    if (prefetchBodyId === null) return;
+    const body = world.body(prefetchBodyId).body;
+    prefetchSurface(world.surface(prefetchBodyId), body.kind, { seed: state.seed, gen: state.worldGen ?? 1 }, region);
+  }, [world, prefetchBodyId, region]);
 
   return (
     <>

@@ -1,6 +1,7 @@
 import { ShipStatus } from "./ShipStatus";
 import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
+import { preloadSprites } from "./compendiumSprites";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
 import { EncounterOverlay } from "./Encounter";
@@ -15,6 +16,7 @@ import { Hub } from "./screens/Hub";
 import { StarMap } from "./screens/StarMap";
 import { SurfaceView } from "./screens/SurfaceView";
 import { SystemView } from "./screens/SystemView";
+import { warmTerrain } from "./screens/surface/terrainImage";
 
 export function App() {
   const [session, setSession] = useState<GameSession | null>(null);
@@ -28,6 +30,18 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const [contractsOpen, setContractsOpen] = useState(false);
   const [shipOpen, setShipOpen] = useState(false);
   const [crewOpen, setCrewOpen] = useState(false);
+
+  // Get the terrain workers going as soon as the game is up (and tell them which world is in orbit), so the first
+  // surface doesn't wait for threads, textures or the universe to be built.
+  const loc = session.state.location;
+  const orbiting = loc.kind === "space" ? loc.orbiting : null;
+  useEffect(() => {
+    warmTerrain(session.state.seed, session.state.worldGen ?? 1, orbiting);
+  }, [session, orbiting]);
+  // The compendium's sprite atlas, fetched and decoded now rather than when the book is opened.
+  useEffect(() => {
+    void preloadSprites();
+  }, []);
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {

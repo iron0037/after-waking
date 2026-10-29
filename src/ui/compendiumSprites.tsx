@@ -13,29 +13,61 @@ interface SpriteIndex {
   width: number;
   height: number;
   sprites: Record<string, [number, number]>;
+  /** The atlas redrawn as flat dark silhouettes (a data URL, also set as the page's `--comp-silhouettes`) for entries not found yet; null if it couldn't be made. */
+  silhouettes: string | null;
 }
 
 const ATLAS_URL = "./assets/compendium/atlas.webp";
 const INDEX_URL = "./assets/compendium/index.json";
+/** The colour of an undiscovered entry's silhouette. */
+const SILHOUETTE = [0x26, 0x32, 0x4d] as const;
 
 let loaded: SpriteIndex | null = null;
 let pending: Promise<SpriteIndex | null> | null = null;
 
-function loadSprites(): Promise<SpriteIndex | null> {
+/** The atlas with every visible pixel painted the silhouette colour (alpha kept): one plain image instead of a CSS mask per card. */
+async function makeSilhouettes(img: HTMLImageElement): Promise<string | null> {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < data.data.length; i += 4) {
+      data.data[i] = SILHOUETTE[0];
+      data.data[i + 1] = SILHOUETTE[1];
+      data.data[i + 2] = SILHOUETTE[2];
+    }
+    ctx.putImageData(data, 0, 0);
+    // One shared custom property on the page (not on each icon: the data URL is a few hundred KB).
+    const url = canvas.toDataURL("image/png");
+    document.documentElement.style.setProperty("--comp-silhouettes", `url(${url})`);
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetches the index and atlas and prepares the silhouettes. Called at game start so the compendium opens with its sprites in place. */
+export function preloadSprites(): Promise<SpriteIndex | null> {
   if (!pending) {
     pending = (async () => {
       try {
-        const res = await fetch(INDEX_URL);
+        const [res, img] = await Promise.all([
+          fetch(INDEX_URL),
+          new Promise<HTMLImageElement>((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => resolve(image);
+            image.onerror = () => reject(new Error("atlas failed to load"));
+            image.src = ATLAS_URL;
+          }),
+        ]);
         if (!res.ok) return null;
-        const index = (await res.json()) as SpriteIndex;
-        await new Promise<void>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = () => reject(new Error("atlas failed to load"));
-          img.src = ATLAS_URL;
-        });
-        loaded = index;
-        return index;
+        const index = (await res.json()) as Omit<SpriteIndex, "silhouettes">;
+        loaded = { ...index, silhouettes: await makeSilhouettes(img) };
+        return loaded;
       } catch {
         return null;
       }
@@ -50,7 +82,7 @@ export function useSpriteIndex(): SpriteIndex | null {
   useEffect(() => {
     if (loaded) return;
     let live = true;
-    void loadSprites().then((i) => live && setIndex(i));
+    void preloadSprites().then((i) => live && setIndex(i));
     return () => {
       live = false;
     };
@@ -64,7 +96,7 @@ export function useSpriteIndex(): SpriteIndex | null {
  */
 export function CompIcon({ index, entryKey, color, found }: { index: SpriteIndex | null; entryKey: string; color: string; found: boolean }) {
   const cell = index?.sprites[entryKey];
-  if (!index || !cell) return <span class="comp-icon" style={found ? { background: color } : undefined} />;
+  if (!index || !cell || (!found && !index.silhouettes)) return <span class="comp-icon" style={found ? { background: color } : undefined} />;
   const style = {
     "--atlas": `url(${ATLAS_URL})`,
     "--atlas-size": `${index.width}px ${index.height}px`,

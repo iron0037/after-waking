@@ -14,7 +14,7 @@ import type { BodyKind, BodySurface } from "../../../sim";
 import { hexCorners } from "../../../sim";
 import { ATLAS_PATH, loadTextures, texturesReady } from "./terrainTextures";
 import { computeFoggedPixels, computeTerrainPixels, HEX, tileRange, type RegionPixels } from "./terrainPixels";
-import type { BuiltMessage, RequestMessage, WorkerReply } from "./terrainWorker";
+import type { BuiltMessage, RegionPayload, RequestMessage, WarmMessage, WorkerReply } from "./terrainWorker";
 
 loadTextures();
 
@@ -38,6 +38,9 @@ export interface RegionImage {
   x: number;
   y: number;
   region: number;
+  /** For a thumbnail: the size, in HEX pixels, of the full image it stands for (the canvas itself is smaller). */
+  w?: number;
+  h?: number;
 }
 
 function newCanvas(w: number, h: number): HTMLCanvasElement {
@@ -81,7 +84,10 @@ export function exploredMask(surface: BodySurface, region: number, explored: (gx
   return mask;
 }
 
-/** Full-color terrain where the swept tiles (`mask`, see `exploredMask`) are, fogged imagery everywhere else. */
+/**
+ * Full-color terrain where the swept tiles (`mask`, see `exploredMask`) are, fogged imagery everywhere else.
+ * Works on thumbnails too (`terrain.w` set): the same hexes, drawn at the thumbnail's scale.
+ */
 export function composeFromMask(terrain: RegionImage, fogged: RegionImage, surface: BodySurface, mask: Uint8Array): RegionImage {
   const canvas = newCanvas(terrain.canvas.width, terrain.canvas.height);
   const out: RegionImage = { ...terrain, canvas };
@@ -93,6 +99,8 @@ export function composeFromMask(terrain: RegionImage, fogged: RegionImage, surfa
   const { x0, y0, x1, y1 } = tileRange(surface, terrain.region);
   const w = x1 - x0 + 1;
   const hexW = Math.sqrt(3) * HEX;
+  const thumb = terrain.w !== undefined && terrain.h !== undefined;
+  if (thumb) ctx.setTransform(canvas.width / (terrain.w as number), 0, 0, canvas.height / (terrain.h as number), 0, 0);
   ctx.beginPath();
   let any = false;
   for (let gy = y0; gy <= y1; gy++) {
@@ -108,7 +116,8 @@ export function composeFromMask(terrain: RegionImage, fogged: RegionImage, surfa
   }
   if (any) {
     ctx.clip();
-    ctx.drawImage(terrain.canvas, 0, 0);
+    if (thumb) ctx.drawImage(terrain.canvas, 0, 0, terrain.w as number, terrain.h as number);
+    else ctx.drawImage(terrain.canvas, 0, 0);
   }
   return out;
 }
@@ -133,82 +142,137 @@ interface CacheEntry {
   paintedMask: Uint8Array | null;
   /** Whether the terrain image was drawn with textures (the synchronous path rebuilds it if they finish loading later). */
   textured: boolean;
+  /** The frame this entry was last asked for in: entries asked for this frame (or the last) are never evicted. */
+  used: number;
 }
 
-/** Most region images kept at once (three images each, a few MB apiece). */
+/** Most full-size region images kept at once (three images each, a few MB apiece) beyond those on screen. */
 const CACHE_LIMIT = 16;
-/** Region builds the worker is handed at once: one, so a newly urgent region (the rover moved on) goes next rather than waiting behind a queue. */
-const IN_FLIGHT = 1;
+/** Most thumbnail sets kept at once beyond those on screen (about 1.5 MB a set). */
+const THUMB_LIMIT = 64;
+/**
+ * Far zoom: while a region image is drawn at no more than this many device pixels per HEX pixel, the thumbnail
+ * (a third of the size) serves instead of the full image.
+ */
+const LOD_SCALE = 0.4;
 
 /** Releases an image's memory now rather than at the next garbage collection. */
 function release(img: RegionImage | null): void {
   if (img && typeof ImageBitmap !== "undefined" && img.canvas instanceof ImageBitmap) img.canvas.close();
 }
 
-// --- the worker -------------------------------------------------------------------------------------
+// --- the workers -------------------------------------------------------------------------------------
 
-/** Where the surface being drawn comes from: the worker rebuilds the same world from this. */
+/** Where the surface being drawn comes from: the workers rebuild the same world from this. */
 export interface SurfaceSource {
   seed: number;
   /** World generator version (`state.worldGen ?? 1`). */
   gen: number;
 }
 
-let worker: Worker | null | undefined; // undefined: not tried yet; null: unavailable
+interface PoolWorker {
+  worker: Worker;
+  busy: boolean;
+}
+
+let pool: PoolWorker[] | null | undefined; // undefined: not tried yet; null: unavailable
 let nextRequestId = 1;
 const listeners = new Map<number, (msg: BuiltMessage) => void>();
 
-function terrainWorker(): Worker | null {
-  if (worker !== undefined) return worker;
-  worker = null;
-  if (typeof Worker === "undefined" || typeof document === "undefined") return null;
-  try {
-    const w = new Worker(new URL("./terrainWorker.ts", import.meta.url), { type: "module" });
-    w.onmessage = (ev: MessageEvent<WorkerReply>) => {
-      const msg = ev.data;
-      if (msg.type !== "built") return;
-      const done = listeners.get(msg.id);
-      listeners.delete(msg.id);
-      done?.(msg);
-    };
-    w.onerror = () => {
-      // The worker could not start (or died): everything falls back to building on this thread.
-      worker = null;
-      w.terminate();
-      const waiting = [...listeners.values()];
-      listeners.clear();
-      for (const f of waiting) f({ type: "built", id: 0, failed: true } as BuiltMessage);
-    };
-    w.postMessage({ type: "init", atlasUrl: new URL(ATLAS_PATH, document.baseURI).href });
-    worker = w;
-  } catch {
-    worker = null;
-  }
-  return worker;
+/** How many workers build regions in parallel. */
+function poolSize(): number {
+  const cores = typeof navigator !== "undefined" ? navigator.hardwareConcurrency || 2 : 2;
+  return Math.max(1, Math.min(3, cores - 1));
 }
 
-/** A region image from a worker reply: a bitmap, or (no OffscreenCanvas there) raw pixels put on a canvas here. */
-function imageFrom(r: { x: number; y: number; region: number; width: number; height: number; bitmap?: ImageBitmap; data?: ArrayBuffer }): RegionImage {
-  if (r.bitmap) return { canvas: r.bitmap, x: r.x, y: r.y, region: r.region };
-  return pixelsToImage({ x: r.x, y: r.y, region: r.region, width: r.width, height: r.height, data: new Uint8ClampedArray(r.data as ArrayBuffer) });
+function terrainPool(): PoolWorker[] | null {
+  if (pool !== undefined) return pool;
+  pool = null;
+  if (typeof Worker === "undefined" || typeof document === "undefined") return null;
+  try {
+    const made: PoolWorker[] = [];
+    const atlasUrl = new URL(ATLAS_PATH, document.baseURI).href;
+    for (let i = 0; i < poolSize(); i++) {
+      const worker = new Worker(new URL("./terrainWorker.ts", import.meta.url), { type: "module" });
+      const pw: PoolWorker = { worker, busy: false };
+      worker.onmessage = (ev: MessageEvent<WorkerReply>) => {
+        const msg = ev.data;
+        if (msg.type !== "built") return;
+        pw.busy = false;
+        const done = listeners.get(msg.id);
+        listeners.delete(msg.id);
+        done?.(msg);
+      };
+      worker.onerror = () => {
+        // A worker could not start (or died): everything falls back to building on this thread.
+        pool = null;
+        for (const m of made) m.worker.terminate();
+        const waiting = [...listeners.values()];
+        listeners.clear();
+        for (const f of waiting) f({ type: "built", id: 0, failed: true, textured: false });
+      };
+      worker.postMessage({ type: "init", atlasUrl });
+      made.push(pw);
+    }
+    pool = made;
+  } catch {
+    pool = null;
+  }
+  return pool;
 }
 
 /**
+ * Gets the workers going early (threads started, texture atlas loaded, the universe, and `bodyId`'s surface if given,
+ * built), so the first real region doesn't pay for any of it. Safe to call repeatedly.
+ */
+export function warmTerrain(seed: number, gen: number, bodyId: string | null = null): void {
+  const workers = terrainPool();
+  if (!workers) return;
+  const msg: WarmMessage = { type: "warm", seed, gen, bodyId };
+  for (const w of workers) w.worker.postMessage(msg);
+}
+
+/** A region image from a worker reply: a bitmap, or (no OffscreenCanvas there) raw pixels put on a canvas here. */
+function imageFrom(r: RegionPayload): RegionImage {
+  const thumb = r.width !== r.fullWidth || r.height !== r.fullHeight;
+  const extra = thumb ? { w: r.fullWidth, h: r.fullHeight } : {};
+  if (r.bitmap) return { canvas: r.bitmap, x: r.x, y: r.y, region: r.region, ...extra };
+  return pixelsToImage({ x: r.x, y: r.y, region: r.region, width: r.width, height: r.height, data: new Uint8ClampedArray(r.data as ArrayBuffer) });
+}
+
+interface Job {
+  frame: number;
+  urgent: boolean;
+  /** Wanted ahead of time, not for a frame in progress: kept until built, but served last. */
+  prefetch: boolean;
+}
+
+type Want = "full" | "thumb";
+
+/**
  * Region images for one world's surface, built on demand and kept (least recently used dropped first).
- * With a Worker the builds happen off the main thread: a region that isn't built yet comes back null (and is
- * queued, the `force`d one first) and shows up on a later frame. Without one, callers get a per-frame budget
- * (`beginFrame`) and regions past it are built on a later frame.
+ *
+ * With Workers the builds happen off the main thread, several at once: a region that isn't built yet comes back
+ * null (and is queued, the `force`d one first) and shows up on a later frame. Without them, callers get a
+ * per-frame budget (`beginFrame`) and regions past it are built on a later frame.
+ *
+ * Far out, where a region covers only a few hundred screen pixels, thumbnails (kept in a larger cache of their
+ * own) are drawn instead of the full images. Nothing asked for in the current frame is ever evicted.
  */
 export class TerrainCache {
   private readonly entries = new Map<number, CacheEntry>();
+  private readonly thumbs = new Map<number, CacheEntry>();
   private budget = 0;
   private frame = 0;
+  private lod = false;
   private disposed = false;
-  /** Regions waiting for the worker, with the frame they were last asked for and whether they are urgent. */
-  private readonly queue = new Map<number, { frame: number; urgent: boolean }>();
-  private readonly inFlight = new Set<number>();
-  /** Regions the worker couldn't build (built on this thread instead). */
+  /** Regions waiting for a worker (full images, or thumbnails only). */
+  private readonly queues: Record<Want, Map<number, Job>> = { full: new Map(), thumb: new Map() };
+  private readonly inFlight = new Set<string>();
+  /** Regions the workers couldn't build (built on this thread instead). */
   private readonly failed = new Set<number>();
+  /** Set if the workers can't make thumbnails (no OffscreenCanvas there): far zoom then uses the full images. */
+  private noThumbs = false;
   /** The last urgent region: the others are served nearest-first from it. */
   private focus = -1;
 
@@ -218,57 +282,92 @@ export class TerrainCache {
     readonly source: SurfaceSource | null = null,
   ) {}
 
-  /** Call once per frame: allows `builds` new regions to be rendered this frame (without a worker) and ages the queue. */
-  beginFrame(builds = 1): void {
+  /**
+   * Call once per frame. `builds`: regions the synchronous path may render this frame. `scale`: device pixels per
+   * HEX pixel the images are drawn at (`L.k * devicePixelRatio`), which picks full images or thumbnails.
+   */
+  beginFrame(builds = 1, scale = 1): void {
     this.budget = builds;
     this.frame++;
+    this.lod = scale <= LOD_SCALE && this.source !== null && !this.noThumbs;
   }
 
   /** Stops all work for this surface (the player moved on) and frees its images. */
   dispose(): void {
     this.disposed = true;
-    this.queue.clear();
-    for (const e of this.entries.values()) {
-      release(e.terrain);
-      release(e.fogged);
+    this.queues.full.clear();
+    this.queues.thumb.clear();
+    for (const m of [this.entries, this.thumbs]) {
+      for (const e of m.values()) {
+        release(e.terrain);
+        release(e.fogged);
+      }
+      m.clear();
     }
-    this.entries.clear();
   }
 
   /** True while regions are still being built in the background. */
   get busy(): boolean {
-    return this.queue.size > 0 || this.inFlight.size > 0;
+    return this.queues.full.size > 0 || this.queues.thumb.size > 0 || this.inFlight.size > 0;
   }
 
-  private store(region: number, e: CacheEntry): void {
-    this.entries.set(region, e);
-    while (this.entries.size > CACHE_LIMIT) {
-      const oldest = this.entries.keys().next().value;
-      if (oldest === undefined) break;
-      const old = this.entries.get(oldest);
-      this.entries.delete(oldest);
-      if (old) {
-        release(old.terrain);
-        release(old.fogged);
-      }
+  /** Queues the landing region (first) and the ones around it so they are ready when the surface opens. Replaces an earlier prefetch. */
+  prefetch(regions: readonly number[]): void {
+    if (!this.source || this.disposed) return;
+    for (const queue of Object.values(this.queues)) for (const [r, job] of [...queue]) if (job.prefetch) queue.delete(r);
+    regions.forEach((r, i) => {
+      if (!this.entries.has(r)) this.queueJob("full", r, i === 0, true);
+    });
+    this.pump();
+  }
+
+  private evict(m: Map<number, CacheEntry>, limit: number): void {
+    // Oldest first, skipping anything asked for this frame or the last (it is on screen).
+    for (const [region, e] of m) {
+      if (m.size <= limit) break;
+      if (e.used >= this.frame - 1) continue;
+      m.delete(region);
+      release(e.terrain);
+      release(e.fogged);
     }
   }
 
+  private store(m: Map<number, CacheEntry>, region: number, e: Omit<CacheEntry, "used">, limit: number): CacheEntry {
+    const old = m.get(region);
+    m.delete(region);
+    if (old) {
+      release(old.terrain);
+      release(old.fogged);
+    }
+    const entry: CacheEntry = { ...e, used: this.frame };
+    m.set(region, entry);
+    this.evict(m, limit);
+    return entry;
+  }
+
+  private touch(m: Map<number, CacheEntry>, region: number): CacheEntry | undefined {
+    const e = m.get(region);
+    if (e) {
+      // Refresh its place in the LRU order.
+      m.delete(region);
+      m.set(region, e);
+      e.used = this.frame;
+    }
+    return e;
+  }
+
+  /** The full-image entry for `region`, building it (synchronously) or asking the workers. */
   private entry(region: number, force: boolean): CacheEntry | null {
-    const useWorker = this.source !== null && !this.failed.has(region) && terrainWorker() !== null;
+    const useWorkers = this.source !== null && !this.failed.has(region) && terrainPool() !== null;
     let e = this.entries.get(region);
-    if (e && !useWorker && !e.textured && texturesReady() && (force || this.budget > 0)) {
+    if (e && !useWorkers && !e.textured && texturesReady() && (force || this.budget > 0)) {
       this.entries.delete(region); // built before the textures arrived: draw it again with them
       e = undefined;
     }
-    if (e) {
-      // Refresh its place in the LRU order.
-      this.entries.delete(region);
-      this.entries.set(region, e);
-      return e;
-    }
-    if (useWorker) {
-      this.request(region, force);
+    if (e) return this.touch(this.entries, region) ?? null;
+    if (useWorkers) {
+      this.queueJob("full", region, force, false);
+      this.pump();
       return null;
     }
     if (!force && this.budget <= 0) return null;
@@ -276,50 +375,66 @@ export class TerrainCache {
     const px = computeTerrainPixels(this.surface, region, this.kind);
     const terrain = pixelsToImage(px);
     const fogged = pixelsToImage(computeFoggedPixels(px));
-    this.store(region, { terrain, fogged, painted: null, paintedSig: "", paintedMask: null, textured: texturesReady() });
-    return this.entries.get(region) ?? null;
+    return this.store(this.entries, region, { terrain, fogged, painted: null, paintedSig: "", paintedMask: null, textured: texturesReady() }, CACHE_LIMIT);
   }
 
-  /** Queues a region for the worker (once) and sends what is next. */
-  private request(region: number, urgent: boolean): void {
-    if (this.inFlight.has(region)) return;
-    const queued = this.queue.get(region);
-    this.queue.set(region, { frame: this.frame, urgent: urgent || (queued?.urgent ?? false) });
-    if (urgent) this.focus = region;
-    this.pump();
+  /** The thumbnail entry for `region`, or null (and queued) if it isn't there yet. */
+  private thumbEntry(region: number, force: boolean): CacheEntry | null {
+    const e = this.touch(this.thumbs, region);
+    if (e) return e;
+    if (!this.failed.has(region)) {
+      this.queueJob("thumb", region, force, false);
+      this.pump();
+    }
+    return null;
   }
 
-  /** The most wanted queued region: urgent first, then nearest the urgent one, then in the order asked. */
-  private next(): number | null {
-    let best: number | null = null;
+  private queueJob(want: Want, region: number, urgent: boolean, prefetch: boolean): void {
+    if (this.inFlight.has(`${want}${region}`)) return;
+    const queue = this.queues[want];
+    const q = queue.get(region);
+    queue.set(region, { frame: this.frame, urgent: urgent || (q?.urgent ?? false), prefetch: prefetch && (q?.prefetch ?? true) });
+    if (urgent && !prefetch) this.focus = region;
+  }
+
+  /** The most wanted queued job: current urgent regions first, then nearest the urgent one, then prefetches. */
+  private next(): { region: number; want: Want } | null {
+    let best: { region: number; want: Want } | null = null;
     let bestKey = Number.POSITIVE_INFINITY;
     const f = this.focus >= 0 ? this.surface.origin(this.focus) : null;
-    for (const [region, q] of [...this.queue]) {
-      // Not asked for in this frame or the last: the view has moved on.
-      if (q.frame < this.frame - 1) {
-        this.queue.delete(region);
-        continue;
-      }
-      const o = this.surface.origin(region);
-      const dist = f ? Math.abs(o.x - f.x) + Math.abs(o.y - f.y) : 0;
-      const key = (q.urgent ? 0 : 1e6) + dist;
-      if (key < bestKey) {
-        bestKey = key;
-        best = region;
+    for (const want of ["full", "thumb"] as const) {
+      const queue = this.queues[want];
+      for (const [region, q] of [...queue]) {
+        // Not asked for in this frame or the last: the view has moved on.
+        if (!q.prefetch && q.frame < this.frame - 1) {
+          queue.delete(region);
+          continue;
+        }
+        const o = this.surface.origin(region);
+        const dist = f ? Math.abs(o.x - f.x) + Math.abs(o.y - f.y) : 0;
+        const key = (q.prefetch ? 2e6 : 0) + (q.urgent ? 0 : 1e6) + dist;
+        if (key < bestKey) {
+          bestKey = key;
+          best = { region, want };
+        }
       }
     }
     return best;
   }
 
   private pump(): void {
-    const w = this.source ? terrainWorker() : null;
-    while (w && this.source && !this.disposed && this.inFlight.size < IN_FLIGHT) {
-      const region = this.next();
-      if (region === null) return;
-      this.queue.delete(region);
-      this.inFlight.add(region);
+    const workers = this.source ? terrainPool() : null;
+    if (!workers || !this.source || this.disposed) return;
+    for (const pw of workers) {
+      if (pw.busy) continue;
+      const job = this.next();
+      if (!job) return;
+      this.queues[job.want].delete(job.region);
+      const tag = `${job.want}${job.region}`;
+      this.inFlight.add(tag);
+      pw.busy = true;
       const id = nextRequestId++;
-      listeners.set(id, (msg) => this.arrived(region, msg));
+      listeners.set(id, (msg) => this.arrived(job.region, job.want, tag, msg));
       const req: RequestMessage = {
         type: "build",
         id,
@@ -327,38 +442,35 @@ export class TerrainCache {
         gen: this.source.gen,
         bodyId: this.surface.body.id,
         kind: this.kind,
-        region,
+        region: job.region,
+        want: job.want,
       };
-      w.postMessage(req);
+      pw.worker.postMessage(req);
     }
   }
 
-  private arrived(region: number, msg: BuiltMessage): void {
-    this.inFlight.delete(region);
+  private arrived(region: number, want: Want, tag: string, msg: BuiltMessage): void {
+    this.inFlight.delete(tag);
     if (this.disposed) {
-      if (msg.terrain?.bitmap) msg.terrain.bitmap.close();
-      if (msg.fogged?.bitmap) msg.fogged.bitmap.close();
+      for (const p of [msg.terrain, msg.fogged, msg.thumbTerrain, msg.thumbFogged]) p?.bitmap?.close();
       return;
     }
-    if (msg.failed || !msg.terrain || !msg.fogged) {
-      // The worker is gone or couldn't build it: this thread takes over (entry() sees there's no worker, or the failure).
+    if (msg.failed || (want === "full" && (!msg.terrain || !msg.fogged))) {
+      // The workers are gone or couldn't build it: this thread takes over (entry() sees no workers, or the failure).
       this.failed.add(region);
       return;
     }
-    const old = this.entries.get(region);
-    this.entries.delete(region);
-    if (old) {
-      release(old.terrain);
-      release(old.fogged);
+    if (want === "thumb" && (!msg.thumbTerrain || !msg.thumbFogged)) {
+      this.noThumbs = true; // no OffscreenCanvas over there: far zoom draws the full images
+      return;
     }
-    this.store(region, {
-      terrain: imageFrom(msg.terrain),
-      fogged: imageFrom(msg.fogged),
-      painted: null,
-      paintedSig: "",
-      paintedMask: null,
-      textured: msg.textured,
-    });
+    const fresh = { painted: null, paintedSig: "", paintedMask: null, textured: msg.textured };
+    if (msg.terrain && msg.fogged) {
+      this.store(this.entries, region, { terrain: imageFrom(msg.terrain), fogged: imageFrom(msg.fogged), ...fresh }, CACHE_LIMIT);
+    }
+    if (msg.thumbTerrain && msg.thumbFogged) {
+      this.store(this.thumbs, region, { terrain: imageFrom(msg.thumbTerrain), fogged: imageFrom(msg.thumbFogged), ...fresh }, THUMB_LIMIT);
+    }
     this.pump();
   }
 
@@ -367,10 +479,7 @@ export class TerrainCache {
     return this.entry(region, force)?.terrain ?? null;
   }
 
-  /** The fogged/painted map of a region for the fog state `sig` (recomposed only when `sig` changes). */
-  painted(region: number, sig: string, explored: (gx: number, gy: number) => boolean, force = false): RegionImage | null {
-    const e = this.entry(region, force);
-    if (!e) return null;
+  private compose(e: CacheEntry, region: number, sig: string, explored: (gx: number, gy: number) => boolean): RegionImage {
     if (!e.painted || e.paintedSig !== sig) {
       // The signature covers the neighbours' whole fog; only the tiles this image shows matter.
       const mask = exploredMask(this.surface, region, explored);
@@ -382,6 +491,23 @@ export class TerrainCache {
     }
     return e.painted;
   }
+
+  /**
+   * The fogged/painted map of a region for the fog state `sig` (recomposed only when `sig` changes): the full image,
+   * or the thumbnail far out. Whichever is built stands in while the wanted one is on its way.
+   */
+  painted(region: number, sig: string, explored: (gx: number, gy: number) => boolean, force = false): RegionImage | null {
+    if (this.lod) {
+      const t = this.thumbEntry(region, force);
+      if (t) return this.compose(t, region, sig, explored);
+      const f = this.touch(this.entries, region);
+      return f ? this.compose(f, region, sig, explored) : null;
+    }
+    const e = this.entry(region, force);
+    if (e) return this.compose(e, region, sig, explored);
+    const t = this.touch(this.thumbs, region); // zooming in: the thumbnail holds the place until the full image lands
+    return t ? this.compose(t, region, sig, explored) : null;
+  }
 }
 
 function sameMask(a: Uint8Array, b: Uint8Array): boolean {
@@ -392,7 +518,25 @@ function sameMask(a: Uint8Array, b: Uint8Array): boolean {
 
 let shared: TerrainCache | null = null;
 
-/** The cache for this surface (a new world or body starts a fresh one). `source` lets the worker rebuild the world. */
+/**
+ * Starts building the region the player is about to land in, and the ones around it, so the surface is ready when it
+ * opens (the cache is the one the surface view will pick up).
+ */
+export function prefetchSurface(surface: BodySurface, kind: BodyKind, source: SurfaceSource, region: number): void {
+  const { cols, regions } = surface.layout;
+  const row = Math.floor(region / cols);
+  const col = region % cols;
+  const list = [region];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const r = (row + dr) * cols + (col + dc);
+      if ((dr !== 0 || dc !== 0) && col + dc >= 0 && col + dc < cols && row + dr >= 0 && r < regions) list.push(r);
+    }
+  }
+  terrainCache(surface, kind, source).prefetch(list);
+}
+
+/** The cache for this surface (a new world or body starts a fresh one). `source` lets the workers rebuild the world. */
 export function terrainCache(surface: BodySurface, kind: BodyKind, source: SurfaceSource | null = null): TerrainCache {
   if (!shared || shared.surface !== surface || shared.kind !== kind) {
     shared?.dispose();
