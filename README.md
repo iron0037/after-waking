@@ -6,6 +6,16 @@ Two million colonists aboard the generation ship **Intrepid** were bound for Kep
 
 > **Status: early development, but playable.** Saves may break between versions, the balance is still moving, and some systems are placeholders. Feedback is welcome.
 
+### [▶ Play it in your browser](https://iron0037.github.io/after-waking/)
+
+No install needed. Your game saves in that browser.
+
+![The rover on a forested world, its sensor sweep revealing the ground around the landing site](docs/screenshots/surface.png)
+
+| | | |
+|---|---|---|
+| ![Title screen](docs/screenshots/title.png) | ![A red dwarf system from orbit](docs/screenshots/system.png) | ![The star map around the Intrepid](docs/screenshots/starmap.png) |
+
 ## What you do
 
 - **Fold** between stars instantly, then cross each system at a quarter of light-speed.
@@ -18,9 +28,9 @@ Two million colonists aboard the generation ship **Intrepid** were bound for Kep
 
 The Archive, the technical record that came with Earth's last transmission, explains each new system the first time it comes up. You can turn it off on the new-game screen or in the Journal.
 
-## Running it
+## Running it locally
 
-You need [Node.js](https://nodejs.org/) 20 or newer.
+The [hosted build](https://iron0037.github.io/after-waking/) is the quickest way to play; it's rebuilt from `main` on every push. To run it yourself, you need [Node.js](https://nodejs.org/) 20 or newer.
 
 ```bash
 npm install
