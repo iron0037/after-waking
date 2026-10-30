@@ -9,3 +9,7 @@ tools/art/output/
 # Reference images (copyrighted; local only)
 docs/flagships.jpg
 docs/reference/
+
+# Python bytecode
+__pycache__/
+*.pyc
