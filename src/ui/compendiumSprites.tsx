@@ -19,6 +19,11 @@ interface SpriteIndex {
 
 const ATLAS_URL = "./assets/compendium/atlas.webp";
 const INDEX_URL = "./assets/compendium/index.json";
+/**
+ * The atlas as an absolute URL. It goes into a CSS custom property, and a relative url() there is
+ * resolved against the stylesheet that uses it (assets/ in a production build), not the page.
+ */
+const atlasHref = (): string => new URL(ATLAS_URL, document.baseURI).href;
 /** The colour of an undiscovered entry's silhouette. */
 const SILHOUETTE = [0x26, 0x32, 0x4d] as const;
 
@@ -98,7 +103,7 @@ export function CompIcon({ index, entryKey, color, found }: { index: SpriteIndex
   const cell = index?.sprites[entryKey];
   if (!index || !cell || (!found && !index.silhouettes)) return <span class="comp-icon" style={found ? { background: color } : undefined} />;
   const style = {
-    "--atlas": `url(${ATLAS_URL})`,
+    "--atlas": `url("${atlasHref()}")`,
     "--atlas-size": `${index.width}px ${index.height}px`,
     "--atlas-pos": `${-cell[0] * index.cell}px ${-cell[1] * index.cell}px`,
   } as Record<string, string>;

@@ -20,6 +20,11 @@ interface PortraitIndex {
 
 const ATLAS_URL = "./assets/portraits/atlas.webp";
 const INDEX_URL = "./assets/portraits/index.json";
+/**
+ * The atlas as an absolute URL. It goes into a CSS custom property, and a relative url() there is
+ * resolved against the stylesheet that uses it (assets/ in a production build), not the page.
+ */
+const atlasHref = (): string => new URL(ATLAS_URL, document.baseURI).href;
 
 let loaded: PortraitIndex | null = null;
 let pending: Promise<PortraitIndex | null> | null = null;
@@ -101,7 +106,7 @@ export function Portrait({
   const band = Math.min(index.bands - 1, portraitBand(age));
   const k = size / index.cell;
   const style = {
-    "--portrait-atlas": `url(${ATLAS_URL})`,
+    "--portrait-atlas": `url("${atlasHref()}")`,
     "--portrait-size": `${size}px`,
     "--portrait-atlas-size": `${index.width * k}px ${index.height * k}px`,
     "--portrait-pos": `${-band * size}px ${-face * size}px`,
