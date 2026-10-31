@@ -48,6 +48,8 @@ export interface Scene {
   world: World;
   detail: SystemDetail;
   view: ViewState;
+  /** The viewport dimension the orrery's scale is fitted to; see makeProjection. */
+  fitDim?: number;
   /** Game time to draw the bodies at. */
   time: number;
   timeMs: number;
@@ -88,7 +90,7 @@ const STARFIELD = (() => {
 
 export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, scene: Scene): DrawResult {
   const { detail, state } = scene;
-  const proj = makeProjection(w, h, scene.view, detail);
+  const proj = makeProjection(w, h, scene.view, detail, scene.fitDim);
   const hits: HitTarget[] = [];
 
   drawBackdrop(ctx, w, h, scene.view);

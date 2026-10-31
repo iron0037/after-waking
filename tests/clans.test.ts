@@ -34,11 +34,11 @@ describe("starting clan (AW-146)", () => {
     expect(clanMods(s).loanRate).toBe(1);
   });
 
-  it("Exchange: cheaper note and fuel", () => {
+  it("Exchange: a cheaper note, but the brokers mark up plicite (AW-174)", () => {
     const plain = newGame({ seed: 3 });
     const ex = newGame({ seed: 3, clan: "exchange" });
     expect(loanRate(ex)).toBeCloseTo(loanRate(plain) / 2);
-    expect(fuelPriceFor(ex)).toBeLessThan(fuelPriceFor(plain));
+    expect(fuelPriceFor(ex)).toBeGreaterThan(fuelPriceFor(plain));
   });
 
   it("Midshipmen: own gear 10% off, a seasoned engineer, pricier upkeep", () => {

@@ -376,7 +376,7 @@ Your starting clan shapes the early game. Every perk is small but felt, and each
 
 | Clan | Perk | Cost / friction |
 |---|---|---|
-| **Exchange** *(user's idea)* | Loan interest halved (3%); 10% off fuel and Exchange goods; slightly better sell prices | Exchange collectors are relentless; missed payments hurt your reputation with them twice as much |
+| **Exchange** *(user's idea)* | Loan interest halved; sell 3% better | Traders, not haulers: the Exchange's brokers add 5% to your plicite, and missed payments carry a double late fee. *(Rebalanced in AW-174: the old fuel discount made it the strongest clan.)* |
 | **Helm** | Fold-drive refits 15% faster; 3 extra systems charted at start | Helm expects you to take enforcement jobs; refusing costs standing |
 | **Midshipmen** | 10% off Midshipmen ship upgrades; start with a skilled engineer | Fussy about maintenance: skipping refits costs reputation |
 | **Diggers** | Drill rate +15%; one free high-grade deposit lead per year | Diggers expect a cut of your biggest strikes (a tithe on plicite and platinum) |

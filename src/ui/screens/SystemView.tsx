@@ -99,6 +99,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const flightRef = useRef<Flight | null>(null);
   const timerRef = useRef(0);
   const sizeRef = useRef({ w: 800, h: 600 });
+  /** The dimension the orrery is scaled to. Held while only the canvas height changes (the Archive strip), so the map keeps its size. */
+  const fitRef = useRef({ w: 0, dim: 0 });
   const hitsRef = useRef<HitTarget[]>([]);
   const headingRef = useRef(-Math.PI / 2);
   const cameraRef = useRef<Camera>(HOME_CAMERA);
@@ -244,7 +246,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   /** The view as it is on screen right now, with the anchor's drift applied. */
   const currentView = (): ViewState => {
     const { anchor, view } = cameraRef.current;
-    return resolveView(sizeRef.current.w, sizeRef.current.h, detail, view, anchor, cameraTime(anchor));
+    return resolveView(sizeRef.current.w, sizeRef.current.h, detail, view, anchor, cameraTime(anchor), fitRef.current.dim || undefined);
   };
 
   /** Adopt `next` (derived from currentView) as the new view, anchored to what's under the center. */
@@ -254,7 +256,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     if (isHomeView(next)) return setCamera(HOME_CAMERA);
     if (prev?.follow) return setCamera({ view: next, anchor: { bodyId: prev.bodyId, t: drawTimeRef.current, follow: true } });
     const t = session.state.time;
-    const id = nearestBodyId(w, h, detail, next, t);
+    const id = nearestBodyId(w, h, detail, next, t, fitRef.current.dim || undefined);
     setCamera({ view: next, anchor: id ? { bodyId: id, t, follow: false } : null });
   };
 
@@ -266,7 +268,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     const { w, h } = sizeRef.current;
     const t = drawTimeRef.current;
     setCamera({
-      view: focusView(w, h, detail, selected, t, zoomForBody(w, h, detail, selected)),
+      view: focusView(w, h, detail, selected, t, zoomForBody(w, h, detail, selected), fitRef.current.dim || undefined),
       anchor: { bodyId: selected.id, t, follow: true },
     });
   };
@@ -320,6 +322,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number, timeMs: number) => {
     sizeRef.current = { w, h };
+    if (w > 10 && h > 10 && (fitRef.current.dim === 0 || fitRef.current.w !== w)) fitRef.current = { w, dim: Math.min(w, h) };
+    const fitDim = fitRef.current.dim || undefined;
     const f = flightRef.current;
     let time = state.time;
     let flight: FlightOverlay | null = null;
@@ -337,7 +341,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       state,
       world,
       detail,
-      view: resolveView(w, h, detail, camera.view, camera.anchor, camera.anchor?.follow ? time : state.time),
+      view: resolveView(w, h, detail, camera.view, camera.anchor, camera.anchor?.follow ? time : state.time, fitDim),
+      fitDim,
       time,
       timeMs,
       selectedId: selected?.id ?? null,

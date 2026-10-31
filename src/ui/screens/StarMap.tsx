@@ -137,7 +137,9 @@ export function StarMap({ session }: { session: GameSession }) {
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   const [selected, setSelected] = useState<string | null>(() => {
-    if (state.location.kind === "deep") return null; // out here the question is where to fold blind, not which star is nearest
+    // Anywhere but the Intrepid's dock (a system, or out in deep space), the usual next step is heading home.
+    if (state.location.kind !== "intrepid") return "intrepid";
+    // Docked: suggest the nearest charted, unvisited system with somewhere to land.
     const here = positionOf(world.galaxy, currentSystemId(state));
     let best: Node | null = null;
     let bestD = Infinity;

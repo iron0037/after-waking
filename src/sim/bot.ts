@@ -1,3 +1,4 @@
+import type { ClanId } from "../data/ship";
 /**
  * A headless captain that plays the core loop: fold out, prospect, drill, haul, fold home,
  * sell, upgrade. Used by tests to prove the loop works end to end, and by balance sims to
@@ -90,6 +91,8 @@ export interface BotOptions {
   novice?: boolean;
   /** Share of each sale paid to the crew as bonuses (0–0.2). */
   crewShare?: number;
+  /** The captain's clan (for comparing clan perks in the career report). */
+  clan?: ClanId;
 }
 
 export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
@@ -99,7 +102,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
   let rescues = 0;
   let raids = 0;
   const world = new World(seed);
-  const state = newGame({ seed });
+  const state = newGame({ seed, ...(options.clan ? { clan: options.clan } : {}) });
   const rng = new Rng(seed ^ 0xb07);
   const errors: string[] = [];
   const tripSummaries: BotReport["tripSummaries"] = [];

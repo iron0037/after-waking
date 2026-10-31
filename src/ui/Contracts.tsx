@@ -47,12 +47,17 @@ function targetsOf(session: GameSession, c: Contract): Target[] {
   return [];
 }
 
-/** One subtle line of the non-credit upsides (experience, loyalty, spirits). Used on every contract card. */
+/** The non-credit upsides (experience, loyalty, spirits), one per line under a muted "Also" label. Used on every contract card. */
 export function ContractAlso({ state, c }: { state: GameState; c: Contract }) {
-  const text = contractBenefits(state, c).join(" · ");
+  const effects = contractBenefits(state, c);
   return (
     <div class="con-also muted small" title="What finishing this job does besides paying: experience, loyalty and morale">
-      Also: {text}
+      <span class="con-also-label">Also</span>
+      <ul class="con-also-list">
+        {effects.map((e) => (
+          <li key={e}>{e}</li>
+        ))}
+      </ul>
     </div>
   );
 }

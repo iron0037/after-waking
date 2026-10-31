@@ -26,16 +26,27 @@ const FILL = 0.84;
  * stays inside the viewport at full zoom.
  */
 export function bodyScale(zoom: number): number {
-  return Math.min(12, Math.pow(zoom, 0.6));
+  return Math.min(MAX_BODY_SCALE, Math.pow(zoom, 0.6));
 }
 
-/** Smallest a moon is ever drawn (px radius at zoom 1): small enough to be a moon, big enough to click. */
-const MOON_MIN_R = 3.6;
+/** Ceiling on bodyScale: the biggest gas giant (~19 px at zoom 1) then fills about a third of a typical viewport. */
+const MAX_BODY_SCALE = 10;
 
-/** Radius in px before zoom scaling. */
+/** Smallest a moon is ever drawn (px radius at zoom 1): clearly a disc, and easy to click. */
+const MOON_MIN_R = 4.5;
+
+/** Moon orbits at zoom 1: gap between the parent's edge and the first moon, and the step to each next one (px). */
+const MOON_GAP = 13;
+const MOON_STEP = 10;
+
+/**
+ * Radius in px before zoom scaling. Square-root of the real radius keeps the order (moon < rocky
+ * planet < giant) while compressing the range: roughly moons 4.5-7, rocky worlds 6-10, ice giants
+ * 11-13, gas giants 14-19.
+ */
 function baseRadius(body: Body): number {
-  const r = 2 + 3 * Math.sqrt(body.radiusEarth);
-  return body.parentId ? Math.max(MOON_MIN_R, r) : r;
+  if (body.parentId) return Math.max(MOON_MIN_R, 3 + 4 * Math.sqrt(body.radiusEarth));
+  return 4 + 4.4 * Math.sqrt(body.radiusEarth);
 }
 
 /** On-screen disc radius in px: compressed so a gas giant is big, an asteroid still visible. */
@@ -47,16 +58,16 @@ export function discRadius(body: Body, zoom: number): number {
 
 /** Distance in px from a parent to its index-th moon. */
 export function moonOrbitPx(parent: Body, index: number, zoom: number): number {
-  return discRadius(parent, zoom) + (11 + index * 7) * bodyScale(zoom);
+  return discRadius(parent, zoom) + (MOON_GAP + index * MOON_STEP) * bodyScale(zoom);
 }
 
 /**
  * A view with `body` dead center at `zoom`. The planet's screen offset from the star is linear in
  * zoom, so evaluating at pan 0 and negating gives the pan directly.
  */
-export function focusView(w: number, h: number, detail: SystemDetail, body: Body, t: number, zoom: number): ViewState {
+export function focusView(w: number, h: number, detail: SystemDetail, body: Body, t: number, zoom: number, fitDim?: number): ViewState {
   const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
-  const p = makeProjection(w, h, { zoom: z, panX: 0, panY: 0 }, detail).bodyPos(body, t);
+  const p = makeProjection(w, h, { zoom: z, panX: 0, panY: 0 }, detail, fitDim).bodyPos(body, t);
   const limit = (Math.min(w, h) / 2) * z;
   const clampPan = (v: number) => Math.max(-limit, Math.min(limit, v));
   return { zoom: z, panX: clampPan(w / 2 - p.x), panY: clampPan(h / 2 - p.y) };
@@ -66,10 +77,10 @@ export function focusView(w: number, h: number, detail: SystemDetail, body: Body
 export function zoomForBody(w: number, h: number, detail: SystemDetail, body: Body): number {
   const root = body.parentId ? findBody(detail, body.parentId) : body;
   const half = Math.min(w, h) / 2;
-  let scale = Math.min(12, 70 / baseRadius(body));
+  let scale = Math.min(MAX_BODY_SCALE, 70 / baseRadius(body));
   if (root.moonIds.length > 0) {
     // Outermost moon orbit (parent radius + gap) must fit inside ~80% of the half-viewport.
-    const reach = baseRadius(root) + 11 + (root.moonIds.length - 1) * 7;
+    const reach = baseRadius(root) + MOON_GAP + (root.moonIds.length - 1) * MOON_STEP;
     scale = Math.min(scale, (half * 0.8) / reach);
   }
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.pow(Math.max(1, scale), 1 / 0.6)));
@@ -89,10 +100,14 @@ export interface Projection {
   bodyOffset(body: Body, t: number): Vec2;
 }
 
-export function makeProjection(w: number, h: number, view: ViewState, detail: SystemDetail): Projection {
+/**
+ * `fitDim` is the viewport dimension the orrery is scaled to (default: the smaller side). The screen holds it
+ * steady while the canvas changes height (the Archive strip appearing), so the system doesn't jump in size.
+ */
+export function makeProjection(w: number, h: number, view: ViewState, detail: SystemDetail, fitDim = Math.min(w, h)): Projection {
   const cx = w / 2 + view.panX;
   const cy = h / 2 + view.panY;
-  const k = (Math.min(w, h) / 2) * FILL / Math.log(1 + detail.edgeAU / A0);
+  const k = (fitDim / 2) * FILL / Math.log(1 + detail.edgeAU / A0);
   const radiusPx = (au: number) => k * view.zoom * Math.log(1 + au / A0);
 
   const toScreen = (v: Vec2): Vec2 => {
@@ -152,20 +167,20 @@ export interface ViewAnchor {
 }
 
 /** The view to draw at game time `t`: `view` carried along with its anchor body's motion since `anchor.t`. */
-export function resolveView(w: number, h: number, detail: SystemDetail, view: ViewState, anchor: ViewAnchor | null, t: number): ViewState {
+export function resolveView(w: number, h: number, detail: SystemDetail, view: ViewState, anchor: ViewAnchor | null, t: number, fitDim?: number): ViewState {
   if (!anchor || t === anchor.t) return view;
   const body = detail.bodies.find((b) => b.id === anchor.bodyId);
   if (!body) return view;
   // At pan 0 the body's screen position is linear in zoom, so the difference is its drift since anchor.t.
-  const p0 = makeProjection(w, h, { zoom: view.zoom, panX: 0, panY: 0 }, detail);
+  const p0 = makeProjection(w, h, { zoom: view.zoom, panX: 0, panY: 0 }, detail, fitDim);
   const now = p0.bodyPos(body, t);
   const then = p0.bodyPos(body, anchor.t);
   return { zoom: view.zoom, panX: view.panX - (now.x - then.x), panY: view.panY - (now.y - then.y) };
 }
 
 /** The body drawn nearest the viewport center, if one is reasonably close; the natural thing to hold the view to. */
-export function nearestBodyId(w: number, h: number, detail: SystemDetail, view: ViewState, t: number): string | null {
-  const proj = makeProjection(w, h, view, detail);
+export function nearestBodyId(w: number, h: number, detail: SystemDetail, view: ViewState, t: number, fitDim?: number): string | null {
+  const proj = makeProjection(w, h, view, detail, fitDim);
   let best: string | null = null;
   let bestD = Math.min(w, h) * 0.5;
   for (const b of detail.bodies) {

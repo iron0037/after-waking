@@ -52,9 +52,9 @@ export interface CaptainClan {
 
 export const CAPTAIN_CLANS: Record<ClanId, CaptainClan> = {
   exchange: {
-    perk: "The note's interest is halved, fuel is 10% cheaper, and you sell 2% better.",
-    cost: "Exchange collectors are relentless: a missed payment adds a late fee.",
-    mods: { loanRate: 0.5, fuelPrice: 0.9, salePrice: 1.02 },
+    perk: "The note's interest is halved, and you sell 3% better.",
+    cost: "Traders, not haulers: the Exchange's own brokers add 5% to your plicite, and a missed payment adds a late fee.",
+    mods: { loanRate: 0.5, fuelPrice: 1.05, salePrice: 1.03 },
   },
   helm: {
     perk: "Fold-drive refits 15% faster, and Helm's charts of three more stars come with you.",

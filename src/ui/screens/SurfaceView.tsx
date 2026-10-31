@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
   activeRegion,
+  autoExplore,
+  autoExploreBlockers,
   autoWorkVehicleBlocker,
   boardBoat,
   canEnter,
@@ -197,6 +199,11 @@ interface Camera {
   follow: boolean;
   /** False until the first frame has placed the camera. */
   placed: boolean;
+  /**
+   * The hex size at which one region fills the view, taken when the camera is placed or reset and then held. A
+   * resize (the Archive strip appearing, a window drag) keeps the map's scale instead of refitting; 0 = refit next frame.
+   */
+  fit: number;
 }
 
 /** Keyboard driving, one hex per press: Q/E/A/D/Z/C (nw/ne/w/e/sw/se), plus Left/Right arrows for w/e. */
@@ -353,7 +360,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     flora: Set<string>;
   } | null>(null);
   const aliveRef = useRef(true);
-  const camRef = useRef<Camera>({ center: { x: 0, y: 0 }, zoom: 1, follow: true, placed: false });
+  const camRef = useRef<Camera>({ center: { x: 0, y: 0 }, zoom: 1, follow: true, placed: false, fit: 0 });
   const [following, setFollowingState] = useState(true);
   const wrapRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ sx: number; sy: number; lx: number; ly: number; moved: boolean } | null>(null);
@@ -441,7 +448,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const zoom = clamp(cam.zoom * factor, MIN_ZOOM, MAX_ZOOM);
     if (L && !cam.follow && px !== undefined && py !== undefined) {
       // Keep the point under the cursor where it is.
-      const size = Math.max(MIN_HEX_PX, fitSize(L.w, L.h) * zoom);
+      const size = Math.max(MIN_HEX_PX, (cam.fit || fitSize(L.w, L.h)) * zoom);
       const p = { x: (px - L.ox) / L.size, y: (py - L.oy) / L.size };
       const c = viewCenter(L.w, L.h);
       cam.center = { x: p.x - (px - c.x) / size, y: p.y - (py - c.y) / size };
@@ -451,6 +458,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const resetView = (): void => {
     camRef.current.zoom = 1;
+    camRef.current.fit = 0; // refit to the view as it is now
     setFollowing(true);
   };
 
@@ -625,7 +633,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
     const extent = mapPixelSize(surface.width, surface.height, 1);
     cam.center = { x: clamp(cam.center.x, 0, extent.w), y: clamp(cam.center.y, 0, extent.h) };
-    const size = Math.max(MIN_HEX_PX, fitSize(w, h) * cam.zoom);
+    if (cam.fit === 0 && w > 10 && h > 10) cam.fit = fitSize(w, h);
+    const size = Math.max(MIN_HEX_PX, (cam.fit || fitSize(w, h)) * cam.zoom);
     const L = cameraLayout(w, h, surface.width, surface.height, size, cam.center);
     layoutRef.current = L;
     const pos: Vec2 | null = roverUnit ? { x: L.ox + roverUnit.x * size, y: L.oy + roverUnit.y * size } : null;
@@ -976,6 +985,21 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (r.ok) session.notify(`Recharged the ${noun}'s cells in ${formatDuration(r.value.hours * HOUR)}.`);
   };
 
+  /** The rover crew sweeps the whole fog of this region on their own (sim: autoExplore). It can pass days, so the clock time-lapses. */
+  const doAutoExplore = (): void => {
+    const region = world.surface(loc.bodyId).regionAt(ship.x, ship.y) ?? loc.region;
+    const r = session.act((s, w) => autoExplore(s, w));
+    setRechargeHint(false);
+    if (!r.ok) return;
+    const { before, after, days } = r.value;
+    const range = `${Math.round(before * 100)}% → ${Math.round(after * 100)}%`;
+    session.notify(
+      after >= 0.999
+        ? `Rover swept region ${region + 1}: ${range} in ${days.toFixed(1)} days.`
+        : `Rover swept region ${region + 1}: ${range} in ${days.toFixed(1)} days. ${r.value.reason}`,
+    );
+  };
+
   const doWork = async (mark: DepositMark, maxTonnes = Infinity): Promise<void> => {
     const dep = mark.d;
     const blockers = workBlockers(state, world, mark.know, dep);
@@ -1024,6 +1048,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const rechargeHours = rover ? Math.max(0, energyMax - rover.energy) / roverChargePerHour(state) : 0;
   const canRecharge = rover !== null && nearShip && energyMax - rover.energy >= 0.5;
+  const autoBlocker = rover !== null && !isBoat ? (autoExploreBlockers(state, world)[0] ?? null) : null;
 
   keyRef.current = (ev: KeyboardEvent): void => {
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -1210,6 +1235,19 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 >
                   Recharge
                 </button>
+                {!isBoat && (
+                  <button
+                    class="btn"
+                    disabled={busy || autoBlocker !== null}
+                    title={
+                      autoBlocker ??
+                      "The rover crew drive into this region's fog and keep going, coming back to the ship to recharge as needed, until it is swept or nothing more is reachable. Can take days. They collect nothing and ignore \"?\" readings."
+                    }
+                    onClick={doAutoExplore}
+                  >
+                    Auto-explore
+                  </button>
+                )}
               </>
             )}
             {isBoat && roverAboard && (

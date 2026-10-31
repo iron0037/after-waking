@@ -67,7 +67,7 @@ const BASE: Record<OreId | GasId, Commodity> = {
     name: "Titanium ore",
     basePrice: 64,
     marketDepthT: 720,
-    color: "#b8c4cc",
+    color: "#7d8893",
     blurb: "Hull plate and pressure vessels. The Midshipmen pay well for clean ore.",
   },
   rareEarths: {
@@ -91,7 +91,7 @@ const BASE: Record<OreId | GasId, Commodity> = {
     name: "Platinum-group ore",
     basePrice: 431,
     marketDepthT: 43,
-    color: "#e6e1ff",
+    color: "#f7f5ff",
     blurb: "Catalysts and contacts. A good platinum strike pays for a refit.",
   },
   waterIce: {

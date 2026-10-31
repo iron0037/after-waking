@@ -10,6 +10,7 @@ export * from "./clan";
 export * from "./archive";
 export * from "./covenant";
 export * from "./deepspace";
+export * from "./autoexplore";
 export * from "./nicknames";
 export * from "./bodies";
 export * from "./economy";
