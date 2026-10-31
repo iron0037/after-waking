@@ -1,5 +1,6 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
+import { SEAS } from "../../../data/seas";
 import type { Ratings } from "../../../data/ship";
 import { useEffect, useRef, useState } from "preact/hooks";
 import {
@@ -192,6 +193,12 @@ export function Environment({ body, ratings }: { body: Body; ratings: Ratings })
         <dd class={cls(over.surface)} title={over.surface ?? undefined}>
           {SURFACE_LABEL[body.surface]}
         </dd>
+        {body.sea && (
+          <>
+            <dt>Seas</dt>
+            <dd>{SEAS[body.sea].liquid[0]?.toUpperCase()}{SEAS[body.sea].liquid.slice(1)}</dd>
+          </>
+        )}
         <dt>Chemistry</dt>
         <dd class={cls(over.chemistry)} title={over.chemistry ?? undefined}>
           {body.chemistry[0]?.toUpperCase()}
@@ -210,6 +217,7 @@ export function Environment({ body, ratings }: { body: Body; ratings: Ratings })
         <dt>Life signs</dt>
         <dd class={body.life ? "good" : "muted"}>{body.life ? "Detected" : "None detected"}</dd>
       </dl>
+      {body.sea && <div class="muted small sys-sea-note">{SEAS[body.sea].note}</div>}
 
       <h3 class="sys-sub" title="Read from orbit. Faint traces may have no seam worth digging anywhere on the surface.">
         Potential resource signatures

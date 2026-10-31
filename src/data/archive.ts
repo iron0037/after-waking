@@ -23,6 +23,7 @@ export type ArchiveTrigger =
   | "orbit"
   | "orbit-scanned"
   | "surface"
+  | "exotic-sea"
   | "hold-full"
   | "fuel-low"
   | "raider"
@@ -133,6 +134,14 @@ export const ARCHIVE: readonly ArchiveEntry[] = [
     title: "On the ground",
     text:
       "The ship lands in one region and stays there. The rover leaves it to drill and to sample, and its cells and cargo bay are small: it must come back to unload and recharge. Moving the ship to another region means a short hop through the air.",
+  },
+  {
+    id: "exotic-sea",
+    trigger: "exotic-sea",
+    title: "Other seas",
+    text:
+      "Not every sea is water. Where it is cold enough, seas of ammonia or of methane lie in the lowlands; where it is hot and the air is corrosive, seas of sulfuric acid. Each holds what it is made of, and what is dissolved in it. The survey boat sails ammonia as it is. Methane needs cryo floats; acid needs a lined hull.",
+    gloss: "The methane seas are where the Lyceum's strangest specimens have come from.",
   },
   {
     id: "sensor-ring",

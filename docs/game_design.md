@@ -382,6 +382,32 @@ Career report: no broke careers; novice and competent income about where they we
 
 Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too close to "Adrift"), and **Cosmos** (generic and unsearchable).
 
+## Exotic Seas (AW-189) **[phase 1 DECIDED 2026-10-31]**
+- **World generation 3.** New games get seas that aren't water; old saves keep generation 2 unchanged. A world's sea follows only from its temperature, pressure and air, assigned after the rest of the system is built and from its own random streams, so nothing else moves:
+  - **Ammonia:** −100 to −35 °C, at least 0.3 atm.
+  - **Methane and ethane:** −186 to −150 °C, at least 0.3 atm.
+  - **Sulfuric acid:** corrosive air, 100–330 °C, at least 1 atm.
+  - **Never:** water worlds, volcanic worlds, asteroids, or the home systems' easy worlds.
+- **Lowlands are liquid** below elevation 0.34, like a terrestrial world's lakes. They're never frozen: that's why it's that liquid.
+- **Seabed:** 2–3 deposits per sea region, of what the sea is made of (`SEAS[sea].dredge`):
+  - ammonia (a new commodity, 45 cr/t) and water ice;
+  - methane and water ice;
+  - copper, rare earths and a little platinum dissolved in acid.
+- **Life:** half of all methane worlds hold life, in the sea only: azotosome drift (rare) and tholin mats.
+- **Landing** uses the existing hull ratings:
+
+  | Sea | What it takes to land |
+  |---|---|
+  | Ammonia | Most worlds with the stock ship |
+  | Methane | Pressure hull Mk II, for the cold |
+  | Acid | Ceramic hull cladding (AW-188), plus Mk II or the new **Pressure hull Mk III** (100 atm, 400 °C; research "Deep-pressure hulls", Midshipmen: 40 t titanium, 8 t uranium) |
+
+- **The boat:**
+  - ammonia: as it is;
+  - methane: **cryo floats** (Midshipmen, 18k);
+  - acid: **acid-lined boat hull** (Diggers, 20k).
+- **Phase 2 (planned):** Titan- and Triton-like moons with thick nitrogen air around cold giants, and nitrogen seas with a cryogenic hull.
+
 ## Clan Relations (AW-22) **[DECIDED 2026-10-31]**
 - **Standing.** Every clan rates you from −100 to +100 (`src/sim/reputation.ts`). The tiers:
 

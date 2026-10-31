@@ -84,6 +84,19 @@ export const RESEARCH: readonly ResearchProject[] = [
     ],
   },
   {
+    id: "deep-pressure",
+    name: "Deep-pressure hulls",
+    clan: "midshipmen",
+    unlocks: "pressureHull3",
+    blurb: "A hull that takes a hundred atmospheres needs titanium ribs and a lot of trial and error. The Midshipmen will build test sections if you bring the metal.",
+    cost: 16_000,
+    days: 28,
+    needs: [
+      { kind: "cargo", commodity: "titanium", tonnes: 40 },
+      { kind: "cargo", commodity: "uranium", tonnes: 8 },
+    ],
+  },
+  {
     id: "deep-atmosphere",
     name: "Deep-atmosphere modelling",
     clan: "lyceum",

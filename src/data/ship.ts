@@ -35,6 +35,9 @@ export interface ShipStats {
   sensorTier: number;
   /** Deep-field array reach, in light-years (0: none fitted). */
   deepScanLy: number;
+  /** Boat kits for exotic seas (AW-189): cryo floats for liquid methane, an acid-lined hull for acid. */
+  boatCryo: boolean;
+  boatAcidProof: boolean;
   drillMaxDepthM: number;
   /** Tonnes per hour from a grade-1.0 deposit. */
   drillRateTph: number;
@@ -76,6 +79,8 @@ export const BASE_STATS: ShipStats = {
   cruiseSpeedC: 0.25,
   sensorTier: 1,
   deepScanLy: 0,
+  boatCryo: false,
+  boatAcidProof: false,
   drillMaxDepthM: 250,
   drillRateTph: 1.2,
   roverCargoT: 20,
@@ -205,6 +210,20 @@ export const UPGRADES: readonly Upgrade[] = [
     },
   },
   {
+    id: "pressureHull3",
+    category: "ship",
+    requires: "pressureHull2",
+    name: "Pressure hull Mk III",
+    vendor: "midshipmen",
+    price: 64_000,
+    description: "Land under up to 100 atm and as hot as 400 °C: the crushing, scalding worlds where acid rains into acid seas.",
+    apply: (s) => {
+      s.ratings.maxPressureAtm = Math.max(s.ratings.maxPressureAtm, 100);
+      s.ratings.maxTempC = Math.max(s.ratings.maxTempC, 400);
+      s.hullMassT += 160;
+    },
+  },
+  {
     id: "corrosionHull",
     category: "ship",
     name: "Ceramic hull cladding",
@@ -262,6 +281,30 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.boatCargoT = 30;
       s.boatEnergy = 140;
+    },
+  },
+  {
+    id: "cryoFloats",
+    category: "rover",
+    requires: "boat",
+    name: "Cryo floats",
+    vendor: "midshipmen",
+    price: 18_000,
+    description: "Wide foam floats and a heated drive: the survey boat sails seas of liquid methane, thin and at −180 °C.",
+    apply: (s) => {
+      s.boatCryo = true;
+    },
+  },
+  {
+    id: "acidLining",
+    category: "rover",
+    requires: "boat",
+    name: "Acid-lined boat hull",
+    vendor: "diggers",
+    price: 20_000,
+    description: "A glass-and-ceramic skin for the survey boat: it sails seas of hot sulfuric acid and dredges the metals dissolved in them.",
+    apply: (s) => {
+      s.boatAcidProof = true;
     },
   },
   {

@@ -5,6 +5,7 @@
  *
  * Each entry will get its own pixel sprite (tools/art); until then `color` stands in.
  */
+import type { SeaKind } from "./seas";
 import type { CommodityId } from "./commodities";
 
 export type Climate = "cold" | "temperate" | "warm";
@@ -24,6 +25,8 @@ export interface FloraEntry {
   priceMult?: number;
   /** Lives in open water; only the boat can sample it (AW-17). */
   aquatic?: boolean;
+  /** Lives only in these exotic seas (AW-189), not in water. */
+  seas?: readonly SeaKind[];
 }
 
 export interface MineralSpecimen {
@@ -72,6 +75,8 @@ export const FLORA: readonly FloraEntry[] = [
   { id: "pyre-lily", name: "pyre lily", climates: ["warm"], rarity: 3, color: "#ff7a3d", blurb: "Blooms only after wildfire, from seeds that wait decades for the heat." },
   { id: "mirror-palm", name: "mirror palm", climates: ["warm"], rarity: 3, color: "#d6e2e6", blurb: "Fronds coated in a reflective wax so perfect it looks machined." },
   // --- sea life (open water; the boat samples it) ----------------------------------------------
+  { id: "azotosome-drift", name: "azotosome drift", climates: ["cold"], rarity: 3, aquatic: true, seas: ["methane"], priceMult: 2, color: "#d2a86e", blurb: "Cell-like bubbles of nitrogen and hydrocarbon skin, drifting in liquid methane at −180 °C. The Lyceum says it's alive. Nobody is sure what it's alive with." },
+  { id: "tholin-mat", name: "tholin mat", climates: ["cold"], rarity: 2, aquatic: true, seas: ["methane"], priceMult: 1.5, color: "#8a5a3c", blurb: "Rust-brown rafts of organic sludge that thicken and thin with the methane tides." },
   { id: "tide-bulb", name: "tide bulb", climates: ["cold", "temperate"], rarity: 1, aquatic: true, color: "#7fc7c0", blurb: "Floating bladders that bob in rafts and sink together at dusk. Nobody has found where they go." },
   { id: "reef-lace", name: "reef lace", climates: ["temperate", "warm"], rarity: 1, aquatic: true, color: "#e3b2c8", blurb: "A brittle mesh that grows on itself in the shallows, one lattice cell a day." },
   { id: "kelp-spire", name: "kelp spire", climates: ["cold", "temperate"], rarity: 2, aquatic: true, color: "#4f8a5e", blurb: "Stalks that rise straight from the seabed to just below the surface, and no higher." },

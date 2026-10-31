@@ -12,11 +12,15 @@ export const GAS_IDS = ["methane", "deuterium", "xenon", "helium3"] as const;
  */
 export const CONC_IDS = ["ironNickelConc", "copperConc", "titaniumConc", "rareEarthsConc", "uraniumConc", "platinumConc"] as const;
 
-export const COMMODITY_IDS = [...ORE_IDS, ...GAS_IDS, ...CONC_IDS] as const;
+/** Dredged from exotic seas (AW-189). */
+export const LIQUID_IDS = ["ammonia"] as const;
+
+export const COMMODITY_IDS = [...ORE_IDS, ...GAS_IDS, ...CONC_IDS, ...LIQUID_IDS] as const;
 
 export type OreId = (typeof ORE_IDS)[number];
 export type GasId = (typeof GAS_IDS)[number];
 export type ConcId = (typeof CONC_IDS)[number];
+export type LiquidId = (typeof LIQUID_IDS)[number];
 
 /** Tonnes of ore that make one tonne of concentrate. */
 export const CONC_RATIO = 2.5;
@@ -45,7 +49,7 @@ export interface Commodity {
   blurb: string;
 }
 
-const BASE: Record<OreId | GasId, Commodity> = {
+const BASE: Record<OreId | GasId | LiquidId, Commodity> = {
   ironNickel: {
     id: "ironNickel",
     name: "Iron-nickel ore",
@@ -118,6 +122,14 @@ const BASE: Record<OreId | GasId, Commodity> = {
     marketDepthT: 200,
     color: "#7fb8a0",
     blurb: "Feedstock for the Intrepid's plastics and chemical plants. Ice giants are full of it.",
+  },
+  ammonia: {
+    id: "ammonia",
+    name: "Ammonia",
+    basePrice: 45,
+    marketDepthT: 150,
+    color: "#c7d48a",
+    blurb: "Fertilizer for the Intrepid's farm decks and coolant for its plants. Dredged from seas where it's the ocean.",
   },
   deuterium: {
     id: "deuterium",

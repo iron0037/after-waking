@@ -2,6 +2,7 @@
  * The boat (AW-17): launched from a ship standing at the water's edge. It sails liquid hexes,
  * dredges seabed deposits, samples sea life, and can ferry the rover to put it ashore elsewhere.
  */
+import { SEAS } from "../data/seas";
 import { canEnter } from "./pathfinding";
 import { revealAround, roverChargePerHour, roverMobility, shipTile, visitRegion } from "./actions";
 import { hexDistance, neighbors } from "./hex";
@@ -60,6 +61,10 @@ export function launchBoatBlockers(state: GameState, world: World): string[] {
   if (!hasBoat(state)) return ["No boat aboard. The Midshipmen fit survey boats."];
   if (loc.rover) return [vehicleOf(loc.rover) === "boat" ? "The boat is already out." : "Stow the rover first (or take it along from the bay)."];
   if (!boatDock(state, world)) return ["The ship needs to stand at the water's edge to launch the boat. Hop it to a shore."];
+  // Exotic seas (AW-189): methane and acid need a kitted boat.
+  const sea = world.body(loc.bodyId).body.sea;
+  const needs = sea ? SEAS[sea].boatNeeds : null;
+  if (needs && !effectiveStats(state)[needs.flag]) return [`${needs.why} Check the Shipyard.`];
   return [];
 }
 

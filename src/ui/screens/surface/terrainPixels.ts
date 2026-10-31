@@ -15,6 +15,7 @@ import {
   liquidRule,
   lushRule,
   lushTexture,
+  terrainHex,
   TEX,
   TEX_SCALE,
   tintedTexture,
@@ -146,15 +147,18 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
   const height = Math.max(1, py1 - py0);
   const data = new Uint8ClampedArray(width * height * 4);
   const out: RegionPixels = { x: px0, y: py0, region, width, height, data };
+  // A world with an exotic sea paints its liquid in the sea's colour (data/seas.ts, AW-189).
+  const seaKind = surface.body.sea;
   const palette = TERRAIN_COLORS[kind].map(parseHex);
-  const textures = [0, 1, 2, 3, 4, 5].map((t) => tintedTexture(kind, t));
+  if (seaKind) palette[Terrain.liquid] = parseHex(terrainHex(kind, Terrain.liquid, seaKind));
+  const textures = [0, 1, 2, 3, 4, 5].map((t) => tintedTexture(kind, t, seaKind));
   // Verdant plains (steppe blends to lush meadow near the water) and liquid shaded by depth.
   const lush = lushRule({ kind, life: surface.body.life, tempC: surface.body.tempC });
   const lushTex = lush ? lushTexture(kind) : null;
-  const water = liquidRule(kind);
-  const depthColors = depthGradient(kind);
+  const water = liquidRule(kind, seaKind);
+  const depthColors = depthGradient(kind, seaKind);
   const waterTex = waterDetail();
-  const hasSea = kind === "terrestrial" || kind === "ocean";
+  const hasSea = kind === "terrestrial" || kind === "ocean" || seaKind !== undefined;
   const image = { data };
 
   // Elevation around the region (with a pad from the neighbours, so the hillshade runs on across the seams).

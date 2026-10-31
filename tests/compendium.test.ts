@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ORE_IDS } from "../src/data/commodities";
 import { FLORA, MINERAL_SPECIMENS, FLORA_BY_NAME } from "../src/data/catalog";
-import { bodySpecies, compendiumTotals, World } from "../src/sim";
+import { aquaticSpecies, bodySpecies, COMPENDIUM_MINERALS, compendiumTotals, World } from "../src/sim";
 import { runBot } from "../src/sim/bot";
 
 describe("catalog", () => {
@@ -23,8 +23,9 @@ describe("catalog", () => {
     const living = world.galaxy.systems.flatMap((s) => world.system(s.id).bodies).filter((b) => b.life);
     expect(living.length).toBeGreaterThan(0);
     for (const b of living) {
-      const species = bodySpecies(42, b);
-      expect(species.length).toBeGreaterThanOrEqual(3);
+      // Worlds with exotic seas (AW-189) keep their life in the sea.
+      const species = b.sea ? aquaticSpecies(42, b) : bodySpecies(42, b);
+      expect(species.length).toBeGreaterThanOrEqual(b.sea ? 1 : 3);
       for (const name of species) expect(FLORA_BY_NAME.has(name)).toBe(true);
     }
   });
@@ -35,7 +36,7 @@ describe("compendium", () => {
     const { state } = runBot(42, 6);
     const totals = compendiumTotals(state);
     expect(totals.mineral.found).toBeGreaterThanOrEqual(3);
-    expect(totals.all.total).toBe(ORE_IDS.length + MINERAL_SPECIMENS.length + FLORA.length);
+    expect(totals.all.total).toBe(COMPENDIUM_MINERALS.length + MINERAL_SPECIMENS.length + FLORA.length);
   });
 
   it("turns up mineral specimens over a career", () => {

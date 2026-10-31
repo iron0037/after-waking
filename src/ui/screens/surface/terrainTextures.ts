@@ -14,6 +14,7 @@
  */
 import type { BodyKind } from "../../../sim";
 import { Terrain } from "../../../sim";
+import { SEAS, type SeaKind } from "../../../data/seas";
 import { TERRAIN_COLORS } from "../../palette";
 
 /** Edge length of one tile in the atlas, in pixels. */
@@ -184,9 +185,15 @@ function parseHex(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
+/** The hex colour of a kind's terrain; liquid is the sea's own colour on a world with an exotic sea (AW-189). */
+export function terrainHex(kind: BodyKind, terrain: number, sea?: SeaKind): string {
+  if (sea && terrain === Terrain.liquid) return SEAS[sea].color;
+  return TERRAIN_COLORS[kind][terrain] as string;
+}
+
 /** The palette colour a terrain is recoloured to (ice and snow are pulled toward a darker blue-grey). */
-function paletteColor(kind: BodyKind, terrain: number): [number, number, number] {
-  const pal = parseHex(TERRAIN_COLORS[kind][terrain] as string);
+function paletteColor(kind: BodyKind, terrain: number, sea?: SeaKind): [number, number, number] {
+  const pal = parseHex(terrainHex(kind, terrain, sea));
   if (kind === "ice" && terrain !== Terrain.ice && terrain !== Terrain.lava && terrain !== Terrain.liquid) {
     // The bare ground between the sheets: greyer and darker than the palette's blue, mountains most.
     return desaturate(pal, ICE_ROCK_GREY).map((v) => v * ICE_ROCK_TONE * (terrain === Terrain.mountain ? 0.9 : 1)) as [number, number, number];
@@ -223,9 +230,9 @@ function texture(name: TexName): Decoded | null {
  * or null if textures aren't available. (Liquid comes back at its mid-depth colour; the map shades it by depth
  * with `depthGradient` and `waterDetail` instead.)
  */
-export function tintedTexture(kind: BodyKind, terrain: number): Uint8ClampedArray | null {
+export function tintedTexture(kind: BodyKind, terrain: number, sea?: SeaKind): Uint8ClampedArray | null {
   if (!atlas || !enabled) return null;
-  const key = `${kind}:${terrain}`;
+  const key = `${kind}:${terrain}${sea && terrain === Terrain.liquid ? ":" + sea : ""}`;
   const hit = tinted.get(key);
   if (hit) return hit;
   const name = TEXTURE_FOR[kind][terrain];
@@ -237,7 +244,7 @@ export function tintedTexture(kind: BodyKind, terrain: number): Uint8ClampedArra
     out = new Uint8ClampedArray(tex.rgb); // painted colours as they are
   } else {
     const amount = name === "steppe" ? STEPPE_AMOUNT : name === "shrub" ? SHRUB_AMOUNT : name === "scree" ? SCREE_AMOUNT : name === "peaks" ? PEAKS_AMOUNT : (AMOUNT[terrain] ?? 1);
-    let pal = paletteColor(kind, terrain);
+    let pal = paletteColor(kind, terrain, sea);
     if (name === "steppe") {
       pal = pal.map((v, c) => (v + ((STEPPE_TINT[c] as number) - v) * 0.3) * 0.95) as [number, number, number];
       pal = desaturate(pal, STEPPE_DESAT);
@@ -287,7 +294,8 @@ export interface LiquidRule {
   range: number;
 }
 
-export function liquidRule(kind: BodyKind): LiquidRule {
+export function liquidRule(kind: BodyKind, sea?: SeaKind): LiquidRule {
+  if (sea) return { level: 0.34, range: 0.13 }; // exotic seas sit in the lowlands (EXOTIC_SEA_LEVEL in sim/surface.ts)
   if (kind === "ocean") return { level: 0.6, range: 0.3 };
   if (kind === "terrestrial") return { level: 0.32, range: 0.13 };
   return { level: 0.4, range: 0.2 };
@@ -301,15 +309,15 @@ export const DEPTH_STEPS = 12;
  * lightened toward the shore and darkened to a deep tone offshore. It works from the body kind's liquid colour,
  * so methane and acid seas deepen the same way water does.
  */
-export function depthGradient(kind: BodyKind): Float32Array {
-  const pal = parseHex(TERRAIN_COLORS[kind][Terrain.liquid] as string);
+export function depthGradient(kind: BodyKind, sea?: SeaKind): Float32Array {
+  const pal = parseHex(terrainHex(kind, Terrain.liquid, sea));
   const out = new Float32Array(DEPTH_STEPS * 3);
   for (let k = 0; k < DEPTH_STEPS; k++) {
     const d = k / (DEPTH_STEPS - 1);
     for (let c = 0; c < 3; c++) {
       const v = pal[c] as number;
-      const shallow = v + (255 - v) * 0.2;
-      const mid = v * 0.92;
+      const shallow = v + (255 - v) * (sea ? 0.08 : 0.2); // exotic seas stay dark and still, even at the shore
+      const mid = v * (sea ? 0.74 : 0.92); // darker than the land beside it, so a yellow acid sea reads against yellow ground
       const deep = v * 0.33;
       out[k * 3 + c] = d < 0.35 ? shallow + (mid - shallow) * (d / 0.35) : mid + (deep - mid) * ((d - 0.35) / 0.65);
     }
@@ -345,11 +353,11 @@ const swatches = new Map<string, string>();
  * A small sample of the textured terrain as a data URL, for the map legend; null until the
  * textures load (the legend falls back to the flat palette colour).
  */
-export function terrainSwatch(kind: BodyKind, terrain: number, size = 28): string | null {
-  const key = `${kind}:${terrain}:${size}`;
+export function terrainSwatch(kind: BodyKind, terrain: number, size = 28, sea?: SeaKind): string | null {
+  const key = `${kind}:${terrain}:${size}${sea && terrain === Terrain.liquid ? ":" + sea : ""}`;
   const hit = swatches.get(key);
   if (hit) return hit;
-  const tex = tintedTexture(kind, terrain);
+  const tex = tintedTexture(kind, terrain, sea);
   if (!tex || typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
   canvas.width = size;

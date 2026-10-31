@@ -3,9 +3,10 @@
  * unfound ones are silhouettes with just enough of a hint to go looking.
  */
 import { useState } from "preact/hooks";
-import { COMMODITIES, ORE_IDS } from "../data/commodities";
+import { COMMODITIES } from "../data/commodities";
+import { SEAS } from "../data/seas";
 import { FLORA, MINERAL_SPECIMENS, type Rarity } from "../data/catalog";
-import { compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
+import { COMPENDIUM_MINERALS, compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
 import { CompIcon, useSpriteIndex } from "./compendiumSprites";
 import type { GameSession } from "./session";
 
@@ -34,12 +35,16 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
     name: f.name,
     color: f.color,
     blurb: f.blurb,
-    hint: f.floating ? "Drifts in the atmosphere of a gas or ice giant; only a probe can bring one up" : `Grows on ${f.climates.map((c) => CLIMATE_HINT[c]).join(" and ")}`,
+    hint: f.floating
+      ? "Drifts in the atmosphere of a gas or ice giant; only a probe can bring one up"
+      : f.seas
+        ? `Lives in seas of ${f.seas.map((s) => SEAS[s].liquid).join(" and ")}; sample it from the boat`
+        : `Grows on ${f.climates.map((c) => CLIMATE_HINT[c]).join(" and ")}`,
     rarity: f.rarity,
   });
   const flora: Card[] = FLORA.filter((f) => !f.floating).map(floraCard);
   const floating: Card[] = FLORA.filter((f) => f.floating).map(floraCard);
-  const ores: Card[] = ORE_IDS.map((id) => ({
+  const ores: Card[] = COMPENDIUM_MINERALS.map((id) => ({
     key: compendiumKey("mineral", id),
     name: COMMODITIES[id].name,
     color: COMMODITIES[id].color,

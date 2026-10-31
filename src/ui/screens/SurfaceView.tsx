@@ -83,6 +83,7 @@ import {
   surfaceFlora,
   Terrain,
   TERRAIN_INFO,
+  terrainName,
   type BodySurface,
   type Deposit,
   type FloraSite,
@@ -107,11 +108,11 @@ import {
   workDeposit,
 } from "../../sim";
 import { cargoList, pct, tonnes } from "../format";
-import { TERRAIN_COLORS, UI } from "../palette";
+import { UI } from "../palette";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
 import { RescuePanel } from "../Rescue";
-import { terrainSwatch } from "./surface/terrainTextures";
+import { terrainHex, terrainSwatch } from "./surface/terrainTextures";
 import { Canvas } from "../Canvas";
 import {
   cameraLayout,
@@ -795,10 +796,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   /** Terrain name, with the region when it isn't the one the rover (or ship) is in. */
   const tileName = (tile: Vec2): string => {
-    const info = TERRAIN_INFO[(surface.terrainAt(tile.x, tile.y) ?? Terrain.plain) as Terrain];
+    const name = terrainName(body, (surface.terrainAt(tile.x, tile.y) ?? Terrain.plain) as Terrain);
     const r = surface.regionAt(tile.x, tile.y);
     const where = r !== null && r !== active ? ` · region ${r + 1}` : "";
-    return `${info.name}${isShipTile(tile) ? " · ship" : ""}${where}`;
+    return `${name}${isShipTile(tile) ? " · ship" : ""}${where}`;
   };
 
   const hopTooltip = (tile: Vec2): TipLine[] => {
@@ -1140,11 +1141,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 <i
                   style={(() => {
                     // The legend shows a sample of the real texture, once the textures are in.
-                    const url = terrainSwatch(body.kind, t);
-                    return url ? { background: `url(${url}) center / cover` } : { background: TERRAIN_COLORS[body.kind][t] };
+                    const url = terrainSwatch(body.kind, t, 28, body.sea);
+                    return url ? { background: `url(${url}) center / cover` } : { background: terrainHex(body.kind, t, body.sea) };
                   })()}
                 />
-                {TERRAIN_INFO[t].name}
+                {terrainName(body, t)}
                 {TERRAIN_INFO[t].passable === "climb" && !canClimb ? " ✕" : ""}
               </span>
             ))}

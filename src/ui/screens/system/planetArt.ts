@@ -4,6 +4,7 @@
  * shading is laid over it each frame, so the terminator tracks the orbit without re-rendering.
  * Everything is stable per body: noise is seeded from the game seed and the body id.
  */
+import { SEAS } from "../../../data/seas";
 import { fbm, hashSeed, type Body } from "../../../sim";
 import { BODY_COLOR, TERRAIN_COLORS } from "../../palette";
 import { hexRgb } from "./util";
@@ -87,7 +88,8 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
   const rnd = stream(h("art"));
   const liquidWorld = body.surface === "liquid";
   // A global ocean has no dry land at all: sea level above every peak (depth still shades the water).
-  const sea = liquidWorld ? 1.05 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
+  // Worlds with exotic seas (methane, ammonia, acid) have lowland seas in the sea's own colour (AW-189).
+  const sea = liquidWorld ? 1.05 : body.sea ? 0.44 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
   const capLat = body.tempC > 45 ? 9 : Math.max(0.3, Math.min(1.42, 1.45 - (15 - body.tempC) * 0.025));
   const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
   return {
@@ -101,7 +103,7 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
     rough: hexRgb(t[1]),
     mountain: hexRgb(t[2]),
     ice: hexRgb(t[3]),
-    liquid: hexRgb(t[4]),
+    liquid: hexRgb(body.sea ? SEAS[body.sea].color : t[4]),
     lava: hexRgb(t[5]),
     base: hexRgb(BODY_COLOR[body.kind]),
     sea,

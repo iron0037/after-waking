@@ -3,6 +3,7 @@
  * from the galaxy seed. Orbits are real-scale (AU) so that inner worlds are short hops and the
  * outer system is a long haul.
  */
+import type { SeaKind } from "../data/seas";
 import { ORE_IDS, type CommodityId } from "../data/commodities";
 import { moonSuffix, roman } from "../data/names";
 import type { SpectralClass, StarSystem } from "./galaxy";
@@ -56,6 +57,8 @@ export interface Body {
   moonIds: string[];
   /** A calm home-system world tuned for new captains: shallow seams, mild hazards. */
   easy?: boolean;
+  /** Its seas, if they aren't water (world generation 3, AW-189). */
+  sea?: SeaKind;
   /** What the crews call it, e.g. "the Meadow". */
   nickname?: string;
 }
@@ -110,10 +113,10 @@ interface Ctx {
  * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
  * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145).
  */
-export const WORLD_GEN_LATEST = 2;
+export const WORLD_GEN_LATEST = 3;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
-  if (gen >= 2) return generateSystemV2(galaxySeed, sys);
+  if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);
   const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system", sys.id), bodies: [] };
   const { rng } = ctx;
   const frost = 2.7 * Math.sqrt(sys.luminosity);
@@ -468,8 +471,8 @@ export function systemArchitecture(galaxySeed: number, sys: StarSystem): Archite
   return rngFor(galaxySeed, "system2-arch", sys.id).weighted(ARCHITECTURES[sys.spectral]);
 }
 
-function generateSystemV2(galaxySeed: number, sys: StarSystem): SystemDetail {
-  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system2", sys.id), bodies: [], gen: 2 };
+function generateSystemV2(galaxySeed: number, sys: StarSystem, gen = 2): SystemDetail {
+  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system2", sys.id), bodies: [], gen };
   const { rng } = ctx;
   // Around a star of luminosity L, a world gets Earth's sunlight at sqrt(L) AU; the frost line sits ~2.7x out.
   const hz = Math.sqrt(sys.luminosity);
@@ -595,6 +598,7 @@ function generateSystemV2(galaxySeed: number, sys: StarSystem): SystemDetail {
   });
   const outermost = Math.max(...ctx.bodies.filter((b) => b.parentId === null).map((b) => b.orbitAU));
   // The fold limit hugs the outermost world: compact red-dwarf systems are tiny.
+  if (gen >= 3) addExoticSeas(galaxySeed, ctx.bodies);
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(outermost * 1.5, hz * 0.8, 0.06), frostLineAU: frost };
 }
 
@@ -613,4 +617,34 @@ function makeMiniGiant(ctx: Ctx, id: string, name: string, a: number, kind: "gas
     pressureAtm: Infinity,
     tempC: equilibriumK(sys, a) - 273,
   });
+}
+
+/**
+ * What a world's seas are made of, if not water (world generation 3, AW-189): methane and ethane on
+ * very cold worlds with air, ammonia on cold ones, sulfuric acid on hot corrosive ones. Water worlds,
+ * volcanic worlds (lava), asteroids and the home systems' easy worlds keep what they had.
+ */
+export function exoticSea(b: Body): SeaKind | undefined {
+  if (b.surface === "none" || b.easy) return undefined;
+  if (b.kind === "ocean" || b.kind === "terrestrial" || b.kind === "volcanic" || b.kind === "asteroid") return undefined;
+  const p = b.pressureAtm;
+  const t = b.tempC;
+  if (p >= 0.3 && t > -186 && t <= -150) return "methane";
+  if (p >= 0.3 && t > -100 && t <= -35) return "ammonia";
+  if (b.chemistry === "corrosive" && p >= 1 && t >= 100 && t <= 330) return "acid";
+  return undefined;
+}
+
+/**
+ * Generation 3's pass over a finished system: give worlds their exotic seas. It reads the bodies and
+ * draws only from its own streams, so every body, orbit and deposit stays where generation 2 put it.
+ * Some methane seas hold life.
+ */
+function addExoticSeas(galaxySeed: number, bodies: Body[]): void {
+  for (const b of bodies) {
+    const sea = exoticSea(b);
+    if (!sea) continue;
+    b.sea = sea;
+    if (sea === "methane" && !b.life && rngFor(galaxySeed, b.id, "exo-life").chance(0.5)) b.life = true;
+  }
 }

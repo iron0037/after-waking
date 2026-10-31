@@ -3,6 +3,7 @@
  * as a top-down tile map (one tile ≈ 2 km). Terrain and deposits regenerate from the seed;
  * what the player has discovered or dug out is stored separately in RegionKnowledge.
  */
+import { SEAS } from "../data/seas";
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
@@ -32,6 +33,15 @@ export const TERRAIN_INFO: Record<Terrain, { name: string; minutes: number; ener
   [Terrain.liquid]: { name: "Liquid", minutes: 0, energy: 0, passable: "no" },
   [Terrain.lava]: { name: "Lava", minutes: 0, energy: 0, passable: "no" },
 };
+
+/** What a terrain is called on this world: its liquid is "Liquid methane" (or ammonia, sulfuric acid) where the seas aren't water (AW-189). */
+export function terrainName(body: Pick<Body, "sea">, terrain: Terrain): string {
+  if (terrain === Terrain.liquid && body.sea) {
+    const liquid = SEAS[body.sea].liquid;
+    return liquid.charAt(0).toUpperCase() + liquid.slice(1);
+  }
+  return TERRAIN_INFO[terrain].name;
+}
 
 export interface DepositSpec {
   id: number;
@@ -160,7 +170,8 @@ export function exploredFraction(k: RegionKnowledge | undefined): number {
 
 /** The handful of catalogued plant species that grow on a living world, by climate; stable per body. */
 export function bodySpecies(seed: number, body: Body): string[] {
-  if (!body.life) return [];
+  // Life on a world with exotic seas lives in the sea (AW-189).
+  if (!body.life || body.sea) return [];
   const rng = rngFor(seed, body.id, "species");
   const climate = climateOf(body.tempC);
   // Land plants only: sea life has its own list (aquaticSpecies), so adding it never reshuffles these.
@@ -175,9 +186,12 @@ export function bodySpecies(seed: number, body: Body): string[] {
 
 /** Sea life on a living world with open water (AW-17), from its own stream. */
 export function aquaticSpecies(seed: number, body: Body): string[] {
-  if (!body.life || (body.kind !== "terrestrial" && body.kind !== "ocean") || body.tempC < -10) return [];
+  if (!body.life) return [];
+  const sea = body.sea;
+  if (!sea && ((body.kind !== "terrestrial" && body.kind !== "ocean") || body.tempC < -10)) return [];
   const climate = climateOf(body.tempC);
-  const pool = FLORA.filter((f) => f.aquatic && f.climates.includes(climate));
+  // Water life lives in water; methane life only in methane (AW-189).
+  const pool = FLORA.filter((f) => f.aquatic && (sea ? f.seas?.includes(sea) : !f.seas && f.climates.includes(climate)));
   if (pool.length === 0) return [];
   const rng = rngFor(seed, body.id, "sea-species");
   const names = new Set<string>();
@@ -204,11 +218,13 @@ function seaSites(seed: number, body: Body, region: number, terrain: Uint8Array,
     const i = water[rng.int(0, water.length - 1)] as number;
     return { x: i % w, y: Math.floor(i / w) };
   };
-  const entries = Object.entries(body.resources) as [CommodityId, number][];
-  const nDeposits = entries.length === 0 ? 0 : body.kind === "ocean" ? rng.int(2, 4) : rng.int(0, 2);
+  // Exotic seas hold what they're made of, and what's dissolved in them (AW-189).
+  const exotic = body.sea ? SEAS[body.sea].dredge : null;
+  const entries = exotic ?? (Object.entries(body.resources) as [CommodityId, number][]);
+  const nDeposits = entries.length === 0 ? 0 : body.kind === "ocean" ? rng.int(2, 4) : exotic ? rng.int(2, 3) : rng.int(0, 2);
   const scale = frontierTonnage(seed, body);
   const deposits: Deposit[] = Array.from({ length: nDeposits }, (_, i) => {
-    const spec = depositSpec(rng, body, entries, rng.range(0.5, 1.3), SEA_ID_BASE + i);
+    const spec = depositSpec(rng, body, entries, exotic ? 2.5 : rng.range(0.5, 1.3), SEA_ID_BASE + i);
     return { ...spec, tonnes: Math.max(5, Math.round(spec.tonnes * scale)), ...at() };
   });
   const species = aquaticSpecies(seed, body);
@@ -473,6 +489,9 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };
 }
 
+/** Elevation below which a world with exotic seas is sea: lowland seas and lakes, like a terrestrial world's. */
+export const EXOTIC_SEA_LEVEL = 0.34;
+
 /** Elevation below which an ocean world is sea: about three-quarters water, in island chains (terrestrial worlds use 0.32). */
 export const OCEAN_SEA_LEVEL = 0.6;
 
@@ -482,6 +501,8 @@ function classify(body: Body, e: number, rough: number, seaLevel: number, rugged
   const frozen = body.tempC < -10;
 
   if (body.kind === "volcanic" && e < 0.22 + seaLevel * 0.5) return Terrain.lava;
+  // Exotic seas (AW-189): the lowlands hold liquid ammonia, methane or acid, never frozen.
+  if (body.sea && e < EXOTIC_SEA_LEVEL + seaLevel) return Terrain.liquid;
   // Ocean worlds are open sea with island chains; terrestrial worlds have lakes and inland seas.
   if ((body.kind === "terrestrial" || body.kind === "ocean") && e < (body.kind === "ocean" ? OCEAN_SEA_LEVEL : 0.32) + seaLevel) {
     return frozen ? Terrain.ice : Terrain.liquid;

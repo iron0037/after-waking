@@ -4,7 +4,10 @@
  *
  * Like contracts.ts, this writes the journal directly so it can be used from anywhere.
  */
-import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
+import { COMMODITIES, LIQUID_IDS, ORE_IDS, type CommodityId } from "../data/commodities";
+
+/** What the Compendium lists as minerals: the ores, plus what's dredged from exotic seas (AW-189). */
+export const COMPENDIUM_MINERALS: readonly CommodityId[] = [...ORE_IDS, ...LIQUID_IDS];
 import { FLORA, MINERAL_SPECIMENS, type CompendiumKind, type MineralSpecimen } from "../data/catalog";
 import type { Rng } from "./rng";
 import type { GameState } from "./state";
@@ -41,7 +44,7 @@ export interface CompendiumTotals {
 
 export function compendiumTotals(state: GameState): CompendiumTotals {
   const has = (kind: CompendiumKind, id: string) => Boolean(state.compendium?.[compendiumKey(kind, id)]);
-  const mineral = { found: ORE_IDS.filter((id) => has("mineral", id)).length, total: ORE_IDS.length };
+  const mineral = { found: COMPENDIUM_MINERALS.filter((id) => has("mineral", id)).length, total: COMPENDIUM_MINERALS.length };
   const gem = { found: MINERAL_SPECIMENS.filter((g) => has("gem", g.id)).length, total: MINERAL_SPECIMENS.length };
   const flora = { found: FLORA.filter((f) => has("flora", f.id)).length, total: FLORA.length };
   return {

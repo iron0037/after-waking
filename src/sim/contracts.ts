@@ -190,7 +190,8 @@ export function exclusiveContract(rng: Rng, serial: number): Contract {
 }
 
 const worldCache = new Map<string, World>();
-function worldFor(seed: number, gen: number): World {
+/** A cached World for sim code that only has the state (the UI and actions pass theirs in). */
+export function worldFor(seed: number, gen: number): World {
   const key = `${seed}:${gen}`;
   let w = worldCache.get(key);
   if (!w) {

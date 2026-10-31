@@ -3,6 +3,7 @@
  * up. Some triggers are read from the state here; screens raise the rest (what's on screen). The
  * entries themselves live in src/data/archive.ts.
  */
+import { worldFor } from "./contracts";
 import { CLUES_FOR_STRANGE } from "../data/clues";
 import { ARCHIVE, ARCHIVE_BY_ID, type ArchiveEntry, type ArchiveTrigger } from "../data/archive";
 import { fail, ok, type Result } from "./result";
@@ -19,6 +20,7 @@ export function guidanceOn(state: GameState): boolean {
 /** Triggers that hold in the current state (screens add their own). */
 export function archiveStateTriggers(state: GameState): ArchiveTrigger[] {
   const out: ArchiveTrigger[] = ["start"];
+  const seaOf = (bodyId: string) => worldFor(state.seed, state.worldGen ?? 1).body(bodyId).body.sea;
   const loc = state.location;
   if (loc.kind === "intrepid") out.push("intrepid");
   if (loc.kind === "space") {
@@ -27,6 +29,8 @@ export function archiveStateTriggers(state: GameState): ArchiveTrigger[] {
     if (loc.orbiting && state.scannedBodies.includes(loc.orbiting)) out.push("orbit-scanned");
   }
   if (loc.kind === "surface") out.push("surface");
+  const here = loc.kind === "surface" ? loc.bodyId : loc.kind === "space" ? loc.orbiting : null;
+  if (here && state.scannedBodies.includes(here) && seaOf(here)) out.push("exotic-sea");
   if (loc.kind === "deep") out.push("deep");
   const stats = effectiveStats(state);
   if (cargoTonnes(state.ship.cargo) >= stats.cargoCapacityT * 0.9) out.push("hold-full");
