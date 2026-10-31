@@ -679,7 +679,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             <ProbePanel session={session} body={selected} orbiting={orbitingSel} scanned={scanned} busy={busy} />
 
             {scanned ? (
-              <Environment body={selected} ratings={stats.ratings} />
+              <Environment body={selected} ratings={stats.ratings} state={state} />
             ) : (
               <div class="sys-unscanned muted small">
                 Unscanned: {orbitingSel ? "scan to reveal its environment and resources." : "enter orbit and scan to reveal its environment and resources."}

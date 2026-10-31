@@ -154,6 +154,8 @@ export interface GameState {
   deepScans?: { x: number; y: number; r: number; t: number }[];
   /** What the array has picked out between the stars: identified, or a faint return. */
   deepKnown?: Record<string, "known" | "faint">;
+  /** Floating life brought up from each giant by probes (playtest 15), so the life-signs readout can confirm it. */
+  giantLife?: Record<string, string[]>;
   /** Clan relations (AW-22): each clan's standing with you (-100..100; missing means its starting value), and recent changes. */
   reputation?: Partial<Record<ClanId, number>>;
   repLog?: RepChange[];

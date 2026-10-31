@@ -313,6 +313,7 @@ function finishDive(state: GameState, world: World): DiveResult {
         state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + 1;
         const entry = FLORA_BY_NAME.get(floater);
         if (entry) recordFind(state, "flora", entry.id, body.name, entry.name);
+        noteGiantLife(state, body.id, floater);
         log(state, "discovery", `Something alive came up in the canisters: a ${floater}, still drifting in its sample jar.`);
       } else {
         log(state, "warning", `A ${floater} came up in the canisters, but the containment racks are full. It had to be released.`);
@@ -345,4 +346,34 @@ export function buyProbes(state: GameState, count: number): Result<number> {
   state.ship.probes = (state.ship.probes ?? 0) + n;
   log(state, "trade", `Bought ${n} atmospheric probe${n === 1 ? "" : "s"} from the Lyceum for ${(n * PROBE_PRICE).toLocaleString()} cr.`);
   return ok(n);
+}
+
+function noteGiantLife(state: GameState, bodyId: string, species: string): void {
+  state.giantLife ??= {};
+  const seen = (state.giantLife[bodyId] ??= []);
+  if (!seen.includes(species)) seen.push(species);
+}
+
+export interface LifeSigns {
+  label: string;
+  /** "good" when life is known here, "muted" otherwise. */
+  tone: "good" | "muted";
+  title?: string;
+}
+
+/**
+ * What the world info says about life (playtest 15). Worlds with a surface read it from orbit. Giants
+ * can't be read from orbit: drifting life lives only in the deep layers, and only a probe that comes
+ * back from band 3 or deeper can bring some up; once one has, it's confirmed by name.
+ */
+export function lifeSigns(state: GameState, body: Body): LifeSigns {
+  const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
+  if (!giant) return body.life ? { label: "Detected", tone: "good" } : { label: "None detected", tone: "muted" };
+  const found = state.giantLife?.[body.id] ?? [];
+  if (found.length > 0) return { label: `Confirmed: ${found.join(", ")}`, tone: "good", title: "Brought up from the deep layers by your probes." };
+  return {
+    label: "Unknown below the clouds",
+    tone: "muted",
+    title: `Drifting life lives only in the deep layers. A probe back from band 3 or deeper sometimes brings some up${body.kind === "iceGiant" ? " (about half as often on ice giants)" : ""}.`,
+  };
 }

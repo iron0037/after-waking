@@ -77,3 +77,16 @@ describe("surface lists", () => {
     expect(regions.every((r) => Number.isInteger(r))).toBe(true);
   });
 });
+
+describe("life signs", () => {
+  it("giants can't be read from orbit; a floater brought up confirms life there", async () => {
+    const { lifeSigns } = await import("../src/sim");
+    const s = newGame({ seed: 42 });
+    const giant = world.galaxy.systems.flatMap((x) => world.system(x.id).bodies).find((b) => b.kind === "gasGiant")!;
+    expect(lifeSigns(s, giant).label).toMatch(/Unknown/);
+    s.giantLife = { [giant.id]: ["abyssal bloom"] };
+    expect(lifeSigns(s, giant)).toMatchObject({ tone: "good", label: "Confirmed: abyssal bloom" });
+    const rock = world.galaxy.systems.flatMap((x) => world.system(x.id).bodies).find((b) => b.kind === "barren")!;
+    expect(lifeSigns(s, rock).label).toBe("None detected");
+  });
+});

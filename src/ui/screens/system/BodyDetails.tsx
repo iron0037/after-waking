@@ -20,6 +20,7 @@ import {
   type Contract,
   type GameState,
   type SystemDetail,
+  lifeSigns,
 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
 import { pct } from "../../format";
@@ -156,7 +157,7 @@ export function Exploration({
  * The body's conditions. Red marks exactly what stops your current ship landing (with the reason on
  * hover), so a glance tells you whether a trip there is worth it.
  */
-export function Environment({ body, ratings }: { body: Body; ratings: Ratings }) {
+export function Environment({ body, ratings, state }: { body: Body; ratings: Ratings; state: GameState }) {
   const resources = (Object.entries(body.resources) as [CommodityId, number][]).sort((a, b) => b[1] - a[1]);
   const regionText = body.regions > 0 ? `${body.regions}` : "None";
   const over = {
@@ -215,7 +216,14 @@ export function Environment({ body, ratings }: { body: Body; ratings: Ratings })
         <dt>Regions</dt>
         <dd>{regionText}</dd>
         <dt>Life signs</dt>
-        <dd class={body.life ? "good" : "muted"}>{body.life ? "Detected" : "None detected"}</dd>
+        {(() => {
+          const life = lifeSigns(state, body);
+          return (
+            <dd class={life.tone} title={life.title}>
+              {life.label}
+            </dd>
+          );
+        })()}
       </dl>
       {body.sea && <div class="muted small sys-sea-note">{SEAS[body.sea].note}</div>}
 

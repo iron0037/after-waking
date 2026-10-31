@@ -1,3 +1,4 @@
+import { FLORA_BY_NAME } from "../data/catalog";
 import { noticeFind } from "./covenant";
 /** Save files are the GameState as JSON. The universe regenerates from the seed. */
 import { gasDeliveryReward } from "./contracts";
@@ -37,6 +38,14 @@ export function deserialize(json: string): GameState {
   }
   // Saves from before world generations existed were built by generation 1 (AW-145).
   data.worldGen ??= 1;
+  // Floating life already in the racks confirms life on the giant it came from (playtest 15).
+  for (const key of Object.keys(data.ship.specimens ?? {})) {
+    const [bodyId, species] = key.split("|");
+    if (!bodyId || !species || !FLORA_BY_NAME.get(species)?.floating) continue;
+    data.giantLife ??= {};
+    const seen = (data.giantLife[bodyId] ??= []);
+    if (!seen.includes(species)) seen.push(species);
+  }
   // The Covenant's dossier (AW-25): finds made before it existed still count as evidence.
   for (const key of Object.keys(data.compendium ?? {})) {
     const [kind, id] = key.split(":");
