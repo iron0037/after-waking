@@ -13,3 +13,6 @@ docs/reference/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Scratch measurement tests (never commit)
+tests/tmp_*
