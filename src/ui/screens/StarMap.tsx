@@ -393,11 +393,20 @@ export function StarMap({ session }: { session: GameSession }) {
     view.current.userMoved = false;
   };
 
+  // H = home: centre on the ship (the same as the button). A ref so the listener always sees the current position.
+  const centerRef = useRef(centerOnShip);
+  centerRef.current = centerOnShip;
+
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const el = ev.target;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
       if (ev.key === "Escape") {
         setSelected(null);
         setDeepPoint(null);
+      } else if ((ev.key === "h" || ev.key === "H") && !session.state.encounter && !session.encounterDebrief) {
+        centerRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1051,7 +1060,7 @@ export function StarMap({ session }: { session: GameSession }) {
           <button class="btn" onClick={fitAll}>
             Fit all
           </button>
-          <button class="btn" onClick={centerOnShip}>
+          <button class="btn" onClick={centerOnShip} title="Center on the ship (H)">
             Center on ship
           </button>
         </div>
@@ -1069,7 +1078,7 @@ export function StarMap({ session }: { session: GameSession }) {
             <span class="sm-blind">···</span> blind range · <span class="sm-anomaly">◎</span> deep site · <span class="sm-faint">?</span> faint return
           </div>
         </div>
-        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · Esc: clear</div>
+        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · H: home (centre on ship) · Esc: clear</div>
       </div>
 
       <aside class="side">

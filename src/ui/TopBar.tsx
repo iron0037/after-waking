@@ -56,7 +56,7 @@ export function TopBar({
           <span style={{ width: `${pct(state.ship.fuel, stats.fuelCapacity)}%` }} />
         </div>
       </div>
-      <button class="tb-block tb-click" onClick={onShip} title="Ship status: hold, specimens, vehicles, refinery (H)">
+      <button class="tb-block tb-click" onClick={onShip} title="Ship status: hold, specimens, vehicles, refinery (I)">
         <div class="tb-label">Hold</div>
         <div class="tb-value">{cargoSummary(state.ship.cargo, stats.cargoCapacityT)}</div>
       </button>
@@ -73,7 +73,7 @@ export function TopBar({
         </div>
       </div>
       <div class="tb-spacer" />
-      <button class="btn" onClick={onShip} title="Ship status: hold, specimens, vehicles, damage, refinery (H)">
+      <button class="btn" onClick={onShip} title="Ship status: hold, specimens, vehicles, damage, refinery (I)">
         Ship
       </button>
       <button class="btn" onClick={onContracts} title="Contracts (K)">

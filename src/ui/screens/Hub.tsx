@@ -1219,7 +1219,7 @@ function Research({ session }: { session: GameSession }) {
                     </button>
                     <button
                       class={`btn ${(state.trackedResearch ?? []).includes(p.id) ? "primary" : ""}`}
-                      title="Pin this project's needs to the ship status window (H) and the star map while you're out"
+                      title="Pin this project's needs to the ship status window (I) and the star map while you're out"
                       onClick={() => session.act((s) => toggleTrackResearch(s, p.id))}
                     >
                       {(state.trackedResearch ?? []).includes(p.id) ? "Tracking ✓" : "Track"}

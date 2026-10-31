@@ -79,7 +79,7 @@ export const ARCHIVE: readonly ArchiveEntry[] = [
     title: "The Exchange's note",
     text:
       "The note on your ship falls due every 120 days at the Exchange's rate. Missed payments accrue penalties and are remembered. Payment is taken from your credits when it falls due, wherever you are.",
-    gloss: "Keep a payment's worth of credits in hand when you leave port. The Ship window (H) shows when the next one is due.",
+    gloss: "Keep a payment's worth of credits in hand when you leave port. The Ship window (I) shows when the next one is due.",
   },
   {
     id: "starmap",

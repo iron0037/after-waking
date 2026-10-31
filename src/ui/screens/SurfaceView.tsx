@@ -135,7 +135,9 @@ import {
   drawRoute,
   drawRover,
   drawSensorRange,
+  drawSelectedHex,
   drawShip,
+  drawShipBeacon,
   drawShoreTargets,
   drawTooltip,
   fitSize,
@@ -766,7 +768,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       }
     }
 
+    if (hexSel && hexData) drawSelectedHex(ctx, L, hexSel);
     if (tile) drawSensorRange(ctx, L, tile, sweep);
+    drawShipBeacon(ctx, L, ship, t);
     drawShip(ctx, L, ship);
     // Flagged but unidentified: a "?" until the sensors get close (the sweep in progress identifies some).
     const unknowns = sensedSites(state, surface, loc.bodyId, inView).filter((u) => !rc || (!rc.deposits.has(u.key) && !rc.flora.has(u.key)));
@@ -1101,6 +1105,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       zoomBy(1 / ZOOM_STEP);
       return;
     }
+    if (key === "h") {
+      // Home: centre the map on the ship, as a list click centres on a deposit.
+      if (session.state.encounter || session.encounterDebrief) return;
+      if (rover) centreOn(ship);
+      else setFollowing(true); // no rover out: the camera already follows the ship, so just pick it back up
+      return;
+    }
     if (session.busy) return;
     const dir = KEY_DIRS[key];
     if (dir) {
@@ -1157,14 +1168,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         <div class="surface-footer">
           <div class="viewport-hint">
             {ashoreOn
-              ? "Click a lit shore hex beside the boat to put the rover ashore · Esc to cancel · drag to pan, scroll to zoom"
+              ? "Click a lit shore hex beside the boat to put the rover ashore · Esc to cancel · H home · drag to pan, scroll to zoom"
               : moveMode && !rover
-                ? "Click a clear tile to set the ship down · Esc to cancel · drag to pan, scroll to zoom"
+                ? "Click a clear tile to set the ship down · Esc to cancel · H home · drag to pan, scroll to zoom"
                 : isBoat
-                  ? "Click or Q/E/A/D/Z/C to sail · R stow at ship · F work selected seabed deposit · drag to pan, scroll to zoom"
+                  ? "Click or Q/E/A/D/Z/C to sail · R stow at ship · F work selected seabed deposit · H home · drag to pan, scroll to zoom"
                   : rover
-                    ? `Click or Q/E/A/D/Z/C to drive · R stow at ship · F work selected deposit${parkedBoat ? " · the boat waits offshore" : ""} · drag to pan, scroll to zoom`
-                    : `R deploy rover${hasBoat(state) ? " · B launch boat" : ""} · Hover for terrain · drag to pan, scroll to zoom`}
+                    ? `Click or Q/E/A/D/Z/C to drive · R stow at ship · F work selected deposit${parkedBoat ? " · the boat waits offshore" : ""} · H home · drag to pan, scroll to zoom`
+                    : `R deploy rover${hasBoat(state) ? " · B launch boat" : ""} · H home · Hover for terrain · drag to pan, scroll to zoom`}
           </div>
           <div class="surface-legend">
             {present.map((t) => (
@@ -1511,6 +1522,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             const c = COMMODITIES[d.commodity];
             const quote = lastKnownPrice(state, d.commodity);
             const priceTip = `${c.name}: ${quote.price} cr/t at the Intrepid (${quote.asOf === null ? "live" : `as of ${formatDate(quote.asOf)}`})`;
+            // The Status cell speaks to the seam itself; the rest of the row still says which region it is in.
+            const statusTip =
+              status === "depleted"
+                ? "Worked out"
+                : status === "prospected"
+                  ? `About ${tonnes(remainingTonnes(m.know, d))} of ${c.name.toLowerCase()} left`
+                  : "Tonnage unknown: prospect it to measure the seam";
             return (
               <tr
                 key={d.key}
@@ -1530,7 +1548,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                   {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
                 </td>
                 <td class="num">{dist}</td>
-                <td>
+                <td title={statusTip}>
                   {status === "new" && <span class="tag new">new</span>}
                   {status === "prospected" && <span class="tag">{Math.round(d.grade * 100)}%</span>}
                   {status === "depleted" && <span class="muted">depleted</span>}

@@ -42,6 +42,7 @@ import {
   focusView,
   HOME_VIEW,
   isHomeView,
+  makeProjection,
   nearestBodyId,
   panView,
   resolveView,
@@ -64,6 +65,9 @@ interface Camera {
 }
 
 const HOME_CAMERA: Camera = { view: HOME_VIEW, anchor: null };
+
+/** Least zoom H gives when the ship is drifting between bodies (so centring on it is visible). */
+const DRIFT_HOME_ZOOM = 3;
 
 interface Flight {
   route: Route;
@@ -273,6 +277,40 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
     });
   };
 
+  /** H = home: orbiting a body, zoom to it like "Zoom to body"; drifting, pan to the ship's own position. */
+  const goHome = () => {
+    if (busy) return;
+    const { w, h } = sizeRef.current;
+    const fitDim = fitRef.current.dim || undefined;
+    const orbited = orbitingId ? detail.bodies.find((b) => b.id === orbitingId) : undefined;
+    if (orbited) {
+      const t = drawTimeRef.current;
+      setCamera({
+        view: focusView(w, h, detail, orbited, t, zoomForBody(w, h, detail, orbited), fitDim),
+        anchor: { bodyId: orbited.id, t, follow: true },
+      });
+      return;
+    }
+    const zoom = Math.max(currentView().zoom, DRIFT_HOME_ZOOM);
+    const p = makeProjection(w, h, { zoom, panX: 0, panY: 0 }, detail, fitDim).toScreen(shipReal);
+    const limit = (Math.min(w, h) / 2) * zoom;
+    const clampPan = (v: number) => Math.max(-limit, Math.min(limit, v));
+    commitView({ zoom, panX: clampPan(w / 2 - p.x), panY: clampPan(h / 2 - p.y) });
+  };
+  const homeRef = useRef(goHome);
+  homeRef.current = goHome;
+
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const el = ev.target;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
+      if ((ev.key === "h" || ev.key === "H") && !session.state.encounter && !session.encounterDebrief) homeRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [session]);
+
   // Left or middle button drag pans; a press that barely moves is still a click and selects.
   const onMouseDown = (ev: MouseEvent) => {
     if ((ev.button !== 0 && ev.button !== 1) || !(ev.target instanceof HTMLCanvasElement)) return;
@@ -417,7 +455,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           </button>
         )}
         <div class="viewport-hint">
-          Drag to pan · scroll to zoom · click to select · radial scale is logarithmic, moon orbits are exaggerated
+          Drag to pan · scroll to zoom · click to select · H home (centre on ship) · radial scale is logarithmic, moon orbits are exaggerated
         </div>
       </div>
 

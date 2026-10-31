@@ -56,7 +56,8 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
       else if (ev.key === "l" || ev.key === "L") setClansOpen((o) => !o);
-      else if (ev.key === "h" || ev.key === "H") setShipOpen((o) => !o);
+      // H is "home" on the map screens (centre on the ship); each screen handles it. The ship window is I ("inventory").
+      else if (ev.key === "i" || ev.key === "I") setShipOpen((o) => !o);
       else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
       else if (ev.key === "Escape") {
         if (session.perkTree) session.openPerkTree(null);

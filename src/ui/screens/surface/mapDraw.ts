@@ -659,6 +659,79 @@ export function drawHoverTile(ctx: CanvasRenderingContext2D, L: Layout, tile: Ve
   ctx.stroke();
 }
 
+/**
+ * The hex the Selected Hex card describes: a crisp white outline over a dark keyline, so it reads on any terrain
+ * and at any zoom (the line stays a couple of pixels wide, and grows outward a little when the hexes are tiny).
+ */
+export function drawSelectedHex(ctx: CanvasRenderingContext2D, L: Layout, tile: Vec2): void {
+  const grow = L.size < 8 ? (8 - L.size) * 0.25 : 0;
+  const w = Math.min(3, Math.max(1.75, L.size * 0.1));
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(5, 7, 15, 0.8)";
+  ctx.lineWidth = w + 2.5;
+  ctx.beginPath();
+  tilePath(ctx, L, tile, grow);
+  ctx.stroke();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = w;
+  ctx.beginPath();
+  tilePath(ctx, L, tile, grow);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Period of the ship beacon's pulse, ms. */
+const BEACON_MS = 1800;
+let reducedMotionQuery: MediaQueryList | null | undefined;
+
+/** True when the player has asked the OS for less motion. */
+function prefersReducedMotion(): boolean {
+  if (reducedMotionQuery === undefined) {
+    reducedMotionQuery = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  }
+  return reducedMotionQuery?.matches ?? false;
+}
+
+/**
+ * A yellow beacon on the ship's hex so it can't be lost: a slowly pulsing outline (alpha and width), and, when the
+ * map is zoomed out, a soft halo and ring sized in screen pixels so it shows even when the ship sprite is tiny.
+ * With reduced motion, the pulse is replaced by a steady glow. Drawn under the ship sprite.
+ */
+export function drawShipBeacon(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, timeMs: number): void {
+  const pulse = prefersReducedMotion() ? 0.6 : 0.5 - 0.5 * Math.cos((2 * Math.PI * (timeMs % BEACON_MS)) / BEACON_MS);
+  const x = cx(L, at.x, at.y);
+  const y = cy(L, at.x, at.y);
+  // 1 when the hexes are tiny (<= 4 px), fading to 0 by 16 px.
+  const far = Math.min(1, Math.max(0, (16 - L.size) / 12));
+  ctx.save();
+  ctx.setLineDash([]);
+  if (far > 0) {
+    const r = L.size + 14 + far * 28 + pulse * 6;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, r);
+    glow.addColorStop(0, `rgba(255, 214, 64, ${(0.45 + pulse * 0.2) * far})`);
+    glow.addColorStop(0.6, `rgba(255, 214, 64, ${0.18 * far})`);
+    glow.addColorStop(1, "rgba(255, 214, 64, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 214, 64, ${(0.5 + pulse * 0.4) * far})`;
+    ctx.lineWidth = 1.5 + far * 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = `rgba(255, 214, 64, ${0.55 + pulse * 0.45})`;
+  ctx.lineWidth = 1.5 + pulse * 1.5 + far;
+  ctx.beginPath();
+  tilePath(ctx, L, at, 0.5 + far);
+  ctx.stroke();
+  ctx.restore();
+}
+
 let roverImg: HTMLImageElement | null = null;
 let roverTopImg: HTMLImageElement | null = null;
 let roverTopFailed = false;
