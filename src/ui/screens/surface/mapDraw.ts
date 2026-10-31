@@ -4,6 +4,7 @@
  * need is passed in.
  */
 import { COMMODITIES } from "../../../data/commodities";
+import { FLORA_BY_NAME } from "../../../data/catalog";
 import {
   disk,
   hexCorners,
@@ -22,7 +23,7 @@ import {
   type SurfaceLayout,
   type Vec2,
 } from "../../../sim";
-import { UI } from "../../palette";
+import { RARITY_COLOR, UI } from "../../palette";
 import { HEX, hexPath, type RegionImage } from "./terrainImage";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace';
@@ -518,6 +519,17 @@ export function drawFlora(
     ctx.beginPath();
     ctx.arc(x, y, u + 2, 0, Math.PI * 2);
     ctx.fill();
+    // Rarity ring: grey common, green uncommon, gold rare.
+    const rarity = FLORA_BY_NAME.get(f.species)?.rarity;
+    if (rarity) {
+      ctx.strokeStyle = RARITY_COLOR[rarity];
+      ctx.globalAlpha = sampled ? 0.55 : 1;
+      ctx.lineWidth = Math.max(1.5, u * 0.2);
+      ctx.beginPath();
+      ctx.arc(x, y, u + 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = Math.max(1.2, u * 0.16);

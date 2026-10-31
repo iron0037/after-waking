@@ -43,3 +43,6 @@ export const TERRAIN_COLORS: Record<BodyKind, readonly [string, string, string, 
   gasGiant: ["#000", "#000", "#000", "#000", "#000", "#000"],
   iceGiant: ["#000", "#000", "#000", "#000", "#000", "#000"],
 };
+
+/** Specimen rarity (FloraEntry.rarity: 1 common, 2 uncommon, 3 rare): grey, green, gold. Mirrors the CSS `--rar*` tokens. */
+export const RARITY_COLOR = { 1: "#8a94a6", 2: "#5fd47a", 3: "#f0c14b" } as const;

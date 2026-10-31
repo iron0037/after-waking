@@ -5,6 +5,7 @@ import {
   aquaticSpecies,
   effectiveStats,
   exoticSea,
+  landingAccess,
   launchBoatBlockers,
   newGame,
   World,
@@ -18,7 +19,7 @@ const bodies = (world: World): Body[] => world.galaxy.systems.flatMap((s) => wor
 
 describe("exotic seas", () => {
   it("new games use generation 3; generation 2 worlds are untouched", () => {
-    expect(WORLD_GEN_LATEST).toBe(3);
+    expect(WORLD_GEN_LATEST).toBe(4);
     const g2 = new World(42, 2);
     const g3 = new World(42, 3);
     expect(bodies(g2).some((b) => b.sea)).toBe(false);
@@ -36,11 +37,12 @@ describe("exotic seas", () => {
         found.add(b.sea);
         expect(exoticSea(b)).toBe(b.sea);
         if (b.sea === "methane") expect(b.tempC).toBeLessThanOrEqual(-150);
+        if (b.sea === "nitrogen") expect(b.tempC).toBeLessThanOrEqual(-196);
         if (b.sea === "ammonia") expect(b.tempC).toBeLessThanOrEqual(-35);
         if (b.sea === "acid") expect(b.chemistry).toBe("corrosive");
       }
     }
-    expect([...found].sort()).toEqual(["acid", "ammonia", "methane"]);
+    expect([...found].sort()).toEqual(["acid", "ammonia", "methane", "nitrogen"]);
   });
 
   it("their lowlands are liquid, and the sea floor holds what the sea is made of", () => {
@@ -61,6 +63,46 @@ describe("exotic seas", () => {
       }
     }
     throw new Error("no exotic seabed found");
+  });
+
+  it("generation 4 gives some cold moons of giants thick air (Titan, Triton); nothing else changes", () => {
+    let thick = 0;
+    for (const seed of SEEDS) {
+      const g3 = bodies(new World(seed, 3));
+      const g4 = bodies(new World(seed, 4));
+      expect(g4.map((b) => b.id)).toEqual(g3.map((b) => b.id));
+      g4.forEach((b, i) => {
+        const old = g3[i]!;
+        if (b.pressureAtm === old.pressureAtm) {
+          expect([b.tempC, b.kind, b.orbitAU]).toEqual([old.tempC, old.kind, old.orbitAU]);
+          return;
+        }
+        thick++;
+        expect(b.parentId).not.toBeNull();
+        expect(b.pressureAtm).toBeGreaterThanOrEqual(0.8);
+        expect(b.kind).toBe("ice");
+      });
+    }
+    expect(thick).toBeGreaterThan(5);
+  });
+
+  it("nitrogen worlds need the cryogenic hull to land and cryo floats Mk II to sail", () => {
+    for (const seed of SEEDS) {
+      const world = new World(seed);
+      const b = bodies(world).find((x) => x.sea === "nitrogen");
+      if (!b) continue;
+      const s = newGame({ seed });
+      s.ship.upgrades.push("pressureHull2", "radShielding", "landingStruts");
+      expect(landingAccess(b, effectiveStats(s).ratings).reasons.join(" ")).toMatch(/°C/);
+      s.ship.upgrades.push("cryoHull");
+      expect(landingAccess(b, effectiveStats(s).ratings).ok).toBe(true);
+      s.ship.upgrades.push("boat", "cryoFloats");
+      expect(effectiveStats(s).boatCryoDeep).toBe(false);
+      s.ship.upgrades.push("cryoFloats2");
+      expect(effectiveStats(s).boatCryoDeep).toBe(true);
+      return;
+    }
+    throw new Error("no nitrogen world");
   });
 
   it("methane seas can hold life of their own", () => {

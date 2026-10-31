@@ -8,6 +8,7 @@ import { SEAS } from "../data/seas";
 import { FLORA, MINERAL_SPECIMENS, type Rarity } from "../data/catalog";
 import { COMPENDIUM_MINERALS, compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
 import { CompIcon, useSpriteIndex } from "./compendiumSprites";
+import { RarityLegend } from "./rarity";
 import type { GameSession } from "./session";
 
 type Tab = "flora" | "minerals" | "artifacts";
@@ -85,6 +86,11 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
           <button class={`chip ${tab === "artifacts" ? "" : "off"}`} onClick={() => setTab("artifacts")}>
             Artifacts
           </button>
+          {tab !== "artifacts" && (
+            <span class="comp-legend">
+              <RarityLegend />
+            </span>
+          )}
         </div>
         <div class="comp-body">
           {tab === "flora" && (
@@ -124,7 +130,7 @@ function Grid({ cards, found }: { cards: Card[]; found: Record<string, Compendiu
       {cards.map((c) => {
         const rec = found[c.key];
         return rec ? (
-          <div key={c.key} class={`comp-card found ${sprites?.sprites[c.key] ? "has-sprite" : ""}`} title={c.blurb}>
+          <div key={c.key} class={`comp-card found ${c.rarity ? `rar${c.rarity}` : ""} ${sprites?.sprites[c.key] ? "has-sprite" : ""}`} title={c.blurb}>
             <CompIcon index={sprites} entryKey={c.key} color={c.color} found />
             <div class="comp-text">
               <div class="comp-name">{c.name}</div>
@@ -136,7 +142,7 @@ function Grid({ cards, found }: { cards: Card[]; found: Record<string, Compendiu
             </div>
           </div>
         ) : (
-          <div key={c.key} class={`comp-card unknown ${sprites?.sprites[c.key] ? "has-sprite" : ""}`}>
+          <div key={c.key} class={`comp-card unknown ${c.rarity ? `rar${c.rarity}` : ""} ${sprites?.sprites[c.key] ? "has-sprite" : ""}`}>
             <CompIcon index={sprites} entryKey={c.key} color={c.color} found={false} />
             <div class="comp-text">
               <div class="comp-name">???</div>

@@ -907,3 +907,55 @@ table.data th.num {
 .new-game-head h2 {
   margin: 0;
 }
+
+/* --- specimen rarity: grey common, green uncommon, gold rare ------------------------------ */
+
+.rar1 {
+  --rar: #8a94a6;
+}
+.rar2 {
+  --rar: #5fd47a;
+}
+.rar3 {
+  --rar: #f0c14b;
+}
+.rarity-legend {
+  display: inline-flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: help;
+}
+.rarity-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rarity-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--rar);
+  background: #0b101c;
+}
+/* A ring around the sprite of a rarity-graded compendium entry */
+.comp-card.rar1 .comp-icon,
+.comp-card.rar2 .comp-icon,
+.comp-card.rar3 .comp-icon {
+  outline: 2px solid var(--rar);
+  outline-offset: 1px;
+}
+.comp-card.unknown.rar1 .comp-icon,
+.comp-card.unknown.rar2 .comp-icon,
+.comp-card.unknown.rar3 .comp-icon {
+  outline-style: dashed;
+}
+.comp-legend {
+  margin-left: auto;
+  align-self: center;
+}
+.rarity-note {
+  margin-top: 6px;
+}

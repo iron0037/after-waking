@@ -8,7 +8,7 @@ import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers } from
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
-import { COMMODITIES, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
+import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
 import { driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
 import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
@@ -44,7 +44,10 @@ import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from ".
 import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
+  isExplored,
   markExplored,
+  Terrain,
+  terrainName,
   normalizeKnowledge,
   regionKey,
   regionSignal,
@@ -242,6 +245,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
     helmOnDocked(state);
     covenantOnDocked(state);
+    notePrices(state);
     return ok(undefined);
   }
 
@@ -1667,4 +1671,112 @@ export function specimenQuote(state: GameState, keys?: readonly string[]): { tot
     count += n;
   }
   return { total, count };
+}
+
+// --- the selected hex (playtest 13) ---------------------------------------------------------------
+
+export interface HexRoute {
+  vehicle: "rover" | "boat";
+  /** Straight-line distance, km. */
+  km: number;
+  reachable: boolean;
+  /** For a reachable hex: the route's time (hours), energy, and whether the cells hold enough. */
+  hours?: number;
+  energy?: number;
+  enough?: boolean;
+  /** Why it can't go there. */
+  reason?: string;
+}
+
+export interface HexInfo {
+  x: number;
+  y: number;
+  terrain: string;
+  region: number | null;
+  /** Swept by the rover's sensors (otherwise only orbital readings). */
+  explored: boolean;
+  shipKm: number;
+  /** Could the ship hop and set down here, and what would it burn? */
+  ship: { canSetDown: boolean; fuel: number | null; reason?: string };
+  /** The vehicle that's out (rover or boat), if any. */
+  route: HexRoute | null;
+  /** The other vehicle, if one is parked (the boat moored while the rover is ashore): distance only. */
+  parked: { vehicle: "rover" | "boat"; km: number } | null;
+}
+
+/** Everything the surface view's Selected Hex panel shows about one hex (planet-wide coordinates). */
+export function hexInfo(state: GameState, world: World, x: number, y: number): HexInfo | null {
+  const loc = state.location;
+  if (loc.kind !== "surface") return null;
+  const surface = world.surface(loc.bodyId);
+  const t = surface.terrainAt(x, y);
+  if (t === null) return null;
+  const body = world.body(loc.bodyId).body;
+  const region = surface.regionAt(x, y);
+  let explored = false;
+  if (region !== null) {
+    const o = surface.origin(region);
+    explored = isExplored(knowledge(state, loc.bodyId, region), x - o.x, y - o.y);
+  }
+  const here = { x, y };
+  const ship = shipTile(state, world);
+  const km = (p: Vec2) => Math.round(hexDistance(p, here) * TILE_KM);
+
+  let shipInfo: HexInfo["ship"];
+  if (!canEnter(surface, x, y, false)) shipInfo = { canSetDown: false, fuel: null, reason: "No open, level ground to set down on." };
+  else if (ship.x === x && ship.y === y) shipInfo = { canSetDown: false, fuel: null, reason: "The ship is here." };
+  else {
+    const fuel = hopFuelTo(state, world, x, y);
+    shipInfo = {
+      canSetDown: true,
+      fuel,
+      ...(loc.rover ? { reason: "Stow the rover first." } : fuel > state.ship.fuel ? { reason: `Needs ${fuel} fuel.` } : {}),
+    };
+  }
+
+  let route: HexRoute | null = null;
+  if (loc.rover) {
+    const v = vehicleOf(loc.rover);
+    const base: HexRoute = { vehicle: v, km: km(loc.rover), reachable: false };
+    if (loc.rover.x === x && loc.rover.y === y) route = { ...base, reachable: true, hours: 0, energy: 0, enough: true };
+    else {
+      const mobility = vehicleMobility(state);
+      const path = canEnter(surface, x, y, mobility) ? findPath(surface, loc.rover, here, mobility) : null;
+      if (!path) {
+        route = {
+          ...base,
+          reason: v === "boat" ? "Not open water the boat can reach." : t === Terrain.liquid ? `${terrainName(body, t)}: the rover can't drive there.` : "No route the rover can drive.",
+        };
+      } else {
+        const energy = routeEnergy(state, path);
+        const minutes = path.reduce((sum, s) => sum + s.minutes, 0) * SHIFT_FACTOR * vehicleMinutesMult(state);
+        route = { ...base, reachable: true, hours: Math.round((minutes / 60) * 10) / 10, energy: Math.round(energy * 10) / 10, enough: energy <= loc.rover.energy };
+      }
+    }
+  }
+  const parkedState = loc.parkedBoat ? { vehicle: "boat" as const, p: loc.parkedBoat } : null;
+  return {
+    x,
+    y,
+    terrain: terrainName(body, t),
+    region,
+    explored,
+    shipKm: km(ship),
+    ship: shipInfo,
+    route,
+    parked: parkedState ? { vehicle: parkedState.vehicle, km: km(parkedState.p) } : null,
+  };
+}
+
+/** Remember the Intrepid's prices as of now (on docking): out in the field, that's all the captain knows. */
+export function notePrices(state: GameState): void {
+  const prices: Partial<Record<CommodityId, number>> = {};
+  for (const id of COMMODITY_IDS) prices[id] = Math.round(sellPrice(state.market, id));
+  state.knownPrices = { t: state.time, prices };
+}
+
+/** A good's price at the Intrepid as the captain last saw it (the live price while docked). */
+export function lastKnownPrice(state: GameState, id: CommodityId): { price: number; asOf: number | null } {
+  if (state.location.kind === "intrepid" || !state.knownPrices) return { price: Math.round(sellPrice(state.market, id)), asOf: null };
+  return { price: state.knownPrices.prices[id] ?? Math.round(sellPrice(state.market, id)), asOf: state.knownPrices.t };
 }

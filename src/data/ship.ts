@@ -38,6 +38,8 @@ export interface ShipStats {
   /** Boat kits for exotic seas (AW-189): cryo floats for liquid methane, an acid-lined hull for acid. */
   boatCryo: boolean;
   boatAcidProof: boolean;
+  /** Cryo floats Mk II: liquid nitrogen (AW-190). */
+  boatCryoDeep: boolean;
   drillMaxDepthM: number;
   /** Tonnes per hour from a grade-1.0 deposit. */
   drillRateTph: number;
@@ -81,6 +83,7 @@ export const BASE_STATS: ShipStats = {
   deepScanLy: 0,
   boatCryo: false,
   boatAcidProof: false,
+  boatCryoDeep: false,
   drillMaxDepthM: 250,
   drillRateTph: 1.2,
   roverCargoT: 20,
@@ -224,6 +227,18 @@ export const UPGRADES: readonly Upgrade[] = [
     },
   },
   {
+    id: "cryoHull",
+    category: "ship",
+    name: "Cryogenic hull",
+    vendor: "lyceum",
+    price: 30_000,
+    description: "Insulated skin and heated landing gear: set down on worlds as cold as −240 °C, where the seas are liquid nitrogen.",
+    apply: (s) => {
+      s.ratings.minTempC = Math.min(s.ratings.minTempC, -240);
+      s.hullMassT += 60;
+    },
+  },
+  {
     id: "corrosionHull",
     category: "ship",
     name: "Ceramic hull cladding",
@@ -293,6 +308,19 @@ export const UPGRADES: readonly Upgrade[] = [
     description: "Wide foam floats and a heated drive: the survey boat sails seas of liquid methane, thin and at −180 °C.",
     apply: (s) => {
       s.boatCryo = true;
+    },
+  },
+  {
+    id: "cryoFloats2",
+    category: "rover",
+    requires: "cryoFloats",
+    name: "Cryo floats Mk II",
+    vendor: "midshipmen",
+    price: 26_000,
+    description: "Aerogel floats and a drive kept warm by the reactor: the survey boat sails liquid nitrogen at −200 °C.",
+    apply: (s) => {
+      s.boatCryo = true;
+      s.boatCryoDeep = true;
     },
   },
   {

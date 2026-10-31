@@ -209,6 +209,65 @@
 .deposit-table tbody tr.dim .leaf-mark {
   background: #4f7a5a;
 }
+/* Specimen rarity: a ring around the leaf (grey common, green uncommon, gold rare) */
+.leaf-mark.rar1,
+.leaf-mark.rar2,
+.leaf-mark.rar3 {
+  margin-left: 2px;
+  box-shadow: 0 0 0 1px #0b101c, 0 0 0 2.5px var(--rar);
+  border-radius: 0 100% 0 100%;
+}
+.deposit-table tbody tr.dim .leaf-mark.rar1,
+.deposit-table tbody tr.dim .leaf-mark.rar2,
+.deposit-table tbody tr.dim .leaf-mark.rar3 {
+  opacity: 0.8;
+}
+
+/* Sortable table headers and the separator before worked-out / sampled rows */
+.deposit-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.deposit-table th.sortable:hover {
+  color: var(--text);
+}
+.deposit-table th.sortable.on {
+  color: var(--cyan);
+}
+.deposit-table tbody tr.sep-row,
+.deposit-table tbody tr.sep-row:hover {
+  cursor: default;
+}
+.deposit-table tbody tr.sep-row td {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-bright);
+  background: transparent;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.flora-legend-row {
+  margin-top: 6px;
+}
+
+/* Selected hex card */
+.hex-panel .hex-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hex-panel .hex-head .hex-title {
+  flex: 1;
+  font-size: 14px;
+}
+.hex-panel .hex-close {
+  padding: 0 7px;
+  line-height: 1.3;
+}
+.hex-panel .kv dd.hex-reason {
+  line-height: 1.35;
+}
 
 .contract-note {
   margin-top: 10px;

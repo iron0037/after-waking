@@ -3,6 +3,7 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import type { CommodityId } from "../data/commodities";
 import { changeRep, tickReputation, type RepChange } from "./reputation";
 import type { ClueId, ErrandKind } from "../data/clues";
 import type { ErrandState } from "./covenant";
@@ -135,6 +136,8 @@ export interface GameState {
   lastEncounter?: EncounterResult;
   /** The system whose departure has already been rolled for raiders (one roll per departure). */
   interdictionClear?: string;
+  /** Intrepid prices as of the last docking, and when (playtest 13): what the captain knows out in the field. */
+  knownPrices?: { t: number; prices: Partial<Record<CommodityId, number>> };
   /** When the ship last folded into a star system: raiders notice a ship that lingers (playtest 12). */
   systemArrivedAt?: number;
   /** The Archive's guidance (AW-24): entries read, and whether it's speaking at all (on unless false). */

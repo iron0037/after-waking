@@ -26,8 +26,11 @@ import {
   drillRate,
   emptyKnowledge,
   exploredFraction,
+  formatDate,
   formatDuration,
   formatPressure,
+  hexInfo,
+  lastKnownPrice,
   hasBoat,
   hexDistance,
   hexToPixel,
@@ -89,6 +92,7 @@ import {
   type FloraSite,
   type GameState,
   type HexDir,
+  type HexInfo,
   type Location,
   type PathStep,
   type RegionKnowledge,
@@ -112,6 +116,7 @@ import { UI } from "../palette";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
 import { RescuePanel } from "../Rescue";
+import { floraRarity, LeafMark, RARITY_LABEL, RarityLegend } from "../rarity";
 import { terrainHex, terrainSwatch } from "./surface/terrainTextures";
 import { Canvas } from "../Canvas";
 import {
@@ -335,14 +340,31 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);
   const [floraKey, setFloraKeyRaw] = useState<string | null>(null);
-  // One selection at a time: a deposit or a flora site.
+  // A plain hex the player clicked (no site on it): the Selected Hex card.
+  const [hexSel, setHexSelRaw] = useState<Vec2 | null>(null);
+  // Lists: deposits by distance (default) or commodity name; worked-out and sampled sites always sink to the bottom.
+  const [depSort, setDepSort] = useState<"dist" | "name">("dist");
+  // One selection at a time: a deposit, a flora site, or a bare hex.
   const setSelectedKey = (key: string | null): void => {
     setSelectedKeyRaw(key);
-    if (key !== null) setFloraKeyRaw(null);
+    if (key !== null) {
+      setFloraKeyRaw(null);
+      setHexSelRaw(null);
+    }
   };
   const setFloraKey = (key: string | null): void => {
     setFloraKeyRaw(key);
-    if (key !== null) setSelectedKeyRaw(null);
+    if (key !== null) {
+      setSelectedKeyRaw(null);
+      setHexSelRaw(null);
+    }
+  };
+  const setHexSel = (t: Vec2 | null): void => {
+    setHexSelRaw(t);
+    if (t) {
+      setSelectedKeyRaw(null);
+      setFloraKeyRaw(null);
+    }
   };
   const animRef = useRef<Anim | null>(null);
   const hoverRef = useRef<Hover | null>(null);
@@ -417,6 +439,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const selected: DepositMark | null = selectedFound ? { d: selectedFound.deposit, know: selectedFound.know } : null;
   const floraFoundSel = floraKey ? surfaceFlora(state, world, floraKey) : null;
   const selectedFlora: FloraMark | null = floraFoundSel ? { f: floraFoundSel.site, know: floraFoundSel.know } : null;
+  const hexData: HexInfo | null = hexSel ? hexInfo(state, world, hexSel.x, hexSel.y) : null;
 
   /** The known deposit on a tile, if any (looked up in that tile's region). */
   const depositAt = (t: Vec2): DepositMark | undefined => {
@@ -456,6 +479,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       cam.center = { x: p.x - (px - c.x) / size, y: p.y - (py - c.y) / size };
     }
     cam.zoom = zoom;
+  };
+
+  /** Pan the map to a tile and stop following the rover (a list click: "show me where it is"). */
+  const centreOn = (t: Vec2): void => {
+    camRef.current.center = unitPos(t);
+    if (camRef.current.follow) setFollowing(false);
   };
 
   const resetView = (): void => {
@@ -934,6 +963,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       else setSelectedKey(dep.d.key);
     } else if (dep) setSelectedKey(dep.d.key);
     else if (flora) setFloraKey(flora.f.key);
+    else setHexSel(tile); // a bare hex: show its card (and drop any deposit selection); driving below is unchanged
     void driveTo(tile, dep !== undefined || flora !== undefined);
   };
 
@@ -977,6 +1007,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     setAshoreMode(false);
     setSelectedKey(null);
     setFloraKey(null);
+    setHexSelRaw(null);
     const { unloaded, jettisoned } = r.value;
     session.notify(`Unloaded ${tonnes(unloaded)} into the hold.${jettisoned > 0.05 ? ` ${tonnes(jettisoned)} left behind: hold full.` : ""}`);
   };
@@ -1382,6 +1413,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             drive={() => void driveTo(selectedFlora.f, true)}
             busy={busy}
           />
+        ) : hexSel && hexData ? (
+          <HexPanel info={hexData} onClose={() => setHexSelRaw(null)} />
         ) : selected ? (
           <DepositPanel
             session={session}
@@ -1404,99 +1437,144 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           </div>
         )}
 
-        {floraFound.length > 0 && (
-          <Section id="flora" title="Flora" summary={`${floraFound.length} found`}>
-            <table class="data deposit-table">
-              <thead>
-                <tr>
-                  <th>Species</th>
-                  <th class="num">Dist</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {floraFound
-                  .map((m) => ({ m, dist: hexDistance(home, m.f) }))
-                  .sort((a, b) => a.dist - b.dist)
-                  .map(({ m, dist }) => {
-                    const { f } = m;
-                    const sampled = floraStatus(m.know, f) === "sampled";
-                    return (
-                      <tr
-                        key={f.key}
-                        class={`${f.key === selectedFlora?.f.key ? "sel" : ""} ${sampled ? "dim" : ""}`}
-                        title={f.region !== active ? `In region ${f.region + 1}` : undefined}
-                        onClick={() => setFloraKey(f.key)}
-                      >
-                        <td>
-                          <i class="leaf-mark" />
-                          {f.species}
-                          {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
-                        </td>
-                        <td class="num">{dist}</td>
-                        <td>{sampled ? <span class="muted">sampled ✓</span> : <span class="tag new">new</span>}</td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-            <div class="muted small tbl-note">
-              In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}.
-            </div>
-          </Section>
-        )}
+        {floraFound.length > 0 && (() => {
+          const rows = floraFound.map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" })).sort((x, y) => x.dist - y.dist);
+          const open = rows.filter((r) => !r.sampled);
+          const done = rows.filter((r) => r.sampled);
+          const row = ({ m, dist, sampled }: (typeof rows)[number]) => {
+            const { f } = m;
+            const rarity = floraRarity(f.species);
+            return (
+              <tr
+                key={f.key}
+                class={`${f.key === selectedFlora?.f.key ? "sel" : ""} ${sampled ? "dim" : ""}`}
+                title={f.region !== active ? `In region ${f.region + 1}` : undefined}
+                onClick={() => {
+                  if (f.key === selectedFlora?.f.key) setFloraKey(null);
+                  else {
+                    setFloraKey(f.key);
+                    centreOn(f);
+                  }
+                }}
+              >
+                <td title={rarity ? `${f.species}: ${RARITY_LABEL[rarity]} specimen` : undefined}>
+                  <LeafMark species={f.species} />
+                  {f.species}
+                  {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
+                </td>
+                <td class="num">{dist}</td>
+                <td>{sampled ? <span class="muted">sampled ✓</span> : <span class="tag new">new</span>}</td>
+              </tr>
+            );
+          };
+          return (
+            <Section id="flora" title="Flora" summary={`${floraFound.length} found`}>
+              <table class="data deposit-table">
+                <thead>
+                  <tr>
+                    <th>Species</th>
+                    <th class="num">Dist</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.map(row)}
+                  {open.length > 0 && done.length > 0 && (
+                    <tr class="sep-row">
+                      <td colSpan={3}>Sampled ({done.length})</td>
+                    </tr>
+                  )}
+                  {done.map(row)}
+                </tbody>
+              </table>
+              <div class="muted small tbl-note">
+                In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a row to select it and
+                centre the map; click it again to deselect.
+              </div>
+              <div class="flora-legend-row">
+                <RarityLegend />
+              </div>
+            </Section>
+          );
+        })()}
 
-        {discovered.length > 0 && (
-          <Section id="deposits" title="Deposits found" summary={`${discovered.length} found`}>
-            <table class="data deposit-table">
-              <thead>
-                <tr>
-                  <th>Commodity</th>
-                  <th class="num">Dist</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {discovered
-                  .map((m) => ({ m, dist: hexDistance(home, m.d) }))
-                  .sort((a, b) => a.dist - b.dist)
-                  .map(({ m, dist }) => {
-                    const { d } = m;
-                    const status = depositStatus(m.know, d);
-                    return (
-                      <tr
-                        key={d.key}
-                        class={`${d.key === selected?.d.key ? "sel" : ""} ${status === "depleted" ? "dim" : ""}`}
-                        title={d.region !== active ? `In region ${d.region + 1}` : undefined}
-                        onClick={() => setSelectedKey(d.key)}
-                      >
-                        <td>
-                          <i class="swatch" style={{ background: status === "depleted" ? "#5b6472" : COMMODITIES[d.commodity].color }} />
-                          {COMMODITIES[d.commodity].name}
-                          {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
-                        </td>
-                        <td class="num">{dist}</td>
-                        <td>
-                          {status === "new" && <span class="tag new">new</span>}
-                          {status === "prospected" && <span class="tag">{Math.round(d.grade * 100)}%</span>}
-                          {status === "depleted" && <span class="muted">depleted</span>}
-                          {status !== "depleted" && d.depthM > stats.drillMaxDepthM && (
-                            <span class="danger small" title={`${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m`}>
-                              {" "}
-                              too deep
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-            <div class="muted small tbl-note">
-              In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}.
-            </div>
-          </Section>
-        )}
+        {discovered.length > 0 && (() => {
+          const rows = discovered.map((m) => ({ m, dist: hexDistance(home, m.d), status: depositStatus(m.know, m.d) }));
+          type Row = (typeof rows)[number];
+          const byName = (x: Row, y: Row): number => COMMODITIES[x.m.d.commodity].name.localeCompare(COMMODITIES[y.m.d.commodity].name) || x.dist - y.dist;
+          const byDist = (x: Row, y: Row): number => x.dist - y.dist;
+          const order = depSort === "name" ? byName : byDist;
+          const live = rows.filter((r) => r.status !== "depleted").sort(order);
+          const spent = rows.filter((r) => r.status === "depleted").sort(order);
+          const row = ({ m, dist, status }: Row) => {
+            const { d } = m;
+            const c = COMMODITIES[d.commodity];
+            const quote = lastKnownPrice(state, d.commodity);
+            const priceTip = `${c.name}: ${quote.price} cr/t at the Intrepid (${quote.asOf === null ? "live" : `as of ${formatDate(quote.asOf)}`})`;
+            return (
+              <tr
+                key={d.key}
+                class={`${d.key === selected?.d.key ? "sel" : ""} ${status === "depleted" ? "dim" : ""}`}
+                title={d.region !== active ? `In region ${d.region + 1}` : undefined}
+                onClick={() => {
+                  if (d.key === selected?.d.key) setSelectedKey(null);
+                  else {
+                    setSelectedKey(d.key);
+                    centreOn(d);
+                  }
+                }}
+              >
+                <td title={priceTip}>
+                  <i class="swatch" style={{ background: status === "depleted" ? "#5b6472" : c.color }} />
+                  {c.name}
+                  {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
+                </td>
+                <td class="num">{dist}</td>
+                <td>
+                  {status === "new" && <span class="tag new">new</span>}
+                  {status === "prospected" && <span class="tag">{Math.round(d.grade * 100)}%</span>}
+                  {status === "depleted" && <span class="muted">depleted</span>}
+                  {status !== "depleted" && d.depthM > stats.drillMaxDepthM && (
+                    <span class="danger small" title={`${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m`}>
+                      {" "}
+                      too deep
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          };
+          return (
+            <Section id="deposits" title="Deposits found" summary={`${discovered.length} found`}>
+              <table class="data deposit-table">
+                <thead>
+                  <tr>
+                    <th class={`sortable ${depSort === "name" ? "on" : ""}`} title="Sort by commodity name" onClick={() => setDepSort("name")}>
+                      Commodity{depSort === "name" ? " ▴" : ""}
+                    </th>
+                    <th class={`num sortable ${depSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setDepSort("dist")}>
+                      Dist{depSort === "dist" ? " ▴" : ""}
+                    </th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {live.map(row)}
+                  {live.length > 0 && spent.length > 0 && (
+                    <tr class="sep-row">
+                      <td colSpan={3}>Worked out ({spent.length})</td>
+                    </tr>
+                  )}
+                  {spent.map(row)}
+                </tbody>
+              </table>
+              <div class="muted small tbl-note">
+                In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort;
+                click a row to select it and centre the map, again to deselect. Hover a commodity for its last known price at the Intrepid.
+              </div>
+            </Section>
+          );
+        })()}
       </aside>
     </>
   );
@@ -1677,7 +1755,7 @@ function SpecimenChips({ specimens }: { specimens: Record<string, number> | unde
     <div class="cargo-chips">
       {list.map(([key, n]) => (
         <span key={key} class="cargo-chip">
-          <i class="leaf-mark" />
+          <LeafMark species={key.split("|")[1] ?? key} />
           {key.split("|")[1] ?? key} ×{n}
         </span>
       ))}
@@ -1697,6 +1775,78 @@ function CargoChips({ cargo }: { cargo: Parameters<typeof cargoList>[0] }) {
         </span>
       ))}
     </div>
+  );
+}
+
+/** The Selected Hex card (playtest 13): what the player can learn about, and do with, a plain hex they clicked. */
+function HexPanel({ info, onClose }: { info: HexInfo; onClose: () => void }) {
+  const { route, parked, ship } = info;
+  const vName = route ? (route.vehicle === "boat" ? "Boat" : "Rover") : "";
+  const go = route?.vehicle === "boat" ? "sail" : "drive";
+  return (
+    <Section id="hex" title="Selected hex" class="deposit-panel hex-panel" revealKey={`${info.x},${info.y}`}>
+      <div class="hex-head">
+        <span class="hex-title">{info.terrain}</span>
+        {!info.explored && (
+          <span class="tag" title="Not yet swept by the rover's sensors: only orbital readings">
+            unexplored
+          </span>
+        )}
+        <button class="btn hex-close" title="Close" aria-label="Close selected hex" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <dl class="kv">
+        <dt>Position</dt>
+        <dd>
+          {info.x}, {info.y}
+          {info.region !== null && <span class="muted"> (region {info.region + 1})</span>}
+        </dd>
+        <dt>From ship</dt>
+        <dd>{info.shipKm} km</dd>
+        {route && (
+          <>
+            <dt>{vName}</dt>
+            <dd class="hex-reason">
+              {route.km} km
+              {route.reachable ? (
+                route.km === 0 ? (
+                  <span class="muted"> · it is here</span>
+                ) : (
+                  <>
+                    <span>
+                      {" "}
+                      · {go} {route.hours} h, {route.energy} energy{" "}
+                    </span>
+                    <span class={route.enough ? "good" : "danger"}>({route.enough ? "enough charge" : "not enough charge"})</span>
+                  </>
+                )
+              ) : (
+                <span class="danger"> · {route.reason}</span>
+              )}
+            </dd>
+          </>
+        )}
+        {parked && (
+          <>
+            <dt>{parked.vehicle === "boat" ? "Boat (moored)" : "Rover (parked)"}</dt>
+            <dd>{parked.km} km</dd>
+          </>
+        )}
+        <dt>Ship hop</dt>
+        <dd class="hex-reason">
+          {ship.canSetDown ? (
+            <>
+              <span class="good">can set down</span>
+              <span> · {ship.fuel?.toFixed(1)} fuel</span>
+              {ship.reason && <span class="danger"> · {ship.reason}</span>}
+            </>
+          ) : (
+            <span class="muted">{ship.reason}</span>
+          )}
+        </dd>
+      </dl>
+    </Section>
   );
 }
 
@@ -1746,7 +1896,7 @@ function FloraPanel({
   return (
     <Section id="plants" title="Selected plants" class="deposit-panel" revealKey={site.key}>
       <div class="dep-title">
-        <i class="leaf-mark big" />
+        <LeafMark species={site.species} big />
         <span>{site.species}</span>
         <span class={`tag ${sampled ? "" : "new"}`}>{sampled ? "sampled" : "unsampled"}</span>
         {wet && <span class="tag sea">sea life</span>}

@@ -74,6 +74,7 @@ import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
+import { LeafMark, RarityLegend } from "../rarity";
 import "./hub.css";
 import "../covenant.css";
 
@@ -482,7 +483,10 @@ function SpecimenDesk({ session }: { session: GameSession }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.key}>
-                <td>{r.species}</td>
+                <td>
+                  <LeafMark species={r.species} />
+                  {r.species}
+                </td>
                 <td>{r.bodyName}</td>
                 <td class="num">{r.count}</td>
                 <td class="num">{cr(r.unit)}</td>
@@ -532,6 +536,11 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         </table>
       ) : (
         <p class="muted">The containment racks are empty. The rover brings samples back from flora on the surface.</p>
+      )}
+      {rows.length > 0 && (
+        <div class="rarity-note">
+          <RarityLegend />
+        </div>
       )}
       <div class="hub-actions">
         <button

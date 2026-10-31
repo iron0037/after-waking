@@ -5,7 +5,7 @@
  */
 import type { CommodityId } from "./commodities";
 
-export type SeaKind = "ammonia" | "methane" | "acid";
+export type SeaKind = "ammonia" | "methane" | "acid" | "nitrogen";
 
 export interface SeaInfo {
   /** "liquid methane" */
@@ -13,7 +13,7 @@ export interface SeaInfo {
   /** For the surface map's liquid tint. */
   color: string;
   /** What the boat needs, if anything: a ShipStats flag and the gear that sets it. */
-  boatNeeds: { flag: "boatCryo" | "boatAcidProof"; gear: string; why: string } | null;
+  boatNeeds: { flag: "boatCryo" | "boatAcidProof" | "boatCryoDeep"; gear: string; why: string } | null;
   /** What the boat dredges from the seabed here, with relative weights. */
   dredge: [CommodityId, number][];
   /** One line for the world's description. */
@@ -44,6 +44,20 @@ export const SEAS: Record<SeaKind, SeaInfo> = {
       ["waterIce", 1],
     ],
     note: "Dark, still seas of liquid methane and ethane under an orange sky. The boat needs cryo floats.",
+  },
+  nitrogen: {
+    liquid: "liquid nitrogen",
+    color: "#a8c6d4",
+    boatNeeds: {
+      flag: "boatCryoDeep",
+      gear: "cryo floats Mk II",
+      why: "Liquid nitrogen at −200 °C would crack the cryo floats' foam and freeze the drive solid. It needs cryo floats Mk II.",
+    },
+    dredge: [
+      ["waterIce", 2],
+      ["deuterium", 0.6],
+    ],
+    note: "Clear, still seas of liquid nitrogen, close to freezing. The ice under them is rich in deuterium. The boat needs cryo floats Mk II.",
   },
   acid: {
     liquid: "sulfuric acid",

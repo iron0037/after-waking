@@ -406,7 +406,11 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
   - ammonia: as it is;
   - methane: **cryo floats** (Midshipmen, 18k);
   - acid: **acid-lined boat hull** (Diggers, 20k).
-- **Phase 2 (planned):** Titan- and Triton-like moons with thick nitrogen air around cold giants, and nitrogen seas with a cryogenic hull.
+- **Phase 2 (AW-190), world generation 4 [DECIDED 2026-10-31].**
+  - **Thick-air moons.** Moons of giants (radius ≥ 0.3, ice or barren, bare temperature below −110 °C) keep thick air with a 45% chance: 0.8–1.8 atm of nitrogen and methane, with a toxic haze. Titan's haze cancels most greenhouse warming, so they warm by only 4–14 K. They become ice worlds with lower radiation, and each decides from its own stream.
+  - **What they get:** the warmer ones get methane seas, the coldest **nitrogen seas** (−213 to −196 °C). Nitrogen seabeds hold water ice and deuterium-rich ice.
+  - **New gear:** a **Cryogenic hull** (Lyceum, 30k, lands down to −240 °C) and **Cryo floats Mk II** (Midshipmen, 26k, after the cryo floats) for the boat.
+  - **How common** (8 seeds, about 1,240 landable bodies): methane 30 (was 5), nitrogen 4, ammonia 23, acid 39.
 
 ## Clan Relations (AW-22) **[DECIDED 2026-10-31]**
 - **Standing.** Every clan rates you from −100 to +100 (`src/sim/reputation.ts`). The tiers:

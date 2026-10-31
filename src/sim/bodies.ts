@@ -113,7 +113,7 @@ interface Ctx {
  * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
  * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145).
  */
-export const WORLD_GEN_LATEST = 3;
+export const WORLD_GEN_LATEST = 4;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
   if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);
@@ -598,6 +598,7 @@ function generateSystemV2(galaxySeed: number, sys: StarSystem, gen = 2): SystemD
   });
   const outermost = Math.max(...ctx.bodies.filter((b) => b.parentId === null).map((b) => b.orbitAU));
   // The fold limit hugs the outermost world: compact red-dwarf systems are tiny.
+  if (gen >= 4) addThickAirMoons(galaxySeed, ctx.bodies);
   if (gen >= 3) addExoticSeas(galaxySeed, ctx.bodies);
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(outermost * 1.5, hz * 0.8, 0.06), frostLineAU: frost };
 }
@@ -629,6 +630,7 @@ export function exoticSea(b: Body): SeaKind | undefined {
   if (b.kind === "ocean" || b.kind === "terrestrial" || b.kind === "volcanic" || b.kind === "asteroid") return undefined;
   const p = b.pressureAtm;
   const t = b.tempC;
+  if (p >= 0.3 && t > -213 && t <= -196) return "nitrogen";
   if (p >= 0.3 && t > -186 && t <= -150) return "methane";
   if (p >= 0.3 && t > -100 && t <= -35) return "ammonia";
   if (b.chemistry === "corrosive" && p >= 1 && t >= 100 && t <= 330) return "acid";
@@ -646,5 +648,34 @@ function addExoticSeas(galaxySeed: number, bodies: Body[]): void {
     if (!sea) continue;
     b.sea = sea;
     if (sea === "methane" && !b.life && rngFor(galaxySeed, b.id, "exo-life").chance(0.5)) b.life = true;
+  }
+}
+
+/**
+ * Generation 4 (AW-190): some big moons of giants hold on to thick air, like Titan. Warmer ones get
+ * methane seas, the coldest (like Triton, given more air) nitrogen seas. Each moon decides from its
+ * own stream, so nothing else in the system moves.
+ */
+function addThickAirMoons(galaxySeed: number, bodies: Body[]): void {
+  for (const m of bodies) {
+    if (m.parentId === null || m.easy || m.radiusEarth < 0.3) continue;
+    if (m.kind !== "ice" && m.kind !== "barren") continue;
+    const parent = bodies.find((b) => b.id === m.parentId);
+    if (!parent || (parent.kind !== "gasGiant" && parent.kind !== "iceGiant")) continue;
+    const rng = rngFor(galaxySeed, m.id, "thick-air");
+    if (!rng.chance(0.45)) continue;
+    const bareC = m.tempC - greenhouseK(m.pressureAtm);
+    // Only cold moons keep thick air; warmer ones lose it to the giant's heat and their own.
+    if (bareC > -110) continue;
+    const pressure = Math.round(rng.range(0.8, 1.8) * 100) / 100;
+    m.pressureAtm = pressure;
+    // Titan's orange haze cancels most of the greenhouse warming: a few kelvin to a dozen, net.
+    m.tempC = Math.round((bareC + rng.range(4, 14)) * 10) / 10;
+    m.kind = "ice";
+    m.surface = "ice";
+    // A methane haze: not breathable, not corrosive. The thick air shields the surface from the giant's belts.
+    m.chemistry = "toxic";
+    m.weather = rng.int(1, 2);
+    m.radiation = Math.max(0, m.radiation - 2);
   }
 }
