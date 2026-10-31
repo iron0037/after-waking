@@ -102,6 +102,13 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
   - The Lyceum buys each giant-and-band profile once, at 600 cr × the band's depth number. That's up to 6k cr per giant, so the incentive is to dive many giants rather than repeat one.
   - Until a giant is charted, the dive planner shows estimates based on an average atmosphere. After the first returning probe, it shows exact values.
 - **Floating life.** Four drifting species (cloud drifter, storm kelp, lantern siphon, abyssal bloom) live in giant atmospheres.
+  - **Living and dead giants (AW-197) [DECIDED 2026-10-31].** About 45% of gas giants and 30% of ice giants hold life, fixed for the universe.
+  - **Catch rates:** a probe back from a living giant brings up a floater 18% of the time from band 3 and 33% from band 4, half that on ice giants. Dead giants never do.
+  - **What you know:**
+    - **Unscanned:** "Unknown".
+    - **After an orbital scan:** a hint, "Organic haze in the clouds" or "No haze seen from orbit". Living giants show haze 75% of the time (90% with sensor tier 2+); dead ones show it 18% (8%).
+    - **After a probe back from band 2 or deeper:** settled, "Organics in the deep layers" or "Sterile below the clouds".
+    - **After a catch:** "Confirmed: <species>".
   - **Where:** they come up in about 8% of returning deep-layer dives and 15% of abyss dives on gas giants, half that on ice giants.
   - **Value:** they sell for 4–8× a plant sample, plus the usual new-species bonus.
   - **Compendium:** they're catalogued as flora, so they fill entries there.

@@ -59,8 +59,29 @@ export interface DiveRecord {
 
 /** What the Lyceum pays for a first atmospheric profile of a depth band on a giant. */
 export const READING_PRICE_PER_DEPTH = 600;
-/** Chance a returning deep probe brings up floating life (gas giants; ice giants half as often). */
-export const FLOATER_CHANCE: Record<ProbeDepth, number> = { 1: 0, 2: 0, 3: 0.08, 4: 0.15 };
+/**
+ * Chance a returning deep probe brings up floating life from a giant that has some (ice giants half as
+ * often). Dead giants never do (playtest 15): about 45% of gas giants and 30% of ice giants are alive.
+ */
+export const FLOATER_CHANCE: Record<ProbeDepth, number> = { 1: 0, 2: 0, 3: 0.18, 4: 0.33 };
+export const GIANT_LIFE_SHARE = { gasGiant: 0.45, iceGiant: 0.3 } as const;
+
+/** Does this giant hold drifting life? Fixed for the universe (its own stream); a confirmed catch always counts. */
+export function giantAlive(state: GameState, body: Body): boolean {
+  if (body.kind !== "gasGiant" && body.kind !== "iceGiant") return false;
+  if ((state.giantLife?.[body.id]?.length ?? 0) > 0) return true;
+  return rngFor(state.seed, body.id, "giant-life").next() < GIANT_LIFE_SHARE[body.kind];
+}
+
+/**
+ * What an orbital scan sees in a giant's upper clouds: organic haze or not. A hint, not proof: living
+ * giants usually show haze, dead ones rarely; better sensors cut the mistakes (playtest 15).
+ */
+export function giantHaze(state: GameState, body: Body): boolean {
+  const roll = rngFor(state.seed, body.id, "giant-haze").next();
+  const sharp = effectiveStats(state).sensorTier >= 2;
+  return giantAlive(state, body) ? roll < (sharp ? 0.9 : 0.75) : roll < (sharp ? 0.08 : 0.18);
+}
 
 /** Depth bands profiled on this giant (from probes that came back). */
 export function readingsFor(state: GameState, bodyId: string): ProbeDepth[] {
@@ -302,7 +323,7 @@ function finishDive(state: GameState, world: World): DiveResult {
     }
     state.atmoReadings[body.id] = [...had].sort();
     // Now and then something alive rides up in the canisters.
-    const chance = FLOATER_CHANCE[dive.depth] * (body.kind === "iceGiant" ? 0.5 : 1) * (outcome === "damaged" ? 0.5 : 1);
+    const chance = giantAlive(state, body) ? FLOATER_CHANCE[dive.depth] * (body.kind === "iceGiant" ? 0.5 : 1) * (outcome === "damaged" ? 0.5 : 1) : 0;
     const pool = FLORA.filter((f) => f.floating && (dive.depth >= 4 || f.rarity < 3));
     floater = withRng(state, (rng) => (pool.length > 0 && rng.chance(chance) ? rng.weighted(pool.map((f) => [f, f.rarity === 3 ? 1 : 3] as const)).name : null));
     if (floater) {
@@ -371,9 +392,15 @@ export function lifeSigns(state: GameState, body: Body): LifeSigns {
   if (!giant) return body.life ? { label: "Detected", tone: "good" } : { label: "None detected", tone: "muted" };
   const found = state.giantLife?.[body.id] ?? [];
   if (found.length > 0) return { label: `Confirmed: ${found.join(", ")}`, tone: "good", title: "Brought up from the deep layers by your probes." };
-  return {
-    label: "Unknown below the clouds",
-    tone: "muted",
-    title: `Drifting life lives only in the deep layers. A probe back from band 3 or deeper sometimes brings some up${body.kind === "iceGiant" ? " (about half as often on ice giants)" : ""}.`,
-  };
+  const how = "Drifting life lives only in the deep layers; a probe back from band 3 or deeper can bring some up.";
+  // A probe back from band 2 or deeper has sampled the deep air: that settles it.
+  if (readingsFor(state, body.id).some((d) => d >= 2)) {
+    return giantAlive(state, body)
+      ? { label: "Organics in the deep layers", tone: "good", title: `Your probes found organic chemistry below the clouds: something lives down there. ${how}` }
+      : { label: "Sterile below the clouds", tone: "muted", title: "Your probes found nothing organic in the deep layers. Nothing lives here." };
+  }
+  if (!state.scannedBodies.includes(body.id)) return { label: "Unknown", tone: "muted", title: `Scan it from orbit for a first hint. ${how}` };
+  return giantHaze(state, body)
+    ? { label: "Organic haze in the clouds", tone: "good", title: `A promising sign, but not proof: probe to band 2 or deeper to be sure. ${how}` }
+    : { label: "No haze seen from orbit", tone: "muted", title: `Living giants usually show organic haze, but not always. Probe to band 2 or deeper to be sure. ${how}` };
 }

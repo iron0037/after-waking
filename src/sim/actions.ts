@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { giantHaze } from "./probes";
 import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers } from "./deepspace";
@@ -528,6 +529,7 @@ export function scanBody(state: GameState, world: World): Result<Body> {
     `Scanned ${body.name}: ${KIND_LABEL[body.kind].toLowerCase()}, ${body.gravityG.toFixed(2)} g, ${Math.round(body.tempC)} °C.` +
       (top.length ? ` Strongest readings: ${top.join(", ")}.` : " No mineral signatures.") +
       (body.sea ? ` ${SEAS[body.sea].note}` : "") +
+      ((body.kind === "gasGiant" || body.kind === "iceGiant") && giantHaze(state, body) ? " Organic haze in the upper clouds: something may live below." : "") +
       (body.life ? (body.sea ? " Life signs in the seas." : " Life signs detected.") : ""),
   );
   return ok(body);

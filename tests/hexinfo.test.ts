@@ -82,11 +82,40 @@ describe("life signs", () => {
   it("giants can't be read from orbit; a floater brought up confirms life there", async () => {
     const { lifeSigns } = await import("../src/sim");
     const s = newGame({ seed: 42 });
-    const giant = world.galaxy.systems.flatMap((x) => world.system(x.id).bodies).find((b) => b.kind === "gasGiant")!;
-    expect(lifeSigns(s, giant).label).toMatch(/Unknown/);
+    const giant = world.galaxy.systems.flatMap((x) => world.system(x.id).bodies).find((b) => b.kind === "gasGiant" && !s.scannedBodies.includes(b.id))!;
+    expect(lifeSigns(s, giant).label).toBe("Unknown");
     s.giantLife = { [giant.id]: ["abyssal bloom"] };
     expect(lifeSigns(s, giant)).toMatchObject({ tone: "good", label: "Confirmed: abyssal bloom" });
     const rock = world.galaxy.systems.flatMap((x) => world.system(x.id).bodies).find((b) => b.kind === "barren")!;
     expect(lifeSigns(s, rock).label).toBe("None detected");
+  });
+});
+
+describe("living and dead giants", () => {
+  it("some giants hold life, some don't; haze hints from orbit; a deep reading settles it", async () => {
+    const { giantAlive, giantHaze, lifeSigns, GIANT_LIFE_SHARE } = await import("../src/sim");
+    const s = newGame({ seed: 42 });
+    const giants = [42, 7, 11, 99].flatMap((seed) => {
+      const w = new World(seed);
+      return w.galaxy.systems.flatMap((x) => w.system(x.id).bodies).filter((b) => b.kind === "gasGiant");
+    });
+    const alive = giants.filter((g) => giantAlive(s, g));
+    const share = alive.length / giants.length;
+    expect(share).toBeGreaterThan(GIANT_LIFE_SHARE.gasGiant - 0.15);
+    expect(share).toBeLessThan(GIANT_LIFE_SHARE.gasGiant + 0.15);
+    // Haze is a good but imperfect sign.
+    const hazeAlive = alive.filter((g) => giantHaze(s, g)).length / alive.length;
+    const dead = giants.filter((g) => !giantAlive(s, g));
+    const hazeDead = dead.filter((g) => giantHaze(s, g)).length / dead.length;
+    expect(hazeAlive).toBeGreaterThan(0.6);
+    expect(hazeDead).toBeLessThan(0.3);
+    // A reading from band 2 settles it.
+    const g = dead[0]!;
+    s.scannedBodies.push(g.id);
+    s.atmoReadings = { [g.id]: [1, 2] };
+    expect(lifeSigns(s, g).label).toBe("Sterile below the clouds");
+    // A confirmed catch always counts as alive.
+    s.giantLife = { [g.id]: ["cloud drifter"] };
+    expect(giantAlive(s, g)).toBe(true);
   });
 });

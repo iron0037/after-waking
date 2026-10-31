@@ -206,9 +206,32 @@ describe("probes v2: jobs, readings, floating life", () => {
     expect(sellReadings(state).ok).toBe(false); // each band pays once
   });
 
-  it("deep dives sometimes bring up floating life, prized by the Lyceum", async () => {
-    const { sellSpecimens } = await import("../src/sim");
+  it("deep dives into a living giant sometimes bring up floating life, prized by the Lyceum; dead giants never", async () => {
+    const { sellSpecimens, giantAlive } = await import("../src/sim");
     const world = new World(42);
+    // Dead giants (playtest 15) never give up life.
+    {
+      const state = newGame({ seed: 42 });
+      const id = inOrbit(state, world);
+      const body = world.body(id).body;
+      if (!giantAlive(state, body)) {
+        let any = 0;
+        for (let i = 0; i < 60; i++) {
+          const s2 = newGame({ seed: 42 });
+          s2.rngState = (i * 2246822519) | 0;
+          s2.ship.upgrades.push("probeBay", "probeBay2");
+          s2.ship.probes = 1;
+          inOrbit(s2, world);
+          launchProbe(s2, world, 4);
+          s2.probeDive!.risk = 0;
+          while (currentProbeEvent(s2)) {
+            const r = chooseProbeOption(s2, world, 1);
+            if (r.ok && r.value.done && r.value.result?.floater) any++;
+          }
+        }
+        expect(any).toBe(0);
+      }
+    }
     let floaters = 0;
     const N = 300;
     let sample: GameState | null = null;
@@ -217,7 +240,9 @@ describe("probes v2: jobs, readings, floating life", () => {
       state.rngState = (i * 2246822519) | 0;
       state.ship.upgrades.push("probeBay", "probeBay2");
       state.ship.probes = 1;
-      inOrbit(state, world);
+      const giant = inOrbit(state, world);
+      // Make this a living giant (a confirmed catch always counts as alive).
+      state.giantLife = { [giant]: ["cloud drifter"] };
       launchProbe(state, world, 4);
       state.probeDive!.risk = 0;
       let result;
@@ -230,8 +255,8 @@ describe("probes v2: jobs, readings, floating life", () => {
         sample ??= state;
       }
     }
-    expect(floaters / N).toBeGreaterThan(0.06);
-    expect(floaters / N).toBeLessThan(0.25);
+    expect(floaters / N).toBeGreaterThan(0.12);
+    expect(floaters / N).toBeLessThan(0.45);
     // A floater sells for well above an ordinary plant sample.
     sample!.location = { kind: "intrepid" };
     sample!.catalogedSpecies = Object.keys(sample!.ship.specimens ?? {}); // no first-sale bonus, just the price
