@@ -205,6 +205,18 @@ export const UPGRADES: readonly Upgrade[] = [
     },
   },
   {
+    id: "corrosionHull",
+    category: "ship",
+    name: "Ceramic hull cladding",
+    vendor: "diggers",
+    price: 26_000,
+    description: "Corrosion-proof: land in acid-laden air without the hull dissolving under you.",
+    apply: (s) => {
+      s.ratings.corrosionProof = true;
+      s.hullMassT += 70;
+    },
+  },
+  {
     id: "radShielding",
     category: "ship",
     name: "Radiation baffles",

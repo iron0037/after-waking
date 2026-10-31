@@ -33,7 +33,7 @@ export function landingAccess(body: Body, ratings: Ratings): AccessResult {
     reasons.push(`Surface ${Math.round(body.tempC)} °C: hull rated down to ${ratings.minTempC} °C.`);
   }
   if (body.chemistry === "corrosive" && !ratings.corrosionProof) {
-    reasons.push("Corrosive atmosphere: needs a corrosion-proof hull.");
+    reasons.push("Corrosive atmosphere: needs a corrosion-proof hull (ceramic hull cladding, at the Shipyard).");
   }
   if (body.radiation > ratings.maxRadiation) {
     reasons.push(`Radiation ${RADIATION_LABEL[body.radiation]}: shielding rated to ${RADIATION_LABEL[ratings.maxRadiation]}.`);
