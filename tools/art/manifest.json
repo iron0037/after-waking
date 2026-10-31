@@ -63,6 +63,12 @@
       "prompt": "top-down view looking straight down at a small flat-bottomed survey boat, white hull with teal trim and faded orange stripes, small wheelhouse cabin at the stern, open cargo deck with a small crane, pointed bow at the top of the image, symmetrical, isolated on plain gray background",
       "seed": 8800,
       "colors": 20
+    },
+    {
+      "id": "freighter-landed",
+      "prompt": "top-down view looking straight down at a small boxy cargo freighter starship parked on the ground, worn gray hull with faded orange stripes, cargo pods on both sides, four landing legs splayed out at the corners, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9900,
+      "colors": 24
     }
   ]
 }

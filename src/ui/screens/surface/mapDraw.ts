@@ -283,12 +283,40 @@ export function drawRegionBorders(ctx: CanvasRenderingContext2D, L: Layout, regi
   ctx.restore();
 }
 
-/** A little lander on its pad. */
+let shipSurfaceImg: HTMLImageElement | null = null;
+
+/** The landed freighter seen from above (nose up); null if it is missing, broken or still loading. */
+function shipSurfaceSprite(): HTMLImageElement | null {
+  if (!shipSurfaceImg && typeof Image !== "undefined") {
+    shipSurfaceImg = new Image();
+    shipSurfaceImg.src = "./assets/freighter-landed.png";
+  }
+  return shipSurfaceImg && shipSurfaceImg.complete && shipSurfaceImg.naturalWidth > 0 ? shipSurfaceImg : null;
+}
+
+/** The freighter on its pad: the pixel-art sprite, or a little drawn lander if the sprite isn't loaded. */
 export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): void {
   const x = cx(L, at.x, at.y);
   const y = cy(L, at.x, at.y);
   const s = L.tw * 0.5;
   ctx.setLineDash([]);
+  const sprite = shipSurfaceSprite();
+  if (sprite) {
+    // The longer side spans about two hexes: bigger than the rover, still clear of the hexes around it.
+    const long = L.tw * 2;
+    const k = long / Math.max(sprite.naturalWidth, sprite.naturalHeight);
+    const w = sprite.naturalWidth * k;
+    const h = sprite.naturalHeight * k;
+    ctx.fillStyle = "rgba(5, 7, 15, 0.4)";
+    ctx.beginPath();
+    ctx.ellipse(x + L.tw * 0.08, y + L.tw * 0.12, w * 0.5, h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, x - w / 2, y - h / 2, w, h);
+    ctx.imageSmoothingEnabled = prev;
+    return;
+  }
   ctx.fillStyle = "rgba(5, 7, 15, 0.45)";
   ctx.beginPath();
   ctx.arc(x, y + s * 0.15, s * 1.15, 0, Math.PI * 2);
