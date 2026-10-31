@@ -61,3 +61,19 @@ describe("selected hex", () => {
     expect(away.asOf).not.toBeNull();
   });
 });
+
+describe("surface lists", () => {
+  it("cover every region of the world where something was found, not just the neighbourhood", async () => {
+    const { regionsWithFinds, autoExplore, deployRover } = await import("../src/sim");
+    const s = landed();
+    deployRover(s, world);
+    autoExplore(s, world);
+    const loc = s.location as Extract<GameState["location"], { kind: "surface" }>;
+    // Something found far away, in a region the rover never reached.
+    const far = (loc.region + 7) % world.body(loc.bodyId).body.regions;
+    s.regions[`${loc.bodyId}#${far}`] = { ...(s.regions[`${loc.bodyId}#${far}`] ?? { discovered: [], prospected: [], drillSites: [], extracted: {}, visits: 0, floraFound: [], floraSampled: [], explored: [] }), floraFound: [100] };
+    const regions = regionsWithFinds(s, loc.bodyId);
+    expect(regions).toContain(far);
+    expect(regions.every((r) => Number.isInteger(r))).toBe(true);
+  });
+});

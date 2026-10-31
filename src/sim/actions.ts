@@ -1780,3 +1780,14 @@ export function lastKnownPrice(state: GameState, id: CommodityId): { price: numb
   if (state.location.kind === "intrepid" || !state.knownPrices) return { price: Math.round(sellPrice(state.market, id)), asOf: null };
   return { price: state.knownPrices.prices[id] ?? Math.round(sellPrice(state.market, id)), asOf: state.knownPrices.t };
 }
+
+/** Regions of this world where the sensors have identified a deposit or a plant, for the surface lists (playtest 14). */
+export function regionsWithFinds(state: GameState, bodyId: string): number[] {
+  const prefix = `${bodyId}#`;
+  const out: number[] = [];
+  for (const [key, k] of Object.entries(state.regions ?? {})) {
+    if (!key.startsWith(prefix)) continue;
+    if ((k.discovered?.length ?? 0) > 0 || (k.floraFound?.length ?? 0) > 0) out.push(Number(key.slice(prefix.length)));
+  }
+  return out.sort((a, b) => a - b);
+}

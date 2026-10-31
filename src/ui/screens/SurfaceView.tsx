@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
+  regionsWithFinds,
   deliveryShortfalls,
   activeRegion,
   autoExplore,
@@ -268,6 +269,9 @@ function workBlockers(state: GameState, world: World, know: RegionKnowledge, dep
   return out;
 }
 
+/** Rows the side lists show before sampled or worked-out sites need a "show more" (untapped ones always show). */
+const LIST_ROOM = 40;
+
 /** Discovered deposits in `regions`, each with its region's knowledge. */
 function knownDeposits(state: GameState, surface: BodySurface, bodyId: string, regions: readonly number[]): DepositMark[] {
   const out: DepositMark[] = [];
@@ -346,6 +350,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const [hexSel, setHexSelRaw] = useState<Vec2 | null>(null);
   // Lists: deposits by distance (default) or commodity name; worked-out and sampled sites always sink to the bottom.
   const [depSort, setDepSort] = useState<"dist" | "name">("dist");
+  // "Show more" for the sampled / worked-out rows past the room the lists keep for them.
+  const [showAllDone, setShowAllDone] = useState(false);
   // One selection at a time: a deposit, a flora site, or a bare hex.
   const setSelectedKey = (key: string | null): void => {
     setSelectedKeyRaw(key);
@@ -429,10 +435,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const ashoreOn = ashoreMode && isBoat && roverAboard !== null;
   const shoreTargets: Vec2[] =
     isBoat && roverAboard && rover ? neighbors(rover.x, rover.y).filter((n) => canEnter(surface, n.x, n.y, roverMobility(state))) : [];
-  // The side panel lists sites in the active region and the regions around it.
-  const nearRegions = regionAndNeighbours(surface, active);
-  const discovered = knownDeposits(state, surface, loc.bodyId, nearRegions);
-  const floraFound = knownFlora(state, surface, loc.bodyId, nearRegions);
+  // The side panel lists everything found anywhere on this world (playtest 14), untapped first.
+  const foundRegions = regionsWithFinds(state, loc.bodyId);
+  const discovered = knownDeposits(state, surface, loc.bodyId, foundRegions);
+  const floraFound = knownFlora(state, surface, loc.bodyId, foundRegions);
   // The Archive explains these where they show: the dashed sensor ring and drive controls (rover out), and a seam below the drill.
   useArchiveTopic(session, "sensor-ring", rover !== null);
   useArchiveTopic(session, "rover", rover !== null);
@@ -1452,6 +1458,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           const rows = floraFound.map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" })).sort((x, y) => x.dist - y.dist);
           const open = rows.filter((r) => !r.sampled);
           const done = rows.filter((r) => r.sampled);
+          // Untapped sites always show; sampled ones fill whatever room is left.
+          const doneShown = showAllDone ? done : done.slice(0, Math.max(0, LIST_ROOM - open.length));
           const row = ({ m, dist, sampled }: (typeof rows)[number]) => {
             const { f } = m;
             const rarity = floraRarity(f.species);
@@ -1479,7 +1487,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             );
           };
           return (
-            <Section id="flora" title="Flora" summary={`${floraFound.length} found`}>
+            <Section id="flora" title="Flora" summary={`${open.length} to sample${done.length ? ` · ${done.length} sampled` : ""}`}>
               <table class="data deposit-table">
                 <thead>
                   <tr>
@@ -1495,11 +1503,16 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       <td colSpan={3}>Sampled ({done.length})</td>
                     </tr>
                   )}
-                  {done.map(row)}
+                  {doneShown.map(row)}
+                  {doneShown.length < done.length && (
+                    <tr class="sep-row more-row" onClick={() => setShowAllDone(true)}>
+                      <td colSpan={3}>Show {done.length - doneShown.length} more sampled</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
               <div class="muted small tbl-note">
-                In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a row to select it and
+                Everything found on this world, nearest first. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a row to select it and
                 centre the map; click it again to deselect.
               </div>
               <div class="flora-legend-row">
@@ -1517,6 +1530,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           const order = depSort === "name" ? byName : byDist;
           const live = rows.filter((r) => r.status !== "depleted").sort(order);
           const spent = rows.filter((r) => r.status === "depleted").sort(order);
+          // Untapped seams always show; worked-out ones fill whatever room is left.
+          const spentShown = showAllDone ? spent : spent.slice(0, Math.max(0, LIST_ROOM - live.length));
           const row = ({ m, dist, status }: Row) => {
             const { d } = m;
             const c = COMMODITIES[d.commodity];
@@ -1563,7 +1578,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             );
           };
           return (
-            <Section id="deposits" title="Deposits found" summary={`${discovered.length} found`}>
+            <Section id="deposits" title="Deposits found" summary={`${live.length} untapped${spent.length ? ` · ${spent.length} worked out` : ""}`}>
               <table class="data deposit-table">
                 <thead>
                   <tr>
@@ -1583,11 +1598,16 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       <td colSpan={3}>Worked out ({spent.length})</td>
                     </tr>
                   )}
-                  {spent.map(row)}
+                  {spentShown.map(row)}
+                  {spentShown.length < spent.length && (
+                    <tr class="sep-row more-row" onClick={() => setShowAllDone(true)}>
+                      <td colSpan={3}>Show {spent.length - spentShown.length} more worked out</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
               <div class="muted small tbl-note">
-                In this region and the ones around it. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort;
+                Everything found on this world. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort;
                 click a row to select it and centre the map, again to deselect. Hover a commodity for its last known price at the Intrepid.
               </div>
             </Section>
