@@ -3,6 +3,7 @@ import { ShipStatus } from "./ShipStatus";
 import { useEffect, useState } from "preact/hooks";
 import { Compendium } from "./Compendium";
 import { preloadSprites } from "./compendiumSprites";
+import { Clans } from "./Clans";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
 import { EncounterOverlay } from "./Encounter";
@@ -29,6 +30,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const [journalOpen, setJournalOpen] = useState(false);
   const [compendiumOpen, setCompendiumOpen] = useState(false);
   const [contractsOpen, setContractsOpen] = useState(false);
+  const [clansOpen, setClansOpen] = useState(false);
   const [shipOpen, setShipOpen] = useState(false);
   const [crewOpen, setCrewOpen] = useState(false);
 
@@ -53,6 +55,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       // C is a hex movement key on the surface (down-right), so the compendium lives on B ("book").
       else if (ev.key === "b" || ev.key === "B") setCompendiumOpen((o) => !o);
       else if (ev.key === "k" || ev.key === "K") setContractsOpen((o) => !o);
+      else if (ev.key === "l" || ev.key === "L") setClansOpen((o) => !o);
       else if (ev.key === "h" || ev.key === "H") setShipOpen((o) => !o);
       else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
       else if (ev.key === "Escape") {
@@ -61,6 +64,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
         setJournalOpen(false);
         setCompendiumOpen(false);
         setContractsOpen(false);
+        setClansOpen(false);
         setShipOpen(false);
       }
       else if (ev.key === "m" || ev.key === "M") session.go(session.view === "starmap" ? defaultView(session.state) : "starmap");
@@ -73,14 +77,14 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const levelUp = session.busy || session.timelapse || session.perkTree || session.probeReport || session.state.encounter || session.encounterDebrief ? null : (session.state.levelUps?.[0] ?? null);
   // With a window open over the game, the Archive floats above it instead of docking above the journal footer.
   const windowOpen =
-    journalOpen || compendiumOpen || contractsOpen || shipOpen || crewOpen || !!session.perkTree || !!levelUp || !!session.state.encounter ||
+    journalOpen || compendiumOpen || contractsOpen || clansOpen || shipOpen || crewOpen || !!session.perkTree || !!levelUp || !!session.state.encounter ||
     !!session.encounterDebrief || !!session.probeReport || !!session.state.probeDive;
   const latest = session.state.journal.slice(-2).reverse();
 
   return (
     <div class="game">
       <TopBar session={session} onJournal={() => setJournalOpen(true)} onCompendium={() => setCompendiumOpen(true)}
-        onContracts={() => setContractsOpen(true)} onCrew={() => setCrewOpen(true)} onShip={() => setShipOpen(true)}
+        onContracts={() => setContractsOpen(true)} onClans={() => setClansOpen(true)} onCrew={() => setCrewOpen(true)} onShip={() => setShipOpen(true)}
         onQuit={onQuit} />
       <main class="main">
         {session.view === "hub" && <Hub session={session} />}
@@ -99,6 +103,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       {journalOpen && <Journal session={session} onClose={() => setJournalOpen(false)} />}
       {compendiumOpen && <Compendium session={session} onClose={() => setCompendiumOpen(false)} />}
       {contractsOpen && <Contracts session={session} onClose={() => setContractsOpen(false)} />}
+      {clansOpen && <Clans session={session} onClose={() => setClansOpen(false)} />}
       {shipOpen && <ShipStatus session={session} onClose={() => setShipOpen(false)} />}
       {crewOpen && <CrewOverlay session={session} onClose={() => setCrewOpen(false)} />}
       <ProbeDiveOverlay session={session} />

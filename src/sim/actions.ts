@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
@@ -1562,10 +1563,12 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   if (upgrade.requires && !queued(upgrade.requires)) {
     return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);
   }
+  if (clanRefuses(state, upgrade.vendor)) return fail(`${CLAN_NAMES[upgrade.vendor]} won't sell to you. Mend things with them first.`);
   const price = upgradePriceFor(state, upgrade.vendor, upgrade.price);
   if (state.credits < price) return fail(`Costs ${price.toLocaleString()} cr.`);
   if ((state.yard ?? []).some((j) => j.upgradeId === upgradeId)) return fail("Already being installed.");
   state.credits -= price;
+  changeRep(state, upgrade.vendor, Math.min(5, upgrade.price / 10_000), `Bought the ${upgrade.name}`);
   // One yard bay: installs queue behind each other, but run alongside Lyceum courses and the refit.
   const installs = (state.yard ?? []).filter((j) => j.kind === "install");
   const start = Math.max(state.time, ...installs.map((j) => j.readyAt));

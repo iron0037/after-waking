@@ -3,6 +3,7 @@ import { COMMODITIES } from "../data/commodities";
 import { CLAN_NAMES } from "../data/ship";
 import { completeContract, contractBenefits, contractPayout, contractProgress, DAY, formatDuration, type Contract, type GameState } from "../sim";
 import { useArchiveTopic } from "./ArchivePanel";
+import { PayStandingTag } from "./Clans";
 import { bandPhrase, cr, pct } from "./format";
 import type { GameSession } from "./session";
 
@@ -84,8 +85,11 @@ function Row({ session, c }: { session: GameSession; c: Contract }) {
             </>
           )}
         </div>
-        <span class="accent" title={payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer` : undefined}>
-          {cr(payout)}
+        <span class="con-pay">
+          <PayStandingTag state={state} clan={c.clan} />
+          <span class="accent" title={payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer and clan standing` : undefined}>
+            {cr(payout)}
+          </span>
         </span>
       </div>
       <div class="muted small">{c.text}</div>

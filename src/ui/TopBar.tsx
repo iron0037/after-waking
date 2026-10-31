@@ -8,6 +8,7 @@ export function TopBar({
   onJournal,
   onCompendium,
   onContracts,
+  onClans,
   onCrew,
   onShip,
   onQuit,
@@ -16,6 +17,7 @@ export function TopBar({
   onJournal: () => void;
   onCompendium: () => void;
   onContracts: () => void;
+  onClans: () => void;
   onCrew: () => void;
   onShip: () => void;
   onQuit: () => void;
@@ -77,6 +79,9 @@ export function TopBar({
       <button class="btn" onClick={onContracts} title="Contracts (K)">
         Contracts ({activeContracts})
       </button>
+      <button class="btn" onClick={onClans} title="Clans: how each clan rates you (L)">
+        Clans
+      </button>
       <button class="btn" onClick={onCrew} title="Crew (O)">
         Crew
         {bankedPoints > 0 && (
@@ -108,7 +113,7 @@ function locationLabel(state: GameState, world: World): string {
   if (loc.kind === "intrepid") return "Docked at the Intrepid";
   if (loc.kind === "deep") {
     const site = siteHere(state, world);
-    return site ? `Deep space · ${site.name}` : `Deep space · ${dist(loc.pos, INTREPID_POS).toFixed(1)} ly from the Intrepid`;
+    return site ? `Deep space Â· ${site.name}` : `Deep space Â· ${dist(loc.pos, INTREPID_POS).toFixed(1)} ly from the Intrepid`;
   }
   const sys = world.system(loc.systemId).system;
   if (loc.kind === "surface") return `${world.body(loc.bodyId).body.name}, region ${activeRegion(state, world) + 1}`;

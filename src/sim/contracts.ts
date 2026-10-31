@@ -5,6 +5,7 @@
  * This module deliberately avoids importing runtime code from state.ts (it's called from
  * advanceTime), so it writes journal entries and runs its RNG directly.
  */
+import { changeRep, clanRefuses, contractRepGain, REP_LAPSE, repPayMult, TIER_INFO } from "./reputation";
 import { fuelPriceFor } from "./actions";
 import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
@@ -327,6 +328,7 @@ export function tickContracts(state: GameState): void {
       c.status = "failed";
       state.journal.push({ t: state.time, kind: "warning", text: `Contract lapsed: "${c.title}". ${CLAN_NAMES[c.clan]} won't forget it.` });
       bondClan(state, c.clan, -4);
+      changeRep(state, c.clan, REP_LAPSE, `Let "${c.title}" lapse`);
       cheerAll(state, -2);
     }
   }
@@ -336,13 +338,15 @@ export function tickContracts(state: GameState): void {
     const offered = state.contracts.filter((c) => c.status === "offered").length;
     if (offered < 4) {
       const serial = state.contracts.length + 1;
-      state.contracts.push(deliveryContract(rng, state.time, serial));
+      const job = deliveryContract(rng, state.time, serial);
+      // A hostile clan won't post work for you (AW-22).
+      if (!clanRefuses(state, job.clan)) state.contracts.push(job);
     }
     // Helm's standing survey work: one on the board at all times, so there's always a way to earn.
     const hasSurvey = state.contracts.some((c) => c.kind === "survey" && !c.starter && !c.obligation && (c.status === "offered" || c.status === "active"));
     if (!hasSurvey) {
       const survey = standingSurvey(state, rng, state.contracts.length + 1);
-      if (survey) state.contracts.push(survey);
+      if (survey && !clanRefuses(state, survey.clan)) state.contracts.push(survey);
     }
     // Preferred Captain (comms): now and then a clan offers private work, bigger and better paid.
     if (hasPerk(state, "preferred-captain") && rng.chance(0.5) && !state.contracts.some((c) => c.status === "offered" && c.exclusive)) {
@@ -359,7 +363,7 @@ export function tickContracts(state: GameState): void {
     if (!probeWork) {
       const rng = new Rng(state.rngState);
       const job = rng.chance(0.5) ? probeSurveyContract(state, rng, state.contracts.length + 1) : gasDeliveryContract(rng, state.contracts.length + 1);
-      if (job) state.contracts.push(job);
+      if (job && !clanRefuses(state, job.clan)) state.contracts.push(job);
       state.rngState = rng.state;
     }
   }
@@ -430,6 +434,7 @@ export function contractBenefits(state: GameState, c: Contract): string[] {
   const out = ["comms and captain experience"];
   const kin = (state.crew ?? []).filter((m) => m.clan === c.clan);
   out.push(kin.length > 0 ? `+loyalty with ${kin.map((m) => m.name).join(", ")}` : `+goodwill with ${CLAN_NAMES[c.clan]}`);
+  out.push(`+standing with ${CLAN_NAMES[c.clan]}`);
   out.push("the crew's spirits");
   if (c.obligation) out.push("keeps Helm's goodwill");
   return out;
@@ -437,7 +442,9 @@ export function contractBenefits(state: GameState, c: Contract): string[] {
 
 /** What a contract pays on completion: its reward, plus the comms officer's haggling. */
 export function contractPayout(state: GameState, c: Contract): number {
-  return Math.round((c.reward * crewBonuses(state).contractPay) / 10) * 10;
+  // Clan standing (AW-22): friends pay more, cool clans less. A clan that's turned hostile still pays what it owes, grudgingly.
+  const standing = repPayMult(state, c.clan) || TIER_INFO.cool.pay;
+  return Math.round((c.reward * crewBonuses(state).contractPay * standing) / 10) * 10;
 }
 
 export function completeContract(state: GameState, id: string): Result<number> {
@@ -468,6 +475,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
   awardXp(state, "comms", 33);
   awardXp(state, "captain", 25);
   bondClan(state, c.clan, 4);
+  changeRep(state, c.clan, contractRepGain(c.reward), `Delivered "${c.title}"`);
   cheerAll(state, 2);
   return ok(pay);
 }

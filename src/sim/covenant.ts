@@ -3,6 +3,7 @@
  * from finds (folded plicite, song moss, what the Awaken-path perks notice), others from the
  * Covenant's errands, accepted at the Intrepid. Content lives in src/data/clues.ts.
  */
+import { changeRep } from "./reputation";
 import { CLUES, CLUES_BY_ID, CLUES_FOR_FINALE, ERRANDS, ERRANDS_BY_KIND, FINALE_TEXT, type Clue, type ClueId, type ErrandDef, type ErrandKind } from "../data/clues";
 import { INTREPID_POS } from "./galaxy";
 import { hasPerk } from "./perks";
@@ -186,6 +187,7 @@ function completeErrand(state: GameState, kind: ErrandKind): Clue | null {
   state.credits += def.stipend;
   state.stats.earned += def.stipend;
   bondClan(state, "covenant", 5);
+  changeRep(state, "covenant", 6, `Ran the Covenant's errand: ${def.title.replace("{star}", "a far star")}`);
   const clue = awardClue(state, def.clue);
   const covenant = CLUES_BY_ID.get(def.clue)?.covenant ?? "";
   log(state, "trade", `The Covenant pays ${def.stipend.toLocaleString()} cr for the errand. ${covenant}`);

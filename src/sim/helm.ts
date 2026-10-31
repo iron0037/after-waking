@@ -7,6 +7,7 @@
  * the note − wages and upkeep owed). After a losing streak, or when the ship docks unable to cover
  * what it owes, Helm steps in. Helm also pays a small operator's first distress call.
  */
+import { changeRep } from "./reputation";
 import { clanMods } from "./clan";
 import { COMMODITY_IDS } from "../data/commodities";
 import type { Contract } from "./contracts";
@@ -154,6 +155,7 @@ function checkObligations(state: GameState): void {
     if (!c.obligation || c.status !== "failed" || h.penalized.includes(c.id)) continue;
     h.penalized.push(c.id);
     h.shunnedUntil = state.time + HELM_SHUN_YEARS * YEAR;
+    changeRep(state, "helm", -15, `Never flew Helm's "${c.title}"`);
     log(state, "warning", `Helm noted that "${c.title}" was never flown. Its fund won't help you for ${HELM_SHUN_YEARS} years.`);
   }
 }

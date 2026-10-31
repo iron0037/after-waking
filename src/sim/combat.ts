@@ -3,6 +3,7 @@
  * Pay, talk, run, or fight a short battle of simultaneous turns on three range bands.
  * Deterministic: every roll goes through the state's RNG. See docs/game_design.md (Combat v1).
  */
+import { changeRep } from "./reputation";
 import { clanMods } from "./clan";
 import {
   HEAD_BOUNTY,
@@ -686,6 +687,9 @@ export function claimPrize(state: GameState, choice: PrizeChoice): Result<Encoun
   state.credits += pay;
   state.stats.earned += pay;
   if (recruited.length > 0) awardXp(state, "comms", 10);
+  // The law likes a raider taken; the Freebooters like their own given a second chance (AW-22).
+  changeRep(state, "helm", heads > 0 ? 5 : 3, `Took the ${e.raiderName}`);
+  if (recruited.length > 0) changeRep(state, "freebooters", 4, `Gave ${e.raiderName} crew a berth`);
   const lootText = Object.keys(loot).length > 0 ? ` Their hold gave up ${Object.entries(loot).map(([id, t]) => `${t} t of ${COMMODITIES[id as CommodityId].name.toLowerCase()}`).join(", ")}.` : "";
   const crewText =
     recruited.length > 0

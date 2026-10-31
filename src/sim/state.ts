@@ -3,6 +3,7 @@
  * `seed` by World. All time passes through advanceTime so the market, the Exchange loan and
  * (later) crises all tick consistently.
  */
+import { changeRep, tickReputation, type RepChange } from "./reputation";
 import type { ClueId, ErrandKind } from "../data/clues";
 import type { ErrandState } from "./covenant";
 import { clanMods } from "./clan";
@@ -148,6 +149,9 @@ export interface GameState {
   deepScans?: { x: number; y: number; r: number; t: number }[];
   /** What the array has picked out between the stars: identified, or a faint return. */
   deepKnown?: Record<string, "known" | "faint">;
+  /** Clan relations (AW-22): each clan's standing with you (-100..100; missing means its starting value), and recent changes. */
+  reputation?: Partial<Record<ClanId, number>>;
+  repLog?: RepChange[];
   /** The captain's own names for worlds, by body id (shown under the catalogue name). */
   nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */
@@ -282,6 +286,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   tickResearch(state);
   chargeStowedRover(state, minutes);
   tickSentiment(state, minutes);
+  tickReputation(state, minutes);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));
   settleLoan(state);
@@ -383,6 +388,7 @@ function settleLoan(state: GameState): void {
       state.credits -= due;
       state.stats.loanPaid = (state.stats.loanPaid ?? 0) + due;
       loan.balance -= due;
+      changeRep(state, "exchange", 1, "Paid an installment on time");
       log(
         state,
         "trade",
@@ -402,6 +408,7 @@ function settleLoan(state: GameState): void {
       );
     } else {
       loan.missed++;
+      changeRep(state, "exchange", -8, "Missed a payment on the note");
       // Exchange captains get the relentless collectors: double the late fee.
       const fee = Math.round(due * 0.1 * (state.captain.clan === "exchange" ? 2 : 1));
       loan.balance += fee;

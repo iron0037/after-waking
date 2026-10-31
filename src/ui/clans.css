@@ -1,0 +1,138 @@
+/* Clans overlay and standing tags (AW-22) */
+.contracts.clans-window {
+  width: min(1180px, 96vw);
+}
+.clans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 10px;
+}
+.clan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px;
+}
+.clan-spec {
+  line-height: 1.3;
+}
+.clan-tier {
+  font-weight: bold;
+  white-space: nowrap;
+}
+.clan-val {
+  font-weight: normal;
+  opacity: 0.8;
+  margin-left: 4px;
+}
+
+/* tier colours: hostile red, cool amber, neutral grey, friendly green, trusted bright */
+.tier-hostile { --tier: var(--danger); }
+.tier-cool { --tier: var(--accent); }
+.tier-neutral { --tier: var(--muted); }
+.tier-friendly { --tier: var(--good); }
+.tier-trusted { --tier: #c8ffd6; }
+.clan-tier,
+.clan-means {
+  color: var(--tier);
+}
+.clan-means {
+  line-height: 1.3;
+}
+.tag.tier-tag {
+  color: var(--tier);
+  border-color: var(--tier);
+  white-space: nowrap;
+}
+.tag.tier-tag.tier-trusted {
+  box-shadow: 0 0 6px rgba(200, 255, 214, 0.35);
+}
+
+.clan-bar {
+  position: relative;
+  height: 10px;
+  border: 1px solid var(--border-bright);
+  border-radius: 5px;
+  background: var(--panel-2);
+  margin: 4px 0 2px;
+}
+.clan-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--tier);
+  opacity: 0.28;
+}
+.clan-seg.tier-hostile {
+  border-radius: 4px 0 0 4px;
+}
+.clan-seg.tier-trusted {
+  border-radius: 0 4px 4px 0;
+}
+.clan-tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--border-bright);
+}
+.clan-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: var(--tier);
+  border: 1px solid var(--bg);
+  box-shadow: 0 0 5px var(--tier);
+}
+.clan-card.tier-hostile {
+  border-color: var(--danger);
+}
+
+.clan-ties {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+}
+.clan-chip {
+  display: inline-block;
+  font-size: 10px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-bright);
+  cursor: help;
+}
+.clan-chip.ally {
+  color: var(--good);
+  border-color: rgba(126, 231, 135, 0.5);
+}
+.clan-chip.rival {
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.5);
+}
+.clan-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.clan-log li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hub-refusal {
+  color: var(--danger);
+}
+.con-pay {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}

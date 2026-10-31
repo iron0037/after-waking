@@ -12,6 +12,7 @@ import {
   formatDate,
   bonusLine,
   captainTitle,
+  clanRefuses,
   dailyWages,
   dailyUpkeep,
   freePerkPoints,
@@ -453,6 +454,7 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
   const diff = wage - curWage;
   const startLoyalty = startingLoyalty(r.clan, true);
   const exact = hasPerk(state, "read-the-room");
+  const refused = clanRefuses(state, r.clan);
   return (
     <div class="panel crew-card recruit">
       <div class="hub-card-head">
@@ -526,12 +528,19 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
       </table>
       <button
         class="btn primary crew-sign"
-        disabled={short > 0}
-        title={short > 0 ? `You need ${cr(short)} more.` : `Sign ${r.name} for ${cr(fee)}${current ? `; ${current.name} goes ashore` : ""}`}
+        disabled={short > 0 || refused}
+        title={
+          refused
+            ? `${CLAN_NAMES[r.clan]} have turned hostile to you, and ${r.name} won't sign with a captain they won't deal with.`
+            : short > 0
+              ? `You need ${cr(short)} more.`
+              : `Sign ${r.name} for ${cr(fee)}${current ? `; ${current.name} goes ashore` : ""}`
+        }
         onClick={() => session.act((s) => hireRecruit(s, r.id))}
       >
         Sign for {cr(fee)}
       </button>
+      {refused && <div class="hub-refusal small">{CLAN_NAMES[r.clan]} won't deal with you, so {r.name} won't sign. Mend things (Clans, L).</div>}
     </div>
   );
 }

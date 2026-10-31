@@ -44,6 +44,32 @@ export const NO_CLAN_MODS: ClanMods = {
   helmFund: true,
 };
 
+/**
+ * How the clans feel about each other (AW-22), -1 (rivals) to +1 (allies). Standing you gain with one
+ * clan spills onto the others by half this much: help Helm and the Midshipmen approve, the Freebooters don't.
+ * Listed once per pair.
+ */
+export const CLAN_TIES: Partial<Record<ClanId, Partial<Record<ClanId, number>>>> = {
+  // Order and the ship: Helm and the Midshipmen run the Intrepid between them; the Lyceum is their quiet ally.
+  helm: { midshipmen: 0.4, lyceum: 0.2, freebooters: -0.6, covenant: -0.2 },
+  midshipmen: { diggers: 0.3 },
+  // The bank and the smugglers: the Exchange hates competition it can't tax.
+  exchange: { freebooters: -0.5, diggers: -0.2 },
+  // The Archive's keepers and its doubters.
+  lyceum: { covenant: -0.5 },
+};
+
+/** What each clan is about, one line, for the Clans panel (docs/lore.md, Society: The Clans). */
+export const CLAN_SPECIALTY: Record<ClanId, string> = {
+  helm: "Navigation and order. The old command crew's heirs, loyal to the council. Charts, sensors, surveys.",
+  midshipmen: "Ship operations. The best engineers aboard. Drives, hulls, weapons, shields.",
+  diggers: "Mining. Drills, rover gear, and ore. They post most of the delivery work.",
+  lyceum: "Research and the Archive. Specimens, probes, and most research projects.",
+  exchange: "Trade and finance. The market, the loans, and the cargo gear.",
+  covenant: "The doubters. They listen to everything and trust none of it.",
+  freebooters: "Smugglers and privateers. No questions asked, in either direction.",
+};
+
 export interface CaptainClan {
   perk: string;
   cost: string;

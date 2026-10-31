@@ -6,6 +6,7 @@
  * Officers can be replaced from the hiring hall aboard the Intrepid; the pool turns over monthly.
  * (Perk trees, aging and retirement come later.)
  */
+import { clanRefuses } from "./reputation";
 import {
   CLAN_TRAITS,
   FIRST_NAMES,
@@ -447,6 +448,7 @@ export function hireRecruit(state: GameState, recruitId: string): Result<{ hired
   const recruits = state.recruits ?? [];
   const r = recruits.find((x) => x.id === recruitId);
   if (!r) return fail("That recruit has signed elsewhere.");
+  if (clanRefuses(state, r.clan)) return fail(`${r.name} won't sign with a captain ${CLAN_NAMES[r.clan]} won't deal with.`);
   const fee = signingFee(state, r);
   if (state.credits < fee) return fail(`Signing ${r.name} costs ${fee.toLocaleString()} cr.`);
   state.credits -= fee;

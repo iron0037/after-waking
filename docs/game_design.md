@@ -371,6 +371,41 @@ Career report: no broke careers; novice and competent income about where they we
 
 Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too close to "Adrift"), and **Cosmos** (generic and unsearchable).
 
+## Clan Relations (AW-22) **[DECIDED 2026-10-31]**
+- **Standing.** Every clan rates you from −100 to +100 (`src/sim/reputation.ts`). The tiers:
+
+  | Tier | Range | Contract pay | Gear prices |
+  |---|---|---|---|
+  | Hostile | −40 or below | No work | Won't sell |
+  | Cool | −40 to −10 | ×0.9 | +10% |
+  | Neutral | −10 to 20 | ×1 | normal |
+  | Friendly | 20 to 50 | ×1.1 | −5% |
+  | Trusted | 50 and up | ×1.2 | −10% |
+
+  - A hostile clan also won't run your research or sign on with you.
+  - Contracts it already gave you still pay, at the Cool rate.
+- **Where you start:** your own clan at +25 (Friendly). A Freebooter captain starts Cool with Helm (−20) and the Exchange (−15). Everyone else starts at 0.
+- **What moves it:**
+
+  | Event | Change |
+  |---|---|
+  | Contract delivered | +4 to +12 (bigger jobs, more) |
+  | Contract lapsed | −12 |
+  | Research commissioned | +5 |
+  | Gear bought from a clan | up to +5 (scaled by price) |
+  | Exchange installment paid | +1 |
+  | Exchange payment missed | −8 |
+  | Helm obligation skipped | −15 |
+  | Raider taken | Helm +3 to +5 |
+  | Raider crew given a berth | Freebooters +4 |
+  | Covenant errand | +6 |
+
+- **Ripples.** A change spills onto other clans at half strength, times their tie (`CLAN_TIES`, from −1 to +1):
+  - Helm–Midshipmen +0.4; Helm–Lyceum +0.2; Midshipmen–Diggers +0.3.
+  - Helm–Freebooters −0.6; Exchange–Freebooters −0.5; Lyceum–Covenant −0.5; Exchange–Diggers −0.2; Helm–Covenant −0.2.
+- **Drift.** Standing relaxes toward where it started by 15% a year, so one bad year isn't permanent.
+- **Seen in:** the Clans panel, standing tags on contract cards and Shipyard prices, and a journal line whenever a tier changes.
+
 ## Starting Clan Perks **[PROPOSED: user's Exchange idea + matching perks]**
 Your starting clan shapes the early game. Every perk is small but felt, and each has a matching cost so no choice is free.
 

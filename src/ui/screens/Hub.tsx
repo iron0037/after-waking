@@ -1,7 +1,7 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
-import { clanMods, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
+import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
@@ -68,6 +68,7 @@ import {
   type Contract,
 } from "../../sim";
 import { bandPhrase, cr, damageSummary, pct, tonnes } from "../format";
+import { PayStandingTag, PriceStandingTag } from "../Clans";
 import { ContractAlso, contractBodyNames } from "../Contracts";
 import { HiringHall, Roster } from "../Crew";
 import { Section, unfoldSection } from "../Section";
@@ -609,7 +610,7 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
   const urgent = active && left < 14 * DAY;
   const activeCount = (state.contracts ?? []).filter((x) => x.status === "active").length;
   const payout = contractPayout(state, c);
-  const payTitle = payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer` : undefined;
+  const payTitle = payout !== c.reward ? `${cr(c.reward)} posted, adjusted for your comms officer and clan standing` : undefined;
 
   return (
     <div class={`panel hub-contract ${active ? "active" : ""}`}>
@@ -633,7 +634,12 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
             </>
           )}
         </div>
-        <span class="accent" title={payTitle}>{cr(payout)}</span>
+        <span class="con-pay">
+          <PayStandingTag state={state} clan={c.clan} />
+          <span class="accent" title={payTitle}>
+            {cr(payout)}
+          </span>
+        </span>
       </div>
       <div class="muted small">{c.text}</div>
       <ContractAlso state={state} c={c} />
@@ -1053,6 +1059,7 @@ function Shipyard({ session }: { session: GameSession }) {
                 // Top-tier gear waits on a research project (AW-15).
                 const gate = researchFor(u.id);
                 const gated = !!gate && !upgradeUnlocked(state, u.id);
+                const refused = clanRefuses(state, u.vendor);
                 return (
                   <div key={u.id} class={`panel hub-card ${installed || job ? "installed" : ""}`}>
                     <div class="hub-card-head">
@@ -1074,6 +1081,7 @@ function Shipyard({ session }: { session: GameSession }) {
                       <span class="tag" title={`Sold by the ${CLAN_NAMES[u.vendor]} clan`}>
                         {CLAN_NAMES[u.vendor]}
                       </span>
+                      <PriceStandingTag state={state} clan={u.vendor} />
                       {missing && <span class="tag accent-tag">Requires {reqName}</span>}
                       {gated && gate && (
                         <span class="tag accent-tag" title={`Commission "${gate.name}" from ${CLAN_NAMES[gate.clan]} under Research`}>
@@ -1094,10 +1102,12 @@ function Shipyard({ session }: { session: GameSession }) {
                     {!installed && !job && (
                       <button
                         class="btn"
-                        disabled={short > 0 || missing || gated}
+                        disabled={short > 0 || missing || gated || refused}
                         title={
-                          gated && gate
-                            ? `Needs the "${gate.name}" research project first (Research tab).`
+                          refused
+                            ? `${CLAN_NAMES[u.vendor]} won't sell to you. Mend things (Clans, L).`
+                            : gated && gate
+                            ?`Needs the "${gate.name}" research project first (Research tab).`
                             : missing
                             ? `Requires ${reqName} first.`
                             : short > 0
@@ -1109,6 +1119,7 @@ function Shipyard({ session }: { session: GameSession }) {
                         Buy
                       </button>
                     )}
+                    {!installed && !job && refused && <div class="hub-refusal small">{CLAN_NAMES[u.vendor]} won't sell to you</div>}
                   </div>
                 );
               })}
@@ -1206,6 +1217,7 @@ function Research({ session }: { session: GameSession }) {
                     </button>
                   </div>
                 )}
+                {status === "available" && clanRefuses(state, p.clan) && <div class="hub-refusal small">{CLAN_NAMES[p.clan]} won't take your commission.</div>}
               </div>
             );
           })}

@@ -2,6 +2,7 @@
  * Research projects (AW-15): bring a clan what it needs, pay for the lab time, and the top tier of
  * a piece of gear goes on sale at the Shipyard when the project finishes. Projects run while you fly.
  */
+import { changeRep, clanRefuses } from "./reputation";
 import { clanMods } from "./clan";
 import { FLORA_BY_NAME } from "../data/catalog";
 import { COMMODITIES, ORE_IDS, type CommodityId } from "../data/commodities";
@@ -88,6 +89,7 @@ export function researchBlockers(state: GameState, id: string): string[] {
   if (status === "running") return ["Already under way."];
   if (status === "done") return ["Already finished."];
   if (state.location.kind !== "intrepid") out.push("Projects are commissioned aboard the Intrepid.");
+  if (clanRefuses(state, p.clan)) out.push(`${CLAN_NAMES[p.clan]} won't take your commission. Mend things with them first.`);
   const running = RESEARCH.filter((q) => researchStatus(state, q.id) === "running").length;
   if (running >= MAX_ACTIVE_RESEARCH) out.push(`The clans will run ${MAX_ACTIVE_RESEARCH} projects for you at a time.`);
   for (const req of p.needs) {
@@ -124,6 +126,7 @@ export function startResearch(state: GameState, id: string): Result<ResearchProj
   state.research ??= {};
   state.research[id] = { startedAt: state.time, readyAt: state.time + p.days * DAY, done: false };
   bondClan(state, p.clan, 3);
+  changeRep(state, p.clan, 5, `Commissioned "${p.name}"`);
   state.journal.push({
     t: state.time,
     kind: "trade",
