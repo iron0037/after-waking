@@ -38,7 +38,9 @@ export interface RaiderTemplate {
 export const RAIDERS: readonly RaiderTemplate[] = [
   { id: "skiff", name: "raider skiff", hull: 60, laser: 7, kinetic: 0, shields: 0, speed: 1.15, bounty: 2_500, nerve: 0.45, captainBounty: 2_000, crew: [2, 3], lootT: [4, 10] },
   { id: "gunboat", name: "pirate gunboat", hull: 100, laser: 8, kinetic: 14, shields: 4, speed: 1.0, bounty: 5_000, nerve: 0.35, captainBounty: 4_000, crew: [3, 5], lootT: [10, 25] },
-  { id: "corsair", name: "corsair", hull: 150, laser: 12, kinetic: 18, shields: 8, speed: 1.05, bounty: 9_000, nerve: 0.3, captainBounty: 7_000, crew: [4, 6], lootT: [20, 40] },
+  { id: "corsair", name: "corsair", hull: 175, laser: 13, kinetic: 18, shields: 10, speed: 1.05, bounty: 9_000, nerve: 0.3, captainBounty: 7_000, crew: [4, 6], lootT: [20, 40] },
+  // The heavy raider (playtest 12): rare, and drawn to captains who've made a name beating the others.
+  { id: "marauder", name: "marauder", hull: 230, laser: 15, kinetic: 26, shields: 13, speed: 0.95, bounty: 14_000, nerve: 0.25, captainBounty: 10_000, crew: [5, 8], lootT: [30, 55] },
 ];
 
 export const RAIDER_CAPTAINS = [

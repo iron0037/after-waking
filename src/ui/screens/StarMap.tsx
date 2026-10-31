@@ -31,6 +31,8 @@ import {
   explorationScore,
   effectiveStats,
   hasPerk,
+  pirateIntel,
+  type PirateIntel,
   positionOf,
   SPECTRAL,
   systemMinerals,
@@ -89,6 +91,24 @@ const isSoftBlocker = (b: string): boolean => isWaitBlocker(b) || b.startsWith("
 
 const intrepidImg = typeof Image === "undefined" ? null : new Image();
 if (intrepidImg) intrepidImg.src = "./assets/intrepid.png";
+
+/** How each raider-intel level reads on the chart (tooltip) and in the side panel (CSS class). */
+const INTEL_COLOR: Record<PirateIntel["level"], string> = {
+  high: UI.danger,
+  moderate: UI.accent,
+  low: UI.muted,
+  quiet: UI.good,
+  patrolled: UI.good,
+  unknown: UI.muted,
+};
+const INTEL_CLASS: Record<PirateIntel["level"], string> = {
+  high: "danger",
+  moderate: "accent",
+  low: "muted",
+  quiet: "good",
+  patrolled: "good",
+  unknown: "muted",
+};
 
 /** Star dot radius in pixels: luminosity on a log scale, in a small range. */
 function starRadius(s: StarSystem): number {
@@ -198,6 +218,8 @@ export function StarMap({ session }: { session: GameSession }) {
   const hereSite = inDeep ? (sites.find((x) => x.level === "known" && dist(x.site.pos, here) <= SITE_REACH_LY)?.site ?? null) : null;
   const rangeLy = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
   const plan = target ? foldPlan(state, world, target.id) : null;
+  /** Raider intel is only for stars: not the Intrepid, and not a point in deep space. */
+  const intel = !deepTarget && target?.star ? pirateIntel(state, world, target.id) : null;
 
   // Departure: what a one-click "fold when ready" would do, and whether it can.
   const hardBlockers = plan ? plan.blockers.filter((b) => !isSoftBlocker(b)) : [];
@@ -977,6 +999,10 @@ export function StarMap({ session }: { session: GameSession }) {
       { text: n.star ? `${SPECTRAL[n.star.spectral].label} · ${d}` : d, color: UI.muted },
     ];
     if (fp) lines.push({ text: `fold: ${fp.fuel} fuel, refit ${formatDuration(fp.refitMinutes)}`, color: UI.cyan });
+    if (n.star) {
+      const intel = pirateIntel(state, world, n.id);
+      lines.push({ text: `Raiders: ${intel.label}`, color: INTEL_COLOR[intel.level] });
+    }
     const covenantAsk = covenantStars.get(n.id);
     if (covenantAsk) lines.push({ text: `◌ Covenant: ${covenantAsk}`, color: UI.covenant });
     const jobs = targets.get(n.id) ?? [];
@@ -1188,6 +1214,16 @@ export function StarMap({ session }: { session: GameSession }) {
                     <span class="tag good">Home</span>
                   )}
                 </dd>
+                {intel && (
+                  <>
+                    <dt>Raiders</dt>
+                    <dd>
+                      <span class={INTEL_CLASS[intel.level]}>{intel.label}</span>
+                      <div class="muted small sm-intel-text">{intel.text}</div>
+                      {intel.raiders.length > 0 && <div class="muted small sm-intel-text">Reported: {intel.raiders.join(", ")}</div>}
+                    </dd>
+                  </>
+                )}
               </dl>
             </section>
 

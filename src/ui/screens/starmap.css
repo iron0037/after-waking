@@ -209,6 +209,10 @@
   color: var(--cyan);
   font-weight: bold;
 }
+.sm-intel-text {
+  margin-top: 3px;
+  line-height: 1.35;
+}
 .sm-site-report {
   margin: 8px 0 0;
 }

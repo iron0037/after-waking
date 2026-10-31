@@ -1,24 +1,15 @@
-/** Every source file must be UTF-8: a stray Latin-1 byte shows up as a garbled character in the game. */
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+/**
+ * Every source file must be UTF-8 (AW-183): a stray Latin-1 byte shows up as a garbled character in
+ * the game. Vite reads the files as UTF-8, so an invalid byte arrives here as U+FFFD.
+ */
 import { expect, it } from "vitest";
 
-function files(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const p = join(dir, name);
-    return statSync(p).isDirectory() ? files(p) : /\.(ts|tsx|css|html|json)$/.test(name) ? [p] : [];
-  });
-}
+const sources = import.meta.glob("../src/**/*.{ts,tsx,css}", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 
 it("source files are valid UTF-8", () => {
-  const decoder = new TextDecoder("utf-8", { fatal: true });
-  const bad = files("src").filter((p) => {
-    try {
-      decoder.decode(readFileSync(p));
-      return false;
-    } catch {
-      return true;
-    }
-  });
+  expect(Object.keys(sources).length).toBeGreaterThan(50);
+  const bad = Object.entries(sources)
+    .filter(([, text]) => text.includes("�"))
+    .map(([path]) => path);
   expect(bad).toEqual([]);
 });

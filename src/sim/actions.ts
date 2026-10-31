@@ -254,6 +254,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     pos: { x: Math.cos(angle) * detail.edgeAU, y: Math.sin(angle) * detail.edgeAU },
     orbiting: null,
   };
+  state.systemArrivedAt = state.time;
   const firstVisit = !state.visitedSystems.includes(targetId);
   if (firstVisit) state.visitedSystems.push(targetId);
   const sys = detail.system;

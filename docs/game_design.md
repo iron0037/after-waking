@@ -336,6 +336,17 @@ Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives ca
   - Afterwards, the debrief offers to continue the flight.
 - **Auto-combat.** **Fight it out** and **Break away** leave the encounter to the officers, turn by turn, with the log scrolling. **Take command** returns control at any point. Auto-fight stops at the prize, so the captives are still the captain's call.
 
+**v1.3: pirates v2 (playtest 12, AW-184) [DECIDED 2026-10-31].**
+- **Geography:**
+  - Helm patrols the home stars, so there are no raids there.
+  - The charted stars are the busiest lanes: base 22% per departure.
+  - Uncharted space thins out from 11 ly and is empty past 22 ly; nobody worth robbing goes out there. Pirate bases (AW-169) and aliens (M6) take over.
+- **Lingering:** the chance scales ×0.5 on a quick visit, up to ×2 after 60 days in the system.
+- **Hold value:** the chance scales with what you carry, up to ×1.5.
+- **Reckless raiders:** even an outgunned raider attacks 12% of the time.
+- **The marauder,** a heavy raider (hull 230, laser 15, kinetic 26, shields 13). The corsair is toughened to 175 hull and 10 shields. Against a strong captain, heavier ships are picked more often.
+- **Star-map intel:** each star shows its raider activity and the reported raider types. Unvisited uncharted stars show "No intel".
+
 ## Star Systems: World Generation 2 **[DECIDED 2026-10-26] (AW-145)**
 Generation 1 gave every star our Solar System's layout: small rocky worlds inside the frost line, giants outside. The exoplanet surveys say otherwise, so new games use generation 2. Saves remember which generator built their universe (`state.worldGen`; old saves are generation 1), so a game in progress never reshuffles.
 

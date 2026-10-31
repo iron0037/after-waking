@@ -153,17 +153,80 @@ export function holdValue(state: GameState): number {
 // --- interdiction -----------------------------------------------------------------------------
 
 /** Chance that a raider is waiting as you fold out of this system with what's in the hold. */
-export function interdictionChance(state: GameState, world: World, systemId: string): number {
+/**
+ * How busy a system's lanes are with raiders, before your hold and your stay are counted (playtest 12):
+ * none at the home stars (Helm patrols them), most at the charted stars where the traffic is, then
+ * thinning out through uncharted space until, far out, there's nobody worth robbing (pirate bases are
+ * the exception, AW-169; aliens take over out there, M6).
+ */
+export function pirateActivity(world: World, systemId: string): number {
   const sys = world.galaxy.systems.find((s) => s.id === systemId);
   if (!sys || sys.home) return 0;
+  if (sys.charted) return RAID_BASE;
   const ly = dist(sys.pos, INTREPID_POS);
-  const base = sys.charted ? 0.25 : Math.min(0.5, 0.35 + 0.015 * Math.max(0, ly - 6));
-  return base * Math.min(1.5, holdValue(state) / 10_000) * clanMods(state).raidChance;
+  const fade = Math.max(0, Math.min(1, (RAID_FADE_END_LY - ly) / (RAID_FADE_END_LY - RAID_FADE_START_LY)));
+  return RAID_BASE * 0.85 * fade;
 }
 
-function pickRaider(rng: { weighted<T>(items: readonly (readonly [T, number])[]): T }, charted: boolean, ly: number): RaiderTemplate {
-  const w = charted ? [3, 1, 0] : [2, 2, 1 + Math.max(0, ly - 8) * 0.2];
-  return rng.weighted(RAIDERS.map((r, i) => [r, w[i] ?? 0] as const));
+/** Raiders' base chance at a busy charted star, and where uncharted space thins them out to nothing. */
+export const RAID_BASE = 0.22;
+export const RAID_FADE_START_LY = 11;
+export const RAID_FADE_END_LY = 22;
+
+/** The longer you work a system, the likelier someone notices: x0.5 for a quick visit, up to x2 after two months. */
+export function lingerFactor(state: GameState): number {
+  const days = (state.time - (state.systemArrivedAt ?? state.time)) / DAY;
+  return Math.max(0.5, Math.min(2, 0.5 + days / 40));
+}
+
+/** Chance that a raider is waiting as you fold out of this system with what's in the hold. */
+export function interdictionChance(state: GameState, world: World, systemId: string): number {
+  return pirateActivity(world, systemId) * Math.min(1.5, holdValue(state) / 10_000) * lingerFactor(state) * clanMods(state).raidChance;
+}
+
+export type PirateIntel = { level: "unknown" | "patrolled" | "quiet" | "low" | "moderate" | "high"; label: string; text: string; raiders: string[] };
+
+/**
+ * What the Intrepid's captains say about raiders at a star, for the star map. Only charted stars and
+ * ones you've visited have reports; out past that, nobody knows.
+ */
+export function pirateIntel(state: GameState, world: World, systemId: string): PirateIntel {
+  const sys = world.galaxy.systems.find((s) => s.id === systemId);
+  if (!sys) return { level: "unknown", label: "No intel", text: "", raiders: [] };
+  if (sys.home) return { level: "patrolled", label: "Patrolled", text: "Helm patrols the home stars. Raiders stay away.", raiders: [] };
+  if (!sys.charted && !state.visitedSystems.includes(sys.id)) {
+    return { level: "unknown", label: "No intel", text: "Nobody's been out here to say. Raiders, or worse, could be anywhere.", raiders: [] };
+  }
+  const a = pirateActivity(world, systemId);
+  const raiders = raiderMix(sys.charted, dist(sys.pos, INTREPID_POS), null)
+    .filter(([, w]) => w > 0)
+    .map(([r]) => r.name);
+  if (a <= 0) return { level: "quiet", label: "Quiet", text: "Too far out for raiders: there's nobody to rob.", raiders: [] };
+  const level = a >= RAID_BASE * 0.95 ? "high" : a >= RAID_BASE * 0.5 ? "moderate" : "low";
+  const label = level === "high" ? "Raiders active" : level === "moderate" ? "Some raiders" : "Few raiders";
+  const where = sys.charted ? "Busy lanes draw raiders." : "Traffic thins out here, and so do the raiders.";
+  return { level, label, text: `${where} The longer you stay and the richer your hold, the likelier they find you.`, raiders };
+}
+
+/**
+ * Which raiders work a star: skiffs and gunboats in the busy charted lanes, heavier ships farther out.
+ * Against a captain with real guns (`power`), the heavier ships come more often: the pirates send
+ * what it takes.
+ */
+function raiderMix(charted: boolean, ly: number, power: number | null): (readonly [RaiderTemplate, number])[] {
+  const base: Record<string, number> = charted
+    ? { skiff: 3, gunboat: 1.5, corsair: 0.5, marauder: 0.2 }
+    : { skiff: 2, gunboat: 2, corsair: 1 + Math.max(0, ly - 8) * 0.2, marauder: 0.4 };
+  const hunt = power === null ? 0 : Math.max(0, Math.min(3, (power - 8) / 8));
+  return RAIDERS.map((r) => {
+    const w = base[r.id] ?? 0;
+    const heavy = power !== null && sidePower(raiderSide(r)) >= power * 0.7;
+    return [r, w * (heavy ? 1 + hunt : 1)] as const;
+  });
+}
+
+function pickRaider(rng: { weighted<T>(items: readonly (readonly [T, number])[]): T }, charted: boolean, ly: number, power: number): RaiderTemplate {
+  return rng.weighted(raiderMix(charted, ly, power));
 }
 
 /**
@@ -180,7 +243,7 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
   const ly = dist(sys.pos, INTREPID_POS);
   const picked = withRng(state, (rng) => {
     if (rng.next() >= chance) return null;
-    const r = pickRaider(rng, sys.charted, ly);
+    const r = pickRaider(rng, sys.charted, ly, sidePower(playerSide(state)));
     if (!willAttack(r, state, rng.next())) return null;
     return { r, cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.15, 0.3) };
   });
@@ -230,15 +293,18 @@ export function routeContact(state: GameState, world: World, systemId: string, d
   if (!sys) return null;
   const rng = rngFor(state.seed, "contact", systemId, routeKey, state.stats.folds, Math.floor(state.time / DAY));
   if (rng.next() >= chance) return null;
-  const r = pickRaider(rng, sys.charted, dist(sys.pos, INTREPID_POS));
+  const r = pickRaider(rng, sys.charted, dist(sys.pos, INTREPID_POS), sidePower(playerSide(state)));
   if (!willAttack(r, state, rng.next())) return null;
   return { fraction: rng.range(0.3, 0.75), raider: r.id };
 }
 
-/** Raiders size you up first: a ship that outguns them is rarely worth the risk. */
+/** Even outgunned, some raiders attack anyway: desperate, drunk or proud (playtest 12). */
+export const RECKLESS_RAIDERS = 0.12;
+
+/** Raiders size you up first: a ship that outguns them is rarely worth the risk, but some try anyway. */
 function willAttack(r: RaiderTemplate, state: GameState, roll: number): boolean {
   const ratio = sidePower(raiderSide(r)) / sidePower(playerSide(state));
-  return ratio >= 1 || roll <= ratio * ratio * ratio;
+  return ratio >= 1 || roll <= Math.max(RECKLESS_RAIDERS, ratio * ratio * ratio);
 }
 
 function raiderSide(r: RaiderTemplate): CombatSide {

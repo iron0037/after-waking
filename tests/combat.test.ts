@@ -13,7 +13,10 @@ import {
   maybeInterdict,
   newGame,
   orderAdvice,
+  pirateIntel,
   playerSide,
+  RAID_FADE_END_LY,
+  RAID_FADE_START_LY,
   raiderById,
   sidePower,
   repairQuote,
@@ -44,16 +47,41 @@ function hailed(world: World, charted = false): GameState {
 }
 
 describe("pirates (combat v1)", () => {
-  it("never at the home stars or with an empty hold; likelier with a rich hold in uncharted space", () => {
+  it("never at the home stars or with an empty hold; busiest at the charted stars, gone far out (playtest 12)", () => {
     const world = new World(SEED);
     const home = world.galaxy.systems.find((s) => s.home)!;
     const { state } = laden(world, false);
     expect(interdictionChance(state, world, home.id)).toBe(0);
-    const unchartedId = world.galaxy.systems.find((s) => !s.home && !s.charted)!.id;
+    const near = (s: { pos: { x: number; y: number } }) => Math.hypot(s.pos.x, s.pos.y);
     const chartedId = world.galaxy.systems.find((s) => !s.home && s.charted)!.id;
-    expect(interdictionChance(state, world, unchartedId)).toBeGreaterThan(interdictionChance(state, world, chartedId));
+    const farId = world.galaxy.systems.find((s) => !s.home && !s.charted && near(s) > RAID_FADE_END_LY)?.id;
+    const midId = world.galaxy.systems.find((s) => !s.home && !s.charted && near(s) > RAID_FADE_START_LY && near(s) < RAID_FADE_END_LY - 2)!.id;
+    expect(interdictionChance(state, world, chartedId)).toBeGreaterThan(interdictionChance(state, world, midId));
+    if (farId) expect(interdictionChance(state, world, farId)).toBe(0);
     state.ship.cargo = {};
-    expect(interdictionChance(state, world, unchartedId)).toBe(0);
+    expect(interdictionChance(state, world, chartedId)).toBe(0);
+  });
+
+  it("the longer you linger, the likelier they find you", () => {
+    const world = new World(SEED);
+    const { state, systemId } = laden(world, true);
+    state.systemArrivedAt = state.time;
+    const quick = interdictionChance(state, world, systemId);
+    state.systemArrivedAt = state.time - 60 * DAY;
+    expect(interdictionChance(state, world, systemId)).toBeCloseTo(quick * 4, 5);
+  });
+
+  it("star map intel: patrolled at home, reports from charted stars, nothing from unvisited far ones", () => {
+    const world = new World(SEED);
+    const state = newGame({ seed: SEED });
+    expect(pirateIntel(state, world, world.galaxy.systems.find((s) => s.home)!.id).level).toBe("patrolled");
+    const charted = pirateIntel(state, world, world.galaxy.systems.find((s) => !s.home && s.charted)!.id);
+    expect(charted.level).toBe("high");
+    expect(charted.raiders).toContain("raider skiff");
+    const unvisited = world.galaxy.systems.find((s) => !s.charted)!;
+    expect(pirateIntel(state, world, unvisited.id).level).toBe("unknown");
+    state.visitedSystems.push(unvisited.id);
+    expect(pirateIntel(state, world, unvisited.id).level).not.toBe("unknown");
   });
 
   it("rolls once per departure, and blocks folding until it's settled", () => {
@@ -242,7 +270,10 @@ describe("prizes and lessons (combat v1.1)", () => {
       }
       return n;
     };
-    expect(count(true)).toBeLessThan(count(false) * 0.5);
+    // Some still try (reckless raiders), and heavier ships come for a strong captain, but far fewer.
+    const armed = count(true);
+    expect(armed).toBeLessThan(count(false) * 0.75);
+    expect(armed).toBeGreaterThan(0);
     const strong = newGame({ seed: SEED });
     strong.ship.upgrades.push("laserBattery", "deflectors");
     const skiff = raiderById("skiff")!;

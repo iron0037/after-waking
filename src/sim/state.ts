@@ -135,6 +135,8 @@ export interface GameState {
   lastEncounter?: EncounterResult;
   /** The system whose departure has already been rolled for raiders (one roll per departure). */
   interdictionClear?: string;
+  /** When the ship last folded into a star system: raiders notice a ship that lingers (playtest 12). */
+  systemArrivedAt?: number;
   /** The Archive's guidance (AW-24): entries read, and whether it's speaking at all (on unless false). */
   archiveSeen?: string[];
   guidance?: boolean;
