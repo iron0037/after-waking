@@ -832,6 +832,17 @@ export function drawRover(
   ctx.fillRect(x - r * 0.55, y - r * 0.4, r * 1.1, r * 0.8);
 }
 
+let boatTopImg: HTMLImageElement | null = null;
+
+/** The top-down boat sprite (bow pointing up); null if it is missing, broken or still loading. */
+function boatTopSprite(): HTMLImageElement | null {
+  if (!boatTopImg && typeof Image !== "undefined") {
+    boatTopImg = new Image();
+    boatTopImg.src = "./assets/boat-top.png";
+  }
+  return boatTopImg && boatTopImg.complete && boatTopImg.naturalWidth > 0 ? boatTopImg : null;
+}
+
 /**
  * The survey boat (AW-17) at a canvas pixel position, a clean top-down hull with its bow along `heading`
  * (degrees, 0 = north, clockwise). `moored` draws it at rest with a mooring ring instead of a wake;
@@ -868,6 +879,31 @@ export function drawBoat(
     ctx.moveTo(u * 0.3, u * 0.95);
     ctx.lineTo(u * 0.7, u * 1.9);
     ctx.stroke();
+  }
+  const sprite = boatTopSprite();
+  if (sprite) {
+    // The pixel-art boat, bow up, rotated to its heading; the wake and mooring ring are drawn above.
+    const h = u * 2.3;
+    const w = h * (sprite.naturalWidth / sprite.naturalHeight);
+    ctx.fillStyle = "rgba(5, 18, 32, 0.35)";
+    ctx.beginPath();
+    ctx.ellipse(u * 0.08, u * 0.1, w * 0.52, h * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    if (opts.roverAboard) {
+      // the rover lashed to the deck, small
+      const top = roverTopSprite();
+      if (top) {
+        const rh = h * 0.32;
+        const rw = rh * (top.naturalWidth / top.naturalHeight);
+        ctx.drawImage(top, -rw / 2, -h * 0.12 - rh / 2, rw, rh);
+      }
+    }
+    ctx.imageSmoothingEnabled = prev;
+    ctx.restore();
+    return;
   }
   const hull = (k: number): void => {
     ctx.beginPath();
