@@ -4,6 +4,7 @@
  * and charges for gear; a hostile clan won't deal with you at all. Extreme standings drift slowly
  * back toward where they started, so one bad year isn't forever.
  */
+import { hasPerk } from "./perks";
 import { CLAN_TIES } from "../data/clans";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { log, type GameState } from "./state";
@@ -95,6 +96,8 @@ function setRep(state: GameState, clan: ClanId, value: number): void {
  */
 export function changeRep(state: GameState, clan: ClanId, amount: number, reason: string, spill = true): void {
   if (amount === 0) return;
+  // Clan Dialects (comms): speaking their way earns a quarter more goodwill.
+  if (amount > 0 && hasPerk(state, "clan-dialects")) amount *= 1.25;
   const deltas = new Map<ClanId, number>([[clan, amount]]);
   if (spill) {
     for (const other of CLAN_IDS) {

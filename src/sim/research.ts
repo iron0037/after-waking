@@ -2,6 +2,7 @@
  * Research projects (AW-15): bring a clan what it needs, pay for the lab time, and the top tier of
  * a piece of gear goes on sale at the Shipyard when the project finishes. Projects run while you fly.
  */
+import { hasPerk } from "./perks";
 import { changeRep, clanRefuses } from "./reputation";
 import { clanMods } from "./clan";
 import { FLORA_BY_NAME } from "../data/catalog";
@@ -124,7 +125,9 @@ export function startResearch(state: GameState, id: string): Result<ResearchProj
   state.trackedResearch = (state.trackedResearch ?? []).filter((t) => t !== id);
   state.credits -= researchCost(state, p);
   state.research ??= {};
-  state.research[id] = { startedAt: state.time, readyAt: state.time + p.days * DAY, done: false };
+  // Living Archive (medical): specimen projects run a quarter faster.
+  const days = p.days * (hasPerk(state, "living-archive") && p.needs.some((n) => n.kind === "specimens") ? 0.75 : 1);
+  state.research[id] = { startedAt: state.time, readyAt: state.time + days * DAY, done: false };
   bondClan(state, p.clan, 3);
   changeRep(state, p.clan, 5, `Commissioned "${p.name}"`);
   state.journal.push({
@@ -185,4 +188,16 @@ export function researchWants(state: GameState): Map<CommodityId, number> {
 /** What a project costs this captain (Covenant captains pay more for Archive work). */
 export function researchCost(state: GameState, p: ResearchProject): number {
   return Math.round((p.cost * clanMods(state).researchCost) / 100) * 100;
+}
+
+/**
+ * Bio-Assay (medical): which research projects not yet started want this species (by name, or by its
+ * rarity). Empty without the perk.
+ */
+export function specimenResearchUses(state: GameState, species: string): string[] {
+  if (!hasPerk(state, "bio-assay")) return [];
+  const rarity = FLORA_BY_NAME.get(species)?.rarity ?? 0;
+  return RESEARCH.filter(
+    (p) => researchStatus(state, p.id) === "available" && p.needs.some((n) => n.kind === "specimens" && (n.species ? n.species === species : rarity >= (n.minRarity ?? 1))),
+  ).map((p) => p.name);
 }

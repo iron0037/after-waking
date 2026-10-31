@@ -593,6 +593,7 @@ export function land(state: GameState, world: World, region: number): Result {
   knowledge(state, body.id, region).visits++;
   state.stats.landings++;
   revealAt(state, world, body.id, state.location.ship as Vec2);
+  if (hasPerk(state, "pinpoint-landing") && state.location.kind === "surface") state.location.freeHop = true;
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
   senseRegionDeposits(state, world, body.id, region);
   noticeLanding(state, body.id, region);
@@ -662,7 +663,13 @@ export function hopFuel(state: GameState, world: World): number {
 
 /** Fuel to hop to (x, y): the base hop, plus more the farther it goes (a region's width doubles it). */
 export function hopFuelTo(state: GameState, world: World, x: number, y: number): number {
-  const d = hexDistance(shipTile(state, world), { x, y });
+  const here = shipTile(state, world);
+  // Pinpoint Landing (navigation): the first hop after setting down, within the landing region, is on the house.
+  if (state.location.kind === "surface" && state.location.freeHop) {
+    const surface = world.surface(state.location.bodyId);
+    if (surface.regionAt(x, y) === surface.regionAt(here.x, here.y)) return 0;
+  }
+  const d = hexDistance(here, { x, y });
   return Math.round(hopFuel(state, world) * (1 + d / REGION_SIZE) * (hasPerk(state, "hop-master") ? 0.5 : 1) * 10) / 10;
 }
 
@@ -679,6 +686,10 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   if (fuel > state.ship.fuel) return fail(`That hop needs ${fuel} fuel.`);
   state.ship.fuel -= fuel;
   advanceTime(state, HOP_MINUTES);
+  if (loc.freeHop) {
+    loc.freeHop = false;
+    log(state, "travel", "Pinpoint landing: the navigator walks the ship to just the right spot.");
+  }
   loc.ship = { x, y };
   visitRegion(state, world, loc.bodyId, x, y);
   revealAt(state, world, loc.bodyId, loc.ship);

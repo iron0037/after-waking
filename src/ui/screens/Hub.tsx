@@ -1,7 +1,7 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
-import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
+import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
@@ -439,6 +439,7 @@ function SpecimenDesk({ session }: { session: GameSession }) {
         reserved: !!hold?.contract,
         research: hold?.contract ? 0 : Math.min(count, hold?.research ?? 0),
         projects: hold?.projects ?? [],
+        wantedBy: specimenResearchUses(state, rest.join("|")),
         isNew: !state.catalogedSpecies.includes(key.split("|")[1] ?? key),
         unit: Math.round(specimenUnitPrice(state, key)),
         floating: (FLORA_BY_NAME.get(rest.join("|"))?.priceMult ?? 1) > 1,
@@ -503,6 +504,11 @@ function SpecimenDesk({ session }: { session: GameSession }) {
                           title={`Tracked research needs these: ${r.projects.join(", ")}. "Sell all" leaves them aboard.`}
                         >
                           {r.research === r.count ? "All" : r.research} kept for {r.projects.join(", ")}
+                        </span>
+                      )}
+                      {r.research === 0 && r.wantedBy.length > 0 && (
+                        <span class="tag" title={`Bio-Assay: research that wants this species: ${r.wantedBy.join(", ")}.`}>
+                          research: {r.wantedBy.join(", ")}
                         </span>
                       )}
                       {r.floating ? (

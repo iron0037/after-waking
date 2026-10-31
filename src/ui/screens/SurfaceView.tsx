@@ -111,6 +111,7 @@ import {
   vehicleMobility,
   vehicleOf,
   workDeposit,
+  specimenResearchUses,
 } from "../../sim";
 import { cargoList, pct, tonnes } from "../format";
 import { UI } from "../palette";
@@ -1463,6 +1464,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           const row = ({ m, dist, sampled }: (typeof rows)[number]) => {
             const { f } = m;
             const rarity = floraRarity(f.species);
+            const wanted = specimenResearchUses(state, f.species);
+            const tip = [rarity ? `${f.species}: ${RARITY_LABEL[rarity]} specimen` : "", wanted.length ? `Research wants it: ${wanted.join(", ")}` : ""].filter(Boolean).join(". ");
             return (
               <tr
                 key={f.key}
@@ -1476,9 +1479,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                   }
                 }}
               >
-                <td title={rarity ? `${f.species}: ${RARITY_LABEL[rarity]} specimen` : undefined}>
+                <td title={tip || undefined}>
                   <LeafMark species={f.species} />
                   {f.species}
+                  {wanted.length > 0 && !sampled && <span class="tag" title={`Bio-Assay: ${wanted.join(", ")}`}> research</span>}
                   {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
                 </td>
                 <td class="num">{dist}</td>

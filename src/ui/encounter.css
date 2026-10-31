@@ -238,6 +238,13 @@
   color: #b9c6da;
 }
 
+/* Read the Enemy: the raider's next move */
+.enc-intent {
+  border-left: 2px solid var(--accent, #e0b050);
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+
 /* orders */
 .enc-orders {
   display: flex;

@@ -28,6 +28,7 @@ import {
   officerAt,
   orderAdvice,
   playerSide,
+  readTheEnemy,
   shipDamage,
   type AutoMode,
   type CombatSide,
@@ -308,6 +309,7 @@ function Battle({ session }: { session: GameSession }) {
   // While the officers have the battle, show the orders they will give next instead of the captain's.
   const orders: Orders = auto ? autoOrders(state, auto) : session.orders;
   const advice = orderAdvice(state);
+  const intent = readTheEnemy(state, orders.helm);
 
   const set = (key: OrderKey, id: string) => {
     (orders as unknown as Record<string, string>)[key] = id;
@@ -361,6 +363,12 @@ function Battle({ session }: { session: GameSession }) {
             </p>
           ))}
         </div>
+
+        {intent && (
+          <div class="enc-intent small" title="Read the Enemy: your captain's read on the raider's next move.">
+            <span class="accent">Read:</span> {intent}
+          </div>
+        )}
 
         <div class="enc-orders">
           {ORDER_GROUPS.map((g) => (

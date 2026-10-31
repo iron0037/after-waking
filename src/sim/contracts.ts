@@ -327,6 +327,12 @@ export function tickContracts(state: GameState): void {
   for (const c of state.contracts) {
     if (c.status === "active" && c.deadline !== null && state.time > c.deadline) {
       c.status = "failed";
+      // Favors Owed (comms): each clan lets one lapse slide.
+      if (hasPerk(state, "favors-owed") && !(state.favorsUsed ?? []).includes(c.clan)) {
+        state.favorsUsed = [...(state.favorsUsed ?? []), c.clan];
+        state.journal.push({ t: state.time, kind: "info", text: `Contract lapsed: "${c.title}". ${CLAN_NAMES[c.clan]} let it slide, this once: your comms officer called in a favor.` });
+        continue;
+      }
       state.journal.push({ t: state.time, kind: "warning", text: `Contract lapsed: "${c.title}". ${CLAN_NAMES[c.clan]} won't forget it.` });
       bondClan(state, c.clan, -4);
       changeRep(state, c.clan, REP_LAPSE, `Let "${c.title}" lapse`);

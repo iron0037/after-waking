@@ -24,7 +24,7 @@ import { addCargo } from "./ship";
 import { COMMODITIES, ORE_IDS, GAS_IDS } from "../data/commodities";
 import { sellPrice } from "./economy";
 import { INTREPID_POS } from "./galaxy";
-import { effectiveStats } from "./perks";
+import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { removeCargo } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
@@ -236,7 +236,8 @@ function pickRaider(rng: { weighted<T>(items: readonly (readonly [T, number])[])
 export function maybeInterdict(state: GameState, world: World, fromId: string): string | null {
   if (state.encounter || state.interdictionClear === fromId) return null;
   state.interdictionClear = fromId;
-  const chance = interdictionChance(state, world, fromId);
+  // Wake Masking (navigation): a fainter fold wake, so fewer raiders are waiting for it.
+  const chance = interdictionChance(state, world, fromId) * (hasPerk(state, "wake-masking") ? 0.65 : 1);
   if (chance <= 0) return null;
   const sys = world.galaxy.systems.find((s) => s.id === fromId);
   if (!sys) return null;
@@ -314,7 +315,8 @@ function raiderSide(r: RaiderTemplate): CombatSide {
 /** Chance your sensors see a raider before it sees you: the array, the science officer, sensor damage. */
 export function spotChance(state: GameState): number {
   const sensors = effectiveStats(state).sensorTier;
-  return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200, 0.1, 0.85);
+  // Early Warning (comms): the listeners hear them first.
+  return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200 + (hasPerk(state, "early-warning") ? 0.2 : 0), 0.1, 0.9);
 }
 
 /** The flight stops where the raider is met; the encounter opens at the contact stage. Returns the alert text. */
@@ -356,11 +358,13 @@ export type ContactChoice = "slip" | "run" | "hail" | "engage";
 export function contactOdds(state: GameState): { slip: number | null; run: number } {
   const e = state.encounter;
   if (!e || e.stage !== "contact") return { slip: null, run: 0 };
+  // Pursuit Course (navigation): the navigator reads their intercept and plots around it.
+  const pursuit = hasPerk(state, "pursuit-course");
   const slip = e.spottedFirst
-    ? clamp(0.5 + 0.05 * stationLevel(state, "navigation") + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200, 0.1, 0.92)
+    ? clamp(0.5 + 0.05 * stationLevel(state, "navigation") + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200 + (pursuit ? 0.1 : 0), 0.1, 0.95)
     : null;
   // At a quarter light-speed nothing can fight; they have to match your burn, which is easier if they saw you coming.
-  const run = clamp(hailOdds(state).run + (e.spottedFirst ? 0.15 : 0), 0.05, 0.92);
+  const run = clamp(hailOdds(state).run + (e.spottedFirst ? 0.15 : 0) + (pursuit ? 0.15 : 0), 0.05, 0.95);
   return { slip, run };
 }
 
@@ -494,8 +498,13 @@ export function hailOdds(state: GameState): { talk: number; run: number } {
   const e = state.encounter;
   if (!e) return { talk: 0, run: 0 };
   const me = playerSide(state);
-  const talk = clamp(0.2 + 0.06 * stationLevel(state, "comms") + 0.03 * stationLevel(state, "captain"), 0.05, 0.85);
-  const run = clamp(0.3 + 0.05 * stationLevel(state, "navigation") + (me.speed - e.enemy.speed) * 1.5 - me.damage.drives / 200, 0.05, 0.9);
+  // Silver Tongue (captain) talks raiders down; Early Warning (comms) gives the run a head start.
+  const talk = clamp(0.2 + 0.06 * stationLevel(state, "comms") + 0.03 * stationLevel(state, "captain") + (hasPerk(state, "silver-tongue") ? 0.15 : 0), 0.05, 0.9);
+  const run = clamp(
+    0.3 + 0.05 * stationLevel(state, "navigation") + (me.speed - e.enemy.speed) * 1.5 - me.damage.drives / 200 + (hasPerk(state, "early-warning") ? 0.05 : 0),
+    0.05,
+    0.9,
+  );
   return { talk, run };
 }
 
@@ -574,16 +583,19 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   const comms = stationLevel(state, "comms");
 
   // Their orders: run when hurt, close in to use a kinetic battery, aim to disarm a dangerous ship.
-  const frac = them.hull / them.hullMax;
-  const theirHelm: Orders["helm"] = frac < e.nerve && them.damage.drives < 80 ? "open" : them.kinetic > 0 && e.range > 0 ? "close" : "hold";
-  const theirGuns: FireTarget =
-    orders.helm === "open" && me.damage.drives < 60 ? "drives" : me.laser + me.kinetic > them.laser + them.kinetic && me.damage.weapons < 60 ? "weapons" : "hull";
+  const { helm: theirHelm, guns: theirGuns } = enemyIntent(state, orders.helm);
 
   // 1. Maneuver: opposite wishes are settled by speed.
   const want = (h: Orders["helm"]) => (h === "close" ? -1 : h === "open" ? 1 : 0);
   const mine = want(orders.helm);
   const theirs = want(theirHelm);
-  const mySpeed = me.speed * (1 - me.damage.drives / 100) + 0.03 * nav;
+  // Evasive Pilot (navigation) wins more maneuvers; Overdrive (engineering) pushes the drives when breaking away.
+  const overdrive = orders.helm === "open" && hasPerk(state, "overdrive");
+  const mySpeed = (me.speed * (1 - me.damage.drives / 100) + 0.03 * nav + (hasPerk(state, "evasive-pilot") ? 0.1 : 0)) * (overdrive ? 1.4 : 1);
+  if (overdrive && withRng(state, (rng) => rng.next()) < 0.25) {
+    me.damage.drives = Math.min(100, me.damage.drives + 10);
+    say("Overdrive strains the drives.");
+  }
   const theirSpeed = them.speed * (1 - them.damage.drives / 100);
   let move = 0;
   let winner: "me" | "them" | "both" | "none" = "none";
@@ -609,13 +621,15 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   if (e.range !== before) say(`Range ${RANGE_NAMES[before]} to ${RANGE_NAMES[e.range]}.`);
 
   // 2. Engineering before the guns: shields up or guns hot.
-  const myShields = me.shields * (orders.engineering === "shields" ? 1.6 : 1);
-  const myGunBoost = orders.engineering === "guns" ? 1.25 : 1;
+  // Shield Tuning (engineering) and Field Theory (science) stiffen the screens; Fire Control (engineering) hits harder.
+  const myShields = me.shields * (orders.engineering === "shields" ? 1.6 : 1) * (hasPerk(state, "shield-tuning") ? 1.15 : 1) * (hasPerk(state, "field-theory") ? 1.15 : 1);
+  const myGunBoost = (orders.engineering === "guns" ? 1.25 : 1) * (hasPerk(state, "fire-control") ? 1.1 : 1);
+  const aimBonus = (hasPerk(state, "fire-control") ? 0.05 : 0) + (hasPerk(state, "field-theory") ? 0.03 : 0);
 
   // 3. Fire, both at once.
-  const evadeMe = orders.helm === "evade" ? 0.15 + 0.01 * nav : 0;
+  const evadeMe = orders.helm === "evade" ? 0.15 + 0.01 * nav + (hasPerk(state, "evasive-pilot") ? 0.05 : 0) : 0;
   const myAimPenalty = orders.helm === "evade" ? 0.15 : 0;
-  const myHits = orders.guns === "hold" || me.damage.weapons >= 100 ? [] : volley(state, me, e.range, 0.02 * sci - myAimPenalty, 0, myGunBoost);
+  const myHits = orders.guns === "hold" || me.damage.weapons >= 100 ? [] : volley(state, me, e.range, 0.02 * sci - myAimPenalty + aimBonus, 0, myGunBoost);
   const theirHits = them.damage.weapons >= 100 ? [] : volley(state, them, e.range, 0, evadeMe, 1);
   const dealt = applyHits(them, myHits, orders.guns === "hold" ? "hull" : orders.guns, them.shields);
   const taken = applyHits(me, theirHits, theirGuns, myShields);
@@ -633,9 +647,11 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   // 4. Repairs.
   if (orders.engineering === "repair") {
     const fix = 8 + 3 * eng;
+    // Drive Repair (engineering): the drives come back twice as fast.
+    const driveFix = hasPerk(state, "drive-repair") ? 2 : 1;
     const worst = SYSTEMS.reduce((a, b) => (me.damage[b] > me.damage[a] ? b : a));
     if (me.damage[worst] >= 10) {
-      me.damage[worst] = Math.max(0, me.damage[worst] - fix);
+      me.damage[worst] = Math.max(0, me.damage[worst] - fix * (worst === "drives" ? driveFix : 1));
       say(`Damage control patches the ${worst}.`);
     } else if (me.hull < me.hullMax) {
       me.hull = Math.min(me.hullMax, me.hull + fix / 2);
@@ -854,7 +870,9 @@ export function repairQuote(state: GameState): { cost: number; days: number } | 
   const d = shipDamage(state);
   const points = d.hull * 60 + (d.drives + d.weapons + d.sensors) * 40;
   if (points <= 0) return null;
-  return { cost: Math.round(points / 10) * 10, days: 1 + Math.ceil((d.hull + d.drives + d.weapons + d.sensors) / 120) };
+  const days = 1 + Math.ceil((d.hull + d.drives + d.weapons + d.sensors) / 120);
+  // Drive Repair (engineering): the yard work goes in half the time.
+  return { cost: Math.round(points / 10) * 10, days: hasPerk(state, "drive-repair") ? Math.max(1, Math.ceil(days / 2)) : days };
 }
 
 /** Put the yard to work on the battle damage: paid up front, done in a day or more. */
@@ -889,3 +907,29 @@ export function raiderById(id: string): RaiderTemplate | undefined {
   return RAIDERS.find((r) => r.id === id);
 }
 
+
+/**
+ * What the raider means to do this turn, given your helm order: run when hurt, close in to use a
+ * kinetic battery, and aim to disarm a dangerous ship (or cripple yours if you're running).
+ * Read the Enemy (captain) shows it in the battle screen.
+ */
+export function enemyIntent(state: GameState, playerHelm: Orders["helm"]): { helm: Orders["helm"]; guns: FireTarget } {
+  const e = state.encounter as Encounter;
+  const me = playerSide(state);
+  const them = e.enemy;
+  const frac = them.hull / them.hullMax;
+  const helm: Orders["helm"] = frac < e.nerve && them.damage.drives < 80 ? "open" : them.kinetic > 0 && e.range > 0 ? "close" : "hold";
+  const guns: FireTarget =
+    playerHelm === "open" && me.damage.drives < 60 ? "drives" : me.laser + me.kinetic > them.laser + them.kinetic && me.damage.weapons < 60 ? "weapons" : "hull";
+  return { helm, guns };
+}
+
+/** Read the Enemy (captain): the raider's next move, in words, or null without the perk or outside a battle. */
+export function readTheEnemy(state: GameState, playerHelm: Orders["helm"]): string | null {
+  const e = state.encounter;
+  if (!e || e.stage !== "battle" || !hasPerk(state, "read-the-enemy")) return null;
+  const { helm, guns } = enemyIntent(state, playerHelm);
+  const move = helm === "open" ? "break away" : helm === "close" ? "close in" : "hold the range";
+  const aim = guns === "hull" ? "your hull" : `your ${guns}`;
+  return `${e.captain} will ${move} and fire at ${aim}.`;
+}

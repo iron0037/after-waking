@@ -60,6 +60,8 @@ export type Location =
       ship?: Vec2;
       /** Set once positions are planet-wide; older saves stored region-local coordinates. */
       globalCoords?: boolean;
+      /** Pinpoint Landing: the first hop after setting down is free. */
+      freeHop?: boolean;
       /** Jury-Rig already used on this landing. */
       juryRigUsed?: boolean;
       /** The boat, moored offshore while the rover it carried is ashore (AW-17). */
@@ -154,6 +156,8 @@ export interface GameState {
   deepScans?: { x: number; y: number; r: number; t: number }[];
   /** What the array has picked out between the stars: identified, or a faint return. */
   deepKnown?: Record<string, "known" | "faint">;
+  /** Clans that have already forgiven a lapsed contract (Favors Owed). */
+  favorsUsed?: ClanId[];
   /** Floating life brought up from each giant by probes (playtest 15), so the life-signs readout can confirm it. */
   giantLife?: Record<string, string[]>;
   /** Clan relations (AW-22): each clan's standing with you (-100..100; missing means its starting value), and recent changes. */
