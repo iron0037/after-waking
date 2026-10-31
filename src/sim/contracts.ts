@@ -479,3 +479,15 @@ export function completeContract(state: GameState, id: string): Result<number> {
   cheerAll(state, 2);
   return ok(pay);
 }
+
+/**
+ * Active delivery contracts for a good, and how many tonnes each still needs beyond what's aboard
+ * (ore counts its concentrate). For the "haul up to" choices on a deposit (playtest 12).
+ */
+export function deliveryShortfalls(state: GameState, commodity: CommodityId): { contract: Contract; short: number }[] {
+  const have = oreEquivalent(state, commodity);
+  return (state.contracts ?? [])
+    .filter((c) => c.status === "active" && c.kind === "deliver" && c.commodity === commodity)
+    .map((contract) => ({ contract, short: Math.max(0, Math.ceil((contract.tonnes ?? 0) - have)) }))
+    .filter((x) => x.short > 0);
+}

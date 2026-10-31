@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
+  deliveryShortfalls,
   activeRegion,
   autoExplore,
   autoExploreBlockers,
@@ -1936,9 +1937,14 @@ function DepositPanel({
             }}
           >
             <option value="0">until the hold is full</option>
-            {[20, 50, 100, 200, 300].map((t) => (
+            {[20, 50, 100, 150, 200, 300].map((t) => (
               <option key={t} value={String(t)}>
                 up to {t} t
+              </option>
+            ))}
+            {deliveryShortfalls(session.state, dep.commodity).map(({ contract, short }) => (
+              <option key={contract.id} value={String(short)}>
+                up to {short} t, for {contract.title}
               </option>
             ))}
           </select>
