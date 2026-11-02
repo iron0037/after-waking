@@ -53,6 +53,7 @@ export function awardClue(state: GameState, id: ClueId): Clue | null {
   // A few clues in, the ship's own journal starts to slip.
   if (state.clues.length === 3 && !state.futureLog) {
     state.futureLog = { t: state.time + Math.round(2.3 * YEAR), text: `Folded home and docked with the Intrepid. The Covenant was waiting at the airlock.` };
+    log(state, "info", "The journal's index won't sort. One entry keeps jumping back to the top of the log.");
   }
   if (state.clues.length >= CLUES_FOR_FINALE && !state.awakenFinale) {
     state.awakenFinale = state.time;
@@ -90,9 +91,9 @@ export function noticeScan(state: GameState, bodyId: string): void {
   if (hasPerk(state, "anomaly-theory") && rngFor(state.seed, "seams", bodyId).next() < 0.25) awardClue(state, "seams");
 }
 
-/** Sixth Sense (captain): the first look at a landing site sometimes catches a seam. One region in five. */
+/** Sixth Sense (captain): the first look at a landing site sometimes catches a seam. About one region in three. */
 export function noticeLanding(state: GameState, bodyId: string, region: number): void {
-  if (hasPerk(state, "sixth-sense") && rngFor(state.seed, "seams-landing", bodyId, region).next() < 0.2) awardClue(state, "seams");
+  if (hasPerk(state, "sixth-sense") && rngFor(state.seed, "seams-landing", bodyId, region).next() < 0.35) awardClue(state, "seams");
 }
 
 /** Listening Post (comms): arriving at an uncharted star sometimes catches the signal. One in four. */
@@ -234,3 +235,25 @@ export function ghostOrbitAU(world: World, systemId: string): number {
   }
   return widest >= 1.6 ? best : (orbits[orbits.length - 1] as number) * 1.6;
 }
+
+/**
+ * What the listeners mutter once their errands are done and the dossier is still thin (AW-202): a
+ * nudge toward one unfound clue, in their own oblique words. It changes every few weeks.
+ */
+export function covenantWhisper(state: GameState): string | null {
+  if (clueCount(state) >= CLUES_FOR_FINALE) return null;
+  const errandsDone = ERRANDS.every((e) => state.errands?.[e.kind]?.status === "done");
+  if (!errandsDone) return null;
+  const open = WHISPERS.filter(([id]) => !hasClue(state, id) && (id !== "future-log" || state.futureLog));
+  if (open.length === 0) return null;
+  const pick = Math.floor(state.time / (21 * 24 * 60)) % open.length;
+  return (open[pick] as (typeof WHISPERS)[number])[1];
+}
+
+const WHISPERS: readonly (readonly [ClueId, string])[] = [
+  ["future-log", "\"Captains never read their own logs. They should. Some entries are in a hurry to be written.\""],
+  ["song-moss", "\"Somewhere on a mild world there is a moss that hums. Bring us a sample. Mind the note it sings.\""],
+  ["folded-plicite", "\"Drill enough plicite and one day a core comes up folded. The Lyceum will want it. We want it more.\""],
+  ["seams", "\"Look at the ground long enough, from orbit or on foot, and you'll see where it was laid down. Some people are born with the eye for it. Some learn.\""],
+  ["signal", "\"Out past the charted stars the static isn't all static. A trained ear at the comms desk hears it.\""],
+];

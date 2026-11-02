@@ -1,6 +1,7 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
+import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
-import { acceptErrand, covenantErrands, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
+import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
 import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -174,6 +175,7 @@ export function Hub({ session }: { session: GameSession }) {
         </nav>
       </header>
       <p class="hub-blurb muted">{TAB_BLURB[tab]}</p>
+      <CouncilPanel session={session} />
       <div class="hub-body">
         {tab === "market" && <Market session={session} />}
         {tab === "jobs" && <Jobs session={session} />}
@@ -751,6 +753,7 @@ function CovenantListeners({ session }: { session: GameSession }) {
         <span class="covenant-glyph" aria-hidden="true" /> The Covenant's listeners
       </h3>
       <p class="covenant-whisper small">A table at the back of the Concourse, two chairs pulled out. Nobody sits with them for long.</p>
+      {covenantWhisper(state) && <p class="covenant-whisper small">{covenantWhisper(state)}</p>}
       <div class="covenant-errands">
         {offers.map((o) => (
           <ErrandRow key={o.def.kind} session={session} offer={o} docked={docked} />

@@ -3,6 +3,7 @@ import { CAPTAIN_CLANS } from "../data/clans";
 import { FIRST_NAMES, SURNAMES } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { captainTitle } from "../sim";
+import { HallOfFame, readHall } from "./Ending";
 import { PortraitPicker } from "./portraits";
 import { GameSession } from "./session";
 
@@ -16,7 +17,7 @@ function randomName(): string {
   return `${first} ${last}`;
 }
 
-type Page = "menu" | "new" | "options";
+type Page = "menu" | "new" | "options" | "hall";
 
 /** The title screen: New Game, Continue Game and Options; new-game settings live on their own page. */
 export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) {
@@ -24,6 +25,9 @@ export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) 
   const [page, setPage] = useState<Page>("menu");
   if (page === "new") return <NewGame saved={!!saved} onStart={onStart} onBack={() => setPage("menu")} />;
   if (page === "options") return <Options onBack={() => setPage("menu")} />;
+  if (page === "hall") return <HallOfFame onBack={() => setPage("menu")} />;
+  const finished = !!saved?.state.ending;
+  const hallSize = readHall().length;
   return (
     <div class="title-screen">
       <div class="title-card title-menu">
@@ -39,13 +43,18 @@ export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) 
             New Game
           </button>
           <button class={`btn big ${saved ? "primary" : ""}`} disabled={!saved} onClick={() => saved && onStart(saved)} title={saved ? undefined : "No saved game yet"}>
-            Continue Game
+            {finished ? "View Ending" : "Continue Game"}
             {saved && (
               <span class="title-save small">
                 {captainTitle(saved.state.captain.name)}, {saved.state.ship.name}
               </span>
             )}
           </button>
+          {hallSize > 0 && (
+            <button class="btn big" onClick={() => setPage("hall")}>
+              Hall of Fame <span class="title-save small">{hallSize} finished {hallSize === 1 ? "career" : "careers"}</span>
+            </button>
+          )}
           <button class="btn big" onClick={() => setPage("options")}>
             Options
           </button>

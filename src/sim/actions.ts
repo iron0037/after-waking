@@ -2,6 +2,7 @@
  * Every player verb. Each action validates against the current state, then mutates it and
  * advances time. Failures return a reason the UI can show verbatim; they never throw.
  */
+import { EMERGENCE_NOTE } from "./deepspace";
 import { giantHaze } from "./probes";
 import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
@@ -1128,6 +1129,7 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   // Careful Hands: two samples from one site, if the cases have room.
   const count = hasPerk(state, "careful-hands") && specimenCount(rover.specimens) + 2 <= slots ? 2 : 1;
   rover.specimens[specimen] = (rover.specimens[specimen] ?? 0) + count;
+  state.stats.specimens = (state.stats.specimens ?? 0) + count;
   know.floraSampled.push(site.id);
   log(state, "discovery", count === 2 ? `Collected two living samples of ${site.species}.` : `Collected a living sample of ${site.species}.`);
   awardXp(state, "medical", 5);
@@ -1595,6 +1597,7 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   state.yard = [...(state.yard ?? []), { kind: "install", label: upgrade.name, upgradeId, readyAt: start + UPGRADE_INSTALL_DAYS * DAY }];
   bondClan(state, upgrade.vendor, 2);
   log(state, "trade", `Ordered ${upgrade.name}. The yard will have it fitted in ${formatDuration(start + UPGRADE_INSTALL_DAYS * DAY - state.time)}.`);
+  if (upgradeId === "deepFieldArray" && state.deepKnown?.anomaly !== "known") log(state, "discovery", EMERGENCE_NOTE);
   return ok(undefined);
 }
 

@@ -249,6 +249,12 @@ export function regionLifeSignal(seed: number, body: Body, region: number): numb
   return regionFlora(seed, body, region).length;
 }
 
+/** The rarest plants in a region (rarity 3), by name: what a field xenolab picks out from orbit (AW-201). */
+export function regionRareSpecies(seed: number, body: Body, region: number): string[] {
+  const rare = new Set(FLORA.filter((f) => f.rarity === 3).map((f) => f.name));
+  return [...new Set(regionFlora(seed, body, region).map((f) => f.species).filter((s) => rare.has(s)))];
+}
+
 const galaxyCache = new Map<number, Galaxy>();
 function galaxyFor(seed: number): Galaxy {
   let g = galaxyCache.get(seed);

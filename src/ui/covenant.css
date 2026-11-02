@@ -188,6 +188,21 @@
 }
 .journal-list li.future-log .what {
   color: #cfc4ea;
+  animation: future-slip 11s steps(1, end) infinite;
+}
+/* Now and then the entry slips sideways, like a frame dropped from a tape (AW-202). */
+@keyframes future-slip {
+  0%,
+  88%,
+  90%,
+  100% {
+    transform: none;
+    text-shadow: none;
+  }
+  89% {
+    transform: translateX(3px);
+    text-shadow: -2px 0 #ff6b9a88, 2px 0 #5fd4ff88;
+  }
 }
 .future-report {
   display: block;
@@ -208,7 +223,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .journal-list li.future-log .when {
+  .journal-list li.future-log .when,
+  .journal-list li.future-log .what {
     animation: none;
   }
 }

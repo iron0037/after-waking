@@ -75,12 +75,13 @@ describe("playtest 10", () => {
     expect(researchBlockers(state, "living-archive").some((b) => b.includes("rare"))).toBe(true);
     state.ship.specimens = { "a|song moss": 2, "b|aurora tuft": 1, "c|abyss lantern": 1, "d|bellwort": 3 };
     expect(startResearch(state, "living-archive").ok).toBe(true);
-    expect(state.ship.specimens).toEqual({ "d|bellwort": 3 });
+    expect(state.ship.specimens).toEqual({ "c|abyss lantern": 1, "d|bellwort": 3 }); // three rare ones (AW-201)
     state.research!["living-archive"]!.done = true;
     const slots = roverSpecimenSlots(state);
     expect(buyUpgrade(state, "fieldXenolab").ok).toBe(true);
     state.ship.upgrades.push("fieldXenolab");
-    expect(roverSpecimenSlots(state)).toBe(slots + 3);
-    expect(effectiveStats(state).specimenPriceMult).toBeCloseTo(1.4);
+    expect(roverSpecimenSlots(state)).toBe(slots + 4);
+    expect(effectiveStats(state).specimenPriceMult).toBeCloseTo(1.6);
+    expect(effectiveStats(state).rareLifeSense).toBe(true);
   });
 });

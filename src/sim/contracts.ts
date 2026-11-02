@@ -474,6 +474,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
     }
   }
   c.status = "done";
+  state.stats.contractsDone = (state.stats.contractsDone ?? 0) + 1;
   const pay = contractPayout(state, c);
   c.paid = pay;
   state.credits += pay;

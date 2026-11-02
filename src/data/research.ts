@@ -164,10 +164,10 @@ export const RESEARCH: readonly ResearchProject[] = [
     name: "The living archive",
     clan: "lyceum",
     unlocks: "fieldXenolab",
-    blurb: "The Lyceum wants to culture the rarest things you've found, and teach your crew to keep them alive in the field.",
+    blurb: "The Lyceum wants to culture the rarest things you've found, and teach your crew to find more of them, and keep them alive in the field.",
     cost: 10_000,
     days: 30,
-    needs: [{ kind: "specimens", minRarity: 3, count: 4 }],
+    needs: [{ kind: "specimens", minRarity: 3, count: 3 }],
   },
 ];
 

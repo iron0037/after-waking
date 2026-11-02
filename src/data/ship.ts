@@ -35,6 +35,8 @@ export interface ShipStats {
   sensorTier: number;
   /** Deep-field array reach, in light-years (0: none fitted). */
   deepScanLy: number;
+  /** Field xenolab (AW-201): rare plant life shows in the orbital region chart. */
+  rareLifeSense: boolean;
   /** Boat kits for exotic seas (AW-189): cryo floats for liquid methane, an acid-lined hull for acid. */
   boatCryo: boolean;
   boatAcidProof: boolean;
@@ -81,6 +83,7 @@ export const BASE_STATS: ShipStats = {
   cruiseSpeedC: 0.25,
   sensorTier: 1,
   deepScanLy: 0,
+  rareLifeSense: false,
   boatCryo: false,
   boatAcidProof: false,
   boatCryoDeep: false,
@@ -375,10 +378,12 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Field xenolab",
     vendor: "lyceum",
     price: 24_000,
-    description: "A Lyceum-trained bench for keeping specimens healthy: they sell for 40% more, and the rover and ship each carry 3 more. (Research: The living archive.)",
+    description:
+      "A Lyceum-trained bench for finding and keeping the rarest life: the region chart picks out rare plants from orbit, specimens sell for 60% more, and the rover and ship each carry 4 more. (Research: The living archive.)",
     apply: (s) => {
-      s.specimenPriceMult *= 1.4;
-      s.specimenSlotBonus += 3;
+      s.specimenPriceMult *= 1.6;
+      s.specimenSlotBonus += 4;
+      s.rareLifeSense = true;
     },
   },
   // --- weapons & defences (combat v1) -----------------------------------------------------

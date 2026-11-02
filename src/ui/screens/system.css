@@ -372,3 +372,8 @@
 .sys-nick-edit .btn {
   padding: 3px 8px;
 }
+
+/* Field xenolab: rare plants picked out from orbit (AW-201) */
+.sys-rare-star {
+  color: #ffd447;
+}

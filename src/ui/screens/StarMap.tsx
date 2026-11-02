@@ -9,6 +9,9 @@ import {
   BLIND_FOLD_RANGE,
   deepId,
   dist,
+  edgeLy,
+  emergenceKnown,
+  emergenceZone,
   fuelToGetHome,
   knownDeepSites,
   SITE_REACH_LY,
@@ -51,6 +54,7 @@ import { Canvas } from "../Canvas";
 import { BODY_COLOR, UI } from "../palette";
 import { arrivalView, useSession, type GameSession } from "../session";
 import { DeepSweepPanel } from "../DeepSweep";
+import { AnomalyPanel, EdgePanel } from "../Ending";
 import { RescuePanel } from "../Rescue";
 import { useArchiveTopic } from "../ArchivePanel";
 import "./starmap.css";
@@ -470,6 +474,8 @@ export function StarMap({ session }: { session: GameSession }) {
 
     drawGrid(ctx, w, h, v);
     drawSwept(ctx);
+    drawEmergence(ctx);
+    drawEdge(ctx);
 
     const [hx, hy] = toScreen(here);
 
@@ -672,6 +678,52 @@ export function StarMap({ session }: { session: GameSession }) {
     }
     ctx.fillStyle = "rgba(143, 120, 210, 0.16)";
     ctx.fill();
+    ctx.restore();
+  };
+
+  /** The emergence zone (AW-200): where the Intrepid came out of the anomaly, a dashed violet circle. */
+  const drawEmergence = (ctx: CanvasRenderingContext2D) => {
+    if (!emergenceKnown(state)) return;
+    const zone = emergenceZone(world);
+    if (!zone) return;
+    const v = view.current;
+    const [x, y] = toScreen(zone.centre);
+    const r = zone.r * v.scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(199, 146, 255, 0.07)";
+    ctx.fill();
+    ctx.setLineDash([6, 5]);
+    ctx.strokeStyle = "rgba(199, 146, 255, 0.7)";
+    ctx.lineWidth = 1.25;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = `11px ${FONT}`;
+    ctx.fillStyle = "rgba(199, 146, 255, 0.9)";
+    ctx.textAlign = "center";
+    ctx.fillText("Emergence zone (AW 0)", x, y - r - 6);
+    ctx.restore();
+  };
+
+  /** The edge of the Verge (AW-170), once the Covenant has pointed you at it: a faint violet ring. */
+  const drawEdge = (ctx: CanvasRenderingContext2D) => {
+    if (state.awakenFinale === undefined) return;
+    const v = view.current;
+    const [x, y] = toScreen(INTREPID_POS);
+    const r = edgeLy(world) * v.scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.setLineDash([2, 6]);
+    ctx.strokeStyle = "rgba(182, 162, 224, 0.55)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font = `11px ${FONT}`;
+    ctx.fillStyle = "rgba(182, 162, 224, 0.8)";
+    ctx.textAlign = "center";
+    ctx.fillText("the edge", x, y - r - 6);
     ctx.restore();
   };
 
@@ -1163,6 +1215,8 @@ export function StarMap({ session }: { session: GameSession }) {
               </dl>
               {hereSite && <p class="small sm-site-report">{hereSite.report}</p>}
             </section>
+            <AnomalyPanel session={session} />
+            <EdgePanel session={session} />
             <RescuePanel session={session} busy={session.busy} />
           </>
         ) : (

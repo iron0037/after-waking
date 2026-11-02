@@ -7,6 +7,7 @@ import { Clans } from "./Clans";
 import { Contracts } from "./Contracts";
 import { CrewOverlay } from "./Crew";
 import { EncounterOverlay } from "./Encounter";
+import { EndingScreen } from "./Ending";
 import { Journal } from "./Journal";
 import { ProbeDiveOverlay } from "./ProbeDive";
 import { LevelUpPopup, PerkTreeModal } from "./PerkTree";
@@ -81,6 +82,9 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
     journalOpen || compendiumOpen || contractsOpen || clansOpen || shipOpen || crewOpen || !!session.perkTree || !!levelUp || !!session.state.encounter ||
     !!session.encounterDebrief || !!session.probeReport || !!session.state.probeDive;
   const latest = session.state.journal.slice(-2).reverse();
+
+  // The career is over (AW-199): the ending takes the whole screen.
+  if (session.state.ending) return <EndingScreen session={session} onTitle={onQuit} />;
 
   return (
     <div class="game">

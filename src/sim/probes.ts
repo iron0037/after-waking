@@ -332,6 +332,7 @@ function finishDive(state: GameState, world: World): DiveResult {
         state.ship.specimens ??= {};
         const key = specimenKey(body.id, floater);
         state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + 1;
+        state.stats.specimens = (state.stats.specimens ?? 0) + 1;
         const entry = FLORA_BY_NAME.get(floater);
         if (entry) recordFind(state, "flora", entry.id, body.name, entry.name);
         noteGiantLife(state, body.id, floater);

@@ -14,6 +14,8 @@ import {
   regionRecap,
   regionSignal,
   regionLifeSignal,
+  regionRareSpecies,
+  effectiveStats,
   bodySpecies,
   surfaceLayout,
   type Body,
@@ -102,6 +104,11 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
     () => (bodySpecies(seed, body).length > 0 ? Array.from({ length: body.regions }, (_, r) => regionLifeSignal(seed, body, r)) : null),
     [seed, body],
   );
+  // A field xenolab picks out the rarest plants from orbit (AW-201).
+  const rare = useMemo(
+    () => (life && effectiveStats(state).rareLifeSense ? Array.from({ length: body.regions }, (_, r) => regionRareSpecies(seed, body, r)) : null),
+    [seed, body, life, state.ship.upgrades.length],
+  );
   const known = knownDeposits(state, world, body.id);
   // The captain's Hunch perk: one region the gut points to.
   const hunch = hunchRegion(state, body);
@@ -118,7 +125,10 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
     const est = s > 0 ? ` (~${roughCredits(s)} cr est.)` : "";
     const seen = visits > 0 ? ` · visited, ${Math.round(exploredFraction(know) * 100)}% explored` : "";
     const sites = life?.[r] ?? 0;
-    const alive = life ? ` · life signs: ${sites === 0 ? "none" : `${sites} plant site${sites === 1 ? "" : "s"}`}` : "";
+    const rareHere = rare?.[r] ?? [];
+    const alive = life
+      ? ` · life signs: ${sites === 0 ? "none" : `${sites} plant site${sites === 1 ? "" : "s"}`}${rareHere.length ? ` (rare: ${rareHere.join(", ")})` : ""}`
+      : "";
     return `Region ${r + 1} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 
@@ -194,6 +204,28 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
           ctx.strokeStyle = "#05070f";
           ctx.stroke();
         }
+      });
+    }
+
+    // Rare life (field xenolab): a gold star in the region's bottom-left corner.
+    if (rare) {
+      rare.forEach((names, r) => {
+        const cell = layout.cells[r];
+        if (!cell || names.length === 0) return;
+        const x = cell.x0 * w + 9;
+        const y = cell.y1 * h - 9;
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const rad = i % 2 === 0 ? 5.5 : 2.4;
+          const a = -Math.PI / 2 + (i * Math.PI) / 5;
+          ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+        }
+        ctx.closePath();
+        ctx.fillStyle = "#ffd447";
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#05070f";
+        ctx.stroke();
       });
     }
 
@@ -353,6 +385,11 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
         {life && (
           <span class="sys-region-key">
             <span class="sys-life-leaf" /> plant life
+          </span>
+        )}
+        {rare && (
+          <span class="sys-region-key">
+            <span class="sys-rare-star">★</span> rare plants
           </span>
         )}
       </div>

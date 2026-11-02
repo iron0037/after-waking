@@ -128,4 +128,4 @@ export const ERRANDS_BY_KIND = new Map(ERRANDS.map((e) => [e.kind, e] as const))
 
 /** The Covenant's word once the dossier is thick enough: where every thread leads. */
 export const FINALE_TEXT =
-  "The Covenant's eldest listener reads your dossier twice. \"Every thread runs outward. Past the last charted star our listeners hear nothing at all: not silence, nothing, the way a wall sounds. When you have a ship that can cross the dark between the stars, go and look at the edge. We'll be waiting.\"";
+  "The Covenant's eldest listener reads your dossier twice. \"Every thread runs outward. Past the last star of the Verge our listeners hear nothing at all: not silence, nothing, the way a wall sounds. We've marked where on your charts. When you have a ship that can cross the dark between the stars, go out there and sweep it. Nobody we've sent has come back to tell us what they found.\"";

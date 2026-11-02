@@ -152,6 +152,13 @@ export function scanDeep(state: GameState, world: World): Result<DeepScanResult>
   }
   awardXp(state, "science", 6 + 10 * found.length);
   const parts = [`Deep-field sweep: ${radius} ly around the ship.`];
+  // The edge of the Verge (AW-170): only a captain the Covenant has sent knows what they're looking at.
+  if (state.awakenFinale !== undefined && atEdge(state, world) && state.edgeSeenAt === undefined) {
+    state.edgeSeenAt = state.time;
+    parts.push(EDGE_REPORT);
+    log(state, "discovery", parts.join(" "));
+    return ok({ found, faint, radius });
+  }
   for (const s of found) parts.push(`Identified: ${s.name}. ${s.report}`);
   if (faint > 0) parts.push(`${faint === 1 ? "A faint return" : `${faint} faint returns`} just beyond reach: something is out there.`);
   if (found.length === 0 && faint === 0) parts.push("Nothing but the dark.");
@@ -181,3 +188,49 @@ export function sweptShare(state: GameState, radiusLy = 32, samples = 2000): num
   }
   return hit / samples;
 }
+
+/** The emergence zone's radius: about five sweeps of the stock array to cover (AW-200). */
+export const EMERGENCE_RADIUS_LY = 5;
+
+/**
+ * Where the Intrepid came out of the anomaly, from its own navigation log (AW-200): a free, true
+ * first lead. The mouth has drifted since, but it is still inside this circle.
+ */
+export function emergenceZone(world: World): { centre: Vec2; r: number } | null {
+  const mouth = deepSites(world).find((s) => s.kind === "anomaly");
+  if (!mouth) return null;
+  const rng = rngFor(world.seed, "deep", "emergence");
+  const a = rng.range(0, Math.PI * 2);
+  const off = rng.range(0.8, EMERGENCE_RADIUS_LY - 1.5);
+  const centre = { x: Math.round((mouth.pos.x + Math.cos(a) * off) * 10) / 10, y: Math.round((mouth.pos.y + Math.sin(a) * off) * 10) / 10 };
+  return { centre, r: EMERGENCE_RADIUS_LY };
+}
+
+/** The Helm hands over the emergence record to any captain with a deep-field array. */
+export function emergenceKnown(state: GameState): boolean {
+  return effectiveStats(state).deepScanLy > 0 && state.deepKnown?.anomaly !== "known";
+}
+
+/** The Helm's note that comes with the record. */
+export const EMERGENCE_NOTE =
+  "With the deep-field array comes a copy of the Intrepid's own navigation log from the day of the anomaly: where it came out, thirty years ago. The mouth will have drifted since, but not far. The emergence zone is marked on the star map.";
+
+// --- the edge (AW-170) ----------------------------------------------------------------------------
+
+/** The edge lies this far past the outermost star of the Verge. */
+export const EDGE_MARGIN_LY = 4;
+
+/** How far out the edge of the Verge is: a little past the last star. */
+export function edgeLy(world: World): number {
+  const far = Math.max(0, ...world.galaxy.systems.map((s) => dist(s.pos, INTREPID_POS)));
+  return Math.round(Math.min(DEEP_LIMIT_LY - 4, Math.max(22, far + EDGE_MARGIN_LY)) * 10) / 10;
+}
+
+/** Is the ship out past the last star, at the edge? */
+export function atEdge(state: GameState, world: World): boolean {
+  const loc = state.location;
+  return loc.kind === "deep" && dist(loc.pos, INTREPID_POS) >= edgeLy(world);
+}
+
+export const EDGE_REPORT =
+  "The array comes back empty, but not the way it should. No dust, no background, no stray photons: a return so perfectly regular the science officer runs the sweep twice. Ahead, the stars simply stop, along a line. The Covenant called it a wall. It looks more like a seam.";

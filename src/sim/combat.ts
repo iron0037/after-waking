@@ -722,6 +722,7 @@ function applyHits(side: CombatSide, hits: number[], target: FireTarget, shields
 function won(state: GameState, text: string): EncounterResult | null {
   const e = state.encounter as Encounter;
   awardXp(state, "captain", 40);
+  state.stats.raidersBeaten = (state.stats.raidersBeaten ?? 0) + 1;
   const template = raiderById(e.raider);
   const prize = withRng(state, (rng) => {
     const loot: Partial<Record<CommodityId, number>> = {};

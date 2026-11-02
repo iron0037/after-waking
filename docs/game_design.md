@@ -102,6 +102,16 @@ Epilogue slides would reflect everything you achieved.
   4. Fold the city-ship through and play the epilogue.
   - "The anomaly closing" gives the path a window.
 
+### Endings v1 (AW-166, AW-170, AW-199) **[DECIDED 2026-11-01]**
+- **An ending ends the career.** A full-screen ending (pixel art, text that fades in, a coda) is followed by a career report: years, credits earned, ore mined, specimens, compendium, stars visited, worlds scanned, landings, folds, contracts, raiders beaten, research, average crew level, Covenant clues and the closest clan. The save keeps its ending (`state.ending`), and the title screen shows "View Ending" instead of "Continue". Each finished career goes into a **hall of fame** in browser storage (`after-waking-hall-of-fame`, separate from saves), shown from the title screen.
+- **Return, as built.** Moving the Intrepid (about 10,000 freighters' worth of mass) stays out of reach, so the volunteers go first:
+  1. Find the mouth. The Intrepid's emergence log comes with the deep-field array: a 5 ly "emergence zone" on the star map that always holds the mouth (AW-200).
+  2. Send a probe through (needs a probe bay and a probe). Its one frame shows the sky of the Intrepid's old course: the way home.
+  3. Report to the council aboard the Intrepid: a hero's welcome, 25,000 cr, +10 standing with every clan.
+  4. Volunteer to fly through, whenever you're ready. The story stops at the threshold. A captain with 3+ Covenant clues gets a stranger coda.
+- **Awaken, as built.** At 5 clues the Covenant marks the edge on your charts: 4 ly past the outermost star of the Verge (22–36 ly out, by seed). A deep-field sweep there finds the seam; flying into it ends the career. The captain wakes in a cryopod on the real Intrepid, voyage year 2,686 of 3,900. One way: no fold back.
+- **The Covenant trail stays hard to find (AW-202).** No new errands. Once the three errands are done, the listeners mutter an oblique hint toward one unfound clue (changing every few weeks); the future-dated journal entry announces itself with one strange log line and glitches now and then; Sixth Sense notices a seam in about one landing region in three.
+
 ## Systems Map (Starflight → ours)
 | Starflight system | Ours | Modern improvement |
 |---|---|---|

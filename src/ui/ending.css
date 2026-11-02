@@ -1,0 +1,138 @@
+/* Endings (AW-199): the council's summons, the anomaly panel, the ending screen and the hall of fame. */
+
+.council-panel {
+  margin: 0 16px 12px;
+  border-color: var(--accent);
+  box-shadow: 0 0 18px #ffb34722;
+}
+.council-panel h3 {
+  color: var(--accent);
+}
+.council-confirm p {
+  margin-top: 0;
+}
+.anomaly-panel {
+  border-color: var(--cyan);
+}
+.anomaly-panel h3 {
+  color: var(--cyan);
+}
+
+.ending-screen {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  padding: 24px 16px;
+  background: radial-gradient(ellipse at 50% 30%, #0d1830 0%, var(--space) 70%);
+}
+.ending-card {
+  width: min(960px, 100%);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.ending-art {
+  /* Scale the whole picture down rather than crop it: the ring is the point. */
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 52vh;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  animation: ending-fade 2.4s ease-out both;
+}
+.ending-kicker {
+  color: var(--cyan);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.ending-title {
+  margin: 0;
+  font-size: 44px;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+  text-shadow: 0 0 24px #ffb34755;
+}
+.ending-text {
+  max-width: 720px;
+  text-align: left;
+  line-height: 1.7;
+}
+.ending-text p {
+  animation: ending-fade 1.6s ease-out both;
+}
+.ending-coda {
+  color: var(--accent);
+  font-style: italic;
+  margin-top: 20px;
+}
+.ending-actions {
+  justify-content: center;
+  margin-top: 8px;
+}
+.ending-who {
+  color: var(--muted);
+}
+.ending-report {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin: 8px 0;
+}
+.ending-stat {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.ending-stat dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ending-stat dd {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: var(--text);
+}
+@keyframes ending-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.title-card.hall {
+  width: min(1100px, 96vw);
+}
+.hall-table {
+  width: 100%;
+  text-align: left;
+}
+
+.edge-panel {
+  border-color: var(--covenant);
+}
+.edge-panel h3 {
+  color: var(--covenant);
+}
+
+.hall-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+.council-scene {
+  line-height: 1.6;
+}

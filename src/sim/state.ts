@@ -16,6 +16,7 @@ import { UPGRADES_BY_ID } from "../data/ship";
 import { chargeStowedRover, tickYard } from "./actions";
 import type { HelmRecord } from "./helm";
 import type { DiveRecord, ProbeDive } from "./probes";
+import type { EndingState } from "./ending";
 import { hasPerk } from "./perks";
 import { tickSentiment } from "./sentiment";
 import { tickResearch, type ResearchRecord } from "./research";
@@ -156,6 +157,12 @@ export interface GameState {
   deepScans?: { x: number; y: number; r: number; t: number }[];
   /** What the array has picked out between the stars: identified, or a faint return. */
   deepKnown?: Record<string, "known" | "faint">;
+  /** The Return path (AW-166): when the probe went through the anomaly, and when the council heard of it. */
+  anomaly?: { probedAt?: number; reportedAt?: number };
+  /** When a sweep at the edge of the Verge found the seam (AW-170). */
+  edgeSeenAt?: number;
+  /** Set when the career has ended (AW-199): the save is finished. */
+  ending?: EndingState;
   /** Clans that have already forgiven a lapsed contract (Favors Owed). */
   favorsUsed?: ClanId[];
   /** Floating life brought up from each giant by probes (playtest 15), so the life-signs readout can confirm it. */
@@ -193,7 +200,7 @@ export interface GameState {
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];
-  stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number };
+  stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number; specimens?: number; raidersBeaten?: number; contractsDone?: number };
 }
 
 export interface NewGameOptions {
