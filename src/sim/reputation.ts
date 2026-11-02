@@ -101,6 +101,8 @@ export function changeRep(state: GameState, clan: ClanId, amount: number, reason
   if (amount > 0 && hasPerk(state, "clan-dialects")) amount *= 1.25;
   // Clan trust growth (AW-205): how quickly goodwill builds. Losses land the same either way.
   if (amount > 0) amount *= clanTrustMult(peopleOf(state));
+  // Clan fixer (AW-207): an officer who knows everyone in their own clan.
+  if (amount > 0 && (state.crew ?? []).some((m) => m.talent === "clan-fixer" && m.clan === clan)) amount *= 1.5;
   const deltas = new Map<ClanId, number>([[clan, amount]]);
   if (spill) {
     for (const other of CLAN_IDS) {

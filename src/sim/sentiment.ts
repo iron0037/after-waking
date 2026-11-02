@@ -111,13 +111,15 @@ export function tickSentiment(state: GameState, minutes: number): void {
   const leave = SHORE_LEAVE_PER_DAY * (hasPerk(state, "morale") ? 2 : 1) * clanMods(state).shoreLeave;
   // Crew reliability (AW-205): how quickly officers sour on a long haul, and where their mood settles.
   const rules = RELIABILITY[peopleOf(state).reliability];
+  // Morale officer (AW-207): the mess stays cheerful.
+  const baseline = rules.baseline + (state.crew.some((m) => m.talent === "morale-officer") ? 8 : 0);
   for (const m of state.crew) {
     ensureSentiment(m);
     // Upbringing (AW-14): decks-born love shore leave, settlers shrug off long hauls, Earth's sleepers stay steady.
     const up = upbringingOf(m);
     let h = m.happiness as number;
     // Happiness is about recent events: it relaxes back toward a neutral mood over a few weeks.
-    h += (rules.baseline - h) * (1 - Math.exp(-HAPPINESS_RELAX_PER_DAY * days));
+    h += (baseline - h) * (1 - Math.exp(-HAPPINESS_RELAX_PER_DAY * days));
     if (docked && h < SHORE_LEAVE_CAP) h = Math.min(SHORE_LEAVE_CAP, h + leave * (up === "decks" ? 1.5 : 1) * days);
     if (!docked && away > rules.longHaulDays) h -= rules.longHaulPerDay * (up === "settlement" ? 0.5 : 1) * Math.min(days, away - rules.longHaulDays);
     m.happiness = clamp(h);

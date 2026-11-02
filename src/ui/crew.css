@@ -154,3 +154,16 @@
   border-radius: 6px;
   box-shadow: 0 8px 24px #000a;
 }
+
+/* Signature talents (AW-207) */
+.crew-talent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px;
+}
+.talent-tag {
+  align-self: flex-start;
+  color: var(--accent);
+  border-color: var(--accent);
+}

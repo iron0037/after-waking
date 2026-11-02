@@ -6,6 +6,7 @@ import { useState } from "preact/hooks";
 import { CAPTAIN_CLANS } from "../data/clans";
 import { CLAN_TRAITS, STATION_INFO, STATIONS, UPBRINGINGS, type Station } from "../data/crew";
 import { PERKS_BY_ID } from "../data/perks";
+import { TALENTS_BY_ID } from "../data/talents";
 import { CLAN_NAMES } from "../data/ship";
 import {
   ageAt,
@@ -226,6 +227,20 @@ function MoodRows({ m, exact }: { m: CrewMember; exact: boolean }) {
   );
 }
 
+/** Their signature talent (AW-207), or a note that a green volunteer has none. */
+function TalentLine({ m }: { m: CrewMember }) {
+  const t = m.talent ? TALENTS_BY_ID.get(m.talent) : undefined;
+  if (!t) return null;
+  return (
+    <div class="crew-talent">
+      <span class="tag talent-tag" title="A signature talent: something they learned before signing on. It works while they're aboard.">
+        ★ {t.name}
+      </span>
+      <span class="small">{t.text.replace("their own clan", CLAN_NAMES[m.clan])}</span>
+    </div>
+  );
+}
+
 /** "retires in about 4 years" for anyone within ten years of it (AW-206); nothing when turnover is off. */
 function RetirementLine({ session, m }: { session: GameSession; m: CrewMember }) {
   const years = yearsToRetirement(session.state, m);
@@ -383,6 +398,7 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
       </div>
       <MoodWarnings m={m} />
       <ClanLine m={m} />
+      <TalentLine m={m} />
       <LevelMeter xp={m.xp} />
       <dl class="kv crew-kv">
         <MoodRows m={m} exact={exact} />
@@ -491,6 +507,7 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
         </span>
       </div>
       <ClanLine m={r} />
+      <TalentLine m={r} />
       {r.volunteer && (
         <div class="crew-clan">
           <span class="tag" title="Someone from the Intrepid's decks who wants a berth: green, cheap to sign, and paid a starter's wage. They wait in the hall until the post is filled.">

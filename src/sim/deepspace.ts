@@ -8,7 +8,7 @@ import { dist, DAY, type Vec2 } from "./units";
 import { INTREPID_POS, isDeepId, positionOf } from "./galaxy";
 import { rngFor } from "./rng";
 import { fail, ok, type Result } from "./result";
-import { effectiveStats } from "./perks";
+import { effectiveStats, hasTalent } from "./perks";
 import { awardXp } from "./crew";
 import { advanceTime, log, type GameState } from "./state";
 import type { World } from "./world";
@@ -16,6 +16,14 @@ import type { World } from "./world";
 /** A blind fold reaches this share of the drive's range, and burns this much more plicite. */
 export const BLIND_FOLD_RANGE = 0.6;
 export const BLIND_FOLD_FUEL = 1.25;
+
+/** This crew's blind-fold reach and thirst: a dark-fold pilot (AW-207) does better. */
+export function blindFoldRange(state: GameState): number {
+  return hasTalent(state, "dark-fold") ? 0.8 : BLIND_FOLD_RANGE;
+}
+export function blindFoldFuel(state: GameState): number {
+  return hasTalent(state, "dark-fold") ? 1 : BLIND_FOLD_FUEL;
+}
 /** Deep-space points must be at least this far from any star (closer, fold to the star instead). */
 export const DEEP_CLEARANCE_LY = 0.6;
 /** Beyond this, the navigators can't fix a position: the star references thin out (the edge, AW-170). */

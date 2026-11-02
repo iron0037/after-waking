@@ -6,7 +6,7 @@ import { EMERGENCE_NOTE } from "./deepspace";
 import { giantHaze } from "./probes";
 import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
-import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers, isBlindFold } from "./deepspace";
+import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
@@ -43,7 +43,7 @@ import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
 import { helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
-import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
+import { effectiveStats, finishRetraining, hasPerk, hasTalent, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
   emptyKnowledge,
   isExplored,
@@ -183,8 +183,8 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   const crew = crewBonuses(state);
   // A blind fold (AW-165): no star to lock onto, so it's shorter-ranged and thirstier. A charted site counts as a star (AW-203).
   const blind = isBlindFold(state, world, targetId);
-  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? BLIND_FOLD_FUEL : 1) * 10) / 10;
-  const range = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
+  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? blindFoldFuel(state) : 1) * 10) / 10;
+  const range = stats.foldRangeLy * (blind ? blindFoldRange(state) : 1);
   const blockers: string[] = [];
   if (isDeepId(targetId)) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
 
@@ -206,12 +206,14 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   if (ly > range) {
     blockers.push(
       blind
-        ? `${ly.toFixed(1)} ly is beyond a blind fold's ${range.toFixed(1)} ly (with no star to lock onto, the drive reaches ${Math.round(BLIND_FOLD_RANGE * 100)}% of its ${stats.foldRangeLy} ly).`
+        ? `${ly.toFixed(1)} ly is beyond a blind fold's ${range.toFixed(1)} ly (with no star to lock onto, the drive reaches ${Math.round(blindFoldRange(state) * 100)}% of its ${stats.foldRangeLy} ly).`
         : `${ly.toFixed(1)} ly is beyond the drive's ${stats.foldRangeLy} ly range.`,
     );
   }
   if (fuel > state.ship.fuel) blockers.push(`Needs ${fuel} fuel; tanks hold ${state.ship.fuel.toFixed(1)}.`);
-  return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit * clanMods(state).foldRefit), blockers };
+  // Quick plotter (AW-207): folds the drive likes.
+  const plotter = hasTalent(state, "quick-plotter") ? 0.75 : 1;
+  return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit * clanMods(state).foldRefit * plotter), blockers };
 }
 
 export function fold(state: GameState, world: World, targetId: string): Result {

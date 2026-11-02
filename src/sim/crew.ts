@@ -6,6 +6,7 @@
  * Officers can be replaced from the hiring hall aboard the Intrepid; the pool turns over monthly.
  * (Perk trees, aging and retirement come later.)
  */
+import { TALENTS, type TalentId } from "../data/talents";
 import { crewXpMult, peopleOf } from "./settings";
 import { clanRefuses } from "./reputation";
 import {
@@ -22,7 +23,7 @@ import {
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { fail, ok, type Result } from "./result";
 import { cheer, ensureSentiment, isMiserable } from "./sentiment";
-import { autoSpendPerks, crossTrainingLevels, hasPerk, MAX_EFFECTIVE_LEVEL } from "./perks";
+import { autoSpendPerks, crossTrainingLevels, hasPerk, hasTalent, MAX_EFFECTIVE_LEVEL } from "./perks";
 import { hashSeed, rngFor, type Rng } from "./rng";
 import type { GameState } from "./state";
 import { DAY, YEAR } from "./units";
@@ -43,6 +44,8 @@ export interface CrewMember {
   noticeAt?: number;
   /** When they said they'd retire at the next docking (AW-206). */
   retiringAt?: number;
+  /** Their signature talent (AW-207); green volunteers have none. */
+  talent?: TalentId;
 }
 
 /** A level gained, waiting for the player to see it (and maybe pick a perk). */
@@ -344,6 +347,9 @@ export function crewBonuses(state: GameState): CrewBonuses {
   }
   if (hasPerk(state, "sensor-boost")) out.sensorRadius += 1;
   if (hasPerk(state, "steady-hands")) out.incidentRate *= 0.85;
+  // Signature talents (AW-207).
+  if (hasTalent(state, "market-insider")) out.salePrice *= 1.04;
+  if (hasTalent(state, "field-surgeon")) out.incidentHours *= 0.6;
   return out;
 }
 
@@ -413,9 +419,16 @@ function rollPool(state: GameState, pool: number): Recruit[] {
     ] as const);
     const level = Math.min(MAX_LEVEL, base + (CLAN_TRAITS[clan].affinity.includes(station) ? 1 : 0) + (scout ? 1 : 0));
     const person = newPerson(rng, `r${pool}-${i}`, station, clan, level, state.time);
+    person.talent = rollTalent(state.seed, station, person.id);
     autoSpendPerks(person, rng);
     return { ...person, fee: SIGNING_DAYS * wageOf(person) };
   });
+}
+
+/** A recruit's signature talent (AW-207): one of their station's, from its own stream. */
+export function rollTalent(seed: number, station: OfficerStation, id: string): TalentId {
+  const pool = TALENTS.filter((t) => t.station === station);
+  return rngFor(seed, "crew", "talent", id).pick(pool).id;
 }
 
 /** Turn the hiring hall's pool over when its month is up. Called as time passes. */
@@ -457,6 +470,7 @@ export function ensureVolunteers(state: GameState): void {
 export function raiderRecruit(rng: Rng, id: string, now: number): Recruit {
   const station = rng.pick(OFFICER_STATIONS);
   const person = newPerson(rng, id, station, "freebooters", rng.int(2, 4), now);
+  person.talent = station === "navigation" ? "raiders-eyes" : rollTalent(rng.int(0, 1 << 30), station, id);
   autoSpendPerks(person, rng);
   ensureSentiment(person, true);
   person.loyalty = Math.min(100, (person.loyalty ?? 50) + 15);
@@ -548,6 +562,8 @@ function protege(state: GameState, mentor: CrewMember): CrewMember {
   autoSpendPerks(p, rng);
   ensureSentiment(p, true);
   p.loyalty = Math.min(100, (p.loyalty ?? 40) + 15);
+  // They learned the trade at the mentor's elbow, signature and all.
+  if (mentor.talent) p.talent = mentor.talent;
   return p;
 }
 

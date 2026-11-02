@@ -245,6 +245,17 @@ Use **one main clock per playthrough** **[PROPOSED]**, possibly picked at random
 - **The captain's own tree:** Trader / Explorer / Diplomat / Commander. This shapes playstyle and endings.
 - **Scope target:** 6 stations × 3 branches × about 5 perks, plus traits.
 
+### Why replace an officer? (AW-205, AW-206, AW-207) **[DECIDED 2026-11-02]**
+Playtest: the starting five level as fast as anyone and never leave, so the hiring hall had nothing to offer. Three changes:
+- **Signature talents (AW-207).** Every recruit brings one talent from their station's three (15 in all, `src/data/talents.ts`), something no level gives: a tank rigger (+25% fuel), a dark-fold pilot (blind folds reach 80% at no extra fuel), an Archive tracker (rare plants on the region chart), a morale officer, a bounty broker, and so on. The starting crew and deck volunteers are green: no talent. A Family Ship protégé inherits the mentor's.
+- **Retirement (AW-206).** Each officer retires at a fixed age of 58–66 (Longevity +5, Loyalty +2), with a trip's notice. A level-8 veteran is strong now but has fewer years aboard.
+- **Difficulty settings (AW-205).** Chosen on a second new-game page and fixed for the career:
+  - **Universe:** galaxy seed, number of stars (16/22/30/40; 9/12/15/18 charted), ore abundance and life abundance (Scarce/Normal/Plentiful). These are packed into the seed's bits above 2^32, so the World regenerates them. The dice see only the low 32 bits, so a base seed keeps its layout.
+  - **People:** crew leveling rate (×0.6/1/1.6), crew reliability (Limited/Normal/Unwavering), retirement and quitting on/off, clan trust growth (×0.6/1/1.5, gains only), pirate frequency (×0.4/1/1.7), pirate strength (×0.75/1/1.3, and bounties scale with it).
+  - **Reliability** sets where moods settle, when long hauls start to wear (90/75/45 days), how fast loyalty erodes, and the notice threshold. Unwavering is how the game played before; older saves keep it.
+- **The way back:** a green volunteer from the decks waits in the hiring hall for every empty post (level 1, a quarter of the usual fee).
+- **Balance:** at Normal, the career report shows no broke careers for either profile, and novices end with about 207k cr. Under Limited, novices who never share profits lose 8–15 officers per career, but none go broke.
+
 ## Ship Classes **[PROPOSED 2026-10-23]**
 Your third-rate freighter can only be improved so far. Later in a career, captains buy a different hull.
 

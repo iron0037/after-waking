@@ -5,8 +5,8 @@ import {
   prepareFold,
   clamp,
   currentSystemId,
-  BLIND_FOLD_FUEL,
-  BLIND_FOLD_RANGE,
+  blindFoldFuel,
+  blindFoldRange,
   isBlindFold,
   deepId,
   dist,
@@ -221,7 +221,7 @@ export function StarMap({ session }: { session: GameSession }) {
   const blind = !!deepTarget && isBlindFold(state, world, deepTarget.id);
   const deepSite = deepTarget ? sites.find((x) => dist(x.site.pos, deepTarget.pos) <= SITE_REACH_LY) : undefined;
   const hereSite = inDeep ? (sites.find((x) => x.level === "known" && dist(x.site.pos, here) <= SITE_REACH_LY)?.site ?? null) : null;
-  const rangeLy = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
+  const rangeLy = stats.foldRangeLy * (blind ? blindFoldRange(state) : 1);
   const plan = target ? foldPlan(state, world, target.id) : null;
   /** Raider intel is only for stars: not the Intrepid, and not a point in deep space. */
   const intel = !deepTarget && target?.star ? pirateIntel(state, world, target.id) : null;
@@ -499,7 +499,7 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.restore();
 
     // blind range: how far a fold to an empty point reaches (no star to lock onto), drawn as a dotted amber ring
-    const blindPx = stats.foldRangeLy * BLIND_FOLD_RANGE * v.scale;
+    const blindPx = stats.foldRangeLy * blindFoldRange(state) * v.scale;
     ctx.save();
     ctx.beginPath();
     ctx.arc(hx, hy, blindPx, 0, Math.PI * 2);
@@ -512,7 +512,7 @@ export function StarMap({ session }: { session: GameSession }) {
     ctx.font = `11px ${FONT}`;
     ctx.fillStyle = "rgba(255, 179, 71, 0.75)";
     ctx.textAlign = "center";
-    ctx.fillText(`blind range ${(stats.foldRangeLy * BLIND_FOLD_RANGE).toFixed(1)} ly`, hx, clamp(hy + blindPx + 14, 14, h - 8));
+    ctx.fillText(`blind range ${(stats.foldRangeLy * blindFoldRange(state)).toFixed(1)} ly`, hx, clamp(hy + blindPx + 14, 14, h - 8));
     ctx.restore();
 
     // the array's own reach around the ship
@@ -1187,8 +1187,8 @@ export function StarMap({ session }: { session: GameSession }) {
             )}
             {blind && (
               <p class="muted small sm-auto-note">
-                A blind fold has no star to lock onto: the drive reaches {Math.round(BLIND_FOLD_RANGE * 100)}% of its range and burns{" "}
-                {Math.round((BLIND_FOLD_FUEL - 1) * 100)}% more plicite.
+                A blind fold has no star to lock onto: the drive reaches {Math.round(blindFoldRange(state) * 100)}% of its range and burns{" "}
+                {Math.round((blindFoldFuel(state) - 1) * 100)}% more plicite.
               </p>
             )}
             {softBlockers.length > 0 && canDepart && (
@@ -1328,7 +1328,7 @@ export function StarMap({ session }: { session: GameSession }) {
             <h2>Navigation</h2>
             <p class="muted">
               Pick a star on the chart or from the list below. The dashed circle is how far the fold drive can reach from where you
-              are. Click empty space to plan a blind fold into the dark: it reaches only {Math.round(BLIND_FOLD_RANGE * 100)}% as far
+              are. Click empty space to plan a blind fold into the dark: it reaches only {Math.round(blindFoldRange(state) * 100)}% as far
               (the dotted amber ring).
             </p>
           </section>

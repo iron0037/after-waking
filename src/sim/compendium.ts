@@ -4,6 +4,7 @@
  *
  * Like contracts.ts, this writes the journal directly so it can be used from anywhere.
  */
+import { hasTalent } from "./perks";
 import { COMMODITIES, LIQUID_IDS, ORE_IDS, type CommodityId } from "../data/commodities";
 
 /** What the Compendium lists as minerals: the ores, plus what's dredged from exotic seas (AW-189). */
@@ -76,7 +77,8 @@ export function rollMineralSpecimen(rng: Rng, host: CommodityId, hours: number, 
  * entry) for a finder's fee; later ones sell to Exchange collectors. Either way it pays.
  */
 export function foundMineralSpecimen(state: GameState, gem: MineralSpecimen, where: string): void {
-  const bounty = DUPLICATE_BOUNTY[gem.rarity];
+  // Gem cutter (AW-207): knows what collectors pay.
+  const bounty = DUPLICATE_BOUNTY[gem.rarity] * (hasTalent(state, "gem-cutter") ? 2 : 1);
   state.credits += bounty;
   state.stats.earned += bounty;
   const host = COMMODITIES[gem.host].name.toLowerCase();

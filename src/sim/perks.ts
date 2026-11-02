@@ -6,6 +6,7 @@
  * This module owns the rules for taking, retraining and auto-spending perks, plus the ship stats as
  * modified by perks (`effectiveStats`), which gameplay should read instead of raw `shipStats`.
  */
+import type { TalentId } from "../data/talents";
 import { clanMods } from "./clan";
 import type { OfficerStation, Station } from "../data/crew";
 import { BRANCHES, PERKS, PERKS_BY_ID, type PerkDef } from "../data/perks";
@@ -32,6 +33,11 @@ export function hasPerk(state: GameState, id: string): boolean {
   const def = PERKS_BY_ID.get(id);
   if (!def || def.needs) return false;
   return perkHolder(state, def.station)?.perks?.includes(id) ?? false;
+}
+
+/** Is an officer with this signature talent aboard (AW-207)? */
+export function hasTalent(state: GameState, id: TalentId): boolean {
+  return (state.crew ?? []).some((m) => m.talent === id);
 }
 
 /** Points earned (one per level above 1) and not yet spent. */
@@ -181,6 +187,13 @@ export function effectiveStats(state: GameState): ShipStats {
     s.ratings.minTempC -= 20;
     s.ratings.maxTempC += 20;
   }
+  // Signature talents (AW-207).
+  if (hasTalent(state, "archive-tracker")) s.rareLifeSense = true;
+  if (hasTalent(state, "deep-sky")) s.deepScanLy = Math.round(s.deepScanLy * 1.5 * 10) / 10;
+  if (hasTalent(state, "tank-rigger")) s.fuelCapacity = Math.round(s.fuelCapacity * 1.25);
+  if (hasTalent(state, "hold-packer")) s.cargoCapacityT = Math.round(s.cargoCapacityT * 1.15);
+  if (hasTalent(state, "rover-whisperer")) s.roverEnergy = Math.round(s.roverEnergy * 1.3);
+  if (hasTalent(state, "specimen-keeper")) s.specimenSlotBonus += 4;
   return s;
 }
 

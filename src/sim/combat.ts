@@ -25,7 +25,7 @@ import { addCargo } from "./ship";
 import { COMMODITIES, ORE_IDS, GAS_IDS } from "../data/commodities";
 import { sellPrice } from "./economy";
 import { INTREPID_POS } from "./galaxy";
-import { effectiveStats, hasPerk } from "./perks";
+import { effectiveStats, hasPerk, hasTalent } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { removeCargo } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
@@ -256,7 +256,7 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
     raider: r.id,
     raiderName: r.name,
     captain: cap,
-    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state))),
+    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state)) * (hasTalent(state, "bounty-hunter") ? 1.5 : 1)),
     nerve: r.nerve,
     enemy: raiderSide(r, state),
     demand,
@@ -320,6 +320,8 @@ function raiderSide(r: RaiderTemplate, state?: GameState): CombatSide {
 export function spotChance(state: GameState): number {
   const sensors = effectiveStats(state).sensorTier;
   // Early Warning (comms): the listeners hear them first.
+  // Raider's eyes (AW-207): a navigator who used to ride with them knows where they lurk.
+  if (hasTalent(state, "raiders-eyes")) return 0.95;
   return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200 + (hasPerk(state, "early-warning") ? 0.2 : 0), 0.1, 0.9);
 }
 
@@ -341,7 +343,7 @@ export function startContact(state: GameState, world: World, systemId: string, c
     raider: r.id,
     raiderName: r.name,
     captain: rolled.cap,
-    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state))),
+    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state)) * (hasTalent(state, "bounty-hunter") ? 1.5 : 1)),
     nerve: r.nerve,
     enemy: raiderSide(r, state),
     demand: rolled.demand,
