@@ -18,6 +18,7 @@ import { fail, ok, type Result } from "./result";
 import { researchStatus } from "./research";
 import { advanceTime, log, type GameState } from "./state";
 import { GAME_START } from "./time";
+import { peopleOf, universeOf, type GameSettings } from "./settings";
 import { HOUR, YEAR } from "./units";
 import type { World } from "./world";
 
@@ -36,6 +37,8 @@ export interface CareerReport {
   earned: number;
   tonnesMined: number;
   specimens: number;
+  /** The career's new-game settings (AW-205); missing from reports made before them. */
+  settings?: GameSettings;
   folds: number;
   landings: number;
   starsVisited: number;
@@ -195,6 +198,7 @@ export function careerReport(state: GameState, ending: EndingId): CareerReport {
     earned: state.stats.earned,
     tonnesMined: state.stats.tonnesMined,
     specimens: specimensCollected(state),
+    settings: { ...universeOf(state.seed), ...peopleOf(state) },
     folds: state.stats.folds,
     landings: state.stats.landings,
     starsVisited: state.visitedSystems.length,

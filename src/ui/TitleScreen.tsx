@@ -2,7 +2,8 @@ import { useState } from "preact/hooks";
 import { CAPTAIN_CLANS } from "../data/clans";
 import { FIRST_NAMES, SURNAMES } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
-import { captainTitle } from "../sim";
+import { captainTitle, DEFAULT_PEOPLE, DEFAULT_UNIVERSE, type PeopleSettings, type UniverseSettings } from "../sim";
+import { NewGameSettings } from "./NewGameSettings";
 import { HallOfFame, readHall } from "./Ending";
 import { PortraitPicker } from "./portraits";
 import { GameSession } from "./session";
@@ -87,11 +88,47 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
   const [clan, setClan] = useState<ClanId | null>(null);
   const [seed, setSeed] = useState(() => String(Math.floor(Math.random() * 1_000_000)));
   const [guidance, setGuidance] = useState(true);
+  const [step, setStep] = useState<"character" | "universe">("character");
+  const [universe, setUniverse] = useState<UniverseSettings>(DEFAULT_UNIVERSE);
+  const [people, setPeople] = useState<PeopleSettings>(DEFAULT_PEOPLE);
 
   const start = () => {
     const n = Number.parseInt(seed, 10);
-    onStart(GameSession.fresh(Number.isFinite(n) ? n : 1, name.trim() || FALLBACK_NAME, clan ?? undefined, shipName.trim() || DEFAULT_SHIP, face ?? undefined, guidance));
+    onStart(
+      GameSession.fresh(
+        Number.isFinite(n) ? Math.abs(n) : 1,
+        name.trim() || FALLBACK_NAME,
+        clan ?? undefined,
+        shipName.trim() || DEFAULT_SHIP,
+        face ?? undefined,
+        guidance,
+        universe,
+        people,
+      ),
+    );
   };
+
+  if (step === "universe") {
+    return (
+      <div class="title-screen">
+        <div class="title-card">
+          <div class="new-game-head">
+            <button class="btn" onClick={() => setStep("character")}>
+              ← Captain
+            </button>
+            <h2>New game: the Verge</h2>
+          </div>
+          <div class="new-game">
+            <NewGameSettings seed={seed} onSeed={setSeed} universe={universe} onUniverse={setUniverse} people={people} onPeople={setPeople} />
+            <button class="btn big primary" onClick={start}>
+              Begin
+            </button>
+            {saved && <p class="muted small">Starting a new game overwrites the current save.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div class="title-screen">
@@ -100,7 +137,7 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
           <button class="btn" onClick={onBack}>
             ← Back
           </button>
-          <h2>New game</h2>
+          <h2>New game: your captain</h2>
         </div>
         <div class="new-game">
           <div class="new-game-fields">
@@ -116,10 +153,6 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
             <label>
               Ship name
               <input value={shipName} placeholder={DEFAULT_SHIP} onInput={(e) => setShipName((e.target as HTMLInputElement).value)} maxLength={32} />
-            </label>
-            <label>
-              Galaxy seed
-              <input value={seed} onInput={(e) => setSeed((e.target as HTMLInputElement).value)} maxLength={9} />
             </label>
           </div>
           <p class="new-game-preview">
@@ -169,10 +202,9 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
             </span>
           </label>
 
-          <button class="btn big primary" onClick={start}>
-            Begin
+          <button class="btn big primary" onClick={() => setStep("universe")}>
+            Next: the Verge ▸
           </button>
-          {saved && <p class="muted small">Starting a new game overwrites the current save.</p>}
         </div>
       </div>
     </div>

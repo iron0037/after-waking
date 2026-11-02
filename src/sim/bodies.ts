@@ -3,6 +3,7 @@
  * from the galaxy seed. Orbits are real-scale (AU) so that inner worlds are short hops and the
  * outer system is a long haul.
  */
+import { lifeChance } from "./settings";
 import type { SeaKind } from "../data/seas";
 import { ORE_IDS, type CommodityId } from "../data/commodities";
 import { moonSuffix, roman } from "../data/names";
@@ -106,6 +107,8 @@ interface Ctx {
   bodies: Body[];
   /** World generation (see WORLD_GEN_LATEST). */
   gen?: number;
+  /** The galaxy seed, for its universe settings (AW-205). */
+  seed: number;
 }
 
 /**
@@ -117,7 +120,7 @@ export const WORLD_GEN_LATEST = 4;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
   if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);
-  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system", sys.id), bodies: [] };
+  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system", sys.id), bodies: [], seed: galaxySeed };
   const { rng } = ctx;
   const frost = 2.7 * Math.sqrt(sys.luminosity);
   const slots = sys.spectral === "M" ? rng.int(2, 6) : rng.int(3, 9);
@@ -338,8 +341,8 @@ function finishBody(ctx: Ctx, core: BodyCore): Body {
   }
 
   const life =
-    ((core.kind === "terrestrial" || core.kind === "ocean") && core.tempC > -20 && core.tempC < 60 && rng.chance(0.6)) ||
-    (core.kind === "ice" && p > 0.5 && rng.chance(0.1));
+    ((core.kind === "terrestrial" || core.kind === "ocean") && core.tempC > -20 && core.tempC < 60 && rng.chance(lifeChance(ctx.seed, "temperate"))) ||
+    (core.kind === "ice" && p > 0.5 && rng.chance(lifeChance(ctx.seed, "ice")));
 
   return {
     ...core,
@@ -472,7 +475,7 @@ export function systemArchitecture(galaxySeed: number, sys: StarSystem): Archite
 }
 
 function generateSystemV2(galaxySeed: number, sys: StarSystem, gen = 2): SystemDetail {
-  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system2", sys.id), bodies: [], gen };
+  const ctx: Ctx = { sys, rng: rngFor(galaxySeed, "system2", sys.id), bodies: [], gen, seed: galaxySeed };
   const { rng } = ctx;
   // Around a star of luminosity L, a world gets Earth's sunlight at sqrt(L) AU; the frost line sits ~2.7x out.
   const hz = Math.sqrt(sys.luminosity);

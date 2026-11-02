@@ -18,6 +18,7 @@ import type { HelmRecord } from "./helm";
 import type { DiveRecord, ProbeDive } from "./probes";
 import type { EndingState } from "./ending";
 import { hasPerk } from "./perks";
+import { DEFAULT_PEOPLE, universeSeed, type PeopleSettings, type UniverseSettings } from "./settings";
 import { tickSentiment } from "./sentiment";
 import { tickResearch, type ResearchRecord } from "./research";
 import type { Encounter, EncounterResult } from "./combat";
@@ -201,6 +202,8 @@ export interface GameState {
   market: MarketState;
   journal: JournalEntry[];
   stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number; specimens?: number; raidersBeaten?: number; contractsDone?: number };
+  /** The new-game People settings (AW-205), fixed for the career. Universe settings ride in the seed. */
+  settings?: PeopleSettings;
 }
 
 export interface NewGameOptions {
@@ -213,12 +216,22 @@ export interface NewGameOptions {
   shipName?: string;
   /** The Archive's first-run guidance; on unless turned off on the new-game screen. */
   guidance?: boolean;
+  /** Universe settings (packed into the seed) and People settings (AW-205). Normal if left out. */
+  universe?: UniverseSettings;
+  people?: PeopleSettings;
 }
 
-export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance", clan, face, guidance = true }: NewGameOptions): GameState {
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
+function numberWord(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
+export function newGame({ seed: base, captainName = "Reyes", shipName = "Second Chance", clan, face, guidance = true, universe, people }: NewGameOptions): GameState {
+  const seed = universe ? universeSeed(base, universe) : base;
   const state: GameState = {
     version: SAVE_VERSION,
     seed,
+    settings: { ...DEFAULT_PEOPLE, ...people },
     guidance,
     archiveSeen: [],
     time: GAME_START + 8 * 60,
@@ -274,7 +287,7 @@ export function newGame({ seed, captainName = "Reyes", shipName = "Second Chance
   log(
     state,
     "info",
-    "Helm's nav package includes the first scouts' records for the twelve charted stars. The three nearest are well-trodden ground: a good place to learn the trade. The job board has work for new captains.",
+    `Helm's nav package includes the first scouts' records for the ${numberWord(world.galaxy.systems.filter((s) => s.charted).length)} charted stars. The three nearest are well-trodden ground: a good place to learn the trade. The job board has work for new captains.`,
   );
   return state;
 }

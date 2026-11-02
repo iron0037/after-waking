@@ -4,6 +4,7 @@ import { noticeFind } from "./covenant";
 import { gasDeliveryReward } from "./contracts";
 import { COMMODITY_IDS } from "../data/commodities";
 import { ensureCrew } from "./crew";
+import { LEGACY_PEOPLE } from "./settings";
 import { specimensCollected } from "./ending";
 import { SAVE_VERSION, type GameState } from "./state";
 
@@ -58,6 +59,8 @@ export function deserialize(json: string): GameState {
     if (data.loan.annualRate === 0.06) data.loan.annualRate = 0.03;
     data.clock = 2;
   }
+  // Careers from before the new-game settings play by the old rules (AW-205).
+  data.settings ??= { ...LEGACY_PEOPLE };
   ensureCrew(data);
   // Careers that ended before the specimen counter caught up (AW-204).
   if (data.ending) data.ending.report.specimens = Math.max(data.ending.report.specimens ?? 0, specimensCollected(data));

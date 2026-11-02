@@ -3,6 +3,7 @@
  * in empty interstellar space. Star positions are in light-years on a 2D chart (the real
  * region is 3D, but a flat chart reads better, as Starflight's did).
  */
+import { chartedStars, universeOf } from "./settings";
 import { catalogName, STAR_NAMES } from "../data/names";
 import { rngFor, type Rng } from "./rng";
 import { dist, type Vec2 } from "./units";
@@ -72,7 +73,13 @@ export const DEFAULT_GALAXY: GalaxyOptions = {
   maxRadiusLy: 32,
 };
 
-export function generateGalaxy(seed: number, options: GalaxyOptions = DEFAULT_GALAXY): Galaxy {
+/** The galaxy a seed asks for: its star count comes with the universe settings (AW-205). */
+export function galaxyOptionsFor(seed: number): GalaxyOptions {
+  const { stars } = universeOf(seed);
+  return { ...DEFAULT_GALAXY, count: stars, chartedCount: chartedStars(stars) };
+}
+
+export function generateGalaxy(seed: number, options: GalaxyOptions = galaxyOptionsFor(seed)): Galaxy {
   const rng = rngFor(seed, "galaxy");
   const anchors: Vec2[] = [INTREPID_POS];
   const positions: Vec2[] = [];

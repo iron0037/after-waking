@@ -3,6 +3,7 @@
  * as a top-down tile map (one tile ≈ 2 km). Terrain and deposits regenerate from the seed;
  * what the player has discovered or dug out is stored separately in RegionKnowledge.
  */
+import { floraSitesRange, hiddenSeamChance, oreCountMult, oreTonnageMult } from "./settings";
 import { SEAS } from "../data/seas";
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
@@ -238,7 +239,8 @@ export function regionFlora(seed: number, body: Body, region: number): FloraSpec
   const species = bodySpecies(seed, body);
   if (species.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "flora");
-  return Array.from({ length: rng.int(2, 5) }, (_, id) => ({ id, species: rng.pick(species) }));
+  const [lo, hi] = floraSitesRange(seed);
+  return Array.from({ length: rng.int(lo, hi) }, (_, id) => ({ id, species: rng.pick(species) }));
 }
 
 /**
@@ -320,9 +322,13 @@ function rolledDeposits(seed: number, body: Body, region: number): DepositSpec[]
   if (entries.length === 0) return [];
   // Home worlds: reliable but modest, since the first scouts skimmed the best seams.
   const richness = body.easy ? rng.range(0.45, 0.9) : rng.range(0.3, 1.6);
-  const count = Math.round(rng.range(3, 9) * richness * (body.kind === "asteroid" ? 0.6 : 1));
+  const count = Math.round(rng.range(3, 9) * richness * (body.kind === "asteroid" ? 0.6 : 1) * oreCountMult(seed));
   const deposits: DepositSpec[] = [];
-  for (let i = 0; i < count; i++) deposits.push(depositSpec(rng, body, entries, richness, i));
+  const size = oreTonnageMult(seed);
+  for (let i = 0; i < count; i++) {
+    const d = depositSpec(rng, body, entries, richness, i);
+    deposits.push(size === 1 ? d : { ...d, tonnes: Math.round(d.tonnes * size) });
+  }
   return deposits;
 }
 
@@ -350,7 +356,7 @@ export function hiddenDeposits(seed: number, body: Body, region: number, firstId
   const entries = Object.entries(body.resources) as [CommodityId, number][];
   if (entries.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "hidden-deposits");
-  const count = rng.chance(0.5) ? 1 : 0;
+  const count = rng.chance(hiddenSeamChance(seed)) ? 1 : 0;
   // The seams other crews miss are the good ones: the world's pricier minerals, at a high grade.
   const valued = entries.map(([id, a]) => [id, a * COMMODITIES[id].basePrice] as [CommodityId, number]);
   return Array.from({ length: count }, (_, i) => {

@@ -467,6 +467,13 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
         <span class="muted small">age {ageAt(r.born, state.time)}</span>
       </div>
       <ClanLine m={r} />
+      {r.volunteer && (
+        <div class="crew-clan">
+          <span class="tag" title="Someone from the Intrepid's decks who wants a berth: green, cheap to sign, and paid a starter's wage. They wait in the hall until the post is filled.">
+            Volunteer from the decks
+          </span>
+        </div>
+      )}
       {r.formerRaider && (
         <div class="crew-clan">
           <span class="tag accent-tag" title="Taken from a beaten raider and offered a berth instead of a cell. They'll wait in the hiring hall for you, and the signing fee is halved.">

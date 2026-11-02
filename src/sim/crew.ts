@@ -6,6 +6,7 @@
  * Officers can be replaced from the hiring hall aboard the Intrepid; the pool turns over monthly.
  * (Perk trees, aging and retirement come later.)
  */
+import { crewXpMult, peopleOf } from "./settings";
 import { clanRefuses } from "./reputation";
 import {
   CLAN_TRAITS,
@@ -55,6 +56,8 @@ export interface Recruit extends CrewMember {
   /** Taken from a raider and offered a berth instead of a cell (combat v1.1): waits in the hall a year. */
   formerRaider?: boolean;
   keepUntil?: number;
+  /** A green volunteer from the decks for an empty post (AW-205): waits until the post is filled. */
+  volunteer?: boolean;
 }
 
 export const MAX_LEVEL = 10;
@@ -199,7 +202,7 @@ export const STATION_XP_RATE: Record<Station, number> = {
 
 /** Credit work done at a station. Logs level-ups. */
 export function awardXp(state: GameState, station: Station, amount: number): void {
-  amount *= STATION_XP_RATE[station];
+  amount *= STATION_XP_RATE[station] * crewXpMult(peopleOf(state));
   if (amount <= 0) return;
   // Mentor (medic) and Inspiring (captain) lift everyone's learning.
   const boost = 1 + (hasPerk(state, "mentor") ? 0.1 : 0) + (hasPerk(state, "inspiring") ? 0.1 : 0);
@@ -419,9 +422,30 @@ export function tickRecruits(state: GameState): void {
   if (state.time < state.nextRecruitsAt) return;
   const pool = Math.floor(state.time / (RECRUIT_POOL_DAYS * DAY));
   // Former raiders you offered a berth wait for you (a year) while the rest of the hall turns over.
-  const waiting = (state.recruits ?? []).filter((r) => r.formerRaider && state.time < (r.keepUntil ?? 0));
+  const waiting = (state.recruits ?? []).filter((r) => (r.formerRaider && state.time < (r.keepUntil ?? 0)) || r.volunteer);
   state.recruits = [...waiting, ...rollPool(state, pool)];
   state.nextRecruitsAt = (pool + 1) * RECRUIT_POOL_DAYS * DAY;
+  ensureVolunteers(state);
+}
+
+/**
+ * The way back when a post empties (AW-205): the Intrepid has two million people, and someone on
+ * the decks always wants a berth. Green (level 1, no perks), cheap to sign, and paid a starter's wage.
+ * One waits in the hall for each empty post until it's filled.
+ */
+export function ensureVolunteers(state: GameState): void {
+  const empty = OFFICER_STATIONS.filter((st) => !officerAt(state, st));
+  // Volunteers for posts that have since been filled go back to the decks.
+  const kept = (state.recruits ?? []).filter((r) => !r.volunteer || empty.includes(r.station));
+  for (const station of empty) {
+    if (kept.some((r) => r.volunteer && r.station === station)) continue;
+    const rng = rngFor(state.seed, "crew", "volunteer", station, Math.floor(state.time / DAY));
+    const person = newPerson(rng, `v-${station}-${Math.floor(state.time / DAY)}`, station, rng.pick(CLAN_IDS), 1, state.time);
+    person.xp = 0;
+    person.born = state.time - Math.round(rng.range(19, 27) * YEAR);
+    kept.push({ ...person, fee: Math.round((SIGNING_DAYS * wageOf(person)) / 4), volunteer: true });
+  }
+  state.recruits = kept;
 }
 
 /**
@@ -452,11 +476,12 @@ export function hireRecruit(state: GameState, recruitId: string): Result<{ hired
   const fee = signingFee(state, r);
   if (state.credits < fee) return fail(`Signing ${r.name} costs ${fee.toLocaleString()} cr.`);
   state.credits -= fee;
-  const { fee: _fee, formerRaider: _raider, keepUntil: _keep, ...hired } = r;
+  const { fee: _fee, formerRaider: _raider, keepUntil: _keep, volunteer: _vol, ...hired } = r;
   ensureSentiment(hired, true);
   const replaced = officerAt(state, r.station);
   state.crew = [...(state.crew ?? []).filter((m) => m.station !== r.station), hired];
   state.recruits = recruits.filter((x) => x.id !== recruitId);
+  ensureVolunteers(state);
   const title = STATION_INFO[r.station].title.toLowerCase();
   state.journal.push({
     t: state.time,

@@ -10,6 +10,8 @@ import {
   PROBE_FRAME,
   ANOMALY_REWARD,
   anomalyProbeBlockers,
+  baseSeed,
+  settingsLine,
   anomalyStage,
   atAnomaly,
   captainTitle,
@@ -266,6 +268,10 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
                 </div>
               ))}
             </dl>
+            <p class="muted small">
+              Seed {baseSeed(r.seed)}
+              {r.settings ? ` · ${settingsLine(r.settings)}` : ""}
+            </p>
             <p class="muted small">This career has been entered in the hall of fame.</p>
             <div class="btn-row ending-actions">
               <button class="btn" onClick={() => setShowReport(false)}>
@@ -308,7 +314,7 @@ export function HallOfFame({ onBack }: { onBack: () => void }) {
             </thead>
             <tbody>
               {hall.map((e, i) => (
-                <tr key={i} title={`Seed ${e.report.seed} · finished ${new Date(e.finishedOn).toLocaleDateString()}`}>
+                <tr key={i} title={`Seed ${baseSeed(e.report.seed)}${e.report.settings ? ` · ${settingsLine(e.report.settings)}` : ""} · finished ${new Date(e.finishedOn).toLocaleDateString()}`}>
                   <td>
                     {captainTitle(e.report.captain)} <span class="muted small">· {e.report.shipName}</span>
                   </td>

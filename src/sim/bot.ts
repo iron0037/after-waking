@@ -47,6 +47,7 @@ import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
 import { OFFICER_STATIONS } from "../data/crew";
+import type { PeopleSettings, UniverseSettings } from "./settings";
 import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
@@ -95,6 +96,9 @@ export interface BotOptions {
   clan?: ClanId;
   /** Reshuffle the luck without changing any rules: a control for how noisy a comparison is. */
   rngSalt?: number;
+  /** New-game settings to play under (AW-205); Normal if left out. */
+  universe?: UniverseSettings;
+  people?: Partial<PeopleSettings>;
 }
 
 export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
@@ -103,8 +107,8 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
   const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false, crewShare = 0 } = options;
   let rescues = 0;
   let raids = 0;
-  const world = new World(seed);
-  const state = newGame({ seed, ...(options.clan ? { clan: options.clan } : {}) });
+  const state = newGame({ seed, ...(options.clan ? { clan: options.clan } : {}), universe: options.universe, people: options.people as PeopleSettings | undefined });
+  const world = new World(state.seed);
   const salt = options.rngSalt ?? 0;
   if (salt) state.rngState = (state.rngState ^ Math.imul(salt, 0x9e3779b1)) >>> 0;
   const rng = new Rng((seed ^ 0xb07 ^ Math.imul(salt, 0x85ebca6b)) >>> 0);

@@ -3,6 +3,7 @@
  * Pay, talk, run, or fight a short battle of simultaneous turns on three range bands.
  * Deterministic: every roll goes through the state's RNG. See docs/game_design.md (Combat v1).
  */
+import { peopleOf, pirateChanceMult, pirateStrengthMult } from "./settings";
 import { changeRep } from "./reputation";
 import { clanMods } from "./clan";
 import {
@@ -181,7 +182,7 @@ export function lingerFactor(state: GameState): number {
 
 /** Chance that a raider is waiting as you fold out of this system with what's in the hold. */
 export function interdictionChance(state: GameState, world: World, systemId: string): number {
-  return pirateActivity(world, systemId) * Math.min(1.5, holdValue(state) / 10_000) * lingerFactor(state) * clanMods(state).raidChance;
+  return pirateActivity(world, systemId) * Math.min(1.5, holdValue(state) / 10_000) * lingerFactor(state) * clanMods(state).raidChance * pirateChanceMult(peopleOf(state));
 }
 
 export type PirateIntel = { level: "unknown" | "patrolled" | "quiet" | "low" | "moderate" | "high"; label: string; text: string; raiders: string[] };
@@ -255,9 +256,9 @@ export function maybeInterdict(state: GameState, world: World, fromId: string): 
     raider: r.id,
     raiderName: r.name,
     captain: cap,
-    bounty: r.bounty,
+    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state))),
     nerve: r.nerve,
-    enemy: raiderSide(r),
+    enemy: raiderSide(r, state),
     demand,
     range: 2,
     turn: 0,
@@ -304,12 +305,15 @@ export const RECKLESS_RAIDERS = 0.12;
 
 /** Raiders size you up first: a ship that outguns them is rarely worth the risk, but some try anyway. */
 function willAttack(r: RaiderTemplate, state: GameState, roll: number): boolean {
-  const ratio = sidePower(raiderSide(r)) / sidePower(playerSide(state));
+  const ratio = sidePower(raiderSide(r, state)) / sidePower(playerSide(state));
   return ratio >= 1 || roll <= Math.max(RECKLESS_RAIDERS, ratio * ratio * ratio);
 }
 
-function raiderSide(r: RaiderTemplate): CombatSide {
-  return { hull: r.hull, hullMax: r.hull, laser: r.laser, kinetic: r.kinetic, shields: r.shields, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } };
+/** A raider's ship as it fights. With a state, the career's pirate strength applies (AW-205). */
+function raiderSide(r: RaiderTemplate, state?: GameState): CombatSide {
+  const k = state ? pirateStrengthMult(peopleOf(state)) : 1;
+  const hull = Math.round(r.hull * k);
+  return { hull, hullMax: hull, laser: r.laser * k, kinetic: r.kinetic * k, shields: r.shields * k, speed: r.speed, damage: { drives: 0, weapons: 0, sensors: 0 } };
 }
 
 /** Chance your sensors see a raider before it sees you: the array, the science officer, sensor damage. */
@@ -337,9 +341,9 @@ export function startContact(state: GameState, world: World, systemId: string, c
     raider: r.id,
     raiderName: r.name,
     captain: rolled.cap,
-    bounty: r.bounty,
+    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state))),
     nerve: r.nerve,
-    enemy: raiderSide(r),
+    enemy: raiderSide(r, state),
     demand: rolled.demand,
     range: 2,
     turn: 0,

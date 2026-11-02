@@ -11,7 +11,8 @@
 export function hashSeed(...parts: readonly (string | number)[]): number {
   let h = 0x811c9dc5;
   for (const part of parts) {
-    const s = String(part);
+    // A seed's bits above 2^32 hold the universe settings (AW-205): the dice never see them.
+    const s = String(typeof part === "number" && part >= 4294967296 ? part % 4294967296 : part);
     for (let i = 0; i < s.length; i++) {
       h ^= s.charCodeAt(i);
       h = Math.imul(h, 0x01000193);

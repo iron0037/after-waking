@@ -9,6 +9,7 @@ import type { ArchiveTrigger } from "../data/archive";
 import { CLUES_BY_ID } from "../data/clues";
 import type { Station } from "../data/crew";
 import type { ClanId } from "../data/ship";
+import type { PeopleSettings, UniverseSettings } from "../sim/settings";
 import type { ProbeDepth } from "../data/probes";
 import {
   clueCount,
@@ -120,8 +121,8 @@ export class GameSession {
     this.view = defaultView(state);
   }
 
-  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string, face?: number, guidance = true): GameSession {
-    const session = new GameSession(newGame({ seed, captainName, clan, shipName, face, guidance }));
+  static fresh(seed: number, captainName?: string, clan?: ClanId, shipName?: string, face?: number, guidance = true, universe?: UniverseSettings, people?: PeopleSettings): GameSession {
+    const session = new GameSession(newGame({ seed, captainName, clan, shipName, face, guidance, universe, people }));
     session.save();
     return session;
   }
