@@ -41,6 +41,8 @@ export interface CrewMember {
   loyalty?: number;
   /** When they gave notice, if they have. */
   noticeAt?: number;
+  /** When they said they'd retire at the next docking (AW-206). */
+  retiringAt?: number;
 }
 
 /** A level gained, waiting for the player to see it (and maybe pick a perk). */
@@ -514,4 +516,85 @@ export function setCaptainFace(state: GameState, face: number | null): Result<nu
   if (!Number.isInteger(face) || face < 0) return fail("No such portrait.");
   state.captain.face = face;
   return ok(face);
+}
+
+// --- retirement (AW-206) ---------------------------------------------------------------------
+
+/** The age somebody starts thinking about going ashore for good: 58 to 66, fixed for the person. */
+export const RETIRE_AGE_MIN = 58;
+export const RETIRE_AGE_SPAN = 8;
+
+/** The age this officer will retire at (Longevity: five years later; Loyalty: two). */
+export function retirementAge(state: GameState, m: Pick<CrewMember, "id">): number {
+  const own = RETIRE_AGE_MIN + (hashSeed(state.seed, "retire", m.id) % (RETIRE_AGE_SPAN + 1));
+  return own + (hasPerk(state, "longevity") ? 5 : 0) + (hasPerk(state, "loyalty") ? 2 : 0);
+}
+
+/** Years until they retire (0 if they're past it), or null when nobody ever leaves (turnover off). */
+export function yearsToRetirement(state: GameState, m: CrewMember): number | null {
+  if (!peopleOf(state).turnover) return null;
+  return Math.max(0, retirementAge(state, m) - (state.time - m.born) / YEAR);
+}
+
+/**
+ * A retiring veteran's protégé (Family Ship): someone they've trained up in the post, at half their
+ * level, from their own clan.
+ */
+function protege(state: GameState, mentor: CrewMember): CrewMember {
+  const rng = rngFor(state.seed, "crew", "protege", mentor.id);
+  const level = Math.max(1, Math.floor(levelForXp(mentor.xp) / 2));
+  const p = newPerson(rng, `${mentor.id}-p`, mentor.station, mentor.clan, level, state.time);
+  p.born = state.time - Math.round(rng.range(22, 32) * YEAR);
+  autoSpendPerks(p, rng);
+  ensureSentiment(p, true);
+  p.loyalty = Math.min(100, (p.loyalty ?? 40) + 15);
+  return p;
+}
+
+/**
+ * At docking: veterans past their retirement age say they'll go ashore at the next docking (a trip's
+ * notice, so the captain can line someone up), and those who said so last time leave. Only with
+ * turnover on. Returns who retired.
+ */
+export function retirementsOnDocked(state: GameState): CrewMember[] {
+  if (!peopleOf(state).turnover || !state.crew) return [];
+  const retired: CrewMember[] = [];
+  for (const m of state.crew) {
+    const title = STATION_INFO[m.station].title;
+    if (m.retiringAt !== undefined && m.retiringAt < state.time) {
+      retired.push(m);
+      continue;
+    }
+    if (m.retiringAt === undefined && (state.time - m.born) / YEAR >= retirementAge(state, m)) {
+      m.retiringAt = state.time;
+      state.journal.push({
+        t: state.time,
+        kind: "warning",
+        text: `${title} ${m.name} is ready to go ashore for good: they'll retire when we next dock. The hiring hall is the place to find their successor.`,
+      });
+    }
+  }
+  if (retired.length === 0) return [];
+  const family = hasPerk(state, "family-ship");
+  state.crew = state.crew.filter((m) => !retired.includes(m));
+  for (const m of retired) {
+    const title = STATION_INFO[m.station].title;
+    if (family) {
+      const p = protege(state, m);
+      state.crew.push(p);
+      state.journal.push({
+        t: state.time,
+        kind: "info",
+        text: `${title} ${m.name} retired after a long career aboard, leaving their protégé ${p.name} (level ${levelForXp(p.xp)}) in the post.`,
+      });
+    } else {
+      state.journal.push({
+        t: state.time,
+        kind: "warning",
+        text: `${title} ${m.name} retired after a long career aboard. The post is empty until you sign someone at the hiring hall.`,
+      });
+    }
+  }
+  ensureVolunteers(state);
+  return retired;
 }

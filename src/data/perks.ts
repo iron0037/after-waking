@@ -141,8 +141,8 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["mentor", "Mentor", "The whole crew earns 10% more experience."],
       ["morale", "Morale", "Shore leave restores happiness twice as fast, and good news lifts spirits 50% more."],
       ["steady-hands", "Steady Hands", "Drilling incidents are 15% rarer."],
-      ["longevity", "Longevity", "Crew retire five years later.", "aging (AW-96)"],
-      ["family-ship", "Family Ship", "Retiring veterans leave a trained protégé.", "aging (AW-96)"],
+      ["longevity", "Longevity", "Crew retire five years later."],
+      ["family-ship", "Family Ship", "A retiring veteran leaves a trained protégé in their post: half their level, the same clan and craft."],
     ],
   ],
   captain: [
@@ -150,7 +150,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["talent-scout", "Talent Scout", "The hiring hall offers two more recruits, at higher levels."],
       ["recruiter", "Recruiter", "Signing fees halved."],
       ["inspiring", "Inspiring", "The whole crew earns 10% more experience."],
-      ["loyalty", "Loyalty", "Loyalty grows 50% faster."],
+      ["loyalty", "Loyalty", "Loyalty grows 50% faster, and veterans put off retiring by two years."],
       ["silver-tongue", "Silver Tongue", "+15% to talk raiders into letting you go (and colonists into moving, once there are outposts)."],
     ],
     [

@@ -65,8 +65,8 @@ Legend: ✅ works with today's systems · ⏳ needs a later system (named)
 | 1 | **Triage** ✅: +2 effective Medical levels for incident time | **Containment** ✅: +2 specimen slots on the rover and the ship | **Mentor** ✅: the whole crew earns 10% more XP |
 | 2 | **Hazard Suits** ✅: +1 radiation rating and ±20 °C temperature rating for landing | **Culture Lab** ✅: +2 effective Medical levels for specimen prices | **Morale** ⏳ (crew sentiment): happiness recovers twice as fast |
 | 3 | **Stabilize** ⏳ (AW-96 injuries): injuries heal twice as fast | **Pathogen Screen** ⏳ (hostile life): immunity to alien sickness events | **Steady Hands** ✅: drilling incidents are 15% rarer (supports Engineering) |
-| 4 | **Surgeon** ⏳ (AW-96): can save a crew member from a fatal injury | **Bio-Assay** ✅: specimens show which research projects want them, at the specimen desk and on the surface (AW-198) | **Longevity** ⏳ (AW-96): crew retire 5 years later |
-| 5 | **Combat Medic** ⏳ (M3): wounded crew return to their stations mid-fight | **Living Archive** ✅: specimen research projects run 25% faster (AW-198) | **Family Ship** ⏳ (AW-96): retiring veterans leave a trained protégé |
+| 4 | **Surgeon** ⏳ (AW-96): can save a crew member from a fatal injury | **Bio-Assay** ✅: specimens show which research projects want them, at the specimen desk and on the surface (AW-198) | **Longevity** ✅: crew retire 5 years later (AW-206) |
+| 5 | **Combat Medic** ⏳ (M3): wounded crew return to their stations mid-fight | **Living Archive** ✅: specimen research projects run 25% faster (AW-198) | **Family Ship** ✅: a retiring veteran leaves a protégé at half their level (AW-206) |
 
 ## Captain: Charisma · Business · Intuition
 
@@ -75,7 +75,7 @@ Legend: ✅ works with today's systems · ⏳ needs a later system (named)
 | 1 | **Talent Scout** ✅: the hiring hall offers 2 more recruits, at higher levels | **Haggler** ✅: +2 effective Captain levels for sale prices | **Hunch** ✅: the region chart marks the region your gut says to try (best signal, ignoring your sensor tier) |
 | 2 | **Recruiter** ✅: signing fees halved | **Bulk Seller** ✅: big lots move the market price half as much | **Read the Room** ⏳ (crew sentiment): see each crew member's happiness and loyalty as exact 0–100 scores instead of low/medium/high |
 | 3 | **Inspiring** ✅: the whole crew earns 10% more XP | **Credit Line** ✅: the Exchange extends 50% more fuel credit | **Fortune Favors** ✅: rare mineral specimens are twice as likely, and a quarter of incidents turn up something (a specimen or a seam) instead of only costing time |
-| 4 | **Loyalty** ⏳ (crew sentiment): loyalty grows 50% faster; veterans delay retirement | **Futures** ⏳ (Exchange futures): commodity futures contracts | **Read the Enemy** ✅: the battle screen shows the raider's next move (AW-198) |
+| 4 | **Loyalty** ✅: loyalty grows 50% faster; veterans retire 2 years later (AW-206) | **Futures** ⏳ (Exchange futures): commodity futures contracts | **Read the Enemy** ✅: the battle screen shows the raider's next move (AW-198) |
 | 5 | **Silver Tongue** ✅: +15% to talk raiders into letting you go; the outpost half waits for M4 (AW-198) | **Shareholder** ⏳ (M4): a cut of an outpost's trade | **Sixth Sense** ⏳ (Awaken path): notice the world's "seams" first |
 
 ## Leveling up is an event

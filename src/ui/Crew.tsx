@@ -40,6 +40,7 @@ import {
   type MoodLevel,
   type Recruit,
   setCaptainFace,
+  yearsToRetirement,
 } from "../sim";
 import { cr } from "./format";
 import { captainSeed, Portrait, PortraitPicker } from "./portraits";
@@ -225,12 +226,29 @@ function MoodRows({ m, exact }: { m: CrewMember; exact: boolean }) {
   );
 }
 
-/** Warnings under a card's heading: on notice, and miserable. */
+/** "retires in about 4 years" for anyone within ten years of it (AW-206); nothing when turnover is off. */
+function RetirementLine({ session, m }: { session: GameSession; m: CrewMember }) {
+  const years = yearsToRetirement(session.state, m);
+  if (years === null || years > 10 || m.retiringAt !== undefined) return null;
+  return (
+    <span class="muted small" title="Veterans retire in their late fifties or sixties. Longevity (medic) and Loyalty (captain) put it off; Family Ship (medic) leaves a protégé in the post.">
+      {years < 1 ? " · retires within the year" : ` · retires in about ${Math.round(years)} years`}
+    </span>
+  );
+}
+
+/** Warnings under a card's heading: on notice, retiring, and miserable. */
 function MoodWarnings({ m }: { m: CrewMember }) {
   const miserable = isMiserable(m);
-  if (m.noticeAt === undefined && !miserable) return null;
+  if (m.noticeAt === undefined && m.retiringAt === undefined && !miserable) return null;
   return (
     <>
+      {m.retiringAt !== undefined && (
+        <div class="crew-notice" role="alert">
+          <strong>Retiring: goes ashore for good at the next docking.</strong>
+          <span class="small">Line up a successor at the hiring hall.</span>
+        </div>
+      )}
       {m.noticeAt !== undefined && (
         <div class="crew-notice" role="alert">
           <strong>Has given notice: leaves at the next docking unless things improve.</strong>
@@ -358,7 +376,10 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
             <span class="accent">{info.title}</span> <strong>{m.name}</strong>
           </div>
         </div>
-        <span class="muted small">age {ageAt(m.born, state.time)}</span>
+        <span class="muted small">
+          age {ageAt(m.born, state.time)}
+          <RetirementLine session={session} m={m} />
+        </span>
       </div>
       <MoodWarnings m={m} />
       <ClanLine m={m} />
@@ -464,7 +485,10 @@ function RecruitCard({ session, r }: { session: GameSession; r: Recruit }) {
             <span class="accent">{info.title}</span> <strong>{r.name}</strong>
           </div>
         </div>
-        <span class="muted small">age {ageAt(r.born, state.time)}</span>
+        <span class="muted small">
+          age {ageAt(r.born, state.time)}
+          <RetirementLine session={session} m={r} />
+        </span>
       </div>
       <ClanLine m={r} />
       {r.volunteer && (

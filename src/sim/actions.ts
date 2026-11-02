@@ -40,7 +40,7 @@ import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverSta
 import { FLORA_BY_NAME } from "../data/catalog";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
-import { awardXp, crewBonuses } from "./crew";
+import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
 import { helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
 import { effectiveStats, finishRetraining, hasPerk, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
@@ -245,6 +245,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     log(state, "travel", `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
     const departWorth = state.helm?.departWorth;
     sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
+    retirementsOnDocked(state);
     helmOnDocked(state);
     covenantOnDocked(state);
     notePrices(state);
