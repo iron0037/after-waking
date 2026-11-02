@@ -336,6 +336,9 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
   const stats = effectiveStats(state);
   const from = shipPosition(state, world) as Vec2;
   const detail = world.system(loc.systemId);
+  // Flight time for a burn of this length, with every speed-up the ship actually gets.
+  const burnMinutes = (au: number) =>
+    travelMinutes(au, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime * driveDamageMult(state) + MANEUVER_MINUTES;
 
   let arrival: Vec2;
   let distanceAU: number;
@@ -347,19 +350,14 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
   } else {
     if (loc.orbiting === target.bodyId) return fail("Already in orbit there.");
     const { body } = world.body(target.bodyId);
-    // Lead the target: aim where it will be when we arrive.
-    let t = 0;
+    // Lead the target: aim where it will be when we arrive (at the time the burn really takes, AW-208).
     arrival = bodyPosition(detail, body, state.time);
-    for (let i = 0; i < 4; i++) {
-      t = travelMinutes(burnPath(from, arrival).length, stats.cruiseSpeedC) + MANEUVER_MINUTES;
-      arrival = bodyPosition(detail, body, state.time + t);
-    }
+    for (let i = 0; i < 4; i++) arrival = bodyPosition(detail, body, state.time + burnMinutes(burnPath(from, arrival).length));
     // Burns swing around the star rather than through it.
     distanceAU = burnPath(from, arrival).length;
   }
 
-  const minutes =
-    travelMinutes(distanceAU, stats.cruiseSpeedC) * (hasPerk(state, "gravity-assist") ? 0.8 : 1) * crewBonuses(state).flightTime * driveDamageMult(state) + MANEUVER_MINUTES;
+  const minutes = burnMinutes(distanceAU);
   const fuel =
     Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
   const contact = routeContact(state, world, loc.systemId, distanceAU, "edge" in target ? "edge" : target.bodyId);

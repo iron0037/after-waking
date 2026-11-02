@@ -586,6 +586,35 @@ function drawRoute(ctx: CanvasRenderingContext2D, proj: Projection, scene: Scene
 
   // Arrival marker: hollow diamond with an ETA tag.
   const end = legPoint(proj, leg, 1);
+
+  // The burn leads its target (AW-208): trace where the body travels between now and arrival, and
+  // ghost it at the meeting point, so the diamond isn't left floating away from the moon.
+  if ("bodyId" in route.target) {
+    const targetId = route.target.bodyId;
+    const body = scene.detail.bodies.find((b) => b.id === targetId);
+    const arriveAt = route.startTime + route.plan.minutes;
+    if (body && arriveAt > scene.time) {
+      const now = proj.bodyPos(body, scene.time);
+      if (Math.hypot(now.x - end.x, now.y - end.y) > 8) {
+        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = rgba(UI.accent, 0.55);
+        ctx.beginPath();
+        const n = 48;
+        for (let i = 0; i <= n; i++) {
+          const q = proj.bodyPos(body, lerp(scene.time, arriveAt, i / n));
+          if (i === 0) ctx.moveTo(q.x, q.y);
+          else ctx.lineTo(q.x, q.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = rgba(UI.accent, 0.35);
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, Math.max(6, discRadius(body, proj.zoom)), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
   ctx.setLineDash([]);
   ctx.lineWidth = 1.6;
   ctx.strokeStyle = UI.accent;
