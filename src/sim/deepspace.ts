@@ -5,7 +5,7 @@
  * with rogue planets, derelicts, plicite drifts and pirate bases to follow (AW-168, AW-169).
  */
 import { dist, DAY, type Vec2 } from "./units";
-import { INTREPID_POS } from "./galaxy";
+import { INTREPID_POS, isDeepId, positionOf } from "./galaxy";
 import { rngFor } from "./rng";
 import { fail, ok, type Result } from "./result";
 import { effectiveStats } from "./perks";
@@ -87,6 +87,19 @@ export function siteHere(state: GameState, world: World): DeepSite | null {
   const loc = state.location;
   if (loc.kind !== "deep") return null;
   return deepSites(world).find((s) => dist(s.pos, loc.pos) <= SITE_REACH_LY) ?? null;
+}
+
+/**
+ * A charted site gives the navigators something to lock onto: the anomaly's lens outshines any star
+ * on their instruments. Folding to a site the array has identified isn't blind (faint returns still are).
+ */
+export function chartedSiteAt(state: GameState, world: World, p: Vec2): DeepSite | null {
+  return deepSites(world).find((s) => state.deepKnown?.[s.id] === "known" && dist(s.pos, p) <= SITE_REACH_LY) ?? null;
+}
+
+/** Is a fold to this target blind: a deep-space point with no charted site to lock onto? */
+export function isBlindFold(state: GameState, world: World, targetId: string): boolean {
+  return isDeepId(targetId) && !chartedSiteAt(state, world, positionOf(world.galaxy, targetId));
 }
 
 /** Fold arrival in empty space. Called by fold(). */

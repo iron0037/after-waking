@@ -25,6 +25,12 @@ import {
   INTREPID_POS,
   regionRareSpecies,
   scanDeep,
+  foldPlan,
+  deepId,
+  isBlindFold,
+  specimensCollected,
+  serialize,
+  deserialize,
   type GameState,
 } from "../src/sim";
 import { RESEARCH_BY_ID } from "../src/data/research";
@@ -164,5 +170,34 @@ describe("the Covenant trail (AW-202) and the edge (AW-170)", () => {
     if (!r.ok) throw new Error(r.reason);
     expect(r.value.id).toBe("awaken");
     expect(endingText(state, "awaken").paragraphs.join(" ")).toMatch(/CRYOSTASIS/);
+  });
+});
+
+describe("playtest follow-ups (AW-203, AW-204)", () => {
+  it("a charted anomaly is something to lock onto: the fold isn't blind", () => {
+    const state = newGame({ seed: 42 });
+    const target = deepId(mouth.pos);
+    expect(isBlindFold(state, world, target)).toBe(true);
+    const blindPlan = foldPlan(state, world, target);
+    state.deepKnown = { anomaly: "faint" };
+    expect(isBlindFold(state, world, target)).toBe(true);
+    state.deepKnown = { anomaly: "known" };
+    expect(isBlindFold(state, world, target)).toBe(false);
+    const charted = foldPlan(state, world, target);
+    expect(charted.fuel).toBeLessThan(blindPlan.fuel);
+    expect(charted.blockers.some((b) => b.includes("blind fold"))).toBe(false);
+    // Empty space next door is still blind.
+    expect(isBlindFold(state, world, deepId({ x: mouth.pos.x + 2, y: mouth.pos.y }))).toBe(true);
+  });
+
+  it("specimens sampled before the counter existed still count, in the report and on load", () => {
+    const state = atMouth();
+    state.regions = { "a:0": { floraSampled: [1, 2, 3] } as never, "b:1": { floraSampled: [4] } as never };
+    delete state.stats.specimens;
+    expect(specimensCollected(state)).toBe(4);
+    state.ending = { id: "return", t: state.time, report: { specimens: 0 } as never };
+    expect(deserialize(serialize(state)).ending!.report.specimens).toBe(4);
+    state.stats.specimens = 9;
+    expect(specimensCollected(state)).toBe(9);
   });
 });

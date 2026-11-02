@@ -7,6 +7,7 @@ import {
   currentSystemId,
   BLIND_FOLD_FUEL,
   BLIND_FOLD_RANGE,
+  isBlindFold,
   deepId,
   dist,
   edgeLy,
@@ -217,7 +218,7 @@ export function StarMap({ session }: { session: GameSession }) {
       })()
     : null;
   const target = deepTarget ?? (selected ? (byId.get(selected) ?? null) : null);
-  const blind = !!deepTarget;
+  const blind = !!deepTarget && isBlindFold(state, world, deepTarget.id);
   const deepSite = deepTarget ? sites.find((x) => dist(x.site.pos, deepTarget.pos) <= SITE_REACH_LY) : undefined;
   const hereSite = inDeep ? (sites.find((x) => x.level === "known" && dist(x.site.pos, here) <= SITE_REACH_LY)?.site ?? null) : null;
   const rangeLy = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
@@ -1181,6 +1182,9 @@ export function StarMap({ session }: { session: GameSession }) {
                 </button>
               )}
             </div>
+            {deepTarget && !blind && (
+              <p class="muted small sm-auto-note">Charted: the navigators lock onto it like a star, so this fold has full range and the usual fuel.</p>
+            )}
             {blind && (
               <p class="muted small sm-auto-note">
                 A blind fold has no star to lock onto: the drive reaches {Math.round(BLIND_FOLD_RANGE * 100)}% of its range and burns{" "}

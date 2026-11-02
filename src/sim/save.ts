@@ -4,6 +4,7 @@ import { noticeFind } from "./covenant";
 import { gasDeliveryReward } from "./contracts";
 import { COMMODITY_IDS } from "../data/commodities";
 import { ensureCrew } from "./crew";
+import { specimensCollected } from "./ending";
 import { SAVE_VERSION, type GameState } from "./state";
 
 export function serialize(state: GameState): string {
@@ -58,6 +59,8 @@ export function deserialize(json: string): GameState {
     data.clock = 2;
   }
   ensureCrew(data);
+  // Careers that ended before the specimen counter caught up (AW-204).
+  if (data.ending) data.ending.report.specimens = Math.max(data.ending.report.specimens ?? 0, specimensCollected(data));
   // Goods added after a save was made start at normal prices.
   for (const id of COMMODITY_IDS) {
     data.market.mult[id] ??= 1;

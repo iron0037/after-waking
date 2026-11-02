@@ -171,6 +171,15 @@ function endCareer(state: GameState, world: World, id: EndingId): EndingState {
   return ending;
 }
 
+/**
+ * Living specimens taken over the career. The counter arrived late (AW-199), so the sampled flora
+ * sites on every region chart are a floor for older saves (AW-204).
+ */
+export function specimensCollected(state: GameState): number {
+  const sampled = Object.values(state.regions ?? {}).reduce((n, k) => n + (k.floraSampled?.length ?? 0), 0);
+  return Math.max(state.stats.specimens ?? 0, sampled);
+}
+
 /** The career so far, in numbers. */
 export function careerReport(state: GameState, ending: EndingId): CareerReport {
   const crew = [state.captain, ...(state.crew ?? [])];
@@ -185,7 +194,7 @@ export function careerReport(state: GameState, ending: EndingId): CareerReport {
     years: Math.max(0, (state.time - GAME_START) / YEAR),
     earned: state.stats.earned,
     tonnesMined: state.stats.tonnesMined,
-    specimens: state.stats.specimens ?? 0,
+    specimens: specimensCollected(state),
     folds: state.stats.folds,
     landings: state.stats.landings,
     starsVisited: state.visitedSystems.length,

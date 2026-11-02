@@ -6,7 +6,7 @@ import { EMERGENCE_NOTE } from "./deepspace";
 import { giantHaze } from "./probes";
 import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
-import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers } from "./deepspace";
+import { arriveDeep, BLIND_FOLD_FUEL, BLIND_FOLD_RANGE, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
@@ -181,12 +181,12 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   const stats = effectiveStats(state);
   const ly = from === targetId ? 0 : distanceLy(world.galaxy, from, targetId);
   const crew = crewBonuses(state);
-  // A blind fold (AW-165): no star to lock onto, so it's shorter-ranged and thirstier.
-  const blind = isDeepId(targetId);
+  // A blind fold (AW-165): no star to lock onto, so it's shorter-ranged and thirstier. A charted site counts as a star (AW-203).
+  const blind = isBlindFold(state, world, targetId);
   const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? BLIND_FOLD_FUEL : 1) * 10) / 10;
   const range = stats.foldRangeLy * (blind ? BLIND_FOLD_RANGE : 1);
   const blockers: string[] = [];
-  if (blind) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
+  if (isDeepId(targetId)) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
 
   if (from === targetId) blockers.push("You're already here.");
   if (state.location.kind === "surface") blockers.push("Launch from the surface first.");

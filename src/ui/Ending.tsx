@@ -52,12 +52,15 @@ export function readHall(): HallEntry[] {
 
 const sameCareer = (a: CareerReport, b: CareerReport) => a.seed === b.seed && a.endedAt === b.endedAt && a.captain === b.captain;
 
-/** Add a finished career to the hall (once). */
+/** Add a finished career to the hall (once; a corrected report replaces the old one). */
 export function enterHall(report: CareerReport): void {
   try {
     const list = readHall();
-    if (list.some((e) => sameCareer(e.report, report))) return;
-    list.push({ report, finishedOn: new Date().toISOString() });
+    const old = list.find((e) => sameCareer(e.report, report));
+    if (old) {
+      if (JSON.stringify(old.report) === JSON.stringify(report)) return;
+      old.report = report;
+    } else list.push({ report, finishedOn: new Date().toISOString() });
     localStorage.setItem(HALL_KEY, JSON.stringify(list));
   } catch {
     /* storage unavailable: the ending still shows, it just isn't remembered */
