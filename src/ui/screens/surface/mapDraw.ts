@@ -416,8 +416,9 @@ export interface DepositMark {
 }
 
 /**
- * Every deposit in `deposits` (the caller picks which are known). Seams deeper than `drillReachM`
- * are drawn faded, with a dashed red outline and a strike, so they read as "not with this drill".
+ * Every deposit in `deposits` (the caller picks which are known). Seams deeper than `drillReachM`,
+ * and seams up in mountains the rover can't climb (`peaks`, by key), are drawn faded, with a dashed
+ * red outline and a strike, so they read as "not with this gear".
  */
 export function drawDeposits(
   ctx: CanvasRenderingContext2D,
@@ -426,6 +427,7 @@ export function drawDeposits(
   selectedKey: string | null,
   timeMs: number,
   drillReachM: number,
+  peaks: ReadonlySet<string> = new Set(),
 ): void {
   const r = Math.max(5, L.tw * 0.38);
   ctx.setLineDash([]);
@@ -434,7 +436,9 @@ export function drawDeposits(
     const y = cy(L, d.x, d.y);
     const depleted = remainingTonnes(know, d) <= 0.05;
     const prospected = know.prospected.includes(d.id);
-    const tooDeep = !depleted && d.depthM > drillReachM;
+    const deep = !depleted && d.depthM > drillReachM;
+    const peak = !depleted && peaks.has(d.key);
+    const tooDeep = deep || peak;
 
     if (know.drillSites.includes(d.id)) drillMark(ctx, L, d, depleted);
 
@@ -459,7 +463,7 @@ export function drawDeposits(
       ctx.moveTo(x - r * 0.75, y + r * 0.75);
       ctx.lineTo(x + r * 0.75, y - r * 0.75);
       ctx.stroke();
-      label(ctx, `${d.depthM} m`, x, y + r + 12, UI.danger);
+      label(ctx, deep ? `${d.depthM} m` : "peak", x, y + r + 12, UI.danger);
     } else if (!prospected) {
       // unsurveyed: a "?" in the middle
       ctx.fillStyle = "rgba(5, 7, 15, 0.8)";

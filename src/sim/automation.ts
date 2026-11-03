@@ -12,6 +12,7 @@ import {
   drill,
   drillRate,
   moveRoverTo,
+  mountainBlocker,
   prospect,
   remainingTonnes,
   roverMobility,
@@ -92,6 +93,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey, maxTon
     return fail(`The seam is ${deposit.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
   }
   if (remainingTonnes(know, deposit) <= 0.05) return fail("This deposit is worked out.");
+  const peak = mountainBlocker(state, world, loc.bodyId, deposit);
+  if (peak) return fail(peak);
 
   const startTime = state.time;
   const startHold = cargoTonnes(state.ship.cargo);

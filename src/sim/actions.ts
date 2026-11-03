@@ -918,6 +918,16 @@ function depositNearRover(state: GameState, world: World, ctx: SurfaceCtx, key: 
   return ok({ d: found.deposit, know: found.know });
 }
 
+/**
+ * A seam up in the mountains (AW-211): the drill rig has to stand on it, so without all-terrain treads
+ * the rover can't work it (it can still take core samples from the foothills). Null when it can.
+ */
+export function mountainBlocker(state: GameState, world: World, bodyId: string, d: { x: number; y: number }): string | null {
+  if (effectiveStats(state).roverCanClimb) return null;
+  if (world.surface(bodyId).terrainAt(d.x, d.y) !== Terrain.mountain) return null;
+  return "The seam is up in the mountains: the rover needs all-terrain treads to get the drill rig onto it.";
+}
+
 /** How close the rover must be to prospect (Assayer: two hexes). Drilling always needs it adjacent. */
 export function prospectRange(state: GameState): number {
   return hasPerk(state, "assayer") ? 2 : 1;
@@ -969,6 +979,8 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   const stats = effectiveStats(state);
   if (!know.prospected.includes(d.id)) return fail("Prospect the deposit before drilling.");
   if (d.depthM > stats.drillMaxDepthM) return fail(`The seam is ${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m.`);
+  const peak = mountainBlocker(state, world, bodyId, d);
+  if (peak) return fail(peak);
   const remaining = remainingTonnes(know, d);
   if (remaining <= 0) return fail("This deposit is worked out.");
   const bed = vehicleCargoT(state, vehicleOf(rover));

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import {
+  mountainBlocker,
   regionsWithFinds,
   deliveryShortfalls,
   activeRegion,
@@ -263,6 +264,8 @@ function workBlockers(state: GameState, world: World, know: RegionKnowledge, dep
   else if (dep.depthM > stats.drillMaxDepthM) {
     out.push(`The seam is ${dep.depthM} m down and the drill only reaches ${stats.drillMaxDepthM} m. A better drill would get it.`);
   }
+  const peak = out.length === 0 && state.location.kind === "surface" ? mountainBlocker(state, world, state.location.bodyId, dep) : null;
+  if (peak) out.push(peak);
   if (out.length === 0 && stats.cargoCapacityT - cargoTonnes(state.ship.cargo) <= 0.5) out.push("The ship's hold is full.");
   // Seabed seams need the boat, land seams the rover (and the other one stowed).
   const vehicle = out.length === 0 ? autoWorkVehicleBlocker(state, world, dep) : null;
@@ -783,7 +786,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const unknowns = sensedSites(state, surface, loc.bodyId, inView).filter((u) => !rc || (!rc.deposits.has(u.key) && !rc.flora.has(u.key)));
     drawUnknowns(ctx, L, unknowns, t);
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
-    drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM);
+    const peaks = new Set(depMarks.filter(({ d }) => mountainBlocker(state, session.world, loc.bodyId, d)).map(({ d }) => d.key));
+    drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM, peaks);
 
     // hover: route preview and tooltip
     const hover = anim || dragRef.current?.moved ? null : hoverRef.current;
@@ -875,6 +879,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         color: COMMODITIES[dep.d.commodity].color,
       });
       if (terrain === Terrain.liquid) lines.push({ text: "Seabed deposit (dredge with the boat)", color: UI.cyan });
+      if (terrain === Terrain.mountain) {
+        const climb = effectiveStats(state).roverCanClimb;
+        lines.push({ text: climb ? "Mountain deposit" : "Mountain deposit (needs all-terrain treads)", color: climb ? UI.muted : UI.danger });
+      }
     }
     if (flora && terrain === Terrain.liquid) lines.push({ text: "Sea life (sample from the boat)", color: UI.cyan });
     if (dep && flora) lines.push({ text: "Click again to switch between them", color: UI.muted });
@@ -1565,6 +1573,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                   <i class="swatch" style={{ background: status === "depleted" ? "#5b6472" : c.color }} />
                   {c.name}
                   {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
+                  {surface.terrainAt(d.x, d.y) === Terrain.mountain && (
+                    <span class="tag" title="Up in the mountains: the drill rig needs all-terrain treads to reach it">
+                      {" "}
+                      mountains
+                    </span>
+                  )}
                 </td>
                 <td class="num">{dist}</td>
                 <td title={statusTip}>
@@ -1575,6 +1589,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                     <span class="danger small" title={`${d.depthM} m down; the drill reaches ${stats.drillMaxDepthM} m`}>
                       {" "}
                       too deep
+                    </span>
+                  )}
+                  {status !== "depleted" && d.depthM <= stats.drillMaxDepthM && mountainBlocker(state, world, loc.bodyId, d) && (
+                    <span class="danger small" title="Up in the mountains: the rover needs all-terrain treads">
+                      {" "}
+                      needs treads
                     </span>
                   )}
                 </td>
@@ -2013,6 +2033,9 @@ function DepositPanel({
   const remaining = remainingTonnes(know, dep);
   const tooDeep = dep.depthM > stats.drillMaxDepthM;
   const rate = drillRate(session.state, dep);
+  const loc0 = session.state.location;
+  const mountain = loc0.kind === "surface" && session.world.surface(loc0.bodyId).terrainAt(dep.x, dep.y) === Terrain.mountain;
+  const peak = loc0.kind === "surface" ? mountainBlocker(session.state, session.world, loc0.bodyId, dep) : null;
   // Seabed seams are dredged from the boat (AW-17); everything else is the rover's.
   const loc = session.state.location;
   const wet = siteOnWater(session.world, loc.kind === "surface" ? loc.bodyId : "", dep);
@@ -2043,6 +2066,7 @@ function DepositPanel({
   const drillBlockers = [...placement];
   if (status === "depleted") drillBlockers.push("This deposit is worked out.");
   if (tooDeep) drillBlockers.push(`The seam is ${dep.depthM} m down and the drill only reaches ${stats.drillMaxDepthM} m. A better drill would get it.`);
+  if (peak) drillBlockers.push(peak);
   if (rover && !wrong && room <= 0.05) drillBlockers.push(`The ${noun}'s ${bedName} is full. ${go === "sail" ? "Sail" : "Drive"} back to the ship and unload.`);
   const setupEnergy = isSite ? 0 : DRILL_SETUP_ENERGY;
   if (rover && !wrong && rover.energy < setupEnergy + 0.5) drillBlockers.push(`Not enough ${noun} energy to run the ${wet ? "dredge" : "drill"}.`);
@@ -2075,6 +2099,7 @@ function DepositPanel({
         <span>{commodity.name}</span>
         <span class={`tag ${status}`}>{status === "new" ? "unsurveyed" : status}</span>
         {wet && <span class="tag sea">seabed</span>}
+        {mountain && <span class={`tag ${peak ? "danger" : ""}`} title={peak ?? "Up in the mountains: your all-terrain treads reach it"}>mountains</span>}
       </div>
       <p class="muted small blurb">{commodity.blurb}</p>
       <dl class="kv">
