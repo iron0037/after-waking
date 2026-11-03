@@ -610,6 +610,24 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
               </div>
             )}
 
+            {/* From afar (AW-209): the scan records and known deposits help pick where to fly next. */}
+            {!orbitingSel && scanned && selected.regions > 0 && (
+              <>
+                <RegionPicker
+                  session={session}
+                  body={selected}
+                  state={state}
+                  world={world}
+                  sensorTier={orbTier}
+                  reachM={stats.drillMaxDepthM}
+                  selected={region}
+                  landable={false}
+                  remote
+                  onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
+                />
+              </>
+            )}
+
             {orbitingSel && scanned && access && (
               <>
                 <h3>{access.ok ? "Landing" : "Surface"}</h3>

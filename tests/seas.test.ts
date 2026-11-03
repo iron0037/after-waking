@@ -19,7 +19,7 @@ const bodies = (world: World): Body[] => world.galaxy.systems.flatMap((s) => wor
 
 describe("exotic seas", () => {
   it("new games use generation 3; generation 2 worlds are untouched", () => {
-    expect(WORLD_GEN_LATEST).toBe(4);
+    expect(WORLD_GEN_LATEST).toBeGreaterThanOrEqual(3);
     const g2 = new World(42, 2);
     const g3 = new World(42, 3);
     expect(bodies(g2).some((b) => b.sea)).toBe(false);

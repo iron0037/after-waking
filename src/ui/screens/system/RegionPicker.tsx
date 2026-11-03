@@ -15,6 +15,7 @@ import {
   regionSignal,
   regionLifeSignal,
   regionRareSpecies,
+  regionLandShare,
   effectiveStats,
   bodySpecies,
   surfaceLayout,
@@ -42,6 +43,8 @@ export interface RegionPickerProps {
   selected: number;
   /** False when the ship can't set down: the chart stays readable and selectable, just framed as intel. */
   landable?: boolean;
+  /** Viewed from elsewhere in the system (AW-209): the scan records, not a landing choice. */
+  remote?: boolean;
   onSelect: (region: number) => void;
   /** The landing controls, shown under the selected region's recap and above the (possibly long) known-deposits list. */
   action?: ComponentChildren;
@@ -88,7 +91,7 @@ function regionAt(layout: Layout, u: number, v: number): number {
 
 // --- component ---------------------------------------------------------------------------
 
-export function RegionPicker({ session, body, state, world, sensorTier, reachM, selected, landable = true, onSelect, action }: RegionPickerProps) {
+export function RegionPicker({ session, body, state, world, sensorTier, reachM, selected, landable = true, remote = false, onSelect, action }: RegionPickerProps) {
   useArchiveTopic(session, "region-chart");
   const [hover, setHover] = useState<number | null>(null);
   const sizeRef = useRef({ w: 1, h: 1 });
@@ -348,7 +351,9 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
     <div class="sys-regions">
       <h3 class="sys-region-title">{landable ? "Choose a landing region" : "Surface regions"}</h3>
       <div class="muted small">
-        {landable
+        {remote
+          ? "From your scan records. Amber marks stronger mineral signals; cyan outlines are places you've been. Enter orbit to land."
+          : landable
           ? "Click the map to pick where to set down. Amber marks stronger mineral signals; cyan outlines are places you've been."
           : "This ship can't land here, but a detailed survey still sharpens these readings. Amber marks stronger signals."}
       </div>
@@ -473,6 +478,8 @@ export function bestRegion(state: GameState, body: Body, sensorTier: number, rea
   let bestScore = -1;
   for (let r = 0; r < body.regions; r++) {
     const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
+    // Open sea on a continental world (AW-210): nowhere to set down, so never the default.
+    if (regionLandShare(state.seed, body, r) < 0.05) continue;
     const score = regionSignal(state.seed, body, r, sensorTier, reachM) * (visited ? 0.5 : 1);
     if (score > bestScore) {
       bestScore = score;

@@ -60,6 +60,8 @@ export interface Body {
   easy?: boolean;
   /** Its seas, if they aren't water (world generation 3, AW-189). */
   sea?: SeaKind;
+  /** Continental terrain (world generation 5, AW-210): the share of the surface under sea. */
+  waterShare?: number;
   /** What the crews call it, e.g. "the Meadow". */
   nickname?: string;
 }
@@ -114,9 +116,10 @@ interface Ctx {
 /**
  * World generations. Saves remember which one built their universe, so a new generator never
  * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
- * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145).
+ * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145). 3: exotic
+ * seas (AW-189). 4: thick-air moons (AW-190). 5: continents on terrestrial worlds (AW-210).
  */
-export const WORLD_GEN_LATEST = 4;
+export const WORLD_GEN_LATEST = 5;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
   if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);
@@ -603,6 +606,7 @@ function generateSystemV2(galaxySeed: number, sys: StarSystem, gen = 2): SystemD
   // The fold limit hugs the outermost world: compact red-dwarf systems are tiny.
   if (gen >= 4) addThickAirMoons(galaxySeed, ctx.bodies);
   if (gen >= 3) addExoticSeas(galaxySeed, ctx.bodies);
+  if (gen >= 5) addContinents(galaxySeed, ctx.bodies);
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(outermost * 1.5, hz * 0.8, 0.06), frostLineAU: frost };
 }
 
@@ -638,6 +642,26 @@ export function exoticSea(b: Body): SeaKind | undefined {
   if (p >= 0.3 && t > -100 && t <= -35) return "ammonia";
   if (b.chemistry === "corrosive" && p >= 1 && t >= 100 && t <= 330) return "acid";
   return undefined;
+}
+
+/**
+ * Generation 5's pass (AW-210): terrestrial worlds get continents and oceans instead of one landmass
+ * pocked with lakes. Each picks how much of its surface is sea: a quarter are dry worlds with inland
+ * seas, half are continental, a quarter mostly ocean. Home-system garden worlds keep their gentle
+ * ground, and exotic-sea worlds keep their lowland seas. Draws only from its own stream per body.
+ */
+function addContinents(galaxySeed: number, bodies: Body[]): void {
+  for (const b of bodies) {
+    if (b.kind !== "terrestrial" || b.easy || b.sea) continue;
+    const rng = rngFor(galaxySeed, b.id, "continents");
+    const style = rng.weighted([
+      ["dry", 25],
+      ["continental", 50],
+      ["wet", 25],
+    ] as const);
+    const [lo, hi] = style === "dry" ? [0.12, 0.3] : style === "continental" ? [0.35, 0.6] : [0.6, 0.78];
+    b.waterShare = Math.round(rng.range(lo, hi) * 100) / 100;
+  }
 }
 
 /**

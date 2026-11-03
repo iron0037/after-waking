@@ -433,6 +433,15 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
   - **New gear:** a **Cryogenic hull** (Lyceum, 30k, lands down to −240 °C) and **Cryo floats Mk II** (Midshipmen, 26k, after the cryo floats) for the boat.
   - **How common** (8 seeds, about 1,240 landable bodies): methane 30 (was 5), nitrogen 4, ammonia 23, acid 39.
 
+## Continents (AW-210), world generation 5 **[DECIDED 2026-11-02]**
+- **Before:** terrestrial worlds were one landmass with lakes (sea line 0.32 on small-scale noise), and ocean worlds three-quarters sea in island chains. Nothing worked at continent scale.
+- **Now:** new games' terrestrial worlds (not home gardens, not exotic-sea worlds) each pick a sea share: a quarter dry (12–30%), half continental (35–60%), a quarter mostly ocean (60–78%).
+- **How:** height mixes 40% local relief with 60% of a planet-scale field (feature size about a fifth of the planet's width). The sea line is set by a quantile table, so the share comes out close to the pick. Stored elevation is shifted so the sea line stays at 0.32, where the renderer expects it.
+- **Seams and plants** stay ashore, preferring ground the rover can reach from the landing. Open-sea regions refuse a landing, as on ocean worlds, and are never the default pick.
+- **Maps:** the region chart and planet disc draw these worlds' real coastlines (`continentalLevel`). Other worlds still use decorative noise.
+- **Old saves:** generation 4 or earlier is untouched.
+- **Career report:** competent captains about −5% per trip late on. Novices about −15% per trip but end with the same credits (204k vs 207k), 0/6 broke.
+
 ## Clan Relations (AW-22) **[DECIDED 2026-10-31]**
 - **Standing.** Every clan rates you from −100 to +100 (`src/sim/reputation.ts`). The tiers:
 

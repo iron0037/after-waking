@@ -10,7 +10,7 @@ import { climateOf, FLORA } from "../data/catalog";
 import type { Body } from "./bodies";
 import { generateGalaxy, INTREPID_POS, type Galaxy } from "./galaxy";
 import { hashSeed, rngFor, type Rng } from "./rng";
-import { disk, hexDistance, hexWorldPos, ring } from "./hex";
+import { disk, hexDistance, hexWorldPos, neighbors, ring } from "./hex";
 import { clamp, dist, type Vec2 } from "./units";
 
 export const REGION_SIZE = 48;
@@ -430,6 +430,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   const noiseSeed = hashSeed(seed, body.id, "terrain");
   const seaSeed = hashSeed(seed, body.id, "sea");
   const ruggedness = 0.15 * body.tectonics + (body.kind === "asteroid" ? 0.3 : 0);
+  // Continental worlds (AW-210): a planet-scale field shapes continents and ocean basins.
+  const cont = continentParams(seed, body);
 
   const elevation = new Float32Array(w * h);
   const terrain = new Uint8Array(w * h);
@@ -442,6 +444,13 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       // Sea level drifts slowly across the planet: wetter basins, drier highlands.
       const seaLevel = (fbm(seaSeed, p.x / 140, p.y / 140, 2) - 0.5) * 0.3;
       const i = y * w + x;
+      if (cont) {
+        // Shifted so the sea line sits where a terrestrial world's usually does: the map's shading reads it there.
+        const es = contHeight(cont, e, p);
+        elevation[i] = es;
+        terrain[i] = classifyContinental(body, e, es, rough, seaLevel * 0.3, ruggedness);
+        continue;
+      }
       elevation[i] = e;
       terrain[i] = classify(body, e, rough, seaLevel, ruggedness);
     }
@@ -449,13 +458,16 @@ export function generateRegion(seed: number, body: Body, region: number): Region
 
   const landing = findLanding(terrain, w, h);
   const placeRng = rngFor(seed, body.id, region, "placement");
+  // On continental worlds, sites prefer ground the rover can drive to from the landing (not across a strait).
+  const reach = cont ? reachableFrom(terrain, w, h, landing) : null;
   const rolled = rawRegionDeposits(seed, body, region);
   const placed: Deposit[] = rolled.map((spec) => {
     for (let tries = 0; tries < 200; tries++) {
       const x = placeRng.int(1, w - 2);
       const y = placeRng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
-      // On ocean worlds most seams lie under the sea, for the boat to dredge.
+      if (reach && tries < 150 && !reach[y * w + x]) continue;
+      // On ocean worlds most seams lie under the sea, for the boat to dredge. (Continental worlds keep theirs ashore.)
       if (TERRAIN_INFO[t].passable === "no" && !(body.kind === "ocean" && t === Terrain.liquid)) continue;
       if (hexDistance({ x, y }, landing) < 4) continue;
       return { ...spec, x, y };
@@ -471,6 +483,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       const x = placeRng.int(1, w - 2);
       const y = placeRng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
+      if (reach && tries < 150 && !reach[y * w + x]) continue;
       if (TERRAIN_INFO[t].passable !== "yes") continue;
       if (hexDistance({ x, y }, landing) < 3) continue;
       return { ...spec, x, y };
@@ -522,6 +535,106 @@ function classify(body: Body, e: number, rough: number, seaLevel: number, rugged
   if (e > mountainLine) return Terrain.mountain;
   if (body.kind === "ice") return e > roughLine || rough > 0.72 ? Terrain.rough : Terrain.ice;
   if (e > roughLine || rough > 0.7 - ruggedness * 0.2) return Terrain.rough;
+  return Terrain.plain;
+}
+
+/** Elevation below which a terrestrial world is sea (before the slow drift across the planet). */
+export const TERRESTRIAL_SEA_LEVEL = 0.32;
+/** How much of a continental world's height is local relief; the rest is the continent field. */
+const CONT_LOCAL = 0.4;
+
+let contTable: Float32Array | null = null;
+/**
+ * The height below which this share of a continental world lies, read off a table sampled once from
+ * the same noise mix (every seed's noise has the same spread, so one table serves all).
+ */
+export function continentalQuantile(share: number): number {
+  if (!contTable) {
+    const rng = rngFor(1, "continent-table");
+    const n = 4096;
+    const t = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = rng.range(0, 200_000);
+      const y = rng.range(0, 200_000);
+      t[i] = CONT_LOCAL * fbm(17, x / 14, y / 14, 4) + (1 - CONT_LOCAL) * fbm(91, x / 100, y / 100, 3);
+    }
+    contTable = t.sort();
+  }
+  const i = Math.max(0, Math.min(contTable.length - 1, Math.floor(share * contTable.length)));
+  return contTable[i] as number;
+}
+
+interface ContinentParams {
+  seed: number;
+  scale: number;
+  shift: number;
+}
+
+/** A continental world's field settings, or null for every other world. */
+function continentParams(seed: number, body: Body): ContinentParams | null {
+  if (body.waterShare === undefined) return null;
+  return {
+    seed: hashSeed(seed, body.id, "continents"),
+    scale: Math.max(50, Math.min(140, surfaceLayout(body).width / 5)),
+    shift: TERRESTRIAL_SEA_LEVEL - continentalQuantile(body.waterShare),
+  };
+}
+
+function contHeight(c: ContinentParams, local: number, p: Vec2): number {
+  return CONT_LOCAL * local + (1 - CONT_LOCAL) * fbm(c.seed, p.x / c.scale, p.y / c.scale, 3) + c.shift;
+}
+
+/**
+ * How high a continental world stands at planet tile (gx, gy), relative to its sea: positive is land,
+ * negative sea. Null for other worlds. Cheap enough to sample for a map or a region check (AW-210).
+ */
+export function continentalLevel(seed: number, body: Body, gx: number, gy: number): number | null {
+  const c = continentParams(seed, body);
+  if (!c) return null;
+  const p = hexWorldPos(Math.round(gx), Math.round(gy));
+  const e = fbm(hashSeed(seed, body.id, "terrain"), p.x / 14, p.y / 14, 4);
+  const drift = (fbm(hashSeed(seed, body.id, "sea"), p.x / 140, p.y / 140, 2) - 0.5) * 0.3 * 0.3;
+  return contHeight(c, e, p) - (TERRESTRIAL_SEA_LEVEL + drift);
+}
+
+/** Share of a region that's dry land, sampled on an 8×8 grid: 1 for worlds without continents. */
+export function regionLandShare(seed: number, body: Body, region: number): number {
+  if (body.waterShare === undefined) return 1;
+  const o = regionOrigin(surfaceLayout(body), region);
+  let land = 0;
+  for (let j = 0; j < 8; j++) {
+    for (let i = 0; i < 8; i++) {
+      const level = continentalLevel(seed, body, o.x + 3 + i * 6, o.y + 3 + j * 6) as number;
+      if (level >= 0) land++;
+    }
+  }
+  return land / 64;
+}
+
+/** Tiles a rover could reach from `start` without crossing impassable ground. */
+function reachableFrom(terrain: Uint8Array, w: number, h: number, start: Vec2): Uint8Array {
+  const seen = new Uint8Array(w * h);
+  const queue: Vec2[] = [start];
+  seen[start.y * w + start.x] = 1;
+  while (queue.length > 0) {
+    const cur = queue.pop() as Vec2;
+    for (const n of neighbors(cur.x, cur.y)) {
+      if (n.x < 0 || n.y < 0 || n.x >= w || n.y >= h) continue;
+      const i = n.y * w + n.x;
+      if (seen[i] || TERRAIN_INFO[terrain[i] as Terrain].passable === "no") continue;
+      seen[i] = 1;
+      queue.push(n);
+    }
+  }
+  return seen;
+}
+
+/** Terrain on a continental world: sea by the continent-shaped height, land kinds by local relief. */
+function classifyContinental(body: Body, e: number, es: number, rough: number, drift: number, ruggedness: number): Terrain {
+  if (es < TERRESTRIAL_SEA_LEVEL + drift) return body.tempC < -10 ? Terrain.ice : Terrain.liquid;
+  const coast = es < TERRESTRIAL_SEA_LEVEL + 0.04;
+  if (!coast && e > 0.78 - ruggedness * 0.15) return Terrain.mountain;
+  if (e > 0.62 - ruggedness * 0.1 || rough > 0.7 - ruggedness * 0.2) return Terrain.rough;
   return Terrain.plain;
 }
 

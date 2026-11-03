@@ -5,7 +5,7 @@
  * Everything is stable per body: noise is seeded from the game seed and the body id.
  */
 import { SEAS } from "../../../data/seas";
-import { fbm, hashSeed, type Body } from "../../../sim";
+import { continentalLevel, fbm, hashSeed, surfaceLayout, type Body } from "../../../sim";
 import { BODY_COLOR, TERRAIN_COLORS } from "../../palette";
 import { hexRgb } from "./util";
 
@@ -61,6 +61,8 @@ function stream(seed: number): () => number {
 
 interface Ctx {
   body: Body;
+  /** Continental worlds (AW-210) draw their real coastlines: the galaxy seed and the surface's size in tiles. */
+  cont: { seed: number; w: number; h: number } | null;
   oct: number;
   big: boolean;
   /** Noise seeds, offsets and palette, fixed per body. */
@@ -92,8 +94,10 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
   const sea = liquidWorld ? 1.05 : body.sea ? 0.44 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
   const capLat = body.tempC > 45 ? 9 : Math.max(0.3, Math.min(1.42, 1.45 - (15 - body.tempC) * 0.025));
   const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
+  const layout = surfaceLayout(body);
   return {
     body,
+    cont: body.waterShare !== undefined ? { seed, w: layout.width, h: layout.height } : null,
     oct: size >= 128 ? 5 : size >= 64 ? 4 : 3,
     big: size >= 96,
     n: { elev: h("elev"), mott: h("mott"), cap: h("cap"), cloud: h("cloud"), ridge: h("ridge"), warp: h("warp"), fine: h("fine") },
@@ -148,7 +152,14 @@ function rockyColor(c: Ctx, lon: number, lat: number, clouds = true): RGB {
   const { body, n } = c;
   const u = lon + c.ox;
   const v = lat + c.oy;
-  const e = fbm(n.elev, u * 1.15, v * 1.15, c.oct);
+  let e = fbm(n.elev, u * 1.15, v * 1.15, c.oct);
+  if (c.cont) {
+    // The sim's own land and sea, unrolled the same way as the region chart (longitude across, latitude down).
+    const gx = (lon / (Math.PI * 2) + 0.5) * c.cont.w;
+    const gy = (0.5 - lat / Math.PI) * c.cont.h;
+    const level = continentalLevel(c.cont.seed, body, Math.max(0, Math.min(c.cont.w - 1, gx)), Math.max(0, Math.min(c.cont.h - 1, gy)));
+    if (level !== null) e = c.sea + level * 1.2;
+  }
   const m = fbm(n.mott, u * 2.6, v * 2.6, 3);
   let col: RGB;
 
