@@ -20,6 +20,8 @@ import {
   World,
   type GameState,
   type UniverseSettings,
+  systemsNeeded,
+  requirementProgress,
 } from "../src/sim";
 import { DAY } from "../src/sim/units";
 
@@ -159,5 +161,18 @@ describe("people settings (AW-205)", () => {
       const notices = s.crew!.filter((m) => m.noticeAt !== undefined).length;
       expect(notices > 0).toBe(turnover);
     }
+  });
+});
+
+describe("research scales with the Verge (AW-222)", () => {
+  it("'visit N systems' follows the star count, leaving two to spare", () => {
+    const at = (stars: 16 | 22 | 30 | 40) => ({ seed: universeSeed(42, { ...DEFAULT_UNIVERSE, stars }) });
+    expect(systemsNeeded(at(22), 20)).toBe(20);
+    expect(systemsNeeded(at(16), 20)).toBe(14);
+    expect(systemsNeeded(at(30), 20)).toBe(27);
+    expect(systemsNeeded(at(40), 20)).toBe(36);
+    expect(systemsNeeded(at(16), 6)).toBe(4);
+    const s = newGame({ seed: 42, universe: { ...DEFAULT_UNIVERSE, stars: 16 } });
+    expect(requirementProgress(s, { kind: "systems", count: 20 }).need).toBe(14);
   });
 });

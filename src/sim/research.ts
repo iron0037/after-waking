@@ -16,6 +16,7 @@ import { removeCargo } from "./ship";
 import type { GameState } from "./state";
 import { formatDuration } from "./time";
 import { DAY } from "./units";
+import { DEFAULT_UNIVERSE, universeOf } from "./settings";
 
 export interface ResearchRecord {
   startedAt: number;
@@ -40,6 +41,15 @@ export interface RequirementProgress {
 
 const isOre = (id: CommodityId) => (ORE_IDS as readonly string[]).includes(id);
 
+/**
+ * "Visit N systems" is written for the default 22-star Verge: scale it to this career's star count (AW-222), and never
+ * ask for more than all but two of them, so one hard-to-reach star can't block a project.
+ */
+export function systemsNeeded(state: Pick<GameState, "seed">, count: number): number {
+  const stars = universeOf(state.seed).stars;
+  return Math.max(1, Math.min(stars - 2, Math.round((count * stars) / DEFAULT_UNIVERSE.stars)));
+}
+
 export function requirementProgress(state: GameState, req: Requirement): RequirementProgress {
   const of = (have: number, need: number, label: string): RequirementProgress => ({ have, need, met: have >= need - 0.05, label });
   switch (req.kind) {
@@ -61,7 +71,8 @@ export function requirementProgress(state: GameState, req: Requirement): Require
     }
     case "systems": {
       const have = state.visitedSystems.length;
-      return of(have, req.count, `charts from ${req.count} star systems (${have} visited)`);
+      const need = systemsNeeded(state, req.count);
+      return of(have, need, `charts from ${need} star systems (${have} visited)`);
     }
     case "specimens": {
       const have = matchingSpecimens(state, req).reduce((n, [, c]) => n + c, 0);
