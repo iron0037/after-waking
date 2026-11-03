@@ -10,7 +10,9 @@
     "ore": "pixel art, museum specimen card illustration of a single chunk of raw ore: {subject}, rough rock chunk centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
     "gem": "pixel art, museum specimen card illustration of a single hand-sized mineral specimen: {subject}, centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
     "flora_wild": "pixel art, field guide specimen illustration of a single wild alien plant growing straight out of a small patch of bare dark soil, no pot, no container: {subject}, whole plant centered, three-quarter view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
-    "sea_wild": "pixel art, field guide specimen illustration of a single alien sea organism: {subject}, centered, side view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>"
+    "sea_wild": "pixel art, field guide specimen illustration of a single alien sea organism: {subject}, centered, side view, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "creature": "pixel art, field guide specimen illustration of a single alien animal creature: {subject}, whole body centered, side view, full figure, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>",
+    "sea_creature": "pixel art, field guide specimen illustration of a single alien sea creature: {subject}, whole body centered, side view, swimming, limited palette, crisp clean pixels, {bg}, <lora:pixel-art-xl-v1.1:1>"
   },
   "entries": [
     {
@@ -348,6 +350,141 @@
       "key": "gem:folded-plicite",
       "kind": "gem",
       "subject": "light pink crystal whose lattice folds back through itself, impossible geometry, glowing"
+    },
+    {
+      "key": "fauna:frost-burrower",
+      "kind": "creature",
+      "subject": "fat round furry burrowing animal with pale blue-white fur, tiny eyes, big digging claws"
+    },
+    {
+      "key": "fauna:snowshell",
+      "kind": "creature",
+      "subject": "large slow grazing animal with a smooth white domed shell, stubby legs, small head"
+    },
+    {
+      "key": "fauna:rime-skitter",
+      "kind": "creature",
+      "subject": "small six-legged insect-like animal with a glassy pale blue shell and thin legs"
+    },
+    {
+      "key": "fauna:ice-prowler",
+      "kind": "creature",
+      "subject": "pale grey long-limbed predator beast, lean, hunched, glowing eyes, sharp claws"
+    },
+    {
+      "key": "fauna:aurora-wisp",
+      "kind": "floating",
+      "subject": "glowing translucent jellyfish-like membrane creature with no legs, trailing ribbon tendrils, shimmering green and violet aurora light"
+    },
+    {
+      "key": "fauna:glimmerhare",
+      "kind": "creature",
+      "subject": "small long-eared hare-like alien animal with iridescent golden fur"
+    },
+    {
+      "key": "fauna:bramble-grazer",
+      "kind": "creature",
+      "subject": "hulking placid four-legged grazer with a back covered in green bramble-like hedge growth"
+    },
+    {
+      "key": "fauna:pod-hopper",
+      "kind": "creature",
+      "subject": "small green creature balancing on one powerful hopping leg, with a puffed throat sac full of seed pods"
+    },
+    {
+      "key": "fauna:thornjaw",
+      "kind": "creature",
+      "subject": "small stocky brown beast with a wide jaw full of thorny teeth and spiky back"
+    },
+    {
+      "key": "fauna:chime-moth",
+      "kind": "creature",
+      "subject": "large moth with thin glass-like lavender wings"
+    },
+    {
+      "key": "fauna:ridgeback-stalker",
+      "kind": "creature",
+      "subject": "low dark brown armoured predator with plated ridged back, long tail, crouching to stalk"
+    },
+    {
+      "key": "fauna:veil-strider",
+      "kind": "creature",
+      "subject": "tall stilt-legged nearly transparent pale creature with very long thin legs and small body"
+    },
+    {
+      "key": "fauna:dune-skimmer",
+      "kind": "creature",
+      "subject": "flat round plate-shaped sand-coloured creature with a fringe of tiny legs, skimming"
+    },
+    {
+      "key": "fauna:sunback-lumberer",
+      "kind": "creature",
+      "subject": "huge slow orange lizard-like beast with a tall skin sail on its back"
+    },
+    {
+      "key": "fauna:cinder-swarm",
+      "kind": "creature",
+      "subject": "swarm of small glowing orange-red beetles clustered into a ball"
+    },
+    {
+      "key": "fauna:glass-scorpid",
+      "kind": "creature",
+      "subject": "scorpion-like creature with a clear glassy shell and raised stinger tail"
+    },
+    {
+      "key": "fauna:mirage-stilt",
+      "kind": "creature",
+      "subject": "very tall thin wading creature with long neck and long legs, pale sand and cream colours"
+    },
+    {
+      "key": "fauna:dust-drake",
+      "kind": "creature",
+      "subject": "long armoured rust-red reptilian hunter with dust trailing off its plates, fierce"
+    },
+    {
+      "key": "fauna:lantern-eel",
+      "kind": "sea_creature",
+      "subject": "slow glowing teal eel with a luminous lantern lure"
+    },
+    {
+      "key": "fauna:glassfin-shoal",
+      "kind": "sea_creature",
+      "subject": "tight shoal of small clear glassy fish"
+    },
+    {
+      "key": "fauna:reef-roller",
+      "kind": "sea_creature",
+      "subject": "large round spiny ball-shaped sea creature in coral pink"
+    },
+    {
+      "key": "fauna:maw-ray",
+      "kind": "sea_creature",
+      "subject": "broad dark blue-grey manta ray with a huge open toothy mouth"
+    },
+    {
+      "key": "fauna:deepmaw",
+      "kind": "sea_creature",
+      "subject": "enormous dark deep-sea monster fish with a gaping jaw and tiny glowing eyes"
+    },
+    {
+      "key": "fauna:shriek-pack",
+      "kind": "creature",
+      "subject": "lean red pack-hunting beast with an open screaming mouth, wiry and fast"
+    },
+    {
+      "key": "fauna:blight-mantis",
+      "kind": "creature",
+      "subject": "towering sickly green mantis-like predator with huge bladed forelimbs"
+    },
+    {
+      "key": "fauna:razorback-ravager",
+      "kind": "creature",
+      "subject": "massive charging beast with bone plates and a ridge of blades along its back, dark purple-grey"
+    },
+    {
+      "key": "fauna:hollow-king",
+      "kind": "creature",
+      "subject": "colossal dark apex predator with a hollow skull-like head, black and violet, menacing"
     }
   ],
   "negative_wild": "flower pot, potted plant, vase, planter, container, bowl, jar, stone ring, well",

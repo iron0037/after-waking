@@ -113,9 +113,19 @@ def main() -> None:
     rows = math.ceil(len(keys) / cols)
     atlas = Image.new("RGBA", (cols * CELL, rows * CELL), (0, 0, 0, 0))
     index: dict[str, list[int]] = {}
+    # Sprites whose raw candidate is no longer on disk are carried over from the current atlas.
+    old_index = json.loads((PUBLIC / "index.json").read_text()) if (PUBLIC / "index.json").exists() else None
+    old_atlas = Image.open(PUBLIC / "atlas.webp").convert("RGBA") if old_index and (PUBLIC / "atlas.webp").exists() else None
     for i, key in enumerate(keys):
         f = raw / f"{key.replace(':', '_')}__{picks[key]}.png"
-        cell = sprite(Image.open(f), tol.get(key, 34.0))
+        if f.exists():
+            cell = sprite(Image.open(f), tol.get(key, 34.0))
+        elif old_atlas is not None and key in old_index["sprites"]:
+            c, r = old_index["sprites"][key]
+            oc = old_index["cell"]
+            cell = old_atlas.crop((c * oc, r * oc, (c + 1) * oc, (r + 1) * oc))
+        else:
+            raise SystemExit(f"no raw image or existing sprite for {key} ({f})")
         atlas.paste(cell, ((i % cols) * CELL, (i // cols) * CELL))
         index[key] = [i % cols, i // cols]
     PUBLIC.mkdir(parents=True, exist_ok=True)

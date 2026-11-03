@@ -2,7 +2,7 @@
  "cell": 64,
  "cols": 11,
  "width": 704,
- "height": 384,
+ "height": 576,
  "sprites": {
   "flora:frost-lantern": [
    0,
@@ -267,6 +267,114 @@
   "gem:folded-plicite": [
    10,
    5
+  ],
+  "fauna:frost-burrower": [
+   0,
+   6
+  ],
+  "fauna:snowshell": [
+   1,
+   6
+  ],
+  "fauna:rime-skitter": [
+   2,
+   6
+  ],
+  "fauna:ice-prowler": [
+   3,
+   6
+  ],
+  "fauna:aurora-wisp": [
+   4,
+   6
+  ],
+  "fauna:glimmerhare": [
+   5,
+   6
+  ],
+  "fauna:bramble-grazer": [
+   6,
+   6
+  ],
+  "fauna:pod-hopper": [
+   7,
+   6
+  ],
+  "fauna:thornjaw": [
+   8,
+   6
+  ],
+  "fauna:chime-moth": [
+   9,
+   6
+  ],
+  "fauna:ridgeback-stalker": [
+   10,
+   6
+  ],
+  "fauna:veil-strider": [
+   0,
+   7
+  ],
+  "fauna:dune-skimmer": [
+   1,
+   7
+  ],
+  "fauna:sunback-lumberer": [
+   2,
+   7
+  ],
+  "fauna:cinder-swarm": [
+   3,
+   7
+  ],
+  "fauna:glass-scorpid": [
+   4,
+   7
+  ],
+  "fauna:mirage-stilt": [
+   5,
+   7
+  ],
+  "fauna:dust-drake": [
+   6,
+   7
+  ],
+  "fauna:lantern-eel": [
+   7,
+   7
+  ],
+  "fauna:glassfin-shoal": [
+   8,
+   7
+  ],
+  "fauna:reef-roller": [
+   9,
+   7
+  ],
+  "fauna:maw-ray": [
+   10,
+   7
+  ],
+  "fauna:deepmaw": [
+   0,
+   8
+  ],
+  "fauna:shriek-pack": [
+   1,
+   8
+  ],
+  "fauna:blight-mantis": [
+   2,
+   8
+  ],
+  "fauna:razorback-ravager": [
+   3,
+   8
+  ],
+  "fauna:hollow-king": [
+   4,
+   8
   ]
  }
 }

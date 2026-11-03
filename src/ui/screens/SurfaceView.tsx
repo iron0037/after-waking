@@ -855,11 +855,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
     const peaks = new Set(depMarks.filter(({ d }) => mountainBlocker(state, session.world, loc.bodyId, d)).map(({ d }) => d.key));
     drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM, peaks);
-    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, x: c.x, y: c.y, color: c.entry.color, size: c.entry.size, hunter: isHunter(c.entry), down: c.down }));
+    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, species: c.entry.id, x: c.x, y: c.y, color: c.entry.color, size: c.entry.size, hunter: isHunter(c.entry), down: c.down }));
     if (fight && fx) {
       const entry = CREATURES_BY_ID.get(fight.report.species);
       const i = creatureMarks.findIndex((m) => m.key === fight.report.key);
-      const mark: CreatureMark = { key: fight.report.key, x: fx.creature.x, y: fx.creature.y, color: entry?.color ?? "#ccc", size: entry?.size ?? 1, hunter: !!entry && isHunter(entry), down: false };
+      const mark: CreatureMark = { key: fight.report.key, species: fight.report.species, x: fx.creature.x, y: fx.creature.y, color: entry?.color ?? "#ccc", size: entry?.size ?? 1, hunter: !!entry && isHunter(entry), down: false };
       if (i >= 0) creatureMarks[i] = mark;
       else creatureMarks.push(mark);
     }

@@ -25,6 +25,7 @@ import {
 } from "../../../sim";
 import { RARITY_COLOR, UI } from "../../palette";
 import { HEX, hexPath, type RegionImage } from "./terrainImage";
+import { atlasSprite } from "../../compendiumSprites";
 
 const FONT = '"Cascadia Mono", "JetBrains Mono", Consolas, "Courier New", monospace';
 const MARGIN_X = 14;
@@ -1129,6 +1130,8 @@ export function drawTooltip(ctx: CanvasRenderingContext2D, w: number, h: number,
 
 export interface CreatureMark {
   key: string;
+  /** CreatureEntry id, for its sprite. */
+  species: string;
   x: number;
   y: number;
   color: string;
@@ -1154,15 +1157,30 @@ export function drawCreatures(ctx: CanvasRenderingContext2D, L: Layout, marks: r
     ctx.beginPath();
     ctx.ellipse(x + r * 0.15, y + r * 0.35, r * 0.95, r * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
+    // The compendium's pixel portrait when the atlas has it (AW-218); a downed one lies on its side.
+    const sprite = r >= 5 ? atlasSprite(`fauna:${m.species}`) : null;
+    if (sprite) {
+      const d = r * 2.7;
+      const prev = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      ctx.save();
+      ctx.translate(x, y + bob);
+      if (m.down) ctx.rotate(Math.PI / 2);
+      ctx.drawImage(sprite.img, sprite.sx, sprite.sy, sprite.size, sprite.size, -d / 2, -d / 2, d, d);
+      ctx.restore();
+      ctx.imageSmoothingEnabled = prev;
+    }
     ctx.fillStyle = m.color;
     ctx.strokeStyle = "rgba(10, 12, 20, 0.9)";
     ctx.lineWidth = Math.max(1, r * 0.18);
-    ctx.beginPath();
-    ctx.ellipse(x, y + bob, r, r * 0.8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // Eyes, so it reads as an animal and not a marker.
-    if (r >= 5 && !m.down) {
+    if (!sprite) {
+      ctx.beginPath();
+      ctx.ellipse(x, y + bob, r, r * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Eyes, so a plain blob reads as an animal and not a marker.
+    if (!sprite && r >= 5 && !m.down) {
       ctx.fillStyle = m.hunter ? "#ff5050" : "#10131c";
       ctx.beginPath();
       ctx.arc(x - r * 0.3, y + bob - r * 0.2, r * 0.13, 0, Math.PI * 2);

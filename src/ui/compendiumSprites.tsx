@@ -29,6 +29,14 @@ const SILHOUETTE = [0x26, 0x32, 0x4d] as const;
 
 let loaded: SpriteIndex | null = null;
 let pending: Promise<SpriteIndex | null> | null = null;
+let atlasImg: HTMLImageElement | null = null;
+
+/** A compendium sprite for drawing on a canvas (the surface map's creatures, AW-218); null until the atlas is in. */
+export function atlasSprite(entryKey: string): { img: HTMLImageElement; sx: number; sy: number; size: number } | null {
+  const cell = loaded?.sprites[entryKey];
+  if (!loaded || !cell || !atlasImg) return null;
+  return { img: atlasImg, sx: cell[0] * loaded.cell, sy: cell[1] * loaded.cell, size: loaded.cell };
+}
 
 /** The atlas with every visible pixel painted the silhouette colour (alpha kept): one plain image instead of a CSS mask per card. */
 async function makeSilhouettes(img: HTMLImageElement): Promise<string | null> {
@@ -71,6 +79,7 @@ export function preloadSprites(): Promise<SpriteIndex | null> {
         ]);
         if (!res.ok) return null;
         const index = (await res.json()) as Omit<SpriteIndex, "silhouettes">;
+        atlasImg = img;
         loaded = { ...index, silhouettes: await makeSilhouettes(img) };
         return loaded;
       } catch {
