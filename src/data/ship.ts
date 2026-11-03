@@ -138,6 +138,8 @@ export interface Upgrade {
   price: number;
   description: string;
   apply: UpgradeEffect;
+  /** No longer sold (the reason); ships that already carry one keep it. */
+  retired?: string;
 }
 
 export const UPGRADES: readonly Upgrade[] = [
@@ -349,6 +351,9 @@ export const UPGRADES: readonly Upgrade[] = [
     apply: (s) => {
       s.refineryRateTph = Math.max(s.refineryRateTph, 4);
     },
+    // AW-213: refining in the field was busywork that chased its own tail (each refine freed room for a little more
+    // ore). The code stays; the yard stops selling it.
+    retired: "The Diggers no longer fit portable refineries.",
   },
   {
     id: "liftCells",

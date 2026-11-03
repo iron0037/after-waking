@@ -18,6 +18,7 @@ import {
   roverMobility,
   routeEnergy,
   shipTile,
+  spareCellEnergy,
   stowRover,
   surfaceDeposit,
 } from "./actions";
@@ -153,7 +154,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey, maxTon
       const out = findPath(surface, r, deposit, mobility);
       const back = findPath(surface, deposit, dock() as { x: number; y: number }, mobility);
       if (!out || !back) return finish("unreachable", `The ${vehicle} has no route to that deposit and back.`);
-      if (energyOf(state, out) + energyOf(state, back) + ENERGY_MARGIN >= vehicleEnergyMax(state, vehicle)) {
+      // A fresh trip out carries the Long Shifts spare pack, if the crew has it.
+      if (energyOf(state, out) + energyOf(state, back) + ENERGY_MARGIN >= vehicleEnergyMax(state, vehicle) + spareCellEnergy(state, r)) {
         return finish("unreachable", "Too far for one charge there and back. Move the ship closer, or upgrade the rover's cells.");
       }
       const moved = moveRoverTo(state, world, deposit.x, deposit.y);
@@ -167,7 +169,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey, maxTon
 
     // Drill as long as the cells can still bring the rover home.
     const homePath = findPath(surface, rover(state) as RoverState, dock() as { x: number; y: number }, mobility);
-    const budget = ((rover(state) as RoverState).energy - energyOf(state, homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
+    const cells = (rover(state) as RoverState).energy + spareCellEnergy(state, rover(state) as RoverState);
+    const budget = (cells - energyOf(state, homePath) - ENERGY_MARGIN) / DRILL_ENERGY_PER_HOUR;
     const bedRoom = vehicleCargoT(state, vehicle) - cargoTonnes((rover(state) as RoverState).cargo);
     const loadCap = Math.min(bedRoom, holdRoom(), maxTonnes - (cargoTonnes(state.ship.cargo) - startHold) - cargoTonnes((rover(state) as RoverState).cargo));
     if (budget > 0.5 && loadCap > 0.5) {

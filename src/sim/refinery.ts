@@ -5,7 +5,7 @@
  */
 import { CONC_IDS, CONC_RATIO, CONC_SOURCE, COMMODITIES, type CommodityId, type ConcId, type OreId } from "../data/commodities";
 import { awardXp } from "./crew";
-import { effectiveStats, hasPerk } from "./perks";
+import { effectiveStats } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { addCargo, removeCargo } from "./ship";
 import { advanceTime, log, type GameState } from "./state";
@@ -29,8 +29,7 @@ export function isConcentrate(id: CommodityId): id is ConcId {
 /** Hours (on the clock, shifts included) to refine `tonnesOre` of ore. */
 export function refineHours(state: GameState, tonnesOre: number): number {
   const rate = effectiveStats(state).refineryRateTph;
-  // Field Refinery (engineering): the crew runs it 40% faster.
-  return rate > 0 ? (tonnesOre / rate) * REFINE_SHIFT_FACTOR * (hasPerk(state, "field-refinery") ? 0.6 : 1) : Infinity;
+  return rate > 0 ? (tonnesOre / rate) * REFINE_SHIFT_FACTOR : Infinity;
 }
 
 /** Why the refinery can't run on this ore right now (empty if it can). */

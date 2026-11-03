@@ -43,6 +43,8 @@ export interface RoverState {
   specimens?: Record<string, number>;
   /** Which vehicle this is (AW-17); absent means the rover. */
   vehicle?: "rover" | "boat";
+  /** Long Shifts (AW-213): the spare cell pack is aboard and still charged. */
+  spareCells?: boolean;
 }
 
 export type Location =

@@ -14,7 +14,7 @@ import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId }
 import { isConcentrate } from "./refinery";
 import { driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
 import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
-import { CLAN_NAMES, UPGRADES_BY_ID } from "../data/ship";
+import { CLAN_NAMES, UPGRADES, UPGRADES_BY_ID, type Upgrade } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
 import { burnPath } from "./burnpath";
 import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf, vehiclesOut } from "./vehicles";
@@ -723,9 +723,33 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   advanceTime(state, 15 + chargedHours * HOUR);
   state.ship.roverEnergy = full;
   const home = shipTile(state, world);
-  loc.rover = { x: home.x, y: home.y, energy: full, cargo: {} };
+  loc.rover = { x: home.x, y: home.y, energy: full, cargo: {}, ...(hasPerk(state, "long-shifts") ? { spareCells: true } : {}) };
   revealAround(state, world);
   return ok({ chargedHours });
+}
+
+/** Share of a full charge in the Long Shifts spare cell pack. */
+export const SPARE_CELLS_SHARE = 0.5;
+/** Minutes to swap the spare pack in. */
+const SPARE_SWAP_MINUTES = 20;
+
+/** Long Shifts (AW-213): the energy still waiting in the rover's spare cell pack, or 0 if it's used or not carried. */
+export function spareCellEnergy(state: GameState, rover: RoverState): number {
+  return rover.spareCells && vehicleOf(rover) === "rover" ? effectiveStats(state).roverEnergy * SPARE_CELLS_SHARE : 0;
+}
+
+/**
+ * Long Shifts: when a job needs more than the cells hold, the crew plugs in the spare pack (once per trip out)
+ * instead of driving home to recharge. No button: it happens when it's needed.
+ */
+function useSpareCells(state: GameState, rover: RoverState, need: number): void {
+  if (rover.energy >= need) return;
+  const spare = spareCellEnergy(state, rover);
+  if (spare <= 0) return;
+  rover.energy = Math.min(effectiveStats(state).roverEnergy, rover.energy + spare);
+  rover.spareCells = false;
+  advanceTime(state, SPARE_SWAP_MINUTES);
+  log(state, "info", "The rover crew plugged in the spare cell pack.");
 }
 
 /** How the rover gets around: climbing gear, and Ground Navigator's way with rough ground. */
@@ -769,6 +793,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   if (!path) return fail(boat ? "No open water route there." : "No route there for this rover.");
   let steps = 0;
   for (const step of path) {
+    useSpareCells(state, rover, step.energy * energyMult);
     if (rover.energy < step.energy * energyMult) {
       return ok({ steps, stopped: "Rover energy too low to continue." });
     }
@@ -945,6 +970,7 @@ export function prospect(state: GameState, world: World, key: SiteKey): Result<S
   const { d, know } = found.value;
   const { rover } = ctx.value;
   if (know.prospected.includes(d.id)) return ok(d);
+  useSpareCells(state, rover, PROSPECT_ENERGY);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
   advanceTime(state, PROSPECT_MINUTES * SHIFT_FACTOR * (hasPerk(state, "assayer") ? 0.5 : 1));
@@ -988,6 +1014,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   if (room <= 0.05) return fail(vehicleOf(rover) === "boat" ? "The boat's hold is full." : "The rover's cargo bed is full.");
 
   if (!know.drillSites.includes(d.id)) {
+    useSpareCells(state, rover, DRILL_SETUP_ENERGY);
     if (rover.energy < DRILL_SETUP_ENERGY) return fail("Not enough energy to set up the drill rig.");
     rover.energy -= DRILL_SETUP_ENERGY;
     advanceTime(state, DRILL_SETUP_MINUTES * SHIFT_FACTOR);
@@ -998,6 +1025,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   const rate = drillRate(state, d);
   // Rich Veins: more ore per tonne of seam worked.
   const yieldMult = hasPerk(state, "rich-veins") ? 1.1 : 1;
+  useSpareCells(state, rover, Math.min(remaining / rate, room / (rate * yieldMult), maxHours) * DRILL_ENERGY_PER_HOUR);
   let hours = Math.min(remaining / rate, room / (rate * yieldMult), maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
   if (hours <= 0.01) return fail("Not enough rover energy to run the drill.");
 
@@ -1134,6 +1162,7 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   if (hexDistance(site, rover) > 1) return fail(wet ? "Sail the boat next to it first." : "Drive the rover next to the plants first.");
   const slots = roverSpecimenSlots(state);
   if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
+  useSpareCells(state, rover, SAMPLE_ENERGY);
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;
   advanceTime(state, SAMPLE_MINUTES * SHIFT_FACTOR);
@@ -1212,6 +1241,8 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   const hours = (full - rover.energy) / roverChargePerHour(state);
   advanceTime(state, hours * HOUR);
   rover.energy = full;
+  // The spare pack charges alongside (Long Shifts).
+  if (vehicleOf(rover) === "rover" && hasPerk(state, "long-shifts")) rover.spareCells = true;
   return ok({ hours });
 }
 
@@ -1585,12 +1616,18 @@ export function rushRefit(state: GameState, days: number): Result<{ days: number
 /** Yard time to fit any upgrade. */
 export const UPGRADE_INSTALL_DAYS = 2;
 
+/** The gear the yard shows: everything still sold, plus retired gear this ship already carries. */
+export function yardUpgrades(state: GameState): readonly Upgrade[] {
+  return UPGRADES.filter((u) => !u.retired || state.ship.upgrades.includes(u.id));
+}
+
 export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
   const upgrade = UPGRADES_BY_ID.get(upgradeId);
   if (!upgrade) return fail("Unknown upgrade.");
   if (state.ship.upgrades.includes(upgradeId)) return fail("Already installed.");
+  if (upgrade.retired) return fail(upgrade.retired);
   // The top tier of each kind of gear waits on a research project (AW-15).
   const gate = researchFor(upgradeId);
   if (gate && !upgradeUnlocked(state, upgradeId)) return fail(`Needs research first: "${gate.name}" (${CLAN_NAMES[gate.clan]}).`);

@@ -174,7 +174,7 @@ Starflight's instant pickup is out. Exploring and extracting take time, and that
 1. **Prospect.** Rover sensors and core samples confirm a deposit's grade and depth.
 2. **Set up a drill site.** This takes hours. Drill rating limits depth and rock hardness (Diggers sell the best gear).
 3. **Extract.** This takes days. Yield per day depends on drill tier, crew skill and the deposit. Weather and hazard events can interrupt it.
-4. **Process, or haul raw.** *(v1 built, AW-18: the portable refinery turns 2.5 t of metal ore in the hold into 1 t of concentrate worth 10% more, about 4 t of ore per crew hour; concentrate prices follow their ore, and delivery contracts accept it.)*
+4. **Process, or haul raw.** *(v1 built, AW-18: the portable refinery turns 2.5 t of metal ore in the hold into 1 t of concentrate worth 10% more, about 4 t of ore per crew hour; concentrate prices follow their ore, and delivery contracts accept it.)* **[DECIDED, AW-213: retired from the yard.]** Refining in the field was busywork: refine, mine a little more into the freed room, refine again. Ships that already carry one keep it, and the code stays in `src/sim/refinery.ts`.
    - Raw ore is heavy and low-value per ton.
    - A portable refinery turns it into concentrate, which is lighter and more valuable, but takes extra days, power and a bay slot.
    - That makes it a cargo-versus-time-versus-equipment tradeoff.

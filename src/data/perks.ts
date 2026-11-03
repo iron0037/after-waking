@@ -96,7 +96,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["jury-rig", "Jury-Rig", "The first incident on each landing costs no time."],
       ["deep-bore", "Deep Bore", "The drill reaches 20% deeper."],
       ["rover-overhaul", "Rover Overhaul", "+25% rover cargo capacity."],
-      ["field-refinery", "Field Refinery", "The portable refinery runs 40% faster."],
+      ["long-shifts", "Long Shifts", "The rover carries a spare cell pack, half a charge: when the cells run low on a trip out, the crew plugs it in instead of coming home. It recharges with the rover."],
     ],
   ],
   comms: [

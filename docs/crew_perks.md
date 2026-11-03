@@ -46,7 +46,7 @@ Legend: ✅ works with today's systems · ⏳ needs a later system (named)
 | 2 | **Afterburner** ✅: +10% cruise speed | **Fast Charge** ✅: the rover charges twice as fast at the ship | **Jury-Rig** ✅: the first incident each expedition costs no time |
 | 3 | **Lift Rating** ✅: +0.2 g landing gravity rating | **Sensor Boost** ✅: +1 hex sensor sweep (supports Science) | **Deep Bore** ✅: drill reaches 20% deeper, so some "too deep" seams open up |
 | 4 | **Drive Repair** ✅: battle damage control fixes drives twice as fast; yard repairs take half the time (AW-198) | **Fire Control** ✅: in battle, weapons hit more often and 10% harder (AW-198) | **Rover Overhaul** ✅: +25% rover cargo capacity |
-| 5 | **Overdrive** ✅: breaking away in battle gives a 40% speed burst, with a 1-in-4 chance of straining the drives (AW-198) | **Shield Tuning** ✅: in battle, shields soak 15% more (AW-198) | **Field Refinery** ✅: the portable refinery runs 40% faster (AW-198) |
+| 5 | **Overdrive** ✅: breaking away in battle gives a 40% speed burst, with a 1-in-4 chance of straining the drives (AW-198) | **Shield Tuning** ✅: in battle, shields soak 15% more (AW-198) | **Long Shifts** ✅: the rover carries a spare cell pack (half a charge), plugged in automatically once per trip out instead of driving home; auto-explore and deposit runs plan with it (AW-213, from AW-182; replaced Field Refinery when the refinery left the yard) |
 
 ## Comms: Diplomacy · Signals · Linguistics
 

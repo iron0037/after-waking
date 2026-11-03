@@ -20,7 +20,6 @@ import {
   newGame,
   officerAt,
   readTheEnemy,
-  refineHours,
   relocateShip,
   repairQuote,
   reputation,
@@ -38,7 +37,7 @@ import type { Station } from "../src/data/crew";
 
 const ACTIVATED = [
   "field-theory", "evasive-pilot", "pursuit-course", "pinpoint-landing", "wake-masking", "drive-repair", "overdrive",
-  "fire-control", "shield-tuning", "field-refinery", "favors-owed", "early-warning", "clan-dialects", "bio-assay",
+  "fire-control", "shield-tuning", "favors-owed", "early-warning", "clan-dialects", "bio-assay",
   "living-archive", "silver-tongue", "read-the-enemy",
 ];
 
@@ -110,14 +109,6 @@ describe("activated perks (AW-198)", () => {
     state.time += DAY;
     tickContracts(state);
     expect(reputation(state, "helm")).toBeLessThan(before);
-  });
-
-  it("Field Refinery runs the refinery 40% faster", () => {
-    const state = newGame({ seed: 1 });
-    state.ship.upgrades.push("refinery");
-    const slow = refineHours(state, 50);
-    grant(state, "field-refinery");
-    expect(refineHours(state, 50)).toBeCloseTo(slow * 0.6, 5);
   });
 
   it("Living Archive speeds specimen research; Bio-Assay names the projects a species feeds", () => {

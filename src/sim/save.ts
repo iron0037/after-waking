@@ -62,6 +62,8 @@ export function deserialize(json: string): GameState {
   // Careers from before the new-game settings play by the old rules (AW-205).
   data.settings ??= { ...LEGACY_PEOPLE };
   ensureCrew(data);
+  // Field Refinery left with the refinery (AW-213): its point goes to Long Shifts, the perk in its place.
+  for (const m of [...(data.crew ?? []), ...(data.recruits ?? [])]) m.perks = m.perks?.map((p) => (p === "field-refinery" ? "long-shifts" : p));
   // Careers that ended before the specimen counter caught up (AW-204).
   if (data.ending) data.ending.report.specimens = Math.max(data.ending.report.specimens ?? 0, specimensCollected(data));
   // Goods added after a save was made start at normal prices.

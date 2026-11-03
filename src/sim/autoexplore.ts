@@ -9,7 +9,7 @@ import { hexDistance, neighbors } from "./hex";
 import { canEnter, stepCost } from "./pathfinding";
 import { fail, ok, type Result } from "./result";
 import { exploredFraction, isExplored, REGION_SIZE } from "./surface";
-import { knowledge, moveRoverTo, rechargeRover, routeEnergyMult, shipTile, vehicleMobility } from "./actions";
+import { knowledge, moveRoverTo, rechargeRover, routeEnergyMult, shipTile, spareCellEnergy, vehicleMobility } from "./actions";
 import { vehicleOf } from "./vehicles";
 import { log, type GameState } from "./state";
 import { DAY, type Vec2 } from "./units";
@@ -156,7 +156,8 @@ export function autoExplore(state: GameState, world: World): Result<AutoExploreR
       if (!inRegion(x, y) || isExplored(know, x - o.x, y - o.y)) continue;
       const back = homeCost.get(k);
       if (back === undefined) continue;
-      if (c + back * 1.1 + reserve > rover.energy) continue;
+      // Long Shifts: the spare pack counts as charge in hand.
+      if (c + back * 1.1 + reserve > rover.energy + spareCellEnergy(state, rover)) continue;
       if (c < bestCost) {
         bestCost = c;
         target = { x, y };

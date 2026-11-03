@@ -2,7 +2,7 @@
 import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
-import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked } from "../../sim";
+import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
@@ -925,7 +925,8 @@ function Shipyard({ session }: { session: GameSession }) {
   const stats = effectiveStats(state);
   const hw = shipStats(state.ship);
   const r = stats.ratings;
-  const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => UPGRADES.some((u) => u.category === c));
+  const offered = yardUpgrades(state);
+  const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => offered.some((u) => u.category === c));
   const queuedIds = new Set((state.yard ?? []).flatMap((j) => (j.kind === "install" && j.upgradeId ? [j.upgradeId] : [])));
 
   const repair = repairQuote(state);
@@ -1057,13 +1058,13 @@ function Shipyard({ session }: { session: GameSession }) {
           each) alongside refits and Lyceum courses; the ship can't fold out until the yard is done.
         </p>
         {categories.map((cat) => {
-          const inCat = UPGRADES.filter((u) => u.category === cat);
+          const inCat = offered.filter((u) => u.category === cat);
           const owned = inCat.filter((u) => state.ship.upgrades.includes(u.id)).length;
           const fitting = inCat.filter((u) => queuedIds.has(u.id)).length;
           return (
           <Section key={cat} id={`yard-${cat}`} title={UPGRADE_CATEGORY_NAMES[cat]} class="hub-vendor" summary={`${owned} of ${inCat.length} installed${fitting > 0 ? `, ${fitting} being fitted` : ""}`}>
             <div class="hub-cards">
-              {UPGRADES.filter((u) => u.category === cat).map((u) => {
+              {inCat.map((u) => {
                 const installed = state.ship.upgrades.includes(u.id);
                 const job = (state.yard ?? []).find((j) => j.kind === "install" && j.upgradeId === u.id);
                 const upkeepMult = clanMods(state).upkeep;
