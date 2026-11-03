@@ -285,11 +285,17 @@ export function drawRegionBorders(ctx: CanvasRenderingContext2D, L: Layout, regi
 
 let shipSurfaceImg: HTMLImageElement | null = null;
 
-/** The landed freighter seen from above (nose up); null if it is missing, broken or still loading. */
+/** Transparent margin around the hull in freighter-surface.png, made by tools/art/outline_freighter.py. */
+const SHIP_SPRITE_PAD = 2;
+
+/**
+ * The landed freighter seen from above (nose up), with a dark-and-amber outline and a see-through shadow so it
+ * stands out on grey rock (AW-212); null if it is missing, broken or still loading.
+ */
 function shipSurfaceSprite(): HTMLImageElement | null {
   if (!shipSurfaceImg && typeof Image !== "undefined") {
     shipSurfaceImg = new Image();
-    shipSurfaceImg.src = "./assets/freighter-landed.png";
+    shipSurfaceImg.src = "./assets/freighter-surface.png";
   }
   return shipSurfaceImg && shipSurfaceImg.complete && shipSurfaceImg.naturalWidth > 0 ? shipSurfaceImg : null;
 }
@@ -302,15 +308,12 @@ export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): vo
   ctx.setLineDash([]);
   const sprite = shipSurfaceSprite();
   if (sprite) {
-    // The longer side spans about two hexes: bigger than the rover, still clear of the hexes around it.
+    // The hull's longer side spans about two hexes: bigger than the rover, still clear of the hexes around it.
+    // The sprite carries its own shadow.
     const long = L.tw * 2;
-    const k = long / Math.max(sprite.naturalWidth, sprite.naturalHeight);
+    const k = long / (Math.max(sprite.naturalWidth, sprite.naturalHeight) - 2 * SHIP_SPRITE_PAD);
     const w = sprite.naturalWidth * k;
     const h = sprite.naturalHeight * k;
-    ctx.fillStyle = "rgba(5, 7, 15, 0.4)";
-    ctx.beginPath();
-    ctx.ellipse(x + L.tw * 0.08, y + L.tw * 0.12, w * 0.5, h * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
     const prev = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(sprite, x - w / 2, y - h / 2, w, h);
@@ -727,7 +730,7 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * A yellow beacon on the ship's hex so it can't be lost: a slowly pulsing outline (alpha and width), and, when the
+ * A yellow beacon on the ship so it can't be lost: a slowly pulsing ring around it (alpha and width), and, when the
  * map is zoomed out, a soft halo and ring sized in screen pixels so it shows even when the ship sprite is tiny.
  * With reduced motion, the pulse is replaced by a steady glow. Drawn under the ship sprite.
  */
@@ -755,11 +758,19 @@ export function drawShipBeacon(ctx: CanvasRenderingContext2D, L: Layout, at: Vec
     ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = `rgba(255, 214, 64, ${0.55 + pulse * 0.45})`;
-  ctx.lineWidth = 1.5 + pulse * 1.5 + far;
+  // Up close, a pad ring just outside the freighter (the sprite covers its own hex): dark under yellow, so it shows
+  // on pale rock and dark ground alike.
+  const ring = L.tw * 1.2 + pulse * L.tw * 0.06;
+  const alpha = 0.45 + pulse * 0.45;
+  ctx.lineWidth = 2.5 + pulse + far;
+  ctx.strokeStyle = `rgba(5, 7, 15, ${alpha * 0.7})`;
   ctx.beginPath();
-  tilePath(ctx, L, at, 0.5 + far);
+  ctx.arc(x, y, ring + 1.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1.5 + pulse + far;
+  ctx.strokeStyle = `rgba(255, 214, 64, ${alpha})`;
+  ctx.beginPath();
+  ctx.arc(x, y, ring, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
