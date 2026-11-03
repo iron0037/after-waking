@@ -17,7 +17,7 @@ function seaShare(w: World, bodyId: string, regions: number): number {
 
 describe("continents (AW-210)", () => {
   it("new games' terrestrial worlds pick a sea share, from dry to mostly ocean; older generations are untouched", () => {
-    expect(WORLD_GEN_LATEST).toBe(5);
+    expect(WORLD_GEN_LATEST).toBeGreaterThanOrEqual(5);
     const shares: number[] = [];
     for (const seed of [42, 7, 99, 3, 11, 2026, 5, 8]) {
       const w = new World(seed);

@@ -21,7 +21,7 @@ export class World {
     readonly seed: number,
     readonly gen: number = WORLD_GEN_LATEST,
   ) {
-    this.galaxy = generateGalaxy(seed);
+    this.galaxy = generateGalaxy(seed, undefined, gen);
   }
 
   system(systemId: string): SystemDetail {

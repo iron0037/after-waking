@@ -117,9 +117,10 @@ interface Ctx {
  * World generations. Saves remember which one built their universe, so a new generator never
  * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
  * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145). 3: exotic
- * seas (AW-189). 4: thick-air moons (AW-190). 5: continents on terrestrial worlds (AW-210).
+ * seas (AW-189). 4: thick-air moons (AW-190). 5: continents on terrestrial worlds (AW-210). 6: a bigger pool of
+ * star names (AW-223).
  */
-export const WORLD_GEN_LATEST = 5;
+export const WORLD_GEN_LATEST = 6;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
   if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);

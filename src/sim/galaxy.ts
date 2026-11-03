@@ -4,7 +4,7 @@
  * region is 3D, but a flat chart reads better, as Starflight's did).
  */
 import { chartedStars, universeOf } from "./settings";
-import { catalogName, STAR_NAMES } from "../data/names";
+import { catalogName, STAR_NAMES, STAR_NAMES_V2 } from "../data/names";
 import { rngFor, type Rng } from "./rng";
 import { dist, type Vec2 } from "./units";
 
@@ -79,7 +79,8 @@ export function galaxyOptionsFor(seed: number): GalaxyOptions {
   return { ...DEFAULT_GALAXY, count: stars, chartedCount: chartedStars(stars) };
 }
 
-export function generateGalaxy(seed: number, options: GalaxyOptions = galaxyOptionsFor(seed)): Galaxy {
+/** `gen`: the world generator (saves keep theirs); from 6 the charted stars draw on the bigger name pool. */
+export function generateGalaxy(seed: number, options: GalaxyOptions = galaxyOptionsFor(seed), gen = 1): Galaxy {
   const rng = rngFor(seed, "galaxy");
   const anchors: Vec2[] = [INTREPID_POS];
   const positions: Vec2[] = [];
@@ -99,7 +100,7 @@ export function generateGalaxy(seed: number, options: GalaxyOptions = galaxyOpti
 
   // Nearest stars get charted and named first.
   positions.sort((a, b) => dist(a, INTREPID_POS) - dist(b, INTREPID_POS));
-  const names = shuffled(rng, STAR_NAMES);
+  const names = shuffled(rng, gen >= 6 ? STAR_NAMES_V2 : STAR_NAMES);
 
   const systems = positions.map((pos, i): StarSystem => {
     const starRng = rngFor(seed, "star", i);
