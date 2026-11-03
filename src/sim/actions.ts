@@ -8,6 +8,7 @@ import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
+import { diggersLeadOnDocked } from "./leads";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
@@ -250,6 +251,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     retirementsOnDocked(state);
     helmOnDocked(state);
     covenantOnDocked(state);
+    diggersLeadOnDocked(state, world);
     notePrices(state);
     return ok(undefined);
   }

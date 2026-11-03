@@ -31,6 +31,7 @@ import { formatDate, GAME_START } from "./time";
 import { DAY, YEAR, type Vec2 } from "./units";
 import { World } from "./world";
 import { WORLD_GEN_LATEST } from "./bodies";
+import { grantDiggersLead } from "./leads";
 
 export const SAVE_VERSION = 1;
 
@@ -122,6 +123,8 @@ export interface GameState {
   yard?: YardJob[];
   /** Helm's Small Operators' Fund: trip scoring, assists given, obligations. */
   helm?: HelmRecord;
+  /** When a Digger captain last had a seam lead from their clan (AW-21). */
+  diggersLeadAt?: number;
   /** When the ship last docked at the Intrepid (long hauls wear on the crew). */
   lastDockedAt?: number;
   /** Share of each sale paid to the crew as bonuses, 0–0.2. */
@@ -471,6 +474,8 @@ function clanStart(state: GameState, world: World, clan: ClanId): void {
       .slice(0, 3);
     for (const sys of extra) for (const b of world.system(sys.id).bodies) if (!state.scannedBodies.includes(b.id)) state.scannedBodies.push(b.id);
   }
+  // The Diggers' first lead comes with the ship (AW-21).
+  if (clan === "diggers") grantDiggersLead(state, world);
   if (clan === "midshipmen") {
     // A seasoned Midshipman engineer, one of your own.
     const eng = (state.crew ?? []).find((m) => m.station === "engineering");

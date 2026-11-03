@@ -477,20 +477,20 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
 - **Drift.** Standing relaxes toward where it started by 15% a year, so one bad year isn't permanent.
 - **Seen in:** the Clans panel, standing tags on contract cards and Shipyard prices, and a journal line whenever a tier changes.
 
-## Starting Clan Perks **[PROPOSED: user's Exchange idea + matching perks]**
-Your starting clan shapes the early game. Every perk is small but felt, and each has a matching cost so no choice is free.
+## Starting Clan Perks **[DECIDED: built in AW-146, finished in AW-21]**
+Your starting clan shapes the early game. Every perk is small but felt, and each has a matching cost so no choice is free. The text lives in `src/data/clans.ts` (shown on the new-game screen); the numbers are `ClanMods`.
 
 | Clan | Perk | Cost / friction |
 |---|---|---|
-| **Exchange** *(user's idea)* | Loan interest halved; sell 3% better | Traders, not haulers: the Exchange's brokers add 5% to your plicite, and missed payments carry a double late fee. *(Rebalanced in AW-174: the old fuel discount made it the strongest clan.)* |
-| **Helm** | Fold-drive refits 15% faster; 3 extra systems charted at start | Helm expects you to take enforcement jobs; refusing costs standing |
-| **Midshipmen** | 10% off Midshipmen ship upgrades; start with a skilled engineer | Fussy about maintenance: skipping refits costs reputation |
-| **Diggers** | Drill rate +15%; one free high-grade deposit lead per year | Diggers expect a cut of your biggest strikes (a tithe on plicite and platinum) |
-| **Lyceum** | Orbital scans and surveys take half the time; specimens sell for 15% more | Upkeep: the Lyceum asks you to carry its researchers, which takes up berths |
-| **Covenant** | Access to the Covenant's anomaly reports (the Awaken clue trail starts early) | Archive-derived upgrades cost 10% more: your brethren disapprove |
-| **Freebooters** | Black-market fuel 10% cheaper; smuggling jobs open from day one | Helm and Exchange start out cool toward you |
+| **Exchange** *(user's idea)* | Loan interest halved; sell 3% better | The Exchange's brokers add 5% to your plicite, and a missed payment carries a double late fee. *(Rebalanced in AW-174: the old fuel discount made it the strongest clan.)* |
+| **Helm** | Fold-drive refits 15% faster; the three nearest uncharted stars come scanned | Helm colours draw raiders: pirates hail you 20% more often *(stands in for enforcement jobs, which don't exist)* |
+| **Midshipmen** | 10% off Midshipmen gear; start with a seasoned (level 3) Midshipman engineer | Fussy about maintenance: equipment upkeep costs 20% more |
+| **Diggers** | Drill rate +15%; the Diggers' assay office passes you a rich, unknown, drivable seam on a scanned world each year, the first at launch, the rest at the first docking a year after the last (`src/sim/leads.ts`) | A 5% tithe on platinum and plicite sales |
+| **Lyceum** | Orbital scans and surveys take half the time; specimens sell for 15% more | Lyceum researchers' berths take 10 t of hold |
+| **Covenant** | The Covenant's first errand is waiting at launch (the Awaken trail starts early); shore leave lifts spirits 50% faster | Research projects (the Archive's work) cost 10% more |
+| **Freebooters** | Black-market fuel 10% cheaper; 3,000 cr more to start | No help from Helm's small operators' fund; Helm (−20) and the Exchange (−15) start out cool *(smuggling jobs don't exist yet)* |
 
-Clan choice isn't in V1. These perks plug into the same modifiers the balance pass uses (loan rate, prices, rates).
+Every clan's own officers start 10 loyalty higher, and the clan itself starts at +25 standing. Balance: `CLANS=1 npx vitest run tests/clans.report.test.ts` compares the clans with the same careers played clanless.
 
 ## New-Player Experience **[DECIDED 2026-10-21]**
 "A single bad run shouldn't ruin you when you're starting out."

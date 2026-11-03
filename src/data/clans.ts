@@ -1,7 +1,8 @@
 /**
- * The captain's own clan (chosen at the start). Each gives a small, felt perk with a matching
- * cost, from the Starting Clan Perks table in docs/game_design.md. Costs that need systems not
- * built yet (clan reputation, enforcement jobs, smuggling) use stand-ins that work today.
+ * The captain's own clan (chosen at the start, AW-21/AW-146). Each gives a small, felt perk with a matching
+ * cost, from the Starting Clan Perks table in docs/game_design.md. The text here is what the new-game screen
+ * shows, so it names everything the choice does (some effects live outside the mods: Helm's charts, the
+ * Midshipman engineer, the Diggers' lead, the Covenant's errands, the Freebooters' standing).
  */
 import type { ClanId } from "./ship";
 
@@ -93,7 +94,7 @@ export const CAPTAIN_CLANS: Record<ClanId, CaptainClan> = {
     mods: { ownVendorPrice: 0.9, upkeep: 1.2 },
   },
   diggers: {
-    perk: "Drills run 15% faster.",
+    perk: "Drills run 15% faster, and the Diggers' assay office passes you a rich seam to work each year, the first before you launch.",
     cost: "The Diggers take a 5% tithe on your platinum and plicite sales.",
     mods: { drillRate: 1.15, tithe: 0.05 },
   },
@@ -103,13 +104,13 @@ export const CAPTAIN_CLANS: Record<ClanId, CaptainClan> = {
     mods: { scanTime: 0.5, specimenPrice: 1.15, cargoT: -10 },
   },
   covenant: {
-    perk: "Your crew finds peace aboard: shore leave lifts spirits 50% faster.",
+    perk: "The Covenant's listeners trust you from the start: their first errand is waiting when you launch. Your crew finds peace aboard, too: shore leave lifts spirits 50% faster.",
     cost: "Your brethren disapprove of the Archive: research projects cost 10% more.",
     mods: { shoreLeave: 1.5, researchCost: 1.1 },
   },
   freebooters: {
     perk: "Black-market fuel 10% cheaper, and you start with 3,000 cr more.",
-    cost: "Helm won't help a Freebooter: no small operators' fund.",
+    cost: "Helm won't help a Freebooter: no small operators' fund, and Helm and the Exchange start out cool toward you.",
     mods: { fuelPrice: 0.9, helmFund: false },
   },
 };
