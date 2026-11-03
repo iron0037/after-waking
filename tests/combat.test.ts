@@ -5,6 +5,8 @@ import {
   cargoTonnes,
   claimPrize,
   combatTurn,
+  enemyIntent,
+  uncontestedMoveChance,
   DAY,
   driveDamageMult,
   fold,
@@ -278,5 +280,31 @@ describe("prizes and lessons (combat v1.1)", () => {
     strong.ship.upgrades.push("laserBattery", "deflectors");
     const skiff = raiderById("skiff")!;
     expect(sidePower({ ...skiff, hullMax: skiff.hull, damage: { drives: 0, weapons: 0, sensors: 0 } })).toBeLessThan(sidePower(playerSide(strong)));
+  });
+});
+
+describe("wrecked drives (AW-221)", () => {
+  it("a raider with wrecked drives can't close in, even on an evading ship", () => {
+    const world = new World(SEED);
+    const state = hailed(world);
+    answerHail(state, "fight");
+    const e = state.encounter!;
+    e.range = 2;
+    e.enemy.kinetic = Math.max(1, e.enemy.kinetic);
+    e.enemy.damage.drives = 100;
+    e.enemy.hull = e.enemy.hullMax = 10_000; // it won't strike or flee mid-test
+    expect(enemyIntent(state, "evade").helm).toBe("hold");
+    for (let i = 0; i < 12 && state.encounter; i++) {
+      const r = combatTurn(state, { helm: "evade", guns: "hold", engineering: "repair", comms: "quiet" });
+      expect(r.ok).toBe(true);
+      if (state.encounter) expect(state.encounter.range).toBe(2);
+    }
+  });
+
+  it("damaged drives sometimes fail an unopposed move; wrecked ones always do", () => {
+    expect(uncontestedMoveChance(0)).toBe(1);
+    expect(uncontestedMoveChance(60)).toBeCloseTo(0.4);
+    expect(uncontestedMoveChance(95)).toBe(0.2);
+    expect(uncontestedMoveChance(100)).toBe(0);
   });
 });

@@ -594,8 +594,9 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
 
   // 1. Maneuver: opposite wishes are settled by speed.
   const want = (h: Orders["helm"]) => (h === "close" ? -1 : h === "open" ? 1 : 0);
-  const mine = want(orders.helm);
-  const theirs = want(theirHelm);
+  // Wrecked drives can't manoeuvre at all (AW-221).
+  const mine = me.damage.drives >= 100 ? 0 : want(orders.helm);
+  const theirs = them.damage.drives >= 100 ? 0 : want(theirHelm);
   // Evasive Pilot (navigation) wins more maneuvers; Overdrive (engineering) pushes the drives when breaking away.
   const overdrive = orders.helm === "open" && hasPerk(state, "overdrive");
   const mySpeed = (me.speed * (1 - me.damage.drives / 100) + 0.03 * nav + (hasPerk(state, "evasive-pilot") ? 0.1 : 0)) * (overdrive ? 1.4 : 1);
@@ -611,8 +612,14 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
     move = iWin ? mine : theirs;
     winner = iWin ? "me" : "them";
   } else if (mine !== 0 || theirs !== 0) {
-    move = mine !== 0 ? mine : theirs;
-    winner = mine !== 0 && theirs !== 0 ? "both" : mine !== 0 ? "me" : "them";
+    // Unopposed, a ship still has to make the move on its own drives: damaged ones sometimes can't (AW-221).
+    const mover = mine !== 0 ? me : them;
+    if (withRng(state, (rng) => rng.next()) < uncontestedMoveChance(mover.damage.drives)) {
+      move = mine !== 0 ? mine : theirs;
+      winner = mine !== 0 && theirs !== 0 ? "both" : mine !== 0 ? "me" : "them";
+    } else {
+      say(mine !== 0 ? "Your damaged drives can't make the manoeuvre." : `The ${e.raiderName}'s damaged drives can't make the manoeuvre.`);
+    }
   }
   const before = e.range;
   if (move > 0 && before === 2) {
@@ -690,6 +697,11 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   }
   if (e.turn >= 20) return ok({ lines, result: finish(state, "driven off", `After a long fight the ${e.raiderName} gives up and fades into the glare.`, 0, 0) });
   return ok({ lines, result: null });
+}
+
+/** Chance a ship manages an unopposed range change on drives this damaged (0-100): full at 0, none when wrecked. */
+export function uncontestedMoveChance(drives: number): number {
+  return drives >= 100 ? 0 : Math.max(0.2, 1 - drives / 100);
 }
 
 /** Injuries in battle (AW-214): chance per volley taken, and how bad. */
@@ -944,7 +956,8 @@ export function enemyIntent(state: GameState, playerHelm: Orders["helm"]): { hel
   const me = playerSide(state);
   const them = e.enemy;
   const frac = them.hull / them.hullMax;
-  const helm: Orders["helm"] = frac < e.nerve && them.damage.drives < 80 ? "open" : them.kinetic > 0 && e.range > 0 ? "close" : "hold";
+  const helm: Orders["helm"] =
+    them.damage.drives >= 100 ? "hold" : frac < e.nerve && them.damage.drives < 80 ? "open" : them.kinetic > 0 && e.range > 0 ? "close" : "hold";
   const guns: FireTarget =
     playerHelm === "open" && me.damage.drives < 60 ? "drives" : me.laser + me.kinetic > them.laser + them.kinetic && me.damage.weapons < 60 ? "weapons" : "hull";
   return { helm, guns };
