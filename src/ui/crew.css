@@ -96,6 +96,10 @@
 .crew-notice .small {
   color: var(--text);
 }
+.tag.warn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .tag.danger {
   border-color: var(--danger);
   color: var(--danger);

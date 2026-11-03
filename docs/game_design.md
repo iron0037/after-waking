@@ -477,6 +477,19 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
 - **Drift.** Standing relaxes toward where it started by 15% a year, so one bad year isn't permanent.
 - **Seen in:** the Clans panel, standing tags on contract cards and Shipyard prices, and a journal line whenever a tier changes.
 
+## Crew Injuries (AW-214) **[DECIDED 2026-11-03]**
+Officers can be hurt; the captain stays on the bridge. Code: `src/sim/injuries.ts`.
+
+- **Severity:** a *minor* injury costs one working level (about a week), a *serious* one three (three to four weeks). A *critical* one takes the officer off duty: no level, perks or talent.
+- **Deadline, not dice (user's choice):** a critical injury starts a clock of 30 days, plus 4 per medic level above 1. The Intrepid's surgeons stabilize the patient at docking, and a medic with the **Surgeon** perk does it aboard after two days (not on themselves). If the clock runs out, the officer dies, the post empties and a deck volunteer waits at the hiring hall.
+- **Stacking:** a new injury never softens an old one; two serious injuries make a critical one.
+- **Healing:** about 6% faster per medic level, twice as fast with **Stabilize**, and twice as fast while docked. With no medic, healing is slower.
+- **Causes:**
+  - Drilling incidents hurt someone on the field team (engineering or science): 8% of breakdowns, 12% of storms, 20% of quakes.
+  - Raider hits: the chance per volley is twice the share of hull lost, capped at 60%. Being overwhelmed hurts someone badly. **Combat Medic** makes battle injuries one step lighter.
+  - Hostile creatures (coming with the creatures work).
+- **Bots:** across 12 sixty-trip careers, about 30 injuries per career (mostly minor), 0–6 critical, and one death in all (the bots don't rush home). The career report stays within noise.
+
 ## Starting Clan Perks **[DECIDED: built in AW-146, finished in AW-21]**
 Your starting clan shapes the early game. Every perk is small but felt, and each has a matching cost so no choice is free. The text lives in `src/data/clans.ts` (shown on the new-game screen); the numbers are `ClanMods`.
 

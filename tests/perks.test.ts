@@ -112,7 +112,7 @@ describe("perk framework", () => {
     expect(takePerk(state, "engineering", "drill-master").ok).toBe(true);
     expect(takePerk(state, "engineering", "jury-rig").ok).toBe(true);
     expect(takePerk(state, "engineering", "drill-master").ok).toBe(false); // already taken
-    expect(perkBlocker(officerAt(state, "medical")!, "medical", PERKS_BY_ID.get("stabilize")!)).toMatch(/Arrives with injuries/); // still locked
+    expect(perkBlocker(officerAt(state, "medical")!, "medical", PERKS_BY_ID.get("pathogen-screen")!)).toMatch(/Arrives with hostile life/); // still locked
   });
 
   it("queues level-ups for the popup", () => {

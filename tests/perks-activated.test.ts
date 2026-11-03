@@ -74,7 +74,7 @@ function hailed(perks: string[] = [], from = 0): GameState {
 describe("activated perks (AW-198)", () => {
   it("are all switched on, and the ones still waiting say what for", () => {
     for (const id of ACTIVATED) expect(PERKS_BY_ID.get(id)?.needs, id).toBeUndefined();
-    for (const id of ["stabilize", "surgeon", "combat-medic", "xenologist", "shoal-reader", "fauna-handler"]) {
+    for (const id of ["xenologist", "shoal-reader", "fauna-handler"]) {
       expect(PERKS_BY_ID.get(id)?.needs, id).toBeTruthy();
     }
     expect(PERKS.filter((p) => p.needs).length).toBeLessThan(20);

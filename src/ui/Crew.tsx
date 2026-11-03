@@ -20,6 +20,7 @@ import {
   formatDuration,
   hasPerk,
   hireRecruit,
+  injuryLine,
   isMiserable,
   levelForXp,
   upbringingOf,
@@ -36,8 +37,10 @@ import {
   startingLoyalty,
   trainingEndsAt,
   wageOf,
+  workingLevel,
   xpForLevel,
   type CrewMember,
+  type GameState,
   type MoodLevel,
   type Recruit,
   setCaptainFace,
@@ -252,6 +255,27 @@ function RetirementLine({ session, m }: { session: GameSession; m: CrewMember })
   );
 }
 
+/** An officer's injury (AW-214): what it costs, and for a critical one, the time left to get them home. */
+function InjuryWarning({ state, m }: { state: GameState; m: CrewMember }) {
+  const line = injuryLine(state, m);
+  if (!line) return null;
+  if (m.injury?.severity === 3) {
+    return (
+      <div class="crew-notice" role="alert">
+        <strong>{line}</strong>
+        <span class="small">Fold home and dock: the Intrepid's surgeons will stabilize them. A medic with the Surgeon perk can operate aboard.</span>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <span class={`tag ${m.injury?.severity === 2 ? "danger" : "warn"}`} title="Heals faster with a better medic, the Stabilize perk, and shore time aboard the Intrepid.">
+        {line}
+      </span>
+    </div>
+  );
+}
+
 /** Warnings under a card's heading: on notice, retiring, and miserable. */
 function MoodWarnings({ m }: { m: CrewMember }) {
   const miserable = isMiserable(m);
@@ -396,6 +420,7 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
           <RetirementLine session={session} m={m} />
         </span>
       </div>
+      <InjuryWarning state={state} m={m} />
       <MoodWarnings m={m} />
       <ClanLine m={m} />
       <TalentLine m={m} />
@@ -407,7 +432,7 @@ function PersonCard({ session, station, onHall }: { session: GameSession; statio
         <dt>Learns from</dt>
         <dd>{info.learnsFrom}</dd>
         <dt>Gives now</dt>
-        <dd class="good">{bonusLine(state, station)}</dd>
+        <dd class={m.injury ? "accent" : "good"}>{m.injury?.severity === 3 ? "nothing: off duty" : bonusLine(state, station, workingLevel(state, station))}</dd>
       </dl>
       <PerkTags perks={m.perks} />
       <PerkActions session={session} station={station} />

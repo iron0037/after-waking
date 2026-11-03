@@ -9,6 +9,7 @@ import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { diggersLeadOnDocked } from "./leads";
+import { injureCrew } from "./injuries";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
@@ -1063,6 +1064,10 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
     }
     awardXp(state, "engineering", 10);
     awardXp(state, "medical", 6);
+    // Sometimes someone on the field team gets hurt (AW-214).
+    if (withRng(state, (rng) => rng.chance(INCIDENT_INJURY[incident.kind]))) {
+      injureCrew(state, { stations: ["engineering", "science"], cause: INCIDENT_CAUSE[incident.kind] });
+    }
     cheerAll(state, -1);
     cheerStation(state, "engineering", -2);
     cheerStation(state, "medical", -1);
@@ -1089,12 +1094,17 @@ export function placeName(world: World, bodyId: string, state?: Pick<GameState, 
 }
 
 interface Incident {
+  kind: "breakdown" | "storm" | "quake";
   text: string;
   /** Fraction of the planned drilling done before the interruption. */
   atFraction: number;
   lostHours: number;
   energy: number;
 }
+
+/** Chance an incident hurts someone on the field team, and how the roster describes it (AW-214). */
+export const INCIDENT_INJURY: Record<Incident["kind"], number> = { breakdown: 0.08, storm: 0.12, quake: 0.2 };
+const INCIDENT_CAUSE: Record<Incident["kind"], string> = { breakdown: "caught in the drill rig", storm: "hurt in a storm", quake: "hurt in a quake" };
 
 /** Storms, quakes and breakdowns, more likely on wilder worlds and over longer shifts. */
 function rollIncident(rng: Rng, body: Body, hours: number, rateMult = 1, hoursMult = 1): Incident | null {
@@ -1107,10 +1117,10 @@ function rollIncident(rng: Rng, body: Body, hours: number, rateMult = 1, hoursMu
   ] as const);
   const atFraction = rng.range(0.15, 0.9);
   const incident = pickIncident(rng, kind, atFraction);
-  return { ...incident, lostHours: incident.lostHours * hoursMult };
+  return { ...incident, kind, lostHours: incident.lostHours * hoursMult };
 }
 
-function pickIncident(rng: Rng, kind: "breakdown" | "storm" | "quake", atFraction: number): Incident {
+function pickIncident(rng: Rng, kind: Incident["kind"], atFraction: number): Omit<Incident, "kind"> {
   switch (kind) {
     case "storm":
       return {

@@ -32,6 +32,7 @@ import { DAY, YEAR, type Vec2 } from "./units";
 import { World } from "./world";
 import { WORLD_GEN_LATEST } from "./bodies";
 import { grantDiggersLead } from "./leads";
+import { tickInjuries } from "./injuries";
 
 export const SAVE_VERSION = 1;
 
@@ -206,7 +207,7 @@ export interface GameState {
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];
-  stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number; specimens?: number; raidersBeaten?: number; contractsDone?: number };
+  stats: { folds: number; tonnesMined: number; earned: number; landings: number; loanPaid?: number; specimens?: number; raidersBeaten?: number; contractsDone?: number; crewLost?: number; injuries?: number };
   /** The new-game People settings (AW-205), fixed for the career. Universe settings ride in the seed. */
   settings?: PeopleSettings;
 }
@@ -322,6 +323,7 @@ export function advanceTime(state: GameState, minutes: number): void {
   tickResearch(state);
   chargeStowedRover(state, minutes);
   tickSentiment(state, minutes);
+  tickInjuries(state, minutes);
   tickReputation(state, minutes);
   const day = Math.floor(state.time / DAY);
   if (day > state.market.day) withRng(state, (rng) => stepMarket(state.market, rng, day));

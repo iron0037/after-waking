@@ -126,9 +126,9 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
     [
       ["triage", "Triage", "+2 effective Medical levels for time lost to incidents."],
       ["hazard-suits", "Hazard Suits", "+1 radiation rating and 20 °C more temperature range for landing."],
-      ["stabilize", "Stabilize", "Injuries heal twice as fast.", "injuries (AW-96)"],
-      ["surgeon", "Surgeon", "Can save a crew member from a fatal injury.", "injuries (AW-96)"],
-      ["combat-medic", "Combat Medic", "Wounded crew return to their stations mid-fight.", "M3 combat"],
+      ["stabilize", "Stabilize", "Injuries heal twice as fast."],
+      ["surgeon", "Surgeon", "Operates on critical injuries aboard: no race home to the Intrepid (unless the medic is the patient)."],
+      ["combat-medic", "Combat Medic", "Injuries taken in a fight are one step less severe."],
     ],
     [
       ["containment", "Containment", "+2 specimen slots on the rover and the ship."],

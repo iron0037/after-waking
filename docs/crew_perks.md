@@ -64,9 +64,9 @@ Legend: ✅ works with today's systems · ⏳ needs a later system (named)
 |---|---|---|---|
 | 1 | **Triage** ✅: +2 effective Medical levels for incident time | **Containment** ✅: +2 specimen slots on the rover and the ship | **Mentor** ✅: the whole crew earns 10% more XP |
 | 2 | **Hazard Suits** ✅: +1 radiation rating and ±20 °C temperature rating for landing | **Culture Lab** ✅: +2 effective Medical levels for specimen prices | **Morale** ⏳ (crew sentiment): happiness recovers twice as fast |
-| 3 | **Stabilize** ⏳ (AW-96 injuries): injuries heal twice as fast | **Pathogen Screen** ⏳ (hostile life): immunity to alien sickness events | **Steady Hands** ✅: drilling incidents are 15% rarer (supports Engineering) |
-| 4 | **Surgeon** ⏳ (AW-96): can save a crew member from a fatal injury | **Bio-Assay** ✅: specimens show which research projects want them, at the specimen desk and on the surface (AW-198) | **Longevity** ✅: crew retire 5 years later (AW-206) |
-| 5 | **Combat Medic** ⏳ (M3): wounded crew return to their stations mid-fight | **Living Archive** ✅: specimen research projects run 25% faster (AW-198) | **Family Ship** ✅: a retiring veteran leaves a protégé at half their level (AW-206) |
+| 3 | **Stabilize** ✅: injuries heal twice as fast (AW-214) | **Pathogen Screen** ⏳ (hostile life): immunity to alien sickness events | **Steady Hands** ✅: drilling incidents are 15% rarer (supports Engineering) |
+| 4 | **Surgeon** ✅: operates on critical injuries aboard, so there's no race home (unless the medic is the patient) (AW-214) | **Bio-Assay** ✅: specimens show which research projects want them, at the specimen desk and on the surface (AW-198) | **Longevity** ✅: crew retire 5 years later (AW-206) |
+| 5 | **Combat Medic** ✅: injuries taken in a fight are one step less severe (AW-214) | **Living Archive** ✅: specimen research projects run 25% faster (AW-198) | **Family Ship** ✅: a retiring veteran leaves a protégé at half their level (AW-206) |
 
 ## Captain: Charisma · Business · Intuition
 

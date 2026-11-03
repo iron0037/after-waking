@@ -25,6 +25,7 @@ import { fail, ok, type Result } from "./result";
 import { cheer, ensureSentiment, isMiserable } from "./sentiment";
 import { autoSpendPerks, crossTrainingLevels, hasPerk, hasTalent, MAX_EFFECTIVE_LEVEL } from "./perks";
 import { hashSeed, rngFor, type Rng } from "./rng";
+import { injuryLevelsLost, isOffDuty, type Injury } from "./injuries";
 import type { GameState } from "./state";
 import { DAY, YEAR } from "./units";
 
@@ -46,6 +47,8 @@ export interface CrewMember {
   retiringAt?: number;
   /** Their signature talent (AW-207); green volunteers have none. */
   talent?: TalentId;
+  /** Hurt and healing (AW-214). */
+  injury?: Injury;
 }
 
 /** A level gained, waiting for the player to see it (and maybe pick a perk). */
@@ -315,10 +318,15 @@ export function stationBonuses(station: Station, level: number): Partial<CrewBon
   }
 }
 
-/** The level someone actually works at: a miserable officer goes through the motions, a level below. */
+/**
+ * The level someone actually works at: a miserable officer goes through the motions, a level below; an injured
+ * one works below their level, and a critically injured one not at all (AW-214).
+ */
 export function workingLevel(state: GameState, station: Station): number {
   const holder = station === "captain" ? null : officerAt(state, station);
-  return Math.max(0, stationLevel(state, station) - (holder && isMiserable(holder) ? 1 : 0));
+  if (holder && isOffDuty(holder)) return 0;
+  const lost = (holder && isMiserable(holder) ? 1 : 0) + (holder ? injuryLevelsLost(holder) : 0);
+  return Math.max(holder ? 1 : 0, stationLevel(state, station) - lost);
 }
 
 export function crewBonuses(state: GameState): CrewBonuses {

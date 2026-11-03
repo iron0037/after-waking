@@ -1,4 +1,4 @@
-import { activeRegion, ageAt, captainTitle, compendiumTotals, crewAlerts, crewFreePoints, dist, effectiveStats, formatDate, formatDuration, INTREPID_POS, siteHere, type GameState, type World } from "../sim";
+import { activeRegion, ageAt, captainTitle, compendiumTotals, criticalPatient, crewAlerts, crewFreePoints, dist, effectiveStats, formatDate, formatDuration, INTREPID_POS, siteHere, type GameState, type World } from "../sim";
 import { STATION_INFO } from "../data/crew";
 import { cargoSummary, cr, pct } from "./format";
 import type { GameSession } from "./session";
@@ -27,7 +27,10 @@ export function TopBar({
   const foldReady = state.time >= state.foldReadyAt;
   const bankedPoints = crewFreePoints(state);
   const alerts = crewAlerts(state);
+  const critical = criticalPatient(state);
   const alertLines = [
+    ...(critical ? [`${STATION_INFO[critical.member.station].title} ${critical.member.name} is critically injured: ${formatDuration(Math.max(0, critical.minutesLeft))} to reach the Intrepid`] : []),
+    ...(state.crew ?? []).filter((m) => m.injury && m.injury.severity < 3).map((m) => `${STATION_INFO[m.station].title} ${m.name} is injured`),
     ...alerts.onNotice.map((m) => `${STATION_INFO[m.station].title} ${m.name} has given notice`),
     ...alerts.emptyPosts.map((st) => `${STATION_INFO[st].title}: post empty`),
   ];

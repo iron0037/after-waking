@@ -33,6 +33,7 @@ import { DAY, dist } from "./units";
 import type { World } from "./world";
 import type { FlightTarget } from "./actions";
 import { rngFor } from "./rng";
+import { injureCrew, INJURY_NAMES } from "./injuries";
 
 const SYSTEMS: readonly ShipSystem[] = ["drives", "weapons", "sensors"];
 
@@ -649,6 +650,11 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   if (orders.helm !== "hold") awardXp(state, "navigation", 3 + (orders.helm === "evade" && theirHits.length === 0 ? 2 : 0));
   if (orders.engineering !== "repair") awardXp(state, "engineering", 2);
   say(taken > 0 ? `They hit you for ${Math.round(taken)}${theirGuns !== "hull" ? ` (your ${theirGuns})` : ""}.` : "Their fire misses.");
+  // Hard hits can hurt the crew (AW-214): the bigger the hit, the likelier.
+  if (taken > 0 && withRng(state, (rng) => rng.chance(battleInjuryChance(taken, me.hullMax)))) {
+    const hurt = injureCrew(state, { cause: `hurt when the ${e.raiderName}'s fire hit`, weights: BATTLE_SEVERITY, lighten: hasPerk(state, "combat-medic") ? 1 : 0 });
+    if (hurt) say(`${hurt.member.name} is hurt (${INJURY_NAMES[hurt.severity]}).`);
+  }
 
   // 4. Repairs.
   if (orders.engineering === "repair") {
@@ -670,6 +676,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   // 5. Endings.
   if (them.hull <= 0) return ok({ lines, result: won(state, `The ${e.raiderName}'s reactor scrams. ${e.captain} strikes their colours.`) });
   if (me.hull <= 0) {
+    injureCrew(state, { cause: `hurt when the ${e.raiderName} boarded`, weights: OVERWHELMED_SEVERITY, lighten: hasPerk(state, "combat-medic") ? 1 : 0 });
     const lost = takeShare(state, 0.7);
     return ok({ lines, result: finish(state, "overwhelmed", `Your hull won't take more. You strike, and the ${e.raiderName} strips ${lost.toFixed(1)} t from the hold.`, lost, 0) });
   }
@@ -684,6 +691,13 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   if (e.turn >= 20) return ok({ lines, result: finish(state, "driven off", `After a long fight the ${e.raiderName} gives up and fades into the glare.`, 0, 0) });
   return ok({ lines, result: null });
 }
+
+/** Injuries in battle (AW-214): chance per volley taken, and how bad. */
+export function battleInjuryChance(taken: number, hullMax: number): number {
+  return Math.min(0.6, (2 * taken) / Math.max(1, hullMax));
+}
+const BATTLE_SEVERITY = [70, 25, 5] as const;
+const OVERWHELMED_SEVERITY = [40, 40, 20] as const;
 
 /** Each weapon's chance to hit and damage this turn. */
 function volley(state: GameState, side: CombatSide, range: RangeBand, aimBonus: number, evade: number, boost: number): number[] {

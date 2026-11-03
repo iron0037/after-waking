@@ -22,6 +22,8 @@ import { DAY } from "./units";
 export interface PerkHolder {
   xp?: number;
   perks?: string[];
+  /** Officers can be hurt (AW-214); the captain isn't. */
+  injury?: { severity: number };
 }
 
 export function perkHolder(state: GameState, station: Station): PerkHolder | null {
@@ -32,12 +34,15 @@ export function perkHolder(state: GameState, station: Station): PerkHolder | nul
 export function hasPerk(state: GameState, id: string): boolean {
   const def = PERKS_BY_ID.get(id);
   if (!def || def.needs) return false;
-  return perkHolder(state, def.station)?.perks?.includes(id) ?? false;
+  const holder = perkHolder(state, def.station);
+  // A critically injured officer is off duty (AW-214).
+  if (holder?.injury?.severity === 3) return false;
+  return holder?.perks?.includes(id) ?? false;
 }
 
-/** Is an officer with this signature talent aboard (AW-207)? */
+/** Is an officer with this signature talent aboard and on duty (AW-207)? */
 export function hasTalent(state: GameState, id: TalentId): boolean {
-  return (state.crew ?? []).some((m) => m.talent === id);
+  return (state.crew ?? []).some((m) => m.talent === id && m.injury?.severity !== 3);
 }
 
 /** Points earned (one per level above 1) and not yet spent. */
