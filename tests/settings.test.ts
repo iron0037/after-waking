@@ -44,7 +44,7 @@ function totals(u: UniverseSettings) {
 describe("universe settings (AW-205)", () => {
   it("pack into the seed, and all-normal leaves the seed alone", () => {
     expect(universeSeed(42, DEFAULT_UNIVERSE)).toBe(42);
-    const u: UniverseSettings = { stars: 30, ore: "plentiful", life: "scarce" };
+    const u: UniverseSettings = { stars: 30, ore: "plentiful", life: "scarce", hostile: "none" };
     const seed = universeSeed(42, u);
     expect(seed).toBeGreaterThan(2 ** 32);
     expect(universeOf(seed)).toEqual(u);

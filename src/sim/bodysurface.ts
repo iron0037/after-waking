@@ -11,6 +11,7 @@ import {
   regionOrigin,
   REGION_SIZE,
   surfaceLayout,
+  type CreatureSpawn,
   type Deposit,
   type FloraSite,
   type RegionMap,
@@ -37,6 +38,12 @@ export interface SurfaceDeposit extends Deposit {
 }
 
 export interface SurfaceFlora extends FloraSite {
+  key: SiteKey;
+  region: number;
+}
+
+/** A creature's starting place, planet-wide (AW-215). */
+export interface SurfaceCreature extends CreatureSpawn {
   key: SiteKey;
   region: number;
 }
@@ -111,6 +118,17 @@ export class BodySurface implements TileSource {
   flora(region: number): SurfaceFlora[] {
     const o = this.origin(region);
     return this.regionMap(region).flora.map((f) => ({ ...f, x: f.x + o.x, y: f.y + o.y, key: siteKey(region, f.id), region }));
+  }
+
+  creatures(region: number): SurfaceCreature[] {
+    const o = this.origin(region);
+    return (this.regionMap(region).creatures ?? []).map((c) => ({ ...c, x: c.x + o.x, y: c.y + o.y, key: siteKey(region, c.id), region }));
+  }
+
+  creature(key: SiteKey): SurfaceCreature | null {
+    const ref = parseSiteKey(key);
+    if (!ref || ref.region >= this.layout.regions) return null;
+    return this.creatures(ref.region).find((c) => c.id === ref.id) ?? null;
   }
 
   deposit(key: SiteKey): SurfaceDeposit | null {

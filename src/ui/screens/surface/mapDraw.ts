@@ -1124,3 +1124,171 @@ export function drawTooltip(ctx: CanvasRenderingContext2D, w: number, h: number,
     ctx.fillText(l.text, x + pad, y + pad + 9 + i * lineH);
   });
 }
+
+// --- creatures (AW-215/216) ---------------------------------------------------------------------------
+
+export interface CreatureMark {
+  key: string;
+  x: number;
+  y: number;
+  color: string;
+  size: 1 | 2;
+  hunter: boolean;
+  down: boolean;
+}
+
+/**
+ * Creatures in sight: a round body in the species colour with a dark rim, bigger for large ones. Hunters wear a
+ * pulsing red ring; a downed creature lies faded with a "z". The selected one gets a white ring.
+ */
+export function drawCreatures(ctx: CanvasRenderingContext2D, L: Layout, marks: readonly CreatureMark[], selected: string | null, t: number): void {
+  ctx.save();
+  ctx.setLineDash([]);
+  for (const m of marks) {
+    const x = cx(L, m.x, m.y);
+    const y = cy(L, m.x, m.y);
+    const r = Math.max(3, L.tw * (m.size === 2 ? 0.34 : 0.24));
+    const bob = m.down ? 0 : Math.sin(t / 400 + m.x * 1.7 + m.y) * r * 0.08;
+    ctx.globalAlpha = m.down ? 0.55 : 1;
+    ctx.fillStyle = "rgba(5, 7, 15, 0.45)";
+    ctx.beginPath();
+    ctx.ellipse(x + r * 0.15, y + r * 0.35, r * 0.95, r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = m.color;
+    ctx.strokeStyle = "rgba(10, 12, 20, 0.9)";
+    ctx.lineWidth = Math.max(1, r * 0.18);
+    ctx.beginPath();
+    ctx.ellipse(x, y + bob, r, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Eyes, so it reads as an animal and not a marker.
+    if (r >= 5 && !m.down) {
+      ctx.fillStyle = m.hunter ? "#ff5050" : "#10131c";
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y + bob - r * 0.2, r * 0.13, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y + bob - r * 0.2, r * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    if (m.hunter && !m.down) {
+      const pulse = 0.5 + 0.5 * Math.sin(t / 300);
+      ctx.strokeStyle = `rgba(255, 80, 80, ${0.45 + pulse * 0.45})`;
+      ctx.lineWidth = 1.5 + pulse;
+      ctx.beginPath();
+      ctx.arc(x, y + bob, r * 1.35, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (m.down && r >= 4) {
+      ctx.fillStyle = "#d7e3f4";
+      ctx.font = `bold ${Math.max(9, Math.round(r))}px ui-monospace, monospace`;
+      ctx.textAlign = "center";
+      ctx.fillText("z", x + r * 0.9, y - r * 0.6);
+    }
+    if (m.key === selected) {
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+export interface FightFx {
+  kind: string;
+  weapon?: string;
+  hit?: boolean;
+  amount?: number;
+  rover: Vec2;
+  creature: Vec2;
+}
+
+/** One moment of a fight being played back: stun bolts, laser beams, nets, bites. `p` runs 0 to 1. */
+export function drawFightFx(ctx: CanvasRenderingContext2D, L: Layout, fx: FightFx, p: number): void {
+  const rx = cx(L, fx.rover.x, fx.rover.y);
+  const ry = cy(L, fx.rover.x, fx.rover.y);
+  const kx = cx(L, fx.creature.x, fx.creature.y);
+  const ky = cy(L, fx.creature.x, fx.creature.y);
+  // A miss lands a little wide of the creature.
+  const off = fx.hit === false ? L.tw * 0.5 : 0;
+  const tx = kx + off;
+  const ty = ky - off * 0.6;
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.lineCap = "round";
+  if (fx.kind === "fire" && fx.weapon === "rover-laser") {
+    const a = p < 0.7 ? 1 : (1 - p) / 0.3;
+    ctx.strokeStyle = `rgba(255, 70, 60, ${a})`;
+    ctx.lineWidth = Math.max(2, L.tw * 0.08);
+    ctx.shadowColor = "rgba(255, 60, 40, 0.9)";
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+  } else if (fx.kind === "fire") {
+    // A stun bolt: a crackling blue zig-zag that travels to the target.
+    const head = Math.min(1, p * 1.6);
+    const ex = rx + (tx - rx) * head;
+    const ey = ry + (ty - ry) * head;
+    ctx.strokeStyle = `rgba(110, 210, 255, ${1 - Math.max(0, p - 0.7) / 0.3})`;
+    ctx.lineWidth = Math.max(1.5, L.tw * 0.05);
+    ctx.shadowColor = "rgba(95, 212, 255, 0.9)";
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(rx, ry);
+    const n = 6;
+    for (let i = 1; i <= n; i++) {
+      const f = i / n;
+      const jitter = i === n ? 0 : (Math.sin(i * 12.9 + p * 40) * L.tw) / 8;
+      ctx.lineTo(rx + (ex - rx) * f - (ey - ry) * 0.05 + jitter, ry + (ey - ry) * f + jitter);
+    }
+    ctx.stroke();
+    if (fx.hit && p > 0.6) {
+      ctx.fillStyle = `rgba(160, 230, 255, ${1 - p})`;
+      ctx.beginPath();
+      ctx.arc(kx, ky, L.tw * 0.5 * p, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (fx.kind === "net") {
+    // The net flies out and spreads over the target.
+    const fly = Math.min(1, p * 2);
+    const nx = rx + (tx - rx) * fly;
+    const ny = ry + (ty - ry) * fly;
+    const spread = L.tw * (0.15 + 0.45 * Math.max(0, p * 2 - 1));
+    ctx.strokeStyle = "rgba(240, 240, 220, 0.95)";
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(nx, ny);
+      ctx.lineTo(nx + Math.cos(a) * spread, ny + Math.sin(a) * spread);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(nx, ny, spread, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (fx.kind === "bite" && fx.hit) {
+    // Claws on the rover: an orange burst.
+    ctx.strokeStyle = `rgba(255, 150, 60, ${1 - p})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const o = (i - 1) * L.tw * 0.15;
+      ctx.beginPath();
+      ctx.moveTo(rx - L.tw * 0.3 + o, ry - L.tw * 0.3);
+      ctx.lineTo(rx + L.tw * 0.2 + o, ry + L.tw * 0.3);
+      ctx.stroke();
+    }
+  }
+  // Damage numbers float up.
+  if ((fx.kind === "fire" || fx.kind === "bite") && fx.hit && fx.amount) {
+    const at = fx.kind === "bite" ? { x: rx, y: ry } : { x: kx, y: ky };
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = fx.kind === "bite" ? `rgba(255, 140, 80, ${1 - p})` : `rgba(160, 230, 255, ${1 - p})`;
+    ctx.font = `bold ${Math.max(11, Math.round(L.tw * 0.35))}px ui-monospace, monospace`;
+    ctx.textAlign = "center";
+    ctx.fillText(`-${fx.amount}`, at.x, at.y - L.tw * (0.5 + p * 0.6));
+  }
+  ctx.restore();
+}

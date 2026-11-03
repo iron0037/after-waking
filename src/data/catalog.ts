@@ -114,6 +114,6 @@ export function climateOf(tempC: number): Climate {
 }
 
 /** Compendium keys: "mineral:copper", "gem:plicite-geode", "flora:glass-reed". */
-export type CompendiumKind = "mineral" | "gem" | "flora";
+export type CompendiumKind = "mineral" | "gem" | "flora" | "fauna";
 
 export const FLORA_BY_NAME: ReadonlyMap<string, FloraEntry> = new Map(FLORA.map((f) => [f.name, f]));

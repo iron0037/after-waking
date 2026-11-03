@@ -12,6 +12,7 @@ import {
   type PirateStrength,
   type Reliability,
   type SettingChoice,
+  type HostileLife,
   type StarCount,
   type UniverseSettings,
 } from "../sim";
@@ -28,6 +29,11 @@ const HINTS = {
     normal: "About three temperate worlds in five carry life.",
     plentiful: "Most temperate worlds are alive and crowded with plants. Rare specimens turn up more often.",
   } as Record<Abundance, string>,
+  hostile: {
+    none: "Every creature out there is harmless. No Badlands worlds.",
+    normal: "Some creatures defend their ground or hunt rovers. A few uncharted worlds are Badlands, ruled by apex predators.",
+    plentiful: "Hunters are common, and twice as many uncharted living worlds are Badlands.",
+  } as Record<HostileLife, string>,
   crewXp: {
     slow: "Officers learn their trade 40% slower.",
     normal: "Officers learn at the usual pace.",
@@ -112,6 +118,9 @@ export function NewGameSettings({
         </Row>
         <Row label="Life abundance" hint={HINTS.life[universe.life]}>
           <Segmented name="Life abundance" choices={SETTING_LABELS.abundance} value={universe.life} onPick={u("life")} />
+        </Row>
+        <Row label="Hostile life" hint={HINTS.hostile[universe.hostile]}>
+          <Segmented name="Hostile life" choices={SETTING_LABELS.hostile} value={universe.hostile} onPick={u("hostile")} />
         </Row>
       </section>
       <section class="settings-group">

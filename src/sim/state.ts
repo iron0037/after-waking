@@ -33,6 +33,7 @@ import { World } from "./world";
 import { WORLD_GEN_LATEST } from "./bodies";
 import { grantDiggersLead } from "./leads";
 import { tickInjuries } from "./injuries";
+import type { FaunaState, FightReport } from "./creatures";
 
 export const SAVE_VERSION = 1;
 
@@ -45,6 +46,10 @@ export interface RoverState {
   specimens?: Record<string, number>;
   /** Which vehicle this is (AW-17); absent means the rover. */
   vehicle?: "rover" | "boat";
+  /** Plating left (AW-216); full if absent. */
+  hull?: number;
+  /** Wrecked by a creature: can't move until the ship recovers it. */
+  disabled?: boolean;
   /** Long Shifts (AW-213): the spare cell pack is aboard and still charged. */
   spareCells?: boolean;
 }
@@ -204,6 +209,10 @@ export interface GameState {
   catalogedSpecies: string[];
   /** Everything ever found, keyed "mineral:copper", "gem:plicite-geode", "flora:glass-reed". */
   compendium: Record<string, CompendiumRecord>;
+  /** Creatures that have moved or been met, per body, keyed by site (AW-215). Their starting places come from the seed. */
+  fauna?: Record<string, Record<string, FaunaState>>;
+  /** The last creature fight, for the surface map to play back (AW-216). */
+  lastFight?: FightReport;
   regions: Record<string, RegionKnowledge>;
   market: MarketState;
   journal: JournalEntry[];

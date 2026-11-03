@@ -43,3 +43,4 @@ export * from "./ending";
 export * from "./settings";
 export * from "./leads";
 export * from "./injuries";
+export * from "./creatures";

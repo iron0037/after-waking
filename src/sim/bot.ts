@@ -1,3 +1,4 @@
+import { hexDistance } from "./hex";
 import type { ClanId } from "../data/ship";
 /**
  * A headless captain that plays the core loop: fold out, prospect, drill, haul, fold home,
@@ -298,7 +299,8 @@ function workRegion(
   const surface = world.surface(body.id);
   const origin = surface.origin(region);
   const know = knowledge(state, body.id, region);
-  const stats = effectiveStats(state);
+  // Re-read each step: an injury can take an officer (and their perks) off duty mid-landing (AW-214).
+  let stats = effectiveStats(state);
   const holdRoom = () => stats.cargoCapacityT - cargoTonnes(state.ship.cargo);
   let explores = 0;
 
@@ -307,6 +309,13 @@ function workRegion(
     const loc = state.location;
     if (loc.kind !== "surface" || !loc.rover) return;
     const rover = loc.rover;
+    stats = effectiveStats(state);
+    // Wrecked by a creature mid-job (AW-216): recover it and carry on.
+    if (rover.disabled) {
+      if (!returnAndUnload(state, world, must)) return;
+      must("redeploy rover", deployRover(state, world));
+      continue;
+    }
     if (holdRoom() - cargoTonnes(rover.cargo) <= 1) break;
 
     // Rank by credits per hour of work: drilling time at this grade plus the drive there.
@@ -336,8 +345,16 @@ function workRegion(
         must("redeploy rover", deployRover(state, world));
         continue;
       }
-      must("drive to deposit", moveRoverTo(state, world, next.d.x, next.d.y));
+      const drove = must("drive to deposit", moveRoverTo(state, world, next.d.x, next.d.y));
+      // A creature fight that ended badly (AW-216): head home, regroup, carry on.
+      if (!drove || drove.stopped) {
+        if (!returnAndUnload(state, world, must)) return;
+        must("redeploy rover", deployRover(state, world));
+        continue;
+      }
       must("prospect", prospect(state, world, next.d.key));
+      // A fight while taking cores can push the rover off the seam.
+      if (hexDistance(rover, next.d) > 1 || rover.disabled) continue;
       const budget = (rover.energy - homeCost(rover) - 15) / 1.5;
       if (budget > 0.5) must("drill", drill(state, world, next.d.key, budget));
       continue;
@@ -356,7 +373,11 @@ function workRegion(
       must("redeploy rover", deployRover(state, world));
       continue;
     }
-    must("explore", moveRoverTo(state, world, tx, ty));
+    const went = must("explore", moveRoverTo(state, world, tx, ty));
+    if (went?.stopped) {
+      if (!returnAndUnload(state, world, must)) return;
+      must("redeploy rover", deployRover(state, world));
+    }
   }
   returnAndUnload(state, world, must);
 }
@@ -365,7 +386,7 @@ function returnAndUnload(state: GameState, world: World, must: <T>(label: string
   const loc = state.location;
   if (loc.kind !== "surface" || !loc.rover) return true;
   const home = shipTile(state, world);
-  const moved = must("return to ship", moveRoverTo(state, world, home.x, home.y));
+  const moved = loc.rover.disabled ? null : must("return to ship", moveRoverTo(state, world, home.x, home.y));
   if (!moved || moved.stopped) must("recall rover", recallRover(state, world));
   return must("stow rover", stowRover(state, world)) !== null;
 }

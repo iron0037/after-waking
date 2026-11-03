@@ -1038,3 +1038,19 @@ table.data th.num {
     grid-template-columns: 1fr;
   }
 }
+
+/* Creatures (AW-216): a swatch of the species colour. */
+.creature-dot {
+  font-style: normal;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(10, 12, 20, 0.9);
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.creature-dot.big {
+  width: 14px;
+  height: 14px;
+}

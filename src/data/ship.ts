@@ -68,6 +68,11 @@ export interface ShipStats {
   /** Boat (AW-17): cargo and cell capacity; boatEnergy 0 means no boat aboard. */
   boatCargoT: number;
   boatEnergy: number;
+  /** Gear the rover and boat carry against creatures (AW-217): VEHICLE_WEAPONS ids. */
+  vehicleWeapons: string[];
+  /** The rover's (and boat's) plating, and the share of a creature's bite that gets through it. */
+  roverHull: number;
+  roverArmour: number;
   /** Atmospheric probes the bay can carry (0 = no bay). */
   probeCapacity: number;
   /** Deepest band the probes are rated for: 0 none, 1 cloud tops ... 4 abyss. */
@@ -102,6 +107,9 @@ export const BASE_STATS: ShipStats = {
   specimenPriceMult: 1,
   specimenSlotBonus: 0,
   refineryRateTph: 0,
+  vehicleWeapons: ["stun-prod"],
+  roverHull: 40,
+  roverArmour: 1,
   boatCargoT: 0,
   boatEnergy: 0,
   probeCapacity: 0,
@@ -465,7 +473,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Uprated drive motors",
     vendor: "diggers",
     price: 12_000,
-    description: "The rover covers ground 25% faster (same energy per hex).",
+    description: "The rover covers ground 25% faster (same energy per hex), and runs down fleeing creatures faster.",
     apply: (s) => {
       s.roverDriveTime *= 0.75;
     },
@@ -479,6 +487,65 @@ export const UPGRADES: readonly Upgrade[] = [
     description: "+80 rover energy.",
     apply: (s) => {
       s.roverEnergy += 80;
+    },
+  },
+  // --- creature gear (AW-217): mounts on the rover and the boat alike --------------------------------
+  {
+    id: "netLauncher",
+    category: "rover",
+    name: "Net launcher",
+    vendor: "lyceum",
+    price: 7_000,
+    description: "Throws a weighted capture net two hexes: the gentle way to take a creature alive. Works on hunters only once they're worn down.",
+    apply: (s) => {
+      s.vehicleWeapons = [...s.vehicleWeapons, "net-launcher"];
+    },
+  },
+  {
+    id: "tangleCannon",
+    category: "rover",
+    requires: "netLauncher",
+    name: "Tangle cannon",
+    vendor: "lyceum",
+    price: 16_000,
+    description: "A gas-fired net that spreads wide and reaches three hexes. Far likelier to hold, even on the big ones.",
+    apply: (s) => {
+      s.vehicleWeapons = [...s.vehicleWeapons, "tangle-cannon"];
+    },
+  },
+  {
+    id: "stunGun",
+    category: "rover",
+    name: "Stun gun",
+    vendor: "midshipmen",
+    price: 9_000,
+    description: "A turret-mounted shock projector: reaches three hexes and hits much harder than the stock prod. Draws rover energy.",
+    apply: (s) => {
+      s.vehicleWeapons = [...s.vehicleWeapons, "stun-gun"];
+    },
+  },
+  {
+    id: "roverLaser",
+    category: "rover",
+    name: "Rover laser",
+    vendor: "midshipmen",
+    price: 20_000,
+    description: "A low-power cutting laser on a turret, tuned to stun rather than burn. Four hexes and the hardest hitter, but a heavy draw on the cells.",
+    apply: (s) => {
+      s.vehicleWeapons = [...s.vehicleWeapons, "rover-laser"];
+    },
+  },
+  {
+    id: "roverArmour",
+    category: "rover",
+    name: "Rover armour",
+    vendor: "diggers",
+    price: 10_000,
+    description: "Bolted plate over the cab and cells: the rover takes far more punishment, and a quarter less from each bite.",
+    apply: (s) => {
+      s.roverHull += 30;
+      s.roverArmour *= 0.75;
+      s.hullMassT += 10;
     },
   },
   {

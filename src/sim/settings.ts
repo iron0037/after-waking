@@ -14,6 +14,8 @@
 import type { GameState } from "./state";
 
 export type Abundance = "scarce" | "normal" | "plentiful";
+/** Hostile creatures (AW-215): none at all, the usual, or many more (and more Badlands worlds). */
+export type HostileLife = "none" | "normal" | "plentiful";
 export type Pace = "slow" | "normal" | "fast";
 export type Reliability = "limited" | "normal" | "unwavering";
 export type PirateFrequency = "rare" | "normal" | "frequent";
@@ -28,6 +30,7 @@ export interface UniverseSettings {
   stars: StarCount;
   ore: Abundance;
   life: Abundance;
+  hostile: HostileLife;
 }
 
 export interface PeopleSettings {
@@ -42,7 +45,7 @@ export interface PeopleSettings {
 
 export type GameSettings = UniverseSettings & PeopleSettings;
 
-export const DEFAULT_UNIVERSE: UniverseSettings = { stars: 22, ore: "normal", life: "normal" };
+export const DEFAULT_UNIVERSE: UniverseSettings = { stars: 22, ore: "normal", life: "normal", hostile: "normal" };
 export const DEFAULT_PEOPLE: PeopleSettings = {
   crewXp: "normal",
   reliability: "normal",
@@ -58,6 +61,7 @@ export const LEGACY_PEOPLE: PeopleSettings = { ...DEFAULT_PEOPLE, reliability: "
 
 const SEED_SPAN = 2 ** 32;
 const ABUNDANCE_CODE: Abundance[] = ["normal", "scarce", "plentiful"];
+const HOSTILE_CODE: HostileLife[] = ["normal", "none", "plentiful"];
 
 /** The seed the player typed (the low 32 bits). */
 export function baseSeed(seed: number): number {
@@ -67,7 +71,8 @@ export function baseSeed(seed: number): number {
 /** Pack universe settings into a seed. All-normal gives back the base seed. */
 export function universeSeed(base: number, u: UniverseSettings): number {
   const stars = STAR_COUNTS.indexOf(u.stars);
-  const code = Math.max(0, stars) + 4 * ABUNDANCE_CODE.indexOf(u.ore) + 12 * ABUNDANCE_CODE.indexOf(u.life);
+  const code =
+    Math.max(0, stars) + 4 * ABUNDANCE_CODE.indexOf(u.ore) + 12 * ABUNDANCE_CODE.indexOf(u.life) + 36 * Math.max(0, HOSTILE_CODE.indexOf(u.hostile ?? "normal"));
   return baseSeed(Math.abs(Math.floor(base))) + code * SEED_SPAN;
 }
 
@@ -78,6 +83,7 @@ export function universeOf(seed: number): UniverseSettings {
     stars: STAR_COUNTS[code % 4] ?? 22,
     ore: ABUNDANCE_CODE[Math.floor(code / 4) % 3] ?? "normal",
     life: ABUNDANCE_CODE[Math.floor(code / 12) % 3] ?? "normal",
+    hostile: HOSTILE_CODE[Math.floor(code / 36) % 3] ?? "normal",
   };
 }
 
@@ -103,6 +109,13 @@ export function hiddenSeamChance(seed: number): number {
 export function lifeChance(seed: number, kind: "temperate" | "ice"): number {
   const life = universeOf(seed).life;
   return kind === "temperate" ? { scarce: 0.35, normal: 0.6, plentiful: 0.85 }[life] : { scarce: 0.05, normal: 0.1, plentiful: 0.25 }[life];
+}
+/** Hostile creatures (AW-215): weight on hostile and territorial species, and the share of uncharted living worlds that are Badlands. */
+export function hostileLifeOf(seed: number): HostileLife {
+  return universeOf(seed).hostile;
+}
+export function badlandsChance(seed: number): number {
+  return { none: 0, normal: 0.15, plentiful: 0.3 }[universeOf(seed).hostile];
 }
 export function floraSitesRange(seed: number): [number, number] {
   return { scarce: [1, 3], normal: [2, 5], plentiful: [3, 7] }[universeOf(seed).life] as [number, number];
@@ -160,6 +173,7 @@ export function settingsLine(s: GameSettings): string {
     `${s.stars} stars`,
     `ore ${s.ore}`,
     `life ${s.life}`,
+    `hostile life ${s.hostile ?? "normal"}`,
     `leveling ${s.crewXp}`,
     `reliability ${s.reliability}`,
     s.turnover ? "turnover on" : "turnover off",
@@ -181,6 +195,11 @@ export const SETTING_LABELS = {
     { value: "normal", label: "Normal" },
     { value: "plentiful", label: "Plentiful" },
   ] as SettingChoice<Abundance>[],
+  hostile: [
+    { value: "none", label: "None" },
+    { value: "normal", label: "Normal" },
+    { value: "plentiful", label: "Plentiful" },
+  ] as SettingChoice<HostileLife>[],
   pace: [
     { value: "slow", label: "Slow" },
     { value: "normal", label: "Normal" },

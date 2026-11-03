@@ -4,8 +4,14 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
+import { CREATURES_BY_ID } from "../../data/creatures";
 import {
   mountainBlocker,
+  visibleCreatures,
+  creatureByKey,
+  isHunter,
+  type LiveCreature,
+  type FightReport,
   regionsWithFinds,
   deliveryShortfalls,
   activeRegion,
@@ -143,6 +149,10 @@ import {
   drawShipBeacon,
   drawShoreTargets,
   drawTooltip,
+  drawCreatures,
+  drawFightFx,
+  type CreatureMark,
+  type FightFx,
   fitSize,
   tileAt,
   tileCenter,
@@ -157,6 +167,7 @@ import {
 } from "./surface/mapDraw";
 import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
+import { CreaturePanel } from "./surface/CreaturePanel";
 import { terrainCache, type RegionImage } from "./surface/terrainImage";
 import "./surface.css";
 
@@ -350,6 +361,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);
   const [floraKey, setFloraKeyRaw] = useState<string | null>(null);
+  // A creature the player clicked (AW-216).
+  const [creatureKey, setCreatureKeyRaw] = useState<string | null>(null);
   // A plain hex the player clicked (no site on it): the Selected Hex card.
   const [hexSel, setHexSelRaw] = useState<Vec2 | null>(null);
   // Lists: deposits by distance (default) or commodity name; worked-out and sampled sites always sink to the bottom.
@@ -362,6 +375,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (key !== null) {
       setFloraKeyRaw(null);
       setHexSelRaw(null);
+      setCreatureKeyRaw(null);
     }
   };
   const setFloraKey = (key: string | null): void => {
@@ -369,6 +383,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (key !== null) {
       setSelectedKeyRaw(null);
       setHexSelRaw(null);
+      setCreatureKeyRaw(null);
     }
   };
   const setHexSel = (t: Vec2 | null): void => {
@@ -376,8 +391,20 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (t) {
       setSelectedKeyRaw(null);
       setFloraKeyRaw(null);
+      setCreatureKeyRaw(null);
     }
   };
+  const setCreatureKey = (key: string | null): void => {
+    setCreatureKeyRaw(key);
+    if (key !== null) {
+      setSelectedKeyRaw(null);
+      setFloraKeyRaw(null);
+      setHexSelRaw(null);
+    }
+  };
+  // Fight playback (AW-216): the sim works the fight out at once; the map plays it back, event by event.
+  const fightRef = useRef<{ report: FightReport; t0: number; per: number } | null>(null);
+  const playedFightRef = useRef<number>(state.lastFight?.id ?? 0);
   const animRef = useRef<Anim | null>(null);
   const hoverRef = useRef<Hover | null>(null);
   const layoutRef = useRef<Layout | null>(null);
@@ -452,6 +479,29 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const floraFoundSel = floraKey ? surfaceFlora(state, world, floraKey) : null;
   const selectedFlora: FloraMark | null = floraFoundSel ? { f: floraFoundSel.site, know: floraFoundSel.know } : null;
   const hexData: HexInfo | null = hexSel ? hexInfo(state, world, hexSel.x, hexSel.y) : null;
+  const creatures = visibleCreatures(state, world);
+  const selectedCreature: LiveCreature | null = creatureKey ? creatureByKey(state, world, loc.bodyId, creatureKey) : null;
+  const creatureAt = (t: Vec2): LiveCreature | undefined => creatures.find((c) => c.x === t.x && c.y === t.y);
+
+  // A new fight in the sim: play it back on the map, holding input until it's done.
+  const lastFight = state.lastFight;
+  useEffect(() => {
+    if (!lastFight || lastFight.id <= playedFightRef.current) return;
+    playedFightRef.current = lastFight.id;
+    if (lastFight.bodyId !== loc.bodyId || lastFight.events.length === 0) return;
+    const per = Math.min(420, 9000 / lastFight.events.length);
+    fightRef.current = { report: lastFight, t0: performance.now(), per };
+    session.setBusy(true);
+    const done = setTimeout(() => {
+      fightRef.current = null;
+      session.setBusy(false);
+    }, per * lastFight.events.length + 400);
+    return () => {
+      clearTimeout(done);
+      fightRef.current = null;
+      session.setBusy(false);
+    };
+  }, [lastFight?.id]);
 
   /** The known deposit on a tile, if any (looked up in that tile's region). */
   const depositAt = (t: Vec2): DepositMark | undefined => {
@@ -574,7 +624,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (!result.ok) return false;
     const cut = result.value.stopped !== null || steps.length < path.length;
     if (cut) {
-      session.notify(`${isBoat ? "Boat" : "Rover"} energy ran out before it reached the target.`, "error");
+      // A creature fight can end a drive early (AW-216); otherwise it's the cells.
+      const stop = result.value.stopped;
+      const why = stop && !stop.toLowerCase().includes("energy too low") ? stop : `${isBoat ? "Boat" : "Rover"} energy ran out before it reached the target.`;
+      session.notify(why, "error");
       return false;
     }
     const now = session.state.location;
@@ -640,6 +693,20 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // Where the rover is (unit hex-pixel space): mid-drive it slides between hex centres along the path.
     let tile: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
     let roverUnit: Vec2 | null = tile ? unitPos(tile) : null;
+    // During fight playback the rover and creature stand where the event has them.
+    const fight = fightRef.current;
+    let fx: FightFx | null = null;
+    let fxP = 0;
+    if (fight) {
+      const k = Math.max(0, (t - fight.t0) / fight.per);
+      const i = Math.min(fight.report.events.length - 1, Math.floor(k));
+      fx = fight.report.events[i] ?? null;
+      fxP = Math.min(1, k - i);
+      if (fx && rover) {
+        tile = { x: fx.rover.x, y: fx.rover.y };
+        roverUnit = unitPos(tile);
+      }
+    }
     let spent = 0;
     if (anim) {
       const p = Math.min(anim.pts.length - 1, Math.max(0, (t - anim.t0) / STEP_MS));
@@ -788,6 +855,15 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
     const peaks = new Set(depMarks.filter(({ d }) => mountainBlocker(state, session.world, loc.bodyId, d)).map(({ d }) => d.key));
     drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM, peaks);
+    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, x: c.x, y: c.y, color: c.entry.color, size: c.entry.size, hunter: isHunter(c.entry), down: c.down }));
+    if (fight && fx) {
+      const entry = CREATURES_BY_ID.get(fight.report.species);
+      const i = creatureMarks.findIndex((m) => m.key === fight.report.key);
+      const mark: CreatureMark = { key: fight.report.key, x: fx.creature.x, y: fx.creature.y, color: entry?.color ?? "#ccc", size: entry?.size ?? 1, hunter: !!entry && isHunter(entry), down: false };
+      if (i >= 0) creatureMarks[i] = mark;
+      else creatureMarks.push(mark);
+    }
+    drawCreatures(ctx, L, creatureMarks, creatureKey, t);
 
     // hover: route preview and tooltip
     const hover = anim || dragRef.current?.moved ? null : hoverRef.current;
@@ -830,6 +906,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       }
     }
 
+    if (fx) drawFightFx(ctx, L, fx, fxP);
     if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, hopping ? hopTooltip(hover.tile) : tooltipLines(hover.tile));
 
     // The region the ship is in is still being built: say so rather than showing a half-blank map.
@@ -866,6 +943,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     lines.push({ text: tileName(tile), color: UI.text });
     const dep = depositAt(tile);
     const flora = floraAt(tile);
+    const beast = creatureAt(tile);
+    if (beast) {
+      const how = beast.down ? "out cold: click, then Collect" : isHunter(beast.entry) ? "dangerous: click to capture" : `${beast.entry.temperament}: click to capture`;
+      lines.push({ text: `${beast.entry.name} · ${how}`, color: beast.down ? UI.muted : isHunter(beast.entry) ? UI.danger : UI.accent });
+    }
     if (flora) {
       lines.push({ text: `${flora.f.species} · ${floraStatus(flora.know, flora.f)}`, color: UI.good });
     }
@@ -972,6 +1054,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         const region = surface.regionAt(tile.x, tile.y);
         session.notify(`The ship set down at ${tile.x}, ${tile.y}${region !== null ? ` (region ${region + 1})` : ""}.`);
       }
+      return;
+    }
+    // A creature on the hex: select it (capture is an order from its panel, not a drive).
+    const beast = creatureAt(tile);
+    if (beast && beast.key !== creatureKey) {
+      setCreatureKey(beast.key);
       return;
     }
     const dep = depositAt(tile);
@@ -1335,7 +1423,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 Board the boat
               </button>
             )}
-            {stranded && (
+            {(stranded || rover?.disabled) && (
               <button
                 class="btn danger"
                 disabled={busy || state.ship.fuel < RECALL_FUEL}
@@ -1428,7 +1516,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             </div>
           );
         })()}
-        {selectedFlora ? (
+        {selectedCreature ? (
+          <CreaturePanel session={session} creature={selectedCreature} rover={rover} goTo={() => driveTo(selectedCreature, true, true)} busy={busy} />
+        ) : selectedFlora ? (
           <FloraPanel
             session={session}
             site={selectedFlora.f}
@@ -1461,6 +1551,47 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 ? `No deposits detected nearby yet. ${isBoat ? "Sail the boat" : "Drive the rover"} around to sweep with its sensors.`
                 : "Deploy the rover to start surveying."}
           </div>
+        )}
+
+        {creatures.length > 0 && (
+          <Section id="creatures" title="Creatures in sight" summary={`${creatures.length}`}>
+            <table class="data deposit-table">
+              <thead>
+                <tr>
+                  <th>Creature</th>
+                  <th class="num">Dist</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...creatures]
+                  .sort((a, b) => hexDistance(home, a) - hexDistance(home, b))
+                  .map((c) => (
+                    <tr
+                      key={c.key}
+                      class={`${c.key === creatureKey ? "sel" : ""} ${c.down ? "dim" : ""}`}
+                      onClick={() => setCreatureKey(c.key === creatureKey ? null : c.key)}
+                      title={c.entry.blurb}
+                    >
+                      <td>
+                        <span class="creature-dot" style={{ background: c.entry.color }} />
+                        {c.entry.name}
+                      </td>
+                      <td class="num">{hexDistance(home, c)}</td>
+                      <td>
+                        {c.down ? (
+                          <span class="muted">out cold</span>
+                        ) : isHunter(c.entry) ? (
+                          <span class="tag danger">{c.entry.temperament === "hostile" ? "hunter" : "territorial"}</span>
+                        ) : (
+                          <span class="muted">{c.entry.temperament}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </Section>
         )}
 
         {floraFound.length > 0 && (() => {
@@ -1673,6 +1804,7 @@ function RoverPanel({
   const bedT = rover ? cargoTonnes(rover.cargo) : 0;
   const roverSamples = specimenCount(rover?.specimens);
   const slots = roverSpecimenSlots(state);
+  const stats = effectiveStats(state);
   const title = boat ? "Boat" : "Rover";
   const other = boat ? roverAboard : parkedBoat;
   const otherName = boat ? "Rover (on deck)" : "Boat (moored offshore)";
@@ -1701,6 +1833,16 @@ function RoverPanel({
               <p class="accent small act-note">Energy is getting tight: the trip home takes {homeEnergy.toFixed(1)}.</p>
             )
           )}
+          {rover.disabled ? (
+            <p class="danger small act-note">Wrecked by a creature: it can't move. Recall it with the ship.</p>
+          ) : (
+            (rover.hull ?? stats.roverHull) < stats.roverHull && (
+              <p class="accent small act-note">
+                Plating {Math.round(rover.hull ?? 0)} / {stats.roverHull}: the engineer patches it while the cells recharge at the ship.
+              </p>
+            )
+          )}
+          {state.ship.roverWrecked && !rover.disabled && <p class="danger small act-note">Gear offline (stun prod, nets, weapons) until the Intrepid's yard repairs it.</p>}
           <dl class="kv spaced">
             <dt>{boat ? "Hold" : "Cargo bed"}</dt>
             <dd>

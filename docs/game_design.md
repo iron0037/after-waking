@@ -477,6 +477,41 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
 - **Drift.** Standing relaxes toward where it started by 15% a year, so one bad year isn't permanent.
 - **Seen in:** the Clans panel, standing tags on contract cards and Shipyard prices, and a journal line whenever a tier changes.
 
+## Surface Creatures (AW-215, AW-216, AW-217) **[DECIDED 2026-11-03]**
+Unintelligent animals of the land and seas, collected as specimens like plants. Code: `src/data/creatures.ts` (27 species), `src/sim/creatures.ts`, gear in `src/data/vehicleWeapons.ts`.
+
+- **Where they live:**
+  - Only on living worlds; land animals stay out of exotic seas, and sea creatures meet only the boat.
+  - Each world has 3–5 land species and 1–2 sea species, and each region holds a few individuals (more with plentiful life).
+  - Placement uses its own random streams, so no seam or plant moved.
+- **Temperaments:** *skittish* (runs from the vehicle), *docile* (ignores it until it's shot at), *territorial* (defends its patch) and *hostile* (hunts within its sense range).
+- **Hunters:**
+  - Never on the Meadow, named worlds, the home systems' easy worlds or anywhere in the home systems.
+  - Never with Hostile life set to None.
+  - Never within 2 hexes of the freighter, and no fight starts there: the ship is always safe.
+- **Badlands:** an uncharted living world ruled by apex predators (15% of uncharted living worlds, 30% on Plentiful). Hunters dominate, and four Badlands-only species (shriek pack, blight mantis, razorback ravager, hollow king) are worth the most at the Lyceum.
+- **Roaming:** as time passes on the surface, creatures within 14 hexes move: hunters close in, skittish ones flee, the rest wander near home. Wandering uses its own dice, so it never shifts storms, prices or finds.
+- **Fights:**
+  - Worked out in 10-minute rounds and played back on the map: stun bolts, laser beams, nets, bites.
+  - A hunter in reach of the gear starts a fight as the rover drives, drills or samples (auto-defend).
+  - A capture order closes in, then holds against hunters or chases the rest down.
+  - Shots and chase steps draw rover energy. The rover breaks off while it still has the drive home plus 15% of a charge (at least 8). Breaking off from a hunter means a run for the ship, and faster motors help.
+- **Taken alive (user's rule):** a creature brought down is stunned. In a capture it goes into the sample cases if there's room. Otherwise it lies where it fell as a pickup for 30 days.
+- **Disabled, not destroyed (user's choice):**
+  - A rover whose plating is torn through can't move, and its cargo and samples are lost.
+  - The crew takes a heavy injury (AW-214).
+  - The ship must recall it, and its gear stays offline until the Intrepid's yard repairs it (2,500 cr, part of the repair bill).
+  - Ordinary plating damage is patched while the cells recharge at the ship.
+- **Specimens:** the shared slots (user's choice), with large creatures taking two. They sell at the Lyceum for 1.4–12 times a plant's price, earn the new-species bonus, and appear in the compendium's Fauna tab.
+- **Gear (AW-217):**
+  - Every rover carries a stun prod (user's choice): 1 hex, weak, 0.6 energy a shot.
+  - Lyceum: net launcher (7,000 cr, 2 hexes) and tangle cannon (16,000 cr, 3 hexes, holds far better). Nets take a hunter only once it's worn down to 40%.
+  - Midshipmen: stun gun (9,000 cr, 3 hexes) and rover laser (20,000 cr, 4 hexes, the hardest hitter, 2.2 energy a shot).
+  - Diggers: rover armour (10,000 cr, +30 plating and a quarter off each bite). The existing uprated motors now also set chase speed.
+  - Gear mounts on the boat too.
+- **Perks:** Fauna Handler (science) makes creature injuries one step lighter. Science level sharpens aim.
+- **Bots:** they rarely land on living worlds. Across 12 careers, a handful of fights and two wrecks; the career report stays within noise.
+
 ## Crew Injuries (AW-214) **[DECIDED 2026-11-03]**
 Officers can be hurt; the captain stays on the bridge. Code: `src/sim/injuries.ts`.
 

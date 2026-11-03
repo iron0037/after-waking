@@ -10,6 +10,7 @@ import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFo
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { diggersLeadOnDocked } from "./leads";
 import { injureCrew } from "./injuries";
+import { creatureWatch } from "./creatures";
 import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
@@ -40,6 +41,7 @@ import {
 } from "./ship";
 import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverState } from "./state";
 import { FLORA_BY_NAME } from "../data/catalog";
+import { CREATURES_BY_NAME } from "../data/creatures";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenKey } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
@@ -726,7 +728,7 @@ export function deployRover(state: GameState, world: World): Result<{ chargedHou
   advanceTime(state, 15 + chargedHours * HOUR);
   state.ship.roverEnergy = full;
   const home = shipTile(state, world);
-  loc.rover = { x: home.x, y: home.y, energy: full, cargo: {}, ...(hasPerk(state, "long-shifts") ? { spareCells: true } : {}) };
+  loc.rover = { x: home.x, y: home.y, energy: full, cargo: {}, hull: effectiveStats(state).roverHull, ...(hasPerk(state, "long-shifts") ? { spareCells: true } : {}) };
   revealAround(state, world);
   return ok({ chargedHours });
 }
@@ -787,6 +789,7 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { surface, rover, bodyId } = ctx.value;
+  if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
   const boat = vehicleOf(rover) === "boat";
   const path = findPath(surface, rover, { x, y }, vehicleMobility(state));
@@ -807,6 +810,9 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
     steps++;
     visitRegion(state, world, bodyId, step.x, step.y);
     revealAround(state, world);
+    // Creatures move as the rover does; a hunter that catches it gets a fight (AW-216).
+    const fight = creatureWatch(state, world, step.minutes * SHIFT_FACTOR * minutesMult);
+    if (fight && (fight.outcome === "disabled" || fight.outcome === "broke off")) return ok({ steps, stopped: fight.text });
   }
   return ok({ steps, stopped: null });
 }
@@ -973,10 +979,12 @@ export function prospect(state: GameState, world: World, key: SiteKey): Result<S
   const { d, know } = found.value;
   const { rover } = ctx.value;
   if (know.prospected.includes(d.id)) return ok(d);
+  if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   useSpareCells(state, rover, PROSPECT_ENERGY);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
   advanceTime(state, PROSPECT_MINUTES * SHIFT_FACTOR * (hasPerk(state, "assayer") ? 0.5 : 1));
+  creatureWatch(state, world, PROSPECT_MINUTES * SHIFT_FACTOR);
   know.prospected.push(d.id);
   awardXp(state, "science", 6);
   log(
@@ -1014,6 +1022,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   if (remaining <= 0) return fail("This deposit is worked out.");
   const bed = vehicleCargoT(state, vehicleOf(rover));
   const room = bed - cargoTonnes(rover.cargo);
+  if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   if (room <= 0.05) return fail(vehicleOf(rover) === "boat" ? "The boat's hold is full." : "The rover's cargo bed is full.");
 
   if (!know.drillSites.includes(d.id)) {
@@ -1044,6 +1053,7 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   rover.energy -= hours * DRILL_ENERGY_PER_HOUR;
   state.stats.tonnesMined += tonnes;
   advanceTime(state, hours * HOUR * SHIFT_FACTOR);
+  creatureWatch(state, world, hours * HOUR * SHIFT_FACTOR);
   log(state, "info", `${vehicleOf(rover) === "boat" ? "Dredged" : "Drilled"} ${tonnes} t of ${COMMODITIES[d.commodity].name.toLowerCase()} in ${formatDuration(hours * HOUR * SHIFT_FACTOR)}.`);
 
   const where = placeName(world, bodyId, state);
@@ -1174,10 +1184,12 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   if (hexDistance(site, rover) > 1) return fail(wet ? "Sail the boat next to it first." : "Drive the rover next to the plants first.");
   const slots = roverSpecimenSlots(state);
   if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
+  if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   useSpareCells(state, rover, SAMPLE_ENERGY);
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;
   advanceTime(state, SAMPLE_MINUTES * SHIFT_FACTOR);
+  creatureWatch(state, world, SAMPLE_MINUTES * SHIFT_FACTOR);
   rover.specimens ??= {};
   const specimen = specimenKey(bodyId, site.species);
   // Careful Hands: two samples from one site, if the cases have room.
@@ -1253,6 +1265,8 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   const hours = (full - rover.energy) / roverChargePerHour(state);
   advanceTime(state, hours * HOUR);
   rover.energy = full;
+  // The engineer patches the plating while the cells charge (AW-216).
+  rover.hull = effectiveStats(state).roverHull;
   // The spare pack charges alongside (Long Shifts).
   if (vehicleOf(rover) === "rover" && hasPerk(state, "long-shifts")) rover.spareCells = true;
   return ok({ hours });
@@ -1276,7 +1290,16 @@ export function recallRover(state: GameState, world: World): Result {
   const home = shipTile(state, world);
   rover.x = home.x;
   rover.y = home.y;
-  log(state, "warning", "Hopped the ship over to the rover and winched it aboard. It cost fuel and three hours.");
+  const wrecked = rover.disabled;
+  delete rover.disabled;
+  rover.hull = effectiveStats(state).roverHull;
+  log(
+    state,
+    "warning",
+    wrecked
+      ? "Hopped the ship over to the wrecked rover and winched it aboard. The engineer can get it driving, but its gear stays offline until the Intrepid's yard repairs it."
+      : "Hopped the ship over to the rover and winched it aboard. It cost fuel and three hours.",
+  );
   return ok(undefined);
 }
 
@@ -1382,7 +1405,9 @@ export const NEW_SPECIES_BONUS = 900;
 
 /** What the Lyceum pays per specimen under this key ("bodyId|species"): floating life is prized (priceMult), and the comms crew's bonus applies. */
 export function specimenUnitPrice(state: GameState, key: string): number {
-  const priceMult = FLORA_BY_NAME.get(key.split("|")[1] ?? "")?.priceMult ?? 1;
+  const species = key.split("|")[1] ?? "";
+  // Creatures (AW-215) fetch more than plants, the dangerous ones most of all.
+  const priceMult = FLORA_BY_NAME.get(species)?.priceMult ?? CREATURES_BY_NAME.get(species)?.priceMult ?? 1;
   return SPECIMEN_PRICE * priceMult * crewBonuses(state).specimenPrice * effectiveStats(state).specimenPriceMult * clanMods(state).specimenPrice;
 }
 

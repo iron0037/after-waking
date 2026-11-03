@@ -1,3 +1,4 @@
+import { CREATURES } from "../src/data/creatures";
 import { describe, expect, it } from "vitest";
 import { ORE_IDS } from "../src/data/commodities";
 import { FLORA, MINERAL_SPECIMENS, FLORA_BY_NAME } from "../src/data/catalog";
@@ -36,7 +37,7 @@ describe("compendium", () => {
     const { state } = runBot(42, 6);
     const totals = compendiumTotals(state);
     expect(totals.mineral.found).toBeGreaterThanOrEqual(3);
-    expect(totals.all.total).toBe(COMPENDIUM_MINERALS.length + MINERAL_SPECIMENS.length + FLORA.length);
+    expect(totals.all.total).toBe(COMPENDIUM_MINERALS.length + MINERAL_SPECIMENS.length + FLORA.length + CREATURES.length);
   });
 
   it("turns up mineral specimens over a career", () => {

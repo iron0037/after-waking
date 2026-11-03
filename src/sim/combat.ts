@@ -887,9 +887,13 @@ export function orderAdvice(state: GameState): OrderAdvice {
 
 // --- repairs at the Intrepid ------------------------------------------------------------------
 
+/** Repair points (1 cr each) to put a creature-wrecked rover right. */
+const ROVER_REPAIR_POINTS = 2_500;
+
 export function repairQuote(state: GameState): { cost: number; days: number } | null {
   const d = shipDamage(state);
-  const points = d.hull * 60 + (d.drives + d.weapons + d.sensors) * 40;
+  // A rover wrecked by a creature (AW-216) is fixed alongside.
+  const points = d.hull * 60 + (d.drives + d.weapons + d.sensors) * 40 + (state.ship.roverWrecked ? ROVER_REPAIR_POINTS : 0);
   if (points <= 0) return null;
   const days = 1 + Math.ceil((d.hull + d.drives + d.weapons + d.sensors) / 120);
   // Drive Repair (engineering): the yard work goes in half the time.
@@ -911,6 +915,7 @@ export function repairShip(state: GameState): Result<{ cost: number; days: numbe
 
 export function finishRepairs(state: GameState): void {
   state.ship.damage = undefined;
+  state.ship.roverWrecked = undefined;
   log(state, "trade", "The yard finished the repairs. The ship is whole again.");
 }
 

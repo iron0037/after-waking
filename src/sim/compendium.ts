@@ -10,6 +10,7 @@ import { COMMODITIES, LIQUID_IDS, ORE_IDS, type CommodityId } from "../data/comm
 /** What the Compendium lists as minerals: the ores, plus what's dredged from exotic seas (AW-189). */
 export const COMPENDIUM_MINERALS: readonly CommodityId[] = [...ORE_IDS, ...LIQUID_IDS];
 import { FLORA, MINERAL_SPECIMENS, type CompendiumKind, type MineralSpecimen } from "../data/catalog";
+import { CREATURES } from "../data/creatures";
 import type { Rng } from "./rng";
 import type { GameState } from "./state";
 import { noticeFind } from "./covenant";
@@ -40,6 +41,7 @@ export interface CompendiumTotals {
   mineral: { found: number; total: number };
   gem: { found: number; total: number };
   flora: { found: number; total: number };
+  fauna: { found: number; total: number };
   all: { found: number; total: number };
 }
 
@@ -48,11 +50,13 @@ export function compendiumTotals(state: GameState): CompendiumTotals {
   const mineral = { found: COMPENDIUM_MINERALS.filter((id) => has("mineral", id)).length, total: COMPENDIUM_MINERALS.length };
   const gem = { found: MINERAL_SPECIMENS.filter((g) => has("gem", g.id)).length, total: MINERAL_SPECIMENS.length };
   const flora = { found: FLORA.filter((f) => has("flora", f.id)).length, total: FLORA.length };
+  const fauna = { found: CREATURES.filter((c) => has("fauna", c.id)).length, total: CREATURES.length };
   return {
     mineral,
     gem,
     flora,
-    all: { found: mineral.found + gem.found + flora.found, total: mineral.total + gem.total + flora.total },
+    fauna,
+    all: { found: mineral.found + gem.found + flora.found + fauna.found, total: mineral.total + gem.total + flora.total + fauna.total },
   };
 }
 

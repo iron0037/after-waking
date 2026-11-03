@@ -3,7 +3,8 @@
  * as a top-down tile map (one tile ≈ 2 km). Terrain and deposits regenerate from the seed;
  * what the player has discovered or dug out is stored separately in RegionKnowledge.
  */
-import { floraSitesRange, hiddenSeamChance, oreCountMult, oreTonnageMult } from "./settings";
+import { badlandsChance, floraSitesRange, hiddenSeamChance, hostileLifeOf, oreCountMult, oreTonnageMult, universeOf } from "./settings";
+import { CREATURES, type CreatureEntry } from "../data/creatures";
 import { SEAS } from "../data/seas";
 import { COMMODITIES, type CommodityId } from "../data/commodities";
 import { climateOf, FLORA } from "../data/catalog";
@@ -84,8 +85,22 @@ export interface RegionMap {
   deposits: Deposit[];
   /** Specimen sites, on living worlds only. */
   flora: FloraSite[];
+  /** Where creatures start out (AW-215), on living worlds only; where they are now lives in the save. */
+  creatures?: CreatureSpawn[];
   landing: Vec2;
 }
+
+/** A creature's starting place in a region (region-local coordinates). */
+export interface CreatureSpawn {
+  id: number;
+  /** CreatureEntry id. */
+  species: string;
+  x: number;
+  y: number;
+}
+
+/** Creature ids start here, clear of deposits, flora and the sea sites. */
+export const CREATURE_ID_BASE = 200;
 
 /** What the player knows about a region. Lives in the save file. */
 export interface RegionKnowledge {
@@ -255,6 +270,91 @@ export function regionLifeSignal(seed: number, body: Body, region: number): numb
 export function regionRareSpecies(seed: number, body: Body, region: number): string[] {
   const rare = new Set(FLORA.filter((f) => f.rarity === 3).map((f) => f.name));
   return [...new Set(regionFlora(seed, body, region).map((f) => f.species).filter((s) => rare.has(s)))];
+}
+
+// --- creatures (AW-215) --------------------------------------------------------------------------
+
+/**
+ * A Badlands world: an uncharted living world ruled by apex predators. The first scouts never charted one (the
+ * ones who found them didn't come back to report). None at all with Hostile life set to None.
+ */
+export function isBadlands(seed: number, body: Body): boolean {
+  if (!body.life || body.sea || body.easy || body.nickname || body.surface === "none") return false;
+  if (frontierOf(seed, body).frontier !== "uncharted") return false;
+  return rngFor(seed, body.id, "badlands").next() < badlandsChance(seed);
+}
+
+/** Can hostile or territorial creatures live here? Never with Hostile life off, in the home systems, or on named worlds like the Meadow. */
+export function hostilesAllowed(seed: number, body: Body): boolean {
+  return hostileLifeOf(seed) !== "none" && !body.easy && !body.nickname && frontierOf(seed, body).frontier !== "home";
+}
+
+const fierce = (c: CreatureEntry) => c.temperament === "hostile" || c.temperament === "territorial";
+
+/** The creature species of a living world (ids), land and sea, stable per body. */
+export function bodyCreatureSpecies(seed: number, body: Body): { land: string[]; sea: string[] } {
+  if (!body.life) return { land: [], sea: [] };
+  const climate = climateOf(body.tempC);
+  const badlands = isBadlands(seed, body);
+  const hostile = hostilesAllowed(seed, body);
+  const many = hostileLifeOf(seed) === "plentiful";
+  const weight = (c: CreatureEntry): number => {
+    let w = c.rarity === 1 ? 6 : c.rarity === 2 ? 3 : 1;
+    if (fierce(c)) w *= badlands ? 4 : many ? 2 : 1;
+    if (c.badlands) w *= 6;
+    return w;
+  };
+  const choose = (pool: CreatureEntry[], tag: string, lo: number, hi: number): string[] => {
+    if (pool.length === 0) return [];
+    const rng = rngFor(seed, body.id, tag);
+    const want = Math.min(pool.length, rng.int(lo, hi));
+    const picked = new Set<string>();
+    for (let guard = 0; picked.size < want && guard < 200; guard++) picked.add(rng.weighted(pool.map((c) => [c.id, weight(c)] as const)));
+    return [...picked];
+  };
+  const allowed = (c: CreatureEntry) => (hostile || !fierce(c)) && (badlands || !c.badlands);
+  // Land animals don't live on worlds whose life is all in an exotic sea (AW-189), as with plants.
+  const land = body.sea ? [] : CREATURES.filter((c) => !c.aquatic && c.climates.includes(climate) && allowed(c));
+  const wet = !body.sea && (body.kind === "terrestrial" || body.kind === "ocean") && body.tempC >= -10;
+  const sea = wet ? CREATURES.filter((c) => c.aquatic && c.climates.includes(climate) && allowed(c)) : [];
+  return { land: choose(land, "creature-species", badlands ? 4 : 3, badlands ? 6 : 5), sea: choose(sea, "sea-creature-species", 1, 2) };
+}
+
+/** Creatures in one region, placed with their own streams so no deposit or plant moves. */
+function regionCreatures(seed: number, body: Body, region: number, terrain: Uint8Array, w: number, h: number, landing: Vec2): CreatureSpawn[] {
+  const species = bodyCreatureSpecies(seed, body);
+  if (species.land.length + species.sea.length === 0) return [];
+  const rng = rngFor(seed, body.id, region, "creatures");
+  const badlands = isBadlands(seed, body);
+  const life = universeOf(seed).life;
+  const [lo, hi] = life === "scarce" ? [1, 3] : life === "plentiful" ? [3, 6] : [2, 4];
+  const out: CreatureSpawn[] = [];
+  const place = (id: string, water: boolean): void => {
+    const entry = CREATURES.find((c) => c.id === id);
+    const keepOff = entry && fierce(entry) ? 7 : 4;
+    for (let tries = 0; tries < 120; tries++) {
+      const x = rng.int(1, w - 2);
+      const y = rng.int(1, h - 2);
+      const t = terrain[y * w + x] as Terrain;
+      if (water ? t !== Terrain.liquid : TERRAIN_INFO[t].passable === "no") continue;
+      if (hexDistance({ x, y }, landing) < keepOff) continue;
+      out.push({ id: CREATURE_ID_BASE + out.length, species: id, x, y });
+      return;
+    }
+  };
+  if (species.land.length > 0) {
+    const n = rng.int(lo, hi) + (badlands ? 3 : 0);
+    for (let i = 0; i < n; i++) place(rng.pick(species.land), false);
+  }
+  if (species.sea.length > 0) {
+    let water = 0;
+    for (let i = 0; i < terrain.length; i++) if (terrain[i] === Terrain.liquid) water++;
+    if (water >= w * h * 0.05) {
+      const n = rng.int(1, 2);
+      for (let i = 0; i < n; i++) place(rng.pick(species.sea), true);
+    }
+  }
+  return out;
 }
 
 const galaxyCache = new Map<number, Galaxy>();
@@ -511,7 +611,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   deposits.push(...sea.deposits);
   flora.push(...sea.flora);
 
-  return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, landing };
+  const creatures = regionCreatures(seed, body, region, terrain, w, h, landing);
+  return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, creatures, landing };
 }
 
 /** Elevation below which a world with exotic seas is sea: lowland seas and lakes, like a terrestrial world's. */

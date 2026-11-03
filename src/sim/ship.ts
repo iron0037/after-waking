@@ -2,6 +2,7 @@
 import type { ShipDamage } from "./combat";
 import type { CommodityId } from "../data/commodities";
 import { BASE_STATS, UPGRADES_BY_ID, type ShipStats } from "../data/ship";
+import { CREATURES_BY_NAME } from "../data/creatures";
 
 export type Cargo = Partial<Record<CommodityId, number>>;
 
@@ -14,6 +15,8 @@ export interface ShipState {
   roverEnergy?: number;
   /** Battle damage carried until the Intrepid's yard repairs it (combat v1). */
   damage?: ShipDamage;
+  /** A creature wrecked the rover (AW-216): its gear is offline until the yard repairs it. */
+  roverWrecked?: boolean;
   /** Boat cell charge while stowed (AW-17). */
   boatEnergy?: number;
   /** Live specimens in the containment racks, keyed "bodyId|species". */
@@ -25,9 +28,10 @@ export interface ShipState {
 export const SHIP_SPECIMEN_SLOTS = 16;
 export const ROVER_SPECIMEN_SLOTS = 6;
 
+/** Slots used by specimens keyed "bodyId|species": plants take one, large creatures two (AW-215). */
 export function specimenCount(specimens: Record<string, number> | undefined): number {
   let n = 0;
-  for (const v of Object.values(specimens ?? {})) n += v;
+  for (const [key, v] of Object.entries(specimens ?? {})) n += v * (CREATURES_BY_NAME.get(key.split("|")[1] ?? "")?.size ?? 1);
   return n;
 }
 

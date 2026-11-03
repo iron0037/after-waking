@@ -42,7 +42,7 @@ const TREES: Record<Station, readonly (readonly Row[])[]> = {
       ["field-botanist", "Field Botanist", "Sensors flag plant sites out to +50% range as unidentified readings (?). Get close to see what they are."],
       ["careful-hands", "Careful Hands", "Each collection yields two samples, if there's room."],
       ["ecologist", "Ecologist", "Sensors pick up plant sites other crews miss."],
-      ["fauna-handler", "Fauna Handler", "Less harm from hostile specimens.", "hostile life"],
+      ["fauna-handler", "Fauna Handler", "Creature attacks hurt the crew one step less."],
       ["xenologist", "Xenologist", "+2 effective Comms levels in first contact; alien biology dialogue.", "M6 aliens"],
     ],
     [

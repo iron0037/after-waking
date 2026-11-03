@@ -6,12 +6,15 @@ import { useState } from "preact/hooks";
 import { COMMODITIES } from "../data/commodities";
 import { SEAS } from "../data/seas";
 import { FLORA, MINERAL_SPECIMENS, type Rarity } from "../data/catalog";
+import { CREATURES } from "../data/creatures";
 import { COMPENDIUM_MINERALS, compendiumKey, compendiumTotals, formatDate, type CompendiumRecord } from "../sim";
 import { CompIcon, useSpriteIndex } from "./compendiumSprites";
 import { RarityLegend } from "./rarity";
 import type { GameSession } from "./session";
 
-type Tab = "flora" | "minerals" | "artifacts";
+type Tab = "flora" | "fauna" | "minerals" | "artifacts";
+
+const TEMPERAMENT_HINT = { skittish: "runs from the rover", docile: "pays the rover no mind", territorial: "defends its patch", hostile: "hunts the rover" } as const;
 
 const RARITY: Record<Rarity, string> = { 1: "common", 2: "uncommon", 3: "rare" };
 const CLIMATE_HINT = { cold: "cold worlds", temperate: "temperate worlds", warm: "warm worlds" } as const;
@@ -45,6 +48,18 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
   });
   const flora: Card[] = FLORA.filter((f) => !f.floating).map(floraCard);
   const floating: Card[] = FLORA.filter((f) => f.floating).map(floraCard);
+  // Creatures (AW-215): land and sea, and the Badlands' apex predators.
+  const creatureCard = (c: (typeof CREATURES)[number]): Card => ({
+    key: compendiumKey("fauna", c.id),
+    name: c.name,
+    color: c.color,
+    blurb: c.blurb,
+    hint: `${c.badlands ? "Only on Badlands worlds" : c.aquatic ? `In the seas of ${c.climates.map((k) => CLIMATE_HINT[k]).join(" and ")}; meet it in the boat` : `Roams ${c.climates.map((k) => CLIMATE_HINT[k]).join(" and ")}`}; ${TEMPERAMENT_HINT[c.temperament]}`,
+    rarity: c.rarity,
+  });
+  const landFauna: Card[] = CREATURES.filter((c) => !c.aquatic && !c.badlands).map(creatureCard);
+  const seaFauna: Card[] = CREATURES.filter((c) => c.aquatic).map(creatureCard);
+  const badFauna: Card[] = CREATURES.filter((c) => c.badlands).map(creatureCard);
   const ores: Card[] = COMPENDIUM_MINERALS.map((id) => ({
     key: compendiumKey("mineral", id),
     name: COMMODITIES[id].name,
@@ -80,6 +95,9 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
           <button class={`chip ${tab === "flora" ? "" : "off"}`} onClick={() => setTab("flora")}>
             Flora {totals.flora.found}/{totals.flora.total}
           </button>
+          <button class={`chip ${tab === "fauna" ? "" : "off"}`} onClick={() => setTab("fauna")}>
+            Fauna {totals.fauna.found}/{totals.fauna.total}
+          </button>
           <button class={`chip ${tab === "minerals" ? "" : "off"}`} onClick={() => setTab("minerals")}>
             Minerals {totals.mineral.found + totals.gem.found}/{totals.mineral.total + totals.gem.total}
           </button>
@@ -102,6 +120,15 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
                   <Grid cards={floating} found={found} />
                 </>
               )}
+            </>
+          )}
+          {tab === "fauna" && (
+            <>
+              <Grid cards={landFauna} found={found} />
+              <h3>Sea life</h3>
+              <Grid cards={seaFauna} found={found} />
+              <h3>Badlands</h3>
+              <Grid cards={badFauna} found={found} />
             </>
           )}
           {tab === "minerals" && (
