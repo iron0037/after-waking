@@ -7,7 +7,7 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   test: {
     include: ["tests/**/*.test.ts"],
-    // Career-length tests take a few seconds locally and longer on CI runners.
-    testTimeout: 30_000,
+    // Career-length tests take a few seconds locally and much longer on CI runners (the bot sweeps regions, AW-220).
+    testTimeout: 120_000,
   },
 } as import("vite").UserConfig & { test: unknown });
