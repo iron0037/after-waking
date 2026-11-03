@@ -128,3 +128,19 @@ Trips were about 29 days, the bottom of the 1-3 month target, so a few dozen tri
 | Hiring hall turnover | 30 days | 60 days |
 
 Career report: trips now average 45-50 days; money per trip about where it was; no broke careers in either profile. The bot's "worth the wages" threshold dropped from 60 to 30 cr/h with the wages.
+
+## The bot plays like a captain: Helm's ask and Auto-explore (AW-220, 2026-11-03)
+
+A novice career on seed 42 ended with 11k credits and the note grown to 87k. A 30-seed census found 5 of 30 novice and 3 of 30 competent careers broke. Two bot habits caused it, not the economy:
+
+- **Helm's ask.** After the Small Operators' Fund steps in, Helm asks for a survey in return. The bot never flew it, so Helm shunned it for two years after every assist and the safety net disappeared. The bot now flies the asked-for survey first and hands in any ready contract at docking.
+- **Auto-explore.** On sparse worlds the bot hopped randomly a few times, found nothing worth drilling and lifted off with an empty hold (seed 10 came home empty on most trips). The bot now presses Auto-explore once a landing when nothing is in sight, as a player would.
+
+| 30-seed census, 60 trips, Normal settings | Broke (no cash, note over 60k) | Net worth below zero | Median net worth |
+|---|---|---|---|
+| Novice, before | 5 | 9 | 115k |
+| Novice, after | 0 | 0 | 689k |
+| Competent, before | 3 | 5 | 345k |
+| Competent, after | 0 | 0 | 769k |
+
+The career report's baseline moved with it. Competent careers now end around 840k (was 393k) and novices around 633k (was 196k), with trips of 50-75 days. The old bot underplayed: a captain who sweeps regions earns roughly twice what the reports used to show. Reward tuning done against the old numbers should be re-checked against these (AW-224).

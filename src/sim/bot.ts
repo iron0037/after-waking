@@ -55,6 +55,8 @@ import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
 import { frontierTonnage, REGION_SIZE, regionKey, regionSignal, scoutedShare } from "./surface";
 import { DAY } from "./units";
+import { completeContract, contractProgress, type Contract } from "./contracts";
+import { autoExplore, autoExploreBlockers } from "./autoexplore";
 import { World } from "./world";
 
 export interface BotReport {
@@ -146,7 +148,11 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     // The bot's crew spend their perk points the way recruits do.
     autoSpendCrew(state, rng);
 
-    const target = chooseSystem(state, world, novice ? rng : null);
+    // The survey Helm asked for in return for its help (AW-220): any captain who took the help flies it.
+    const ask = helmAsk(state);
+    const askSystem = ask ? (ask.surveyBodyIds?.[0]?.split(".")[0] ?? null) : null;
+    const askReachable = askSystem !== null && reachable(state, world, askSystem);
+    const target = askReachable ? askSystem : chooseSystem(state, world, novice ? rng : null);
     if (!target) {
       errors.push(`trip ${trip}: no reachable system with landable worlds`);
       break;
@@ -155,6 +161,14 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     if (must("fold out", fold(state, world, target)) === null) break;
 
     const tonnesBefore = state.stats.tonnesMined;
+    if (askReachable && ask) {
+      for (const id of ask.surveyBodyIds ?? []) {
+        if (state.surveyedBodies.includes(id)) continue;
+        if (must(`fly to survey ${id}`, flyPaying(state, world, { bodyId: id })) === null) break;
+        must(`scan ${id}`, scanBody(state, world));
+        must(`survey ${id}`, surveyBody(state, world));
+      }
+    }
     mineSystem(state, world, target, rng, must, survey, novice);
 
     // Stranded (it happens to new captains): call the Exchange for a tender.
@@ -172,6 +186,8 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
     if (must("fold home", home) === null) break;
 
     const sold = sellAll(state);
+    // Hand in any contract that's ready (the Helm survey above, mostly).
+    for (const c of state.contracts.filter((k) => k.status === "active")) if (contractProgress(state, c).ready) completeContract(state, c.id);
     tripsCompleted++;
     tripSummaries.push({
       system: world.system(target).system.name,
@@ -192,6 +208,17 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
 
   raids += state.journal.filter((j) => j.text.startsWith("Raider contact")).length;
   return { state, tripsCompleted, errors, tripSummaries, raids };
+}
+
+/** Helm's survey obligation still to fly, if any. */
+function helmAsk(state: GameState): Contract | undefined {
+  return state.contracts.find((c) => c.obligation && c.status === "active" && c.kind === "survey");
+}
+
+/** Can the ship fold there and back on the fuel aboard? */
+function reachable(state: GameState, world: World, systemId: string): boolean {
+  const out = foldPlan(state, world, systemId);
+  return out.blockers.filter((b) => !isWaitBlocker(b)).length === 0 && out.fuel * 2 + 4 <= state.ship.fuel;
 }
 
 function avgOf<T>(xs: readonly T[], f: (x: T) => number): number {
@@ -303,6 +330,7 @@ function workRegion(
   let stats = effectiveStats(state);
   const holdRoom = () => stats.cargoCapacityT - cargoTonnes(state.ship.cargo);
   let explores = 0;
+  let swept = false;
 
   must("deploy rover", deployRover(state, world));
   for (let guard = 0; guard < 60; guard++) {
@@ -360,6 +388,14 @@ function workRegion(
       continue;
     }
 
+    // Nothing worth drilling in sight: sweep the region the way a captain would, with Auto-explore (AW-220).
+    if (!swept) {
+      swept = true;
+      if (autoExploreBlockers(state, world).length === 0) {
+        const r = autoExplore(state, world);
+        if (r.ok) continue;
+      }
+    }
     if (explores >= 8) break;
     explores++;
     // Explore within the landing region (its deposits are the ones the bot ranks).
