@@ -7,6 +7,7 @@ import { COMMODITIES } from "../../data/commodities";
 import { CREATURES_BY_ID } from "../../data/creatures";
 import {
   mountainBlocker,
+  compendiumKey,
   visibleCreatures,
   creatureByKey,
   isHunter,
@@ -150,9 +151,8 @@ import {
   drawShoreTargets,
   drawTooltip,
   drawCreatures,
-  drawFightFx,
   type CreatureMark,
-  type FightFx,
+  TEMPERAMENT_COLOR,
   fitSize,
   tileAt,
   tileCenter,
@@ -168,6 +168,8 @@ import {
 import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
 import { CreaturePanel } from "./surface/CreaturePanel";
+import { CompIcon, useSpriteIndex } from "../compendiumSprites";
+import { FLORA_BY_NAME } from "../../data/catalog";
 import { terrainCache, type RegionImage } from "./surface/terrainImage";
 import "./surface.css";
 
@@ -402,8 +404,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       setHexSelRaw(null);
     }
   };
-  // Fight playback (AW-216): the sim works the fight out at once; the map plays it back, event by event.
-  const fightRef = useRef<{ report: FightReport; t0: number; per: number } | null>(null);
+  // Creature attempts are settled at once (AW-225); the newest one's result is announced once.
   const playedFightRef = useRef<number>(state.lastFight?.id ?? 0);
   const animRef = useRef<Anim | null>(null);
   const hoverRef = useRef<Hover | null>(null);
@@ -483,24 +484,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const selectedCreature: LiveCreature | null = creatureKey ? creatureByKey(state, world, loc.bodyId, creatureKey) : null;
   const creatureAt = (t: Vec2): LiveCreature | undefined => creatures.find((c) => c.x === t.x && c.y === t.y);
 
-  // A new fight in the sim: play it back on the map, holding input until it's done.
+  // A new attempt (the captain's, or a hunter that caught the rover mid-job): say how it went.
   const lastFight = state.lastFight;
   useEffect(() => {
     if (!lastFight || lastFight.id <= playedFightRef.current) return;
     playedFightRef.current = lastFight.id;
-    if (lastFight.bodyId !== loc.bodyId || lastFight.events.length === 0) return;
-    const per = Math.min(420, 9000 / lastFight.events.length);
-    fightRef.current = { report: lastFight, t0: performance.now(), per };
-    session.setBusy(true);
-    const done = setTimeout(() => {
-      fightRef.current = null;
-      session.setBusy(false);
-    }, per * lastFight.events.length + 400);
-    return () => {
-      clearTimeout(done);
-      fightRef.current = null;
-      session.setBusy(false);
-    };
+    if (lastFight.bodyId !== loc.bodyId) return;
+    const bad = lastFight.outcome === "disabled" || lastFight.outcome === "broke off" || lastFight.outcome === "escaped";
+    session.notify(lastFight.text, bad ? "error" : "info");
   }, [lastFight?.id]);
 
   /** The known deposit on a tile, if any (looked up in that tile's region). */
@@ -693,20 +684,6 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // Where the rover is (unit hex-pixel space): mid-drive it slides between hex centres along the path.
     let tile: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
     let roverUnit: Vec2 | null = tile ? unitPos(tile) : null;
-    // During fight playback the rover and creature stand where the event has them.
-    const fight = fightRef.current;
-    let fx: FightFx | null = null;
-    let fxP = 0;
-    if (fight) {
-      const k = Math.max(0, (t - fight.t0) / fight.per);
-      const i = Math.min(fight.report.events.length - 1, Math.floor(k));
-      fx = fight.report.events[i] ?? null;
-      fxP = Math.min(1, k - i);
-      if (fx && rover) {
-        tile = { x: fx.rover.x, y: fx.rover.y };
-        roverUnit = unitPos(tile);
-      }
-    }
     let spent = 0;
     if (anim) {
       const p = Math.min(anim.pts.length - 1, Math.max(0, (t - anim.t0) / STEP_MS));
@@ -855,14 +832,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
     const peaks = new Set(depMarks.filter(({ d }) => mountainBlocker(state, session.world, loc.bodyId, d)).map(({ d }) => d.key));
     drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM, peaks);
-    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, species: c.entry.id, x: c.x, y: c.y, color: c.entry.color, size: c.entry.size, hunter: isHunter(c.entry), down: c.down }));
-    if (fight && fx) {
-      const entry = CREATURES_BY_ID.get(fight.report.species);
-      const i = creatureMarks.findIndex((m) => m.key === fight.report.key);
-      const mark: CreatureMark = { key: fight.report.key, species: fight.report.species, x: fx.creature.x, y: fx.creature.y, color: entry?.color ?? "#ccc", size: entry?.size ?? 1, hunter: !!entry && isHunter(entry), down: false };
-      if (i >= 0) creatureMarks[i] = mark;
-      else creatureMarks.push(mark);
-    }
+    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, x: c.x, y: c.y, temperament: c.entry.temperament, rarity: c.entry.rarity, down: c.down }));
     drawCreatures(ctx, L, creatureMarks, creatureKey, t);
 
     // hover: route preview and tooltip
@@ -906,7 +876,6 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       }
     }
 
-    if (fx) drawFightFx(ctx, L, fx, fxP);
     if (hover) drawTooltip(ctx, w, h, hover.px, hover.py, hopping ? hopTooltip(hover.tile) : tooltipLines(hover.tile));
 
     // The region the ship is in is still being built: say so rather than showing a half-blank map.
@@ -1554,7 +1523,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         )}
 
         {creatures.length > 0 && (
-          <Section id="creatures" title="Creatures in sight" summary={`${creatures.length}`}>
+          <Section id="creatures" title="Creatures" summary={`${creatures.length}`}>
             <table class="data deposit-table">
               <thead>
                 <tr>
@@ -1574,7 +1543,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       title={c.entry.blurb}
                     >
                       <td>
-                        <span class="creature-dot" style={{ background: c.entry.color }} />
+                        <span class="creature-dot" style={{ background: TEMPERAMENT_COLOR[c.entry.temperament] }} />
                         {c.entry.name}
                       </td>
                       <td class="num">{hexDistance(home, c)}</td>
@@ -2075,6 +2044,9 @@ function FloraPanel({
   busy: boolean;
 }) {
   const sampled = floraStatus(know, site) === "sampled";
+  // The specimen's pixel portrait (AW-225), from the compendium atlas.
+  const sprites = useSpriteIndex();
+  const floraEntry = FLORA_BY_NAME.get(site.species);
   const dist = rover ? hexDistance(rover, site) : null;
   const near = dist !== null && dist <= 1;
   const loc = session.state.location;
@@ -2099,11 +2071,18 @@ function FloraPanel({
   };
   return (
     <Section id="plants" title="Selected plants" class="deposit-panel" revealKey={site.key}>
-      <div class="dep-title">
-        <LeafMark species={site.species} big />
-        <span>{site.species}</span>
-        <span class={`tag ${sampled ? "" : "new"}`}>{sampled ? "sampled" : "unsampled"}</span>
-        {wet && <span class="tag sea">sea life</span>}
+      <div class="creature-head">
+        {floraEntry && <CompIcon index={sprites} entryKey={compendiumKey("flora", floraEntry.id)} color={floraEntry.color} found />}
+        <div>
+          <div class="dep-title">
+            <LeafMark species={site.species} big />
+            <span>{site.species}</span>
+          </div>
+          <div class="dep-title">
+            <span class={`tag ${sampled ? "" : "new"}`}>{sampled ? "sampled" : "unsampled"}</span>
+            {wet && <span class="tag sea">sea life</span>}
+          </div>
+        </div>
       </div>
       <dl class="kv">
         <dt>Position</dt>

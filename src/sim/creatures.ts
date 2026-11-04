@@ -1,17 +1,16 @@
 /**
- * Creatures on the surface (AW-215, AW-216). Where each starts comes from the seed (RegionMap.creatures); where it
- * is now, and what's happened to it, lives in `state.fauna`.
+ * Creatures on the surface (AW-215, AW-216, AW-225). Where each starts comes from the seed (RegionMap.creatures);
+ * where it is now, and what's happened to it, lives in `state.fauna`.
  *
  * - **Roaming.** As time passes while landed, creatures near the vehicle move: skittish ones flee it, hunters come
  *   after it, the rest wander near home. No hunter comes within SAFE_RADIUS of the freighter.
- * - **Fights.** A hunter that gets in reach of the rover's gear (or bites range) starts a fight; the rover defends
- *   itself as it drives. The captain can also order a capture: the rover holds its ground against hunters and chases
- *   down the rest. Fights are worked out here in 10-minute rounds and handed to the UI as a list of events to play.
- * - **Energy.** Every shot and chase step draws rover energy. The rover breaks off while it still has the drive home
- *   plus a margin. If a hunter wrecks it first, it's disabled: the crew is hurt, the load is lost, the ship has to
- *   recover it, and its gear is offline until the Intrepid's yard repairs it.
- * - **Taken alive.** A creature brought down is stunned, never killed. In a capture it goes straight into the
- *   sample cases (if there's room); otherwise it's a pickup, like a plant, for 30 days.
+ * - **Seen.** Any creature standing on ground the sensors have swept is on the map, anywhere on the world.
+ * - **Attempts, as odds.** A capture, or a hunter catching the rover, is settled at once: the odds come from the
+ *   rover's speed, gear, plating and spare energy against the creature's speed, toughness and bite. The rover stays
+ *   where it is. Success costs the energy it took; failure leaves just enough to get home, and a hunter may hurt the
+ *   crew or wreck the rover (disabled until recalled; its gear offline until the yard repairs it).
+ * - **Taken alive.** A creature brought down is stunned, never killed: into the sample cases on a capture (if there's
+ *   room), otherwise a pickup for 30 days.
  */
 import { CREATURES_BY_ID, CREATURES_BY_NAME, type CreatureEntry } from "../data/creatures";
 import { VEHICLE_WEAPONS, type VehicleWeapon } from "../data/vehicleWeapons";
@@ -26,6 +25,7 @@ import { specimenCount } from "./ship";
 import { advanceTime, log, withRng, type GameState, type RoverState } from "./state";
 import { rngFor } from "./rng";
 import { siteKey, type SiteKey, type SurfaceCreature } from "./bodysurface";
+import { isExplored, regionKey } from "./surface";
 import { stationLevel } from "./crew";
 import { DAY, type Vec2 } from "./units";
 import { boatMobility, vehicleEnergyMax, vehicleOf } from "./vehicles";
@@ -39,9 +39,8 @@ export const SAFE_RADIUS = 2;
 const AWAKE_RADIUS = 14;
 /** A downed creature waits this long to be collected before it's gone. */
 export const DOWNED_DAYS = 30;
-/** Minutes in a fight round. */
+/** Minutes a round of shooting (or netting) takes. */
 export const ROUND_MINUTES = 10;
-const MAX_ROUNDS = 36;
 /** Hunters driven off leave the rover alone this long. */
 const CALM_MINUTES = 12 * 60;
 /** How far a wanderer strays from home. */
@@ -81,21 +80,10 @@ export interface LiveCreature {
 
 export type FightMode = "defend" | "capture";
 
-export interface FightEvent {
-  round: number;
-  kind: "fire" | "net" | "bite" | "chase" | "flee" | "approach" | "retreat" | "down" | "netted" | "escaped" | "breakoff" | "disabled";
-  /** Weapon id, for fire and net. */
-  weapon?: string;
-  hit?: boolean;
-  amount?: number;
-  rover: Vec2;
-  creature: Vec2;
-}
-
-export type FightOutcome = "captured" | "down" | "escaped" | "broke off" | "disabled" | "gave up";
+export type FightOutcome = "captured" | "down" | "escaped" | "broke off" | "disabled";
 
 export interface FightReport {
-  /** Increases with every fight, so the UI knows a new one to play. */
+  /** Increases with every attempt, so the UI can tell a new one. */
   id: number;
   bodyId: string;
   key: SiteKey;
@@ -103,7 +91,9 @@ export interface FightReport {
   mode: FightMode;
   outcome: FightOutcome;
   text: string;
-  events: FightEvent[];
+  /** The odds it was tried at, the energy it took and the minutes it ran. */
+  chance: number;
+  energy: number;
   minutes: number;
 }
 
@@ -154,20 +144,30 @@ export function creatureByKey(state: GameState, world: World, bodyId: string, ke
   return spawn ? live(state, bodyId, spawn) : null;
 }
 
-/** Sensor reach on this body (as for deposits): kept here to avoid a cycle with actions. */
-function sight(state: GameState): number {
-  return Math.max(2, 2 + effectiveStats(state).sensorTier);
+/** Is this planet-wide tile swept by the sensors? */
+function swept(state: GameState, world: World, bodyId: string, p: Vec2): boolean {
+  const local = world.surface(bodyId).toLocal(p.x, p.y);
+  const k = local ? state.regions[regionKey(bodyId, local.region)] : undefined;
+  return !!local && !!k && isExplored(k, local.x, local.y);
 }
 
-/** What the crew can see right now: creatures within sensor range of the vehicle or the ship. */
+/** Every creature standing on swept ground anywhere on this world (AW-225): what the map and the list show. */
 export function visibleCreatures(state: GameState, world: World): LiveCreature[] {
   const loc = state.location;
   if (loc.kind !== "surface") return [];
-  const eyes: Vec2[] = [shipTile(state, world)];
-  if (loc.rover) eyes.push(loc.rover);
-  const r = sight(state) + 2;
+  const bodyId = loc.bodyId;
+  const surface = world.surface(bodyId);
   const seen = new Map<string, LiveCreature>();
-  for (const eye of eyes) for (const c of creaturesNear(state, world, loc.bodyId, eye, r)) seen.set(c.key, c);
+  const consider = (c: LiveCreature | null) => {
+    if (c && !seen.has(c.key) && swept(state, world, bodyId, c)) seen.set(c.key, c);
+  };
+  // Regions with any swept ground: the creatures that start there...
+  for (const [key, k] of Object.entries(state.regions)) {
+    if (!key.startsWith(`${bodyId}#`) || !(k.explored?.length > 0)) continue;
+    for (const spawn of surface.creatures(Number(key.slice(bodyId.length + 1)))) consider(live(state, bodyId, spawn));
+  }
+  // ...and any that have wandered in from elsewhere.
+  for (const key of Object.keys(state.fauna?.[bodyId] ?? {})) consider(creatureByKey(state, world, bodyId, key));
   return [...seen.values()];
 }
 
@@ -314,11 +314,152 @@ export function stirCreatures(state: GameState, world: World, minutes: number): 
   return attacker;
 }
 
-// --- fights -----------------------------------------------------------------------------------------
+// --- fights: worked out at once, as odds (AW-225) --------------------------------------------------
 
 const DANGER_SEVERITY: Record<1 | 2 | 3, SeverityWeights> = { 1: [85, 14, 1], 2: [65, 30, 5], 3: [45, 40, 15] };
+/** Energy a hex of chasing costs, on average ground. */
+const CHASE_ENERGY_PER_HEX = 1.5;
+/** Minutes a hex of chasing takes. */
+const CHASE_MINUTES_PER_HEX = 12;
 
-/** Why a capture can't start (empty if it can). */
+/**
+ * What an attempt on a creature looks like before the crew commits: the odds, the energy it should take, and for a
+ * hunter, the risk to the crew and the rover. Everything the captain sees on the Attempt capture button.
+ */
+export interface CaptureOdds {
+  /** 0–1. */
+  chance: number;
+  /** Energy it should take if it works (the rover drives out, does the job, and comes back to where it is). */
+  energy: number;
+  /** Energy the rover can spend and still get home with a margin. */
+  budget: number;
+  /** Game minutes it should take. */
+  minutes: number;
+  /** Hunters: chance someone on the crew is hurt, either way. */
+  injuryRisk: number;
+  /** Hunters: chance the rover is wrecked if the attempt fails. */
+  wreckRisk: number;
+  /** The gear that does the work ("net launcher", "stun gun", or "nothing" with the gear offline). */
+  method: string;
+  /** What's weighing on the odds, in words. */
+  notes: string[];
+  /** Plating the rover should lose to bites if it works. */
+  hullLoss: number;
+}
+
+/** The odds of taking this creature from where the vehicle is now. Null if it isn't there to try. */
+export function captureOdds(state: GameState, world: World, key: SiteKey): CaptureOdds | null {
+  const loc = state.location;
+  if (loc.kind !== "surface" || !loc.rover) return null;
+  const v = loc.rover;
+  const c = creatureByKey(state, world, loc.bodyId, key);
+  if (!c || c.down) return null;
+  const surface = world.surface(loc.bodyId);
+  const notes: string[] = [];
+  const gear = vehicleWeapons(state);
+  const budget = Math.max(0, v.energy - energyReserve(state, world, v));
+  const hunter = isHunter(c.entry);
+  const roverSpeed = vehicleChaseSpeed(state, v);
+  const theirSpeed = c.entry.speed / 6;
+
+  // Out to it and back: the rover ends where it started.
+  const path = hexDistance(v, c) <= 1 ? [] : findPath(surface, v, c, mobilityOf(state, v));
+  const approachEnergy = path ? 2 * routeEnergy(state, path) : Infinity;
+  const approachMinutes = path ? 2 * path.reduce((m, s) => m + s.minutes, 0) * 1.5 : 0;
+
+  // The stunner that does the most per shot, aimed by the science officer.
+  const sci = stationLevel(state, "science");
+  const stunners = gear.filter((w) => w.kind !== "net");
+  const nets = gear.filter((w) => w.kind === "net").sort((a, b) => b.hit - a.hit);
+  const aim = (w: VehicleWeapon) => Math.min(0.95, w.hit + 0.02 * Math.max(0, sci - 1));
+  const best = [...stunners].sort((a, b) => b.damage * aim(b) - a.damage * aim(a))[0] ?? null;
+  const stunShots = best ? Math.ceil(c.hp / Math.max(0.1, best.damage * aim(best))) : Infinity;
+  const stunEnergy = best ? stunShots * best.energy : Infinity;
+  const net = nets[0] ?? null;
+  const netHold = net ? (net.hit / (c.entry.size === 2 ? 1.6 : 1)) * (hunter ? 0.7 : 1) : 0;
+  const netEnergy = net ? (1 / Math.max(0.05, netHold)) * net.energy : Infinity;
+
+  let chance = 1;
+  let energy = approachEnergy;
+  let minutes = approachMinutes;
+  let method = "nothing";
+  let injuryRisk = 0;
+  let wreckRisk = 0;
+  let hullLoss = 0;
+
+  // What a hunter's bites do over so many rounds alongside: plating lost, and the risk to the crew and the rover.
+  const bitesOver = (rounds: number): number => {
+    const dodge = roverSpeed > 1 ? 0.1 : 0;
+    const perBite = c.entry.attack * effectiveStats(state).roverArmour;
+    const expectedDamage = rounds * perBite * (0.6 - dodge);
+    const hull = hullOf(state, v);
+    hullLoss = Math.min(hull - 1, expectedDamage);
+    const perInjury = c.entry.danger > 0 ? Math.min(0.6, perBite / 25) : 0;
+    injuryRisk = 1 - Math.pow(1 - perInjury, rounds * (0.6 - dodge));
+    wreckRisk = Math.max(0, Math.min(0.7, expectedDamage / Math.max(1, hull) - 0.6));
+    if (expectedDamage > hull * 0.6) notes.push("It bites harder than the plating can take for long: armour would help.");
+    return expectedDamage;
+  };
+
+  if (gear.length === 0) {
+    chance = 0;
+    notes.push("The rover's gear is offline until the Intrepid's yard repairs it.");
+    // With nothing to fight back with, the rover can only run, and a hunter bites while it keeps up.
+    if (hunter) bitesOver(4 * Math.max(0.5, theirSpeed / Math.max(0.2, roverSpeed)));
+  } else if (hunter) {
+    // A fight: it closes from where it notices the rover, biting once it's alongside.
+    // Nets only hold a hunter once it's worn down: they finish what the stunner started.
+    method = best?.name ?? net?.name ?? "nothing";
+    const shots = net && best ? Math.ceil(stunShots * 0.6) + Math.ceil(1 / Math.max(0.05, netHold)) : stunShots;
+    energy += best ? Math.min(stunEnergy, Math.ceil(stunShots * 0.6) * best.energy + (net ? netEnergy : Infinity)) : netEnergy;
+    const reach = Math.max(1, best?.range ?? 1);
+    const freeRounds = (reach - 1) / Math.max(0.2, theirSpeed);
+    const biteRounds = Math.max(0, shots - freeRounds);
+    const expectedDamage = bitesOver(biteRounds);
+    chance *= Math.max(0.03, Math.min(0.97, 1.15 - (0.6 * expectedDamage) / Math.max(1, hullOf(state, v))));
+    minutes += shots * ROUND_MINUTES;
+    if (freeRounds < 1) notes.push(`It closes before the ${method} can wear it down: longer-reaching gear would help.`);
+  } else {
+    // A chase: skittish ones run from the start; docile ones only once they're shot at.
+    const scared = c.entry.temperament === "skittish" || !!state.fauna?.[loc.bodyId]?.[c.key]?.spooked;
+    const useNet = net !== null && (best === null || netEnergy <= stunEnergy);
+    method = useNet ? (net as VehicleWeapon).name : (best?.name ?? "nothing");
+    energy += useNet ? netEnergy : stunEnergy;
+    const reach = useNet ? (net as VehicleWeapon).range : (best?.range ?? 1);
+    const ratio = theirSpeed / Math.max(0.2, roverSpeed);
+    const lead = scared ? c.entry.sense : 1;
+    const chaseHexes = lead * Math.max(0.5, ratio) * 1.5;
+    energy += chaseHexes * CHASE_ENERGY_PER_HEX;
+    minutes += chaseHexes * CHASE_MINUTES_PER_HEX + (useNet ? 2 : stunShots) * ROUND_MINUTES;
+    // A runner as fast as the rover gets away about half the time from a prod; reach and motors claw that back.
+    const catchChance = scared ? 1.1 - 1.2 * (ratio - 0.7) + 0.12 * (reach - 1) : 1 - 0.2 * Math.max(0, ratio - 1) + 0.05 * (reach - 1);
+    chance *= Math.max(0.05, Math.min(0.97, catchChance));
+    if (useNet) chance *= Math.min(1, 0.6 + netHold);
+    if (scared && ratio > 1) notes.push(`It's faster than the ${vehicleOf(v) === "boat" ? "boat" : "rover"}: uprated motors or longer-reaching gear would help.`);
+  }
+
+  if (!path) {
+    chance = 0;
+    notes.push(`No route for the ${vehicleOf(v) === "boat" ? "boat" : "rover"} to reach it.`);
+  } else if (energy > budget) {
+    // Not enough to spare: the crew can still try, but it's likelier to run out of margin first.
+    chance *= budget <= 0 ? 0 : Math.pow(budget / energy, 1.5);
+    notes.push(`It should take about ${Math.round(energy)} energy and the rover can spare ${Math.round(budget)}.`);
+  }
+  return {
+    chance: Math.max(0, Math.min(0.97, chance)),
+    energy: Math.min(energy, Math.max(budget, 0)),
+    budget,
+    minutes: Math.max(ROUND_MINUTES, minutes),
+    injuryRisk,
+    wreckRisk,
+    method,
+    notes,
+    hullLoss,
+  };
+}
+
+/** Why a capture can't be tried (empty if it can). */
 export function captureBlockers(state: GameState, world: World, key: SiteKey): string[] {
   const loc = state.location;
   if (loc.kind !== "surface") return ["Not on a surface."];
@@ -329,235 +470,93 @@ export function captureBlockers(state: GameState, world: World, key: SiteKey): s
   if (!c) return ["That creature is gone."];
   if (c.down) return ["It's already down: drive alongside and collect it."];
   if (!!c.entry.aquatic !== (vehicleOf(rover) === "boat")) return [c.entry.aquatic ? "That lives in the water: take the boat out." : "That lives ashore: put the rover ashore."];
-  const gear = vehicleWeapons(state);
-  if (gear.length === 0) return ["The rover's gear is offline until the Intrepid's yard repairs it."];
-  if (!isHunter(c.entry) && hexDistance(rover, c) > 25) return ["Too far off: drive closer first."];
-  if (rover.energy < energyReserve(state, world, rover) + 2) return ["Not enough energy to spare for a chase: recharge first."];
+  if (vehicleWeapons(state).length === 0) return ["The rover's gear is offline until the Intrepid's yard repairs it."];
+  const odds = captureOdds(state, world, key);
+  if (!odds || odds.budget <= 0) return ["No energy to spare: the rover needs all it has to get home. Recharge first."];
+  if (odds.chance <= 0) return [odds.notes[0] ?? "No way to reach it from here."];
   return [];
 }
 
-/** The best shot this round: a net when it's the way to take it, else the hardest-hitting stunner in reach. */
-function chooseWeapon(gear: VehicleWeapon[], c: LiveCreature, d: number, capture: boolean): VehicleWeapon | null {
-  const inReach = gear.filter((w) => w.range >= d);
-  const nets = inReach.filter((w) => w.kind === "net").sort((a, b) => b.hit - a.hit);
-  const worn = c.hp <= c.maxHp * 0.4;
-  if (nets[0] && (capture || !isHunter(c.entry)) && (!isHunter(c.entry) || worn)) return nets[0];
-  const stunners = inReach.filter((w) => w.kind !== "net").sort((a, b) => b.damage * b.hit - a.damage * a.hit);
-  return stunners[0] ?? null;
-}
-
 /**
- * Fight it out with one creature. `defend`: a hunter has caught the rover (it fights back, and leaves a downed
- * creature where it falls). `capture`: the captain's order (the rover holds against hunters, chases the rest, and
- * takes the catch aboard if there's room).
+ * Settle an attempt on a creature at once (no play-by-play). `capture`: the captain's order. `defend`: a hunter caught
+ * the rover as it worked. The rover ends where it started.
+ * - Works: the creature is stunned (into the sample cases on a capture, if there's room; otherwise a pickup), and the
+ *   energy it took comes off the cells.
+ * - Fails: the rover is left with just enough to get home. A hunter may hurt the crew, and may wreck the rover.
  */
-export function fightCreature(state: GameState, world: World, key: SiteKey, mode: FightMode): Result<FightReport> {
+export function settleFight(state: GameState, world: World, key: SiteKey, mode: FightMode): Result<FightReport> {
   const loc = state.location;
-  if (loc.kind !== "surface") return fail("Not on a surface.");
+  if (loc.kind !== "surface" || !loc.rover) return fail("Deploy the rover first.");
   const v = loc.rover;
-  if (!v) return fail("Deploy the rover first.");
-  if (v.disabled) return fail("The rover is disabled. Recall it.");
   const c = creatureByKey(state, world, loc.bodyId, key);
   if (!c) return fail("That creature is gone.");
   if (c.down) return fail("It's already down.");
   const bodyId = loc.bodyId;
-  const surface = world.surface(bodyId);
-  const ship = shipTile(state, world);
-  const fauna = faunaOf(state, bodyId);
-  const f = (fauna[c.key] ??= { x: c.x, y: c.y });
-  const gear = vehicleWeapons(state);
-  const capture = mode === "capture";
+  const odds = captureOdds(state, world, key);
+  if (!odds) return fail("That creature is gone.");
+  const f = (faunaOf(state, bodyId)[c.key] ??= { x: c.x, y: c.y });
   const hunter = isHunter(c.entry);
-  const vmob = mobilityOf(state, v);
-  const events: FightEvent[] = [];
-  const start = state.time;
-  const sci = stationLevel(state, "science");
-  let vMove = 0;
-  let cMove = 0;
-  let outcome: FightOutcome = "gave up";
-  let hull = hullOf(state, v);
-  const push = (round: number, kind: FightEvent["kind"], extra: Partial<FightEvent> = {}) =>
-    events.push({ round, kind, rover: { x: v.x, y: v.y }, creature: { x: c.x, y: c.y }, ...extra });
-
-  const creatureStep = (toward: Vec2, sign: 1 | -1): boolean => {
-    const n = stepCreature(world, bodyId, c, toward, sign, hunter ? ship : null);
-    if (!n) return false;
-    setPos(state, bodyId, c, n);
-    return true;
-  };
-  const vehicleStep = (toward: Vec2): number => {
-    const path = findPath(surface, v, toward, vmob);
-    const step = path?.[0];
-    if (!step) return 0;
-    const cost = routeEnergy(state, [step]);
-    v.energy -= cost;
-    v.x = step.x;
-    v.y = step.y;
-    return cost;
-  };
-  /** The creature's turn: hunters close and bite, the rest flee (or ignore). */
-  const creatureTurn = (round: number): void => {
-    if (c.down) return;
-    const d = hexDistance(v, c);
-    if (hunter) {
-      if (d > 1) {
-        cMove += c.entry.speed / 6;
-        while (cMove >= 1 && hexDistance(v, c) > 1) {
-          cMove -= 1;
-          if (!creatureStep(v, 1)) break;
-          push(round, "approach");
-        }
-        return;
-      }
-      const dodge = vehicleChaseSpeed(state, v) > 1 ? 0.1 : 0;
-      const bit = withRng(state, (rng) => rng.chance(0.6 - dodge));
-      const dmg = bit ? Math.round(c.entry.attack * effectiveStats(state).roverArmour * withRng(state, (rng) => rng.range(0.7, 1.3))) : 0;
-      hull -= dmg;
-      push(round, "bite", { hit: bit, amount: dmg });
-      if (bit) {
-        awardXp(state, "engineering", 1);
-        const danger = Math.max(1, c.entry.danger) as 1 | 2 | 3;
-        if (c.entry.danger > 0 && withRng(state, (rng) => rng.chance(Math.min(0.6, dmg / 25)))) {
-          injureCrew(state, {
-            stations: vehicleOf(v) === "boat" ? ["science", "engineering", "medical"] : ["engineering", "science"],
-            cause: `mauled by a ${c.entry.name}`,
-            weights: DANGER_SEVERITY[danger],
-            lighten: hasPerk(state, "fauna-handler") ? 1 : 0,
-          });
-        }
-      }
-      return;
-    }
-    const scared = c.entry.temperament === "skittish" || f.spooked;
-    if (scared && d <= c.entry.sense + 2) {
-      cMove += c.entry.speed / 6;
-      while (cMove >= 1) {
-        cMove -= 1;
-        if (!creatureStep(v, -1)) break;
-        push(round, "flee");
-      }
-    }
-  };
-
-  for (let round = 1; round <= MAX_ROUNDS; round++) {
-    advanceTime(state, ROUND_MINUTES);
-    const d = hexDistance(v, c);
-    const reserve = energyReserve(state, world, v);
-    // The rover's turn. With its gear offline it can only run for it.
-    if (gear.length === 0) {
-      outcome = "broke off";
-      push(round, "breakoff");
-      break;
-    }
-    const w = chooseWeapon(gear, c, d, capture);
-    if (w) {
-      if (v.energy - w.energy < reserve) {
-        outcome = "broke off";
-        push(round, "breakoff");
-        break;
-      }
-      v.energy -= w.energy;
-      if (w.kind === "net") {
-        const hold = (w.hit / (c.entry.size === 2 ? 1.6 : 1)) * (hunter ? 0.7 : 1);
-        const held = withRng(state, (rng) => rng.chance(hold));
-        push(round, "net", { weapon: w.id, hit: held });
-        if (held) {
-          outcome = "captured";
-          break;
-        }
-      } else {
-        const aim = Math.min(0.95, w.hit + 0.02 * Math.max(0, sci - 1));
-        const hit = withRng(state, (rng) => rng.chance(aim));
-        const dmg = hit ? Math.round(w.damage * withRng(state, (rng) => rng.range(0.8, 1.2))) : 0;
-        f.hurt = (f.hurt ?? 0) + dmg;
-        c.hp = Math.max(0, c.maxHp - f.hurt);
-        push(round, "fire", { weapon: w.id, hit, amount: dmg });
-        if (hit) awardXp(state, "science", 2);
-        if (!hunter) f.spooked = true;
-        if (c.hp <= 0) {
-          outcome = capture ? "captured" : "down";
-          break;
-        }
-      }
-    } else if (capture && !hunter) {
-      // Run it down: the gear can't reach it yet.
-      if (v.energy - 1.5 < reserve) {
-        outcome = "broke off";
-        push(round, "breakoff");
-        break;
-      }
-      vMove += vehicleChaseSpeed(state, v);
-      let moved = false;
-      while (vMove >= 1 && hexDistance(v, c) > 1 && v.energy - 1.5 >= reserve) {
-        vMove -= 1;
-        if (vehicleStep(c) <= 0) break;
-        moved = true;
-      }
-      if (moved) push(round, "chase");
-    }
-    // Otherwise a hunter is still out of reach: hold and let it come.
-    creatureTurn(round);
-    if (hull <= 0) {
-      outcome = "disabled";
-      push(round, "disabled");
-      break;
-    }
-    if (!hunter && hexDistance(v, c) > c.entry.sense + 4) {
-      outcome = "escaped";
-      push(round, "escaped");
-      break;
-    }
-  }
-
-  // A rover breaking off from a hunter runs for the ship; the hunter chases while it can keep up.
-  if (outcome === "broke off" && hunter) {
-    const dock = dockOf(state, world, v);
-    for (let round = MAX_ROUNDS + 1; round <= MAX_ROUNDS + 6; round++) {
-      if (hexDistance(v, dock) <= SAFE_RADIUS || hexDistance(v, c) > 3) break;
-      advanceTime(state, ROUND_MINUTES);
-      vMove += vehicleChaseSpeed(state, v);
-      while (vMove >= 1) {
-        vMove -= 1;
-        vehicleStep(dock);
-      }
-      push(round, "retreat");
-      creatureTurn(round);
-      if (hull <= 0) {
-        outcome = "disabled";
-        push(round, "disabled");
-        break;
-      }
-    }
-    if (outcome !== "disabled") f.calmUntil = state.time + CALM_MINUTES;
-  }
-  v.hull = Math.max(0, hull);
-
-  // Settle the outcome.
   const name = c.entry.name;
-  const where = placeName(world, bodyId, state);
-  let text: string;
-  if (outcome === "captured" || outcome === "down") {
-    f.downAt = state.time;
-    if (outcome === "captured") {
-      const r = takeAboard(state, bodyId, c);
-      text = r ? `Captured a ${name}: it's in the sample cases.` : `Brought down a ${name}, but the sample cases are full: it's waiting, stunned, for ${DOWNED_DAYS} days.`;
-      if (!r) outcome = "down";
-    } else {
-      text = `Brought down a ${name}. It's out cold where it fell: collect it within ${DOWNED_DAYS} days.`;
-    }
-    awardXp(state, "captain", 5);
-    recordFind(state, "fauna", c.entry.id, where, name);
-  } else if (outcome === "disabled") {
-    disable(state, c.entry);
-    text = `The ${name} wrecked the ${vehicleOf(v) === "boat" ? "boat" : "rover"}. The crew is shaken and hurt, and the load is lost. Recall it with the ship.`;
-  } else if (outcome === "broke off") {
-    text = hunter ? `The rover broke off from the ${name} to keep enough energy to get home.` : `The rover gave up on the ${name}: no energy to spare for the chase.`;
-  } else if (outcome === "escaped") {
-    text = `The ${name} got away.`;
-  } else {
-    text = `The ${name} kept its distance; the crew called it off.`;
+  const noun = vehicleOf(v) === "boat" ? "boat" : "rover";
+  const won = withRng(state, (rng) => rng.chance(odds.chance));
+  const minutes = Math.round(odds.minutes * withRng(state, (rng) => rng.range(0.8, 1.2)));
+  advanceTime(state, minutes);
+  const hurt = hunter && withRng(state, (rng) => rng.chance(odds.injuryRisk));
+  if (hurt) {
+    injureCrew(state, {
+      stations: noun === "boat" ? ["science", "engineering", "medical"] : ["engineering", "science"],
+      cause: `mauled by a ${name}`,
+      weights: DANGER_SEVERITY[Math.max(1, c.entry.danger) as 1 | 2 | 3],
+      lighten: hasPerk(state, "fauna-handler") ? 1 : 0,
+    });
   }
-  log(state, outcome === "disabled" ? "warning" : outcome === "captured" || outcome === "down" ? "discovery" : "info", text);
+  let outcome: FightOutcome;
+  let text: string;
+  const before = v.energy;
+  if (won) {
+    v.energy = Math.max(v.energy - odds.budget, v.energy - odds.energy * withRng(state, (rng) => rng.range(0.85, 1.15)));
+    v.hull = Math.max(1, hullOf(state, v) - Math.round(odds.hullLoss * withRng(state, (rng) => rng.range(0.6, 1.2))));
+    f.downAt = state.time;
+    awardXp(state, "science", 4);
+    awardXp(state, "captain", 5);
+    recordFind(state, "fauna", c.entry.id, placeName(world, bodyId, state), name);
+    if (mode === "capture" && takeAboard(state, bodyId, c)) {
+      outcome = "captured";
+      text = `Captured a ${name} with the ${odds.method}: it's in the sample cases.`;
+    } else {
+      outcome = "down";
+      text =
+        mode === "capture"
+          ? `Brought down a ${name}, but the sample cases are full: it lies stunned for ${DOWNED_DAYS} days.`
+          : `A ${name} went for the ${noun}; the crew stunned it. It lies out cold nearby: collect it within ${DOWNED_DAYS} days.`;
+    }
+  } else {
+    // Out of margin: the crew gives up with just enough left to get home.
+    v.energy = Math.min(v.energy, Math.max(0, v.energy - odds.budget));
+    if (hunter) {
+      f.hurt = (f.hurt ?? 0) + Math.round(c.hp * 0.4);
+      f.calmUntil = state.time + CALM_MINUTES;
+      if (withRng(state, (rng) => rng.chance(odds.wreckRisk))) {
+        disable(state, c.entry);
+        outcome = "disabled";
+        text = `The ${name} wrecked the ${noun}. The crew is shaken and hurt, and the load is lost. Recall it with the ship.`;
+      } else {
+        outcome = "broke off";
+        text = `The ${noun} broke off from the ${name} with just enough energy to get home. It's wary of you now, for a while.`;
+      }
+    } else {
+      f.spooked = true;
+      // It runs off out of sight of the chase.
+      for (let i = 0; i < c.entry.sense; i++) {
+        const n = stepCreature(world, bodyId, c, v, -1, null);
+        if (!n) break;
+        setPos(state, bodyId, c, n);
+      }
+      outcome = "escaped";
+      text = `The ${name} got away; the ${noun} turned back with just enough energy to get home.`;
+    }
+  }
+  log(state, outcome === "disabled" ? "warning" : won ? "discovery" : "info", text);
   const report: FightReport = {
     id: (state.lastFight?.id ?? 0) + 1,
     bodyId,
@@ -566,8 +565,9 @@ export function fightCreature(state: GameState, world: World, key: SiteKey, mode
     mode,
     outcome,
     text,
-    events,
-    minutes: state.time - start,
+    chance: odds.chance,
+    energy: Math.max(0, before - v.energy),
+    minutes,
   };
   state.lastFight = report;
   return ok(report);
@@ -609,43 +609,11 @@ function disable(state: GameState, c: CreatureEntry): void {
 
 // --- the captain's orders ---------------------------------------------------------------------------
 
-/**
- * Order a capture. If the creature is out of its notice range, the rover first drives up toward it (defending
- * itself as usual on the way); then it fights or chases until the creature is taken, gets away, or the energy
- * margin is reached.
- */
+/** Order a capture: settled at once from where the vehicle stands (AW-225). */
 export function captureCreature(state: GameState, world: World, key: SiteKey): Result<FightReport> {
   const blockers = captureBlockers(state, world, key);
   if (blockers.length > 0) return fail(blockers[0] as string);
-  const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
-  const v = loc.rover as RoverState;
-  const c = creatureByKey(state, world, loc.bodyId, key) as LiveCreature;
-  const surface = world.surface(loc.bodyId);
-  // Close in: hunters until they notice the rover, the rest until the gear (or a short dash) can reach.
-  const near = isHunter(c.entry) ? Math.max(1, Math.min(c.entry.sense, 4)) : Math.max(2, Math.min(c.entry.sense - 1, 4));
-  const lead: FightEvent[] = [];
-  if (hexDistance(v, c) > near) {
-    const path = findPath(surface, v, c, mobilityOf(state, v)) ?? [];
-    for (const step of path) {
-      if (hexDistance(step, c) < near) break;
-      const cost = routeEnergy(state, [step]);
-      if (v.energy - cost < energyReserve(state, world, v) + 2) return fail("Not enough energy to get close and still get home.");
-      v.energy -= cost;
-      v.x = step.x;
-      v.y = step.y;
-      lead.push({ round: 0, kind: "chase", rover: { x: v.x, y: v.y }, creature: { x: c.x, y: c.y } });
-      advanceTime(state, step.minutes * 1.5);
-      // A different hunter can jump the rover on the way.
-      const other = stirCreatures(state, world, step.minutes * 1.5);
-      if (other && other.key !== key) {
-        const r = fightCreature(state, world, other.key, "defend");
-        if (!r.ok || r.value.outcome === "disabled" || r.value.outcome === "broke off") return r;
-      }
-    }
-  }
-  const r = fightCreature(state, world, key, "capture");
-  if (r.ok) r.value.events.unshift(...lead.slice(-12));
-  return r;
+  return settleFight(state, world, key, "capture");
 }
 
 /** Collect a downed creature beside the vehicle. */
@@ -682,6 +650,6 @@ export function creatureKey(region: number, id: number): SiteKey {
 export function creatureWatch(state: GameState, world: World, minutes: number): FightReport | null {
   const attacker = stirCreatures(state, world, minutes);
   if (!attacker) return null;
-  const r = fightCreature(state, world, attacker.key, "defend");
+  const r = settleFight(state, world, attacker.key, "defend");
   return r.ok ? r.value : null;
 }

@@ -1,30 +1,34 @@
 /**
- * The selected creature (AW-215/216): what it is, how it behaves, and the orders the crew can take: attempt a
- * capture, or load one that's already down. The fight itself is worked out in src/sim/creatures.ts.
+ * The selected creature (AW-215, AW-225): its portrait, how it behaves, and the odds of taking it from where the
+ * vehicle stands. The attempt itself is settled at once in src/sim/creatures.ts; the rover doesn't move.
  */
-import { VEHICLE_WEAPONS } from "../../../data/vehicleWeapons";
 import {
   captureBlockers,
   captureCreature,
+  captureOdds,
   collectCreature,
+  compendiumKey,
   DOWNED_DAYS,
   formatDuration,
   isHunter,
-  vehicleWeapons,
   type LiveCreature,
   type RoverState,
 } from "../../../sim";
 import { hexDistance } from "../../../sim/hex";
 import { DAY } from "../../../sim/units";
+import { CompIcon, useSpriteIndex } from "../../compendiumSprites";
 import { Section } from "../../Section";
 import type { GameSession } from "../../session";
+import { TEMPERAMENT_COLOR } from "./mapDraw";
 
 const TEMPERAMENT: Record<string, { label: string; cls: string; hint: string }> = {
   hostile: { label: "hunter", cls: "danger", hint: "Comes after the rover when it notices it. Keeps clear of the freighter." },
-  territorial: { label: "territorial", cls: "danger", hint: "Ignores you unless you come onto its patch." },
+  territorial: { label: "territorial", cls: "warn", hint: "Ignores you unless you come onto its patch." },
   skittish: { label: "skittish", cls: "", hint: "Runs from the rover. Nets, a long reach or fast motors help." },
   docile: { label: "docile", cls: "good", hint: "Pays the rover no mind, until it's shot at." },
 };
+
+const pct = (p: number) => `${Math.round(p * 100)}%`;
 
 export function CreaturePanel({
   session,
@@ -41,15 +45,16 @@ export function CreaturePanel({
   busy: boolean;
 }) {
   const state = session.state;
+  const sprites = useSpriteIndex();
   const t = TEMPERAMENT[c.entry.temperament] ?? TEMPERAMENT.docile!;
   const dist = rover ? hexDistance(rover, c) : null;
-  const gear = vehicleWeapons(state);
   const blockers = c.down ? [] : captureBlockers(state, session.world, c.key);
+  const odds = c.down || !rover ? null : captureOdds(state, session.world, c.key);
   const left = c.downAt !== undefined ? c.downAt + DOWNED_DAYS * DAY - state.time : 0;
+  const hunter = isHunter(c.entry);
 
   const capture = (): void => {
-    const r = session.act((s, w) => captureCreature(s, w, c.key));
-    if (r.ok) session.notify(r.value.text, r.value.outcome === "disabled" ? "error" : undefined);
+    session.act((s, w) => captureCreature(s, w, c.key));
   };
   const collect = async (): Promise<void> => {
     if (rover && hexDistance(rover, c) > 1 && !(await goTo())) return;
@@ -59,15 +64,22 @@ export function CreaturePanel({
 
   return (
     <Section id="creature" title="Selected creature" class="deposit-panel" revealKey={c.key}>
-      <div class="dep-title">
-        <span class="creature-dot" style={{ background: c.entry.color }} />
-        <span>{c.entry.name}</span>
-        <span class={`tag ${t.cls}`} title={t.hint}>
-          {t.label}
-        </span>
-        {c.entry.size === 2 && <span class="tag" title="Takes two specimen slots">large</span>}
-        {c.entry.aquatic && <span class="tag sea">sea life</span>}
-        {c.entry.badlands && <span class="tag danger">Badlands</span>}
+      <div class="creature-head">
+        <CompIcon index={sprites} entryKey={compendiumKey("fauna", c.entry.id)} color={c.entry.color} found />
+        <div>
+          <div class="dep-title">
+            <span class="creature-dot" style={{ background: TEMPERAMENT_COLOR[c.entry.temperament] }} />
+            <span>{c.entry.name}</span>
+          </div>
+          <div class="dep-title">
+            <span class={`tag ${t.cls}`} title={t.hint}>
+              {t.label}
+            </span>
+            {c.entry.size === 2 && <span class="tag" title="Takes two specimen slots">large</span>}
+            {c.entry.aquatic && <span class="tag sea">sea life</span>}
+            {c.entry.badlands && <span class="tag danger">Badlands</span>}
+          </div>
+        </div>
       </div>
       <p class="small muted">{c.entry.blurb}</p>
       <dl class="kv">
@@ -79,11 +91,9 @@ export function CreaturePanel({
         {!c.down && c.hp < c.maxHp && (
           <>
             <dt>Worn down</dt>
-            <dd>{Math.round((100 * (c.maxHp - c.hp)) / c.maxHp)}%</dd>
+            <dd>{pct((c.maxHp - c.hp) / c.maxHp)}</dd>
           </>
         )}
-        <dt>Gear aboard</dt>
-        <dd>{gear.length === 0 ? <span class="danger">offline until the yard repairs it</span> : gear.map((w) => VEHICLE_WEAPONS[w.id]?.name).join(", ")}</dd>
       </dl>
       {c.down ? (
         <>
@@ -96,11 +106,42 @@ export function CreaturePanel({
         </>
       ) : (
         <>
+          {odds && (
+            <dl class="kv capture-odds">
+              <dt>Odds</dt>
+              <dd class={odds.chance >= 0.6 ? "good" : odds.chance >= 0.3 ? "accent" : "danger"}>{pct(odds.chance)}</dd>
+              <dt>Energy</dt>
+              <dd>
+                about {Math.round(odds.energy)} <span class="muted">of {Math.round(odds.budget)} to spare</span>
+              </dd>
+              <dt>Time</dt>
+              <dd>about {formatDuration(odds.minutes)}</dd>
+              <dt>Gear</dt>
+              <dd>{odds.method}</dd>
+              {hunter && (
+                <>
+                  <dt>Crew</dt>
+                  <dd class={odds.injuryRisk >= 0.25 ? "danger" : ""}>{pct(odds.injuryRisk)} chance someone is hurt</dd>
+                  {odds.wreckRisk > 0 && (
+                    <>
+                      <dt>Rover</dt>
+                      <dd class="danger">{pct(odds.wreckRisk)} chance it's wrecked if this fails</dd>
+                    </>
+                  )}
+                </>
+              )}
+            </dl>
+          )}
+          {odds && odds.notes.length > 0 && (
+            <ul class="small muted capture-notes">
+              {odds.notes.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          )}
           <p class="small muted">
-            {isHunter(c.entry)
-              ? "Capture: the rover closes until it's noticed, then holds its ground and fights until the creature drops."
-              : "Capture: the rover chases it down with whatever reaches: nets take it, stunners wear it down."}{" "}
-            It breaks off with enough energy to get home, plus a margin.
+            {hunter ? "The crew fights it from where the rover stands." : "The crew runs it down and comes back to this spot."} If it works, the energy it took comes off the cells; if not,
+            the rover is left with just enough to get home.
           </p>
           {blockers.length > 0 && (
             <ul class="blockers">
@@ -110,13 +151,12 @@ export function CreaturePanel({
             </ul>
           )}
           <div class="dep-actions">
-            <button class={`btn ${isHunter(c.entry) ? "danger" : "primary"}`} disabled={busy || blockers.length > 0} onClick={capture}>
-              Attempt capture
+            <button class={`btn ${hunter ? "danger" : "primary"}`} disabled={busy || blockers.length > 0} onClick={capture}>
+              Attempt capture{odds && blockers.length === 0 ? ` (${pct(odds.chance)})` : ""}
             </button>
           </div>
         </>
       )}
-      {DOWNED_DAYS > 0 && !c.down && <p class="small muted">Creatures are always taken alive. One brought down waits, stunned, for {DOWNED_DAYS} days.</p>}
     </Section>
   );
 }

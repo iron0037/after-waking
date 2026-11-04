@@ -491,11 +491,14 @@ Unintelligent animals of the land and seas, collected as specimens like plants. 
   - Never within 2 hexes of the freighter, and no fight starts there: the ship is always safe.
 - **Badlands:** an uncharted living world ruled by apex predators (15% of uncharted living worlds, 30% on Plentiful). Hunters dominate, and four Badlands-only species (shriek pack, blight mantis, razorback ravager, hollow king) are worth the most at the Lyceum.
 - **Roaming:** as time passes on the surface, creatures within 14 hexes move: hunters close in, skittish ones flee, the rest wander near home. Wandering uses its own dice, so it never shifts storms, prices or finds.
-- **Fights:**
-  - Worked out in 10-minute rounds and played back on the map: stun bolts, laser beams, nets, bites.
-  - A hunter in reach of the gear starts a fight as the rover drives, drills or samples (auto-defend).
-  - A capture order closes in, then holds against hunters or chases the rest down.
-  - Shots and chase steps draw rover energy. The rover breaks off while it still has the drive home plus 15% of a charge (at least 8). Breaking off from a hunter means a run for the ship, and faster motors help.
+- **Seen (AW-225):** every creature standing on swept ground anywhere on the world is on the map and in the sidebar list. The map shows a paw on a dark disc in the temperament's colour (green docile, white skittish, yellow territorial, red hostile), ringed by rarity like the plants. The pixel portraits are in the selected-plant and selected-creature panels.
+- **Attempts, as odds (AW-225, replacing the round-by-round chase and its playback):**
+  - Clicking a creature shows the odds, the energy it should take against what the rover can spare (the drive home plus 15% of a charge, at least 8, is kept back), the time, the gear used, and for hunters the chance someone is hurt and the chance the rover is wrecked if it fails.
+  - The rover stays where it is. If it works, the energy it took comes off the cells. If it fails, the rover is left with just enough to get home.
+  - **Chases (skittish and docile):** creature speed against the rover's motors, the gear's reach, and nets for the big ones. A runner as fast as the rover gets away about half the time from a stock prod; motors and the tangle cannon make it near-certain.
+  - **Fights (territorial and hostile):** shots needed (gear damage, aim from the science officer) against how many rounds the hunter spends biting once it closes (reach buys free rounds), set against the rover's plating and armour.
+  - **Short energy:** if the job should take more than the rover can spare, the odds fall with the shortfall.
+  - **A hunter catching the rover mid-job** is settled the same way, at once. A failure stops the drive with just enough energy to get home.
 - **Taken alive (user's rule):** a creature brought down is stunned. In a capture it goes into the sample cases if there's room. Otherwise it lies where it fell as a pickup for 30 days.
 - **Disabled, not destroyed (user's choice):**
   - A rover whose plating is torn through can't move, and its cargo and samples are lost.

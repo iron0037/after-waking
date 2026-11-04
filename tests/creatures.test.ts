@@ -9,7 +9,10 @@ import {
   creatureByKey,
   deployRover,
   DOWNED_DAYS,
-  fightCreature,
+  captureOdds,
+  settleFight,
+  visibleCreatures,
+  markExplored,
   hostilesAllowed,
   isBadlands,
   newGame,
@@ -159,51 +162,97 @@ describe("roaming (AW-215)", () => {
   });
 });
 
-describe("fights and captures (AW-216)", () => {
-  it("a docile creature stunned beside the rover goes into the sample cases", () => {
+describe("captures, settled as odds (AW-225)", () => {
+  it("shows odds and an energy estimate within what the rover can spare, and the rover stays put", () => {
     const f = pick("docile");
-    const s = scene(f, 1);
+    const s = scene(f, 3);
     const loc = s.location as Surface;
+    const at = { x: loc.rover!.x, y: loc.rover!.y };
+    const odds = captureOdds(s, world, f.key)!;
+    expect(odds.chance).toBeGreaterThan(0.3);
+    expect(odds.energy).toBeGreaterThan(0);
+    expect(odds.energy).toBeLessThanOrEqual(odds.budget);
+    expect(odds.budget).toBeLessThan(loc.rover!.energy);
     expect(captureBlockers(s, world, f.key)).toEqual([]);
+    const before = loc.rover!.energy;
     const r = captureCreature(s, world, f.key);
     if (!r.ok) throw new Error(r.reason);
-    expect(r.value.events.some((e) => e.kind === "fire")).toBe(true);
-    expect(["captured", "down"]).toContain(r.value.outcome);
-    const name = CREATURES_BY_ID.get(f.species)!.name;
-    if (r.value.outcome === "captured") expect(loc.rover!.specimens?.[`${f.bodyId}|${name}`]).toBe(1);
-    expect(s.compendium[`fauna:${f.species}`]).toBeDefined();
+    expect({ x: loc.rover!.x, y: loc.rover!.y }).toEqual(at);
+    expect(r.value.chance).toBeCloseTo(odds.chance);
+    if (r.value.outcome === "captured") {
+      const name = CREATURES_BY_ID.get(f.species)!.name;
+      expect(loc.rover!.specimens?.[`${f.bodyId}|${name}`]).toBe(1);
+      expect(s.compendium[`fauna:${f.species}`]).toBeDefined();
+      expect(before - loc.rover!.energy).toBeLessThanOrEqual(odds.budget + 0.01);
+    } else {
+      // Failed: just enough left to get home.
+      expect(loc.rover!.energy).toBeCloseTo(before - odds.budget, 5);
+    }
     expect(s.lastFight?.id).toBe(1);
   });
 
-  it("breaks off with energy to spare rather than running dry", () => {
-    const f = pick("hostile");
-    const s = scene(f, 1);
-    const loc = s.location as Surface;
-    loc.rover!.energy = 25;
-    const r = fightCreature(s, world, f.key, "defend");
-    if (!r.ok) throw new Error(r.reason);
-    expect(loc.rover!.energy).toBeGreaterThan(0);
+  it("better gear and faster motors improve the odds; a faster creature worsens them", () => {
+    const f = pick("skittish");
+    const plain = captureOdds(scene(f, 3), world, f.key)!;
+    const geared = scene(f, 3);
+    geared.ship.upgrades.push("stunGun", "netLauncher", "roverMotors");
+    expect(captureOdds(geared, world, f.key)!.chance).toBeGreaterThan(plain.chance);
+    const h = pick("hostile");
+    const bare = captureOdds(scene(h, 2), world, h.key)!;
+    const armed = scene(h, 2);
+    armed.ship.upgrades.push("roverLaser", "roverArmour");
+    const better = captureOdds(armed, world, h.key)!;
+    expect(better.chance).toBeGreaterThan(bare.chance);
+    expect(better.injuryRisk).toBeLessThan(bare.injuryRisk);
+  });
+
+  it("with nothing to spare, there's no attempt", () => {
+    const f = pick("docile");
+    const s = scene(f, 2);
+    (s.location as Surface).rover!.energy = 1;
+    expect(captureBlockers(s, world, f.key).join()).toMatch(/No energy to spare/);
   });
 
   it("a hunter that wrecks the rover disables it until recall, and the yard repairs its gear", () => {
-    const f = pick("hostile");
-    const s = scene(f, 1);
+    const h = pick("hostile");
+    let wrecked: GameState | null = null;
+    for (let i = 0; i < 30 && !wrecked; i++) {
+      const s = scene(h, 1);
+      s.rngState = (s.rngState + i * 7919) >>> 0;
+      (s.location as Surface).rover!.cargo = { ironNickel: 5 };
+      (s.location as Surface).rover!.hull = 4; // already badly holed
+      s.ship.roverWrecked = true; // gear offline: the rover can only run
+      const r = settleFight(s, world, h.key, "defend");
+      if (!r.ok) throw new Error(r.reason);
+      expect(r.value.outcome === "disabled" || r.value.outcome === "broke off").toBe(true);
+      if (r.value.outcome === "disabled") wrecked = s;
+    }
+    expect(wrecked).not.toBeNull();
+    const s = wrecked!;
     const loc = s.location as Surface;
-    loc.rover!.hull = 1;
-    loc.rover!.cargo = { ironNickel: 5 };
-    // Gear offline: the rover can only run, and the hunter is on it.
-    s.ship.roverWrecked = true;
-    const r = fightCreature(s, world, f.key, "defend");
-    if (!r.ok) throw new Error(r.reason);
-    expect(r.value.outcome).toBe("disabled");
     expect(loc.rover!.disabled).toBe(true);
     expect(loc.rover!.cargo).toEqual({});
-    expect(captureBlockers(s, world, f.key).join()).toMatch(/disabled/);
+    expect(captureBlockers(s, world, h.key).join()).toMatch(/disabled/);
     expect(recallRover(s, world).ok).toBe(true);
     expect(loc.rover!.disabled).toBeUndefined();
     expect(repairQuote(s)!.cost).toBeGreaterThanOrEqual(2_500);
     finishRepairs(s);
     expect(s.ship.roverWrecked).toBeUndefined();
+  });
+
+  it("creatures on swept ground show anywhere on the world; unswept ones don't", () => {
+    const f = pick("docile");
+    const s = scene(f, 3);
+    const c = creatureByKey(s, world, f.bodyId, f.key)!;
+    expect(visibleCreatures(s, world).some((v) => v.key === f.key)).toBe(false);
+    const local = world.surface(f.bodyId).toLocal(c.x, c.y)!;
+    const k = (s.regions[`${f.bodyId}#${local.region}`] ??= { discovered: [], prospected: [], drillSites: [], extracted: {}, visits: 0, floraFound: [], floraSampled: [], explored: [] });
+    markExplored(k, local.x, local.y, 0);
+    // Park the rover far off: still on the map.
+    const loc = s.location as Surface;
+    loc.rover!.x = loc.ship!.x;
+    loc.rover!.y = loc.ship!.y;
+    expect(visibleCreatures(s, world).some((v) => v.key === f.key)).toBe(true);
   });
 
   it("a downed creature can be collected, and is gone after 30 days", () => {

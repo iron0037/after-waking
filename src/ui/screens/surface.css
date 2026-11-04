@@ -365,3 +365,25 @@
 .deposit-table tbody tr.sep-row.more-row:hover td {
   text-decoration: underline;
 }
+
+/* Selected plant or creature (AW-225): the specimen's pixel portrait beside its name and tags. */
+.creature-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.creature-head .dep-title {
+  margin-bottom: 2px;
+}
+.capture-odds {
+  margin-top: 6px;
+}
+.capture-notes {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+}
+.tag.warn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
