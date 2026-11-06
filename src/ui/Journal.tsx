@@ -1,5 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
-import { archiveRead, archiveText, awakenFinaleReached, clueCount, covenantErrands, dossier, formatDate, guidanceOn, hasClue, reportFutureLog, resetArchive, setGuidance, type JournalKind } from "../sim";
+import { baseSeed, peopleOf, settingsLine, universeOf, archiveRead, archiveText, awakenFinaleReached, clueCount, covenantErrands, dossier, formatDate, guidanceOn, hasClue, reportFutureLog, resetArchive, setGuidance, type JournalKind } from "../sim";
 import { CLUES, FINALE_TEXT } from "../data/clues";
 import { useSession, type GameSession } from "./session";
 import "./archive.css";
@@ -57,6 +57,10 @@ export function Journal({ session, onClose }: { session: GameSession; onClose: (
             Close
           </button>
         </div>
+        {/* The career's fixed new-game settings (AW-226), so a captain can check what they chose. */}
+        <p class="small muted journal-settings">
+          Seed {baseSeed(state.seed)} · {settingsLine({ ...universeOf(state.seed), ...peopleOf(state) })}
+        </p>
         <div class="chips journal-tabs" role="tablist">
           <button role="tab" aria-selected={section === "log"} class={`chip ${section === "log" ? "active" : ""}`} onClick={() => setSection("log")}>
             Log

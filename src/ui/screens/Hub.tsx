@@ -1308,7 +1308,7 @@ function Exchange({ session }: { session: GameSession }) {
               )}
             </dd>
             <dt>Missed payments</dt>
-            <dd class={loan.missed > 0 ? "danger" : ""}>{loan.missed}</dd>
+            <dd class={loan.behind ? "danger" : ""}>{loan.missed}</dd>
             <dt>Hardship deferral</dt>
             <dd class={graceNow ? "good" : "muted"}>
               {graceNow ? "Available now" : `Used ${formatDate(loan.graceAt ?? 0)}; next available ${formatDate(graceAt)}`}

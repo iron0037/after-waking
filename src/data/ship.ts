@@ -126,11 +126,12 @@ export const BASE_STATS: ShipStats = {
 
 export type UpgradeEffect = (stats: ShipStats) => void;
 
-export type UpgradeCategory = "ship" | "rover" | "mining" | "sensors" | "combat";
+export type UpgradeCategory = "ship" | "rover" | "boat" | "mining" | "sensors" | "combat";
 
 export const UPGRADE_CATEGORY_NAMES: Record<UpgradeCategory, string> = {
   ship: "Ship",
   rover: "Rover",
+  boat: "Boat",
   mining: "Mining",
   sensors: "Sensors",
   combat: "Weapons & defences",
@@ -300,7 +301,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "boat",
-    category: "rover",
+    category: "boat",
     name: "Survey boat",
     vendor: "midshipmen",
     price: 22_000,
@@ -313,7 +314,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "cryoFloats",
-    category: "rover",
+    category: "boat",
     requires: "boat",
     name: "Cryo floats",
     vendor: "midshipmen",
@@ -325,7 +326,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "cryoFloats2",
-    category: "rover",
+    category: "boat",
     requires: "cryoFloats",
     name: "Cryo floats Mk II",
     vendor: "midshipmen",
@@ -338,7 +339,7 @@ export const UPGRADES: readonly Upgrade[] = [
   },
   {
     id: "acidLining",
-    category: "rover",
+    category: "boat",
     requires: "boat",
     name: "Acid-lined boat hull",
     vendor: "diggers",

@@ -71,7 +71,7 @@ export function TopBar({
       </div>
       <div class="tb-block" title={`Next payment due ${formatDate(state.loan.nextDue)}`}>
         <div class="tb-label">Exchange note</div>
-        <div class={`tb-value ${state.loan.missed > 0 ? "danger" : ""}`}>
+        <div class={`tb-value ${state.loan.behind ? "danger" : ""}`} title={state.loan.behind ? "A payment was missed: red until the next installment is paid on time" : undefined}>
           {state.loan.balance > 0 ? cr(state.loan.balance) : "Paid off"}
         </div>
       </div>

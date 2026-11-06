@@ -100,6 +100,8 @@ export interface Loan {
   prepaid?: number;
   /** When the Exchange last granted a hardship deferral (one a year). */
   graceAt?: number;
+  /** A payment was missed and none has been made since (AW-226): the note shows red until the next one is paid. */
+  behind?: boolean;
 }
 
 export type JournalKind = "info" | "travel" | "discovery" | "trade" | "warning";
@@ -430,8 +432,10 @@ function settleLoan(state: GameState): void {
     loan.prepaid = (loan.prepaid ?? 0) - fromPrepaid;
     const due = Math.min(installment - fromPrepaid, loan.balance);
     if (due <= 0) {
+      loan.behind = undefined;
       log(state, "trade", `Exchange installment covered by your early payments. Balance: ${loan.balance.toLocaleString()} cr.`);
     } else if (state.credits >= due) {
+      loan.behind = undefined;
       state.credits -= due;
       state.stats.loanPaid = (state.stats.loanPaid ?? 0) + due;
       loan.balance -= due;
@@ -455,6 +459,7 @@ function settleLoan(state: GameState): void {
       );
     } else {
       loan.missed++;
+      loan.behind = true;
       changeRep(state, "exchange", -8, "Missed a payment on the note");
       // Exchange captains get the relentless collectors: double the late fee.
       const fee = Math.round(due * 0.1 * (state.captain.clan === "exchange" ? 2 : 1));
