@@ -41,7 +41,12 @@ describe("compendium", () => {
   });
 
   it("turns up mineral specimens over a career", () => {
-    const found = [42, 7, 2026].reduce((sum, seed) => sum + compendiumTotals(runBot(seed, 10).state).gem.found, 0);
+    // Stop at the first career that turns one up: running all three in one go blocks the test worker on CI.
+    let found = 0;
+    for (const seed of [42, 7, 2026]) {
+      found += compendiumTotals(runBot(seed, 10).state).gem.found;
+      if (found > 0) break;
+    }
     expect(found).toBeGreaterThan(0);
   });
 });
