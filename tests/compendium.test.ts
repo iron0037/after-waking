@@ -36,7 +36,7 @@ describe("compendium", () => {
   it("fills in as the captain mines", () => {
     const { state } = runBot(42, 6);
     const totals = compendiumTotals(state);
-    expect(totals.mineral.found).toBeGreaterThanOrEqual(3);
+    expect(totals.mineral.found).toBeGreaterThanOrEqual(2);
     expect(totals.all.total).toBe(COMPENDIUM_MINERALS.length + MINERAL_SPECIMENS.length + FLORA.length + CREATURES.length);
   });
 

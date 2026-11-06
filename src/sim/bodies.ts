@@ -64,6 +64,8 @@ export interface Body {
   waterShare?: number;
   /** What the crews call it, e.g. "the Meadow". */
   nickname?: string;
+  /** World generation 7 (AW-227): the share of this world's seams the first scouts worked out. */
+  scouted?: number;
 }
 
 export interface SystemDetail {
@@ -118,9 +120,13 @@ interface Ctx {
  * reshuffles a game in progress. 1: the original (rocky inside the frost line, giants outside,
  * everywhere). 2: architectures drawn from what the exoplanet surveys found (AW-145). 3: exotic
  * seas (AW-189). 4: thick-air moons (AW-190). 5: continents on terrestrial worlds (AW-210). 6: a bigger pool of
- * star names (AW-223).
+ * star names (AW-223). 7: the home stars picked over, about two seams a region (AW-227).
  */
-export const WORLD_GEN_LATEST = 6;
+export const WORLD_GEN_LATEST = 7;
+
+/** Generation 7 (AW-227): share of seams worked out in the home systems (was 0.2) and the other charted stars (unchanged). */
+export const HOME_SCOUTED = 0.62;
+export const CHARTED_SCOUTED = 0.1;
 
 export function generateSystem(galaxySeed: number, sys: StarSystem, gen = 1): SystemDetail {
   if (gen >= 2) return generateSystemV2(galaxySeed, sys, gen);
@@ -608,6 +614,9 @@ function generateSystemV2(galaxySeed: number, sys: StarSystem, gen = 2): SystemD
   if (gen >= 4) addThickAirMoons(galaxySeed, ctx.bodies);
   if (gen >= 3) addExoticSeas(galaxySeed, ctx.bodies);
   if (gen >= 5) addContinents(galaxySeed, ctx.bodies);
+  // Thirty years of crews have picked over the home stars (AW-227): about two seams a region on Normal ore (was four);
+  // the other charted stars keep their old share, and the frontier is untouched.
+  if (gen >= 7) for (const b of ctx.bodies) if (sys.home || sys.charted) b.scouted = sys.home ? HOME_SCOUTED : CHARTED_SCOUTED;
   return { system: sys, bodies: ctx.bodies, edgeAU: Math.max(outermost * 1.5, hz * 0.8, 0.06), frostLineAU: frost };
 }
 

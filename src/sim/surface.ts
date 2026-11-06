@@ -392,6 +392,8 @@ export function frontierTonnage(seed: number, body: Body): number {
 
 /** Share of a world's deposits the scouts already worked out (they're simply gone). */
 export function scoutedShare(seed: number, body: Body): number {
+  // Generation 7 sets it on the body (AW-227); earlier worlds keep the old shares.
+  if (body.scouted !== undefined) return body.scouted;
   const { frontier } = frontierOf(seed, body);
   return frontier === "home" ? 0.2 : frontier === "charted" ? 0.1 : 0;
 }

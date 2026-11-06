@@ -79,8 +79,11 @@ function grant(state: GameState, id: string): void {
 }
 
 function onSurface(seed = 42): { state: GameState; world: World; bodyId: string } {
-  const world = new World(seed);
+  // World generation 6: home regions still hold several seams (generation 7 picks them over, AW-227), which these
+  // perk tests need to see working.
+  const world = new World(seed, 6);
   const state = newGame({ seed });
+  state.worldGen = 6;
   expect(fold(state, world, "s0").ok).toBe(true);
   // An easy world (living if possible) whose first region has a few seams the stock drill can reach.
   const ok = (b: { id: string }) =>

@@ -144,3 +144,26 @@ A novice career on seed 42 ended with 11k credits and the note grown to 87k. A 3
 | Competent, after | 0 | 0 | 769k |
 
 The career report's baseline moved with it. Competent careers now end around 840k (was 393k) and novices around 633k (was 196k), with trips of 50-75 days. The old bot underplayed: a captain who sweeps regions earns roughly twice what the reports used to show. Reward tuning done against the old numbers should be re-checked against these (AW-224).
+
+## The home stars are picked over (AW-227, 2026-11-06)
+
+Playtest: once you know how, there's little reason to leave the Meadow's system, with plenty of seams and no pirates. World generation 7 has the first scouts work out more of the home systems' seams. Other charted stars and the frontier are unchanged. Games in progress keep their generation.
+
+| Deposits per region (hidden layer excluded) | Scarce | Normal | Plentiful |
+|---|---|---|---|
+| Home, before | 2.6 | 4.3 (Meadow 3.8) | 6.3 |
+| Home, generation 7 | 1.3 | 2.1 (Meadow 2.3) | 3.1 |
+| Charted (unchanged) | 3.5 | 5.6 | 8.2 |
+| Uncharted (unchanged) | 3.7 | 5.9 | 8.8 |
+
+The user first asked for about one per region at home, with the charted stars thinned too.
+
+| Variant (home / charted per region) | Broke, novice | Broke, competent | Census |
+|---|---|---|---|
+| 1 / 2.6 | 7 of 30 | 5 of 30 | 30 seeds |
+| 1 / 4.4 | 2 of 20 | 1 of 20 | 20 seeds |
+| 2 / unchanged (chosen) | 0 of 20 | 1 of 20 | 20 seeds |
+
+At one per region the starter drill can't reach most charted seams (only the home worlds are kept shallow), so a captain short on fuel and cash cycled empty home systems.
+
+The chosen variant cuts the median 60-trip net worth from 689k to 506k (novice) and from 769k to 663k (competent). The one broke career is seed 10, the worst map in every census so far.
