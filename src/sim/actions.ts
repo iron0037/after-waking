@@ -57,6 +57,7 @@ import {
   normalizeKnowledge,
   regionKey,
   regionSignal,
+  regionLandShare,
   type Deposit,
   REGION_SIZE,
   TILE_KM,
@@ -426,6 +427,30 @@ export function orbitalSensorTier(state: GameState, bodyId: string): number {
  * read the way the landing chart reads it (orbital sensor tier, drill reach). Null if unscanned or
  * without a surface.
  */
+/** A region's orbital reading for this captain: what's still in the ground (worked seams read as what's left, AW-228). */
+export function regionReading(state: GameState, body: Body, region: number, sensorTier: number, reachM = Infinity): number {
+  return regionSignal(state.seed, body, region, sensorTier, reachM, state.regions[regionKey(body.id, region)]?.extracted);
+}
+
+/**
+ * The region the landing chart suggests: the strongest reading, halved for regions already visited, skipping open sea
+ * (AW-210). Readings count only what's left, so a worked-out region drops away (AW-228).
+ */
+export function suggestedRegion(state: GameState, body: Body, sensorTier: number, reachM: number): number {
+  let best = 0;
+  let bestScore = -1;
+  for (let r = 0; r < body.regions; r++) {
+    const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
+    if (regionLandShare(state.seed, body, r) < 0.05) continue;
+    const score = regionReading(state, body, r, sensorTier, reachM) * (visited ? 0.5 : 1);
+    if (score > bestScore) {
+      bestScore = score;
+      best = r;
+    }
+  }
+  return best;
+}
+
 export function bodyValueEstimate(state: GameState, body: Body): { best: number; average: number } | null {
   if (body.regions === 0 || !state.scannedBodies.includes(body.id)) return null;
   const tier = orbitalSensorTier(state, body.id);
@@ -433,7 +458,7 @@ export function bodyValueEstimate(state: GameState, body: Body): { best: number;
   let best = 0;
   let sum = 0;
   for (let r = 0; r < body.regions; r++) {
-    const v = regionSignal(state.seed, body, r, tier, reach);
+    const v = regionReading(state, body, r, tier, reach);
     sum += v;
     if (v > best) best = v;
   }
@@ -447,7 +472,7 @@ export function hunchRegion(state: GameState, body: Body): number | null {
   let bestScore = -1;
   for (let r = 0; r < body.regions; r++) {
     const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
-    const score = regionSignal(state.seed, body, r, 3, effectiveStats(state).drillMaxDepthM) * (visited ? 0.5 : 1);
+    const score = regionReading(state, body, r, 3, effectiveStats(state).drillMaxDepthM) * (visited ? 0.5 : 1);
     if (score > bestScore) [best, bestScore] = [r, score];
   }
   return best;

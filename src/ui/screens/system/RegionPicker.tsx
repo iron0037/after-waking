@@ -12,7 +12,8 @@ import {
   knownDeposits,
   regionKey,
   regionRecap,
-  regionSignal,
+  regionReading,
+  suggestedRegion,
   regionLifeSignal,
   regionRareSpecies,
   regionLandShare,
@@ -98,8 +99,9 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
   const seed = state.seed;
 
   const signals = useMemo(
-    () => Array.from({ length: body.regions }, (_, r) => regionSignal(seed, body, r, sensorTier, reachM)),
-    [seed, body, sensorTier, reachM],
+    // What's left in each region: worked seams read lower (AW-228).
+    () => Array.from({ length: body.regions }, (_, r) => regionReading(state, body, r, sensorTier, reachM)),
+    [seed, body, sensorTier, reachM, state.stats.tonnesMined],
   );
   const layout = useMemo(() => regionLayout(body), [body]);
   // Life signs: plant sites per region, on living worlds.
@@ -473,18 +475,7 @@ function KnownDepositsBox({ known, selected, onSelect }: { known: KnownDeposit[]
 }
 
 /** Index of the strongest-signal region, preferring ones not yet visited. */
+/** The suggested landing region (see suggestedRegion in the sim). */
 export function bestRegion(state: GameState, body: Body, sensorTier: number, reachM: number): number {
-  let best = 0;
-  let bestScore = -1;
-  for (let r = 0; r < body.regions; r++) {
-    const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
-    // Open sea on a continental world (AW-210): nowhere to set down, so never the default.
-    if (regionLandShare(state.seed, body, r) < 0.05) continue;
-    const score = regionSignal(state.seed, body, r, sensorTier, reachM) * (visited ? 0.5 : 1);
-    if (score > bestScore) {
-      bestScore = score;
-      best = r;
-    }
-  }
-  return best;
+  return suggestedRegion(state, body, sensorTier, reachM);
 }

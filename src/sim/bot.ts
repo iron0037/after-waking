@@ -31,6 +31,7 @@ import {
   sellAll,
   shipTile,
   orbitalSensorTier,
+  regionReading,
   surveyBody,
   stowRover,
   recallRover,
@@ -53,7 +54,7 @@ import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
 import { newGame, type GameState } from "./state";
-import { frontierTonnage, REGION_SIZE, regionKey, regionSignal, scoutedShare } from "./surface";
+import { frontierTonnage, REGION_SIZE, regionKey, scoutedShare } from "./surface";
 import { DAY } from "./units";
 import { completeContract, contractProgress, type Contract } from "./contracts";
 import { autoExplore, autoExploreBlockers } from "./autoexplore";
@@ -298,7 +299,7 @@ function mineSystem(
     const regionCount = Math.min(body.regions, 12);
     // Fresh ground first: a region we've already worked is worth a fraction of its signal.
     const regionValue = (r: number) =>
-      regionSignal(state.seed, body, r, orbitalSensorTier(state, body.id), stats().drillMaxDepthM) /
+      regionReading(state, body, r, orbitalSensorTier(state, body.id), stats().drillMaxDepthM) /
       (1 + 3 * (state.regions[regionKey(body.id, r)]?.visits ?? 0));
     // Ocean worlds (AW-17): only regions with an island to set down on.
     const dry = (r: number) => !landingBlockers(state, world, r).some((b) => b.startsWith("No dry land"));
