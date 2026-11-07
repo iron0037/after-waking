@@ -89,6 +89,41 @@
       "pixel": 4,
       "colors": 48,
       "cutout": false
+    },
+    {
+      "id": "hull-firstRate",
+      "prompt": "sleek streamlined cargo freighter starship, clean pale gray hull with crisp blue stripes, compact cargo pods, twin engines, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7102
+    },
+    {
+      "id": "hull-bulker",
+      "prompt": "huge wide boxy mining bulk freighter starship, heavy rust-brown hull with yellow hazard stripes, big open ore hoppers, thick stubby landing legs, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7201
+    },
+    {
+      "id": "hull-scout",
+      "prompt": "small slender long-range scout starship, narrow needle-shaped hull, two long fuel tanks along its sides, sensor dish at the nose, white hull with teal trim, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7302
+    },
+    {
+      "id": "hull-listener",
+      "prompt": "small dark stealthy starship, matte black and dark green hull, long antenna booms and a large dish, faint violet running lights, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7401
+    },
+    {
+      "id": "hull-corsair",
+      "prompt": "rugged patched pirate raider starship, mismatched hull plates, red and black paint, gun turrets, oversized engines, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7502
+    },
+    {
+      "id": "hull-destroyer",
+      "prompt": "sleek angular warship starship, navy blue and steel gray armored hull, gun turrets along the spine, sharp prow, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7603
+    },
+    {
+      "id": "hull-galleon",
+      "prompt": "very large long armed cargo freighter starship, cream and gold hull, rows of cargo containers, gun turrets at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 7703
     }
   ]
 }

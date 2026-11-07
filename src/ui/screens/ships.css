@@ -15,3 +15,15 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.ship-sprite {
+  display: block;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  margin: 0 auto 4px;
+}
+.ship-card .ship-sprite {
+  width: 64px;
+  height: 64px;
+}

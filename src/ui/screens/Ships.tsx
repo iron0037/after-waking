@@ -62,6 +62,15 @@ function StatGrid({ stats }: { stats: ShipStats }) {
   );
 }
 
+/** The hull's top-down sprite (tools/art/manifest.json, "hull-<id>"). */
+function hullSprite(hull: Hull): string {
+  return hull.id === "freighter" ? "./assets/freighter.png" : `./assets/hull-${hull.id}.png`;
+}
+
+function Sprite({ hull }: { hull: Hull }) {
+  return <img class="ship-sprite" src={hullSprite(hull)} alt="" />;
+}
+
 function bare(hull: Hull): ShipStats {
   return shipStats({ name: "", hull: hull.id, upgrades: [], fuel: 0, cargo: {} });
 }
@@ -103,7 +112,8 @@ function ShipCard({ session, ship, index }: { session: GameSession; ship: ShipSt
   const blockers = index === null ? [] : commandBlockers(state, index);
   const value = resaleValue(ship);
   return (
-    <div class={`panel hub-card ${index === null ? "installed" : ""}`}>
+    <div class={`panel hub-card ship-card ${index === null ? "installed" : ""}`}>
+      <Sprite hull={hull} />
       <div class="hub-card-head">
         <strong>{ship.name}</strong>
         {index === null ? <span class="tag good">In use</span> : <span class="tag">Berthed</span>}
@@ -155,6 +165,7 @@ function HullCard({ session, hull }: { session: GameSession; hull: Hull }) {
   const vendor = hull.vendor!;
   return (
     <div class="panel hub-card ship-hull">
+      <Sprite hull={hull} />
       <div class="hub-card-head">
         <strong>{hull.name}</strong>
         <span class="hub-price">
