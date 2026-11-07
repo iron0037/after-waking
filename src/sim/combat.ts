@@ -134,7 +134,7 @@ export function playerSide(state: GameState): CombatSide {
     laser: s.laserDmg,
     kinetic: s.kineticDmg,
     shields: s.shieldStrength,
-    speed: 1,
+    speed: s.combatSpeed,
     damage: { drives: d.drives, weapons: d.weapons, sensors: d.sensors },
   };
 }
@@ -183,7 +183,7 @@ export function lingerFactor(state: GameState): number {
 
 /** Chance that a raider is waiting as you fold out of this system with what's in the hold. */
 export function interdictionChance(state: GameState, world: World, systemId: string): number {
-  return pirateActivity(world, systemId) * Math.min(1.5, holdValue(state) / 10_000) * lingerFactor(state) * clanMods(state).raidChance * pirateChanceMult(peopleOf(state));
+  return pirateActivity(world, systemId) * Math.min(1.5, holdValue(state) / 10_000) * lingerFactor(state) * clanMods(state).raidChance * pirateChanceMult(peopleOf(state)) * effectiveStats(state).raidChanceMult;
 }
 
 export type PirateIntel = { level: "unknown" | "patrolled" | "quiet" | "low" | "moderate" | "high"; label: string; text: string; raiders: string[] };
@@ -319,11 +319,12 @@ function raiderSide(r: RaiderTemplate, state?: GameState): CombatSide {
 
 /** Chance your sensors see a raider before it sees you: the array, the science officer, sensor damage. */
 export function spotChance(state: GameState): number {
-  const sensors = effectiveStats(state).sensorTier;
+  const stats = effectiveStats(state);
+  const sensors = stats.sensorTier;
   // Early Warning (comms): the listeners hear them first.
   // Raider's eyes (AW-207): a navigator who used to ride with them knows where they lurk.
   if (hasTalent(state, "raiders-eyes")) return 0.95;
-  return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200 + (hasPerk(state, "early-warning") ? 0.2 : 0), 0.1, 0.9);
+  return clamp(0.35 + 0.1 * sensors + 0.03 * stationLevel(state, "science") - shipDamage(state).sensors / 200 + (hasPerk(state, "early-warning") ? 0.2 : 0) + stats.spotBonus, 0.1, stats.spotBonus > 0 ? 0.95 : 0.9);
 }
 
 /** The flight stops where the raider is met; the encounter opens at the contact stage. Returns the alert text. */

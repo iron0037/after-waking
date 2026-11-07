@@ -19,6 +19,7 @@ import {
   refineBlockers,
   refineOre,
   vehiclesOut,
+  hullOf,
 } from "../sim";
 import { cr, damageSummary, pct, tonnes } from "./format";
 import type { GameSession } from "./session";
@@ -252,8 +253,14 @@ export function ShipStatus({ session, onClose }: { session: GameSession; onClose
             </dl>
             {hurt && <p class="small accent">Battle damage: {hurt}. The Shipyard aboard the Intrepid repairs it.</p>}
             <h3>Installed</h3>
+            <p class="small">
+              {hullOf(state.ship).name}
+              {hullOf(state.ship).builtIn.length > 0 && (
+                <span class="muted"> · built in: {hullOf(state.ship).builtIn.map((id) => UPGRADES_BY_ID.get(id)?.name ?? id).join(", ")}</span>
+              )}
+            </p>
             {state.ship.upgrades.length === 0 ? (
-              <p class="muted">Stock freighter. The Shipyard aboard the Intrepid fits upgrades.</p>
+              <p class="muted">Nothing fitted yet. The Shipyard aboard the Intrepid fits upgrades.</p>
             ) : (
               <ul class="ship-upgrades">
                 {state.ship.upgrades.map((id) => {

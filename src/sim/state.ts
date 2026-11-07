@@ -194,6 +194,10 @@ export interface GameState {
   credits: number;
   loan: Loan;
   ship: ShipState;
+  /** Ships laid up at the Intrepid, free of charge (AW-103). The rover and the boat travel with the captain. */
+  berthed?: ShipState[];
+  /** Ships bought so far, for default names. */
+  shipsBought?: number;
   location: Location;
   foldReadyAt: number;
   visitedSystems: string[];

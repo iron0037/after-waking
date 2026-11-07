@@ -73,6 +73,19 @@ export interface ShipStats {
   /** The rover's (and boat's) plating, and the share of a creature's bite that gets through it. */
   roverHull: number;
   roverArmour: number;
+  /** Ship classes (AW-103): speed in a fight (1 = the starter freighter; raiders run 0.95-1.15). */
+  combatSpeed: number;
+  /** Added to the chance of seeing a raider before it sees you (a quiet hull). */
+  spotBonus: number;
+  /** Multiplies how often raiders come for you (a quiet hull, pirate colours). */
+  raidChanceMult: number;
+  /** A blind fold's share of the drive's range, and its extra thirst; a talent can do better. */
+  blindFoldRange: number;
+  blindFoldFuel: number;
+  /** Chance that a first look at a landing region catches a seam in the world (the Covenant's ears). */
+  seamSense: number;
+  /** Specimen racks in the ship beyond the standard 16 (negative: fewer). */
+  shipRackBonus: number;
   /** Atmospheric probes the bay can carry (0 = no bay). */
   probeCapacity: number;
   /** Deepest band the probes are rated for: 0 none, 1 cloud tops ... 4 abyss. */
@@ -112,6 +125,13 @@ export const BASE_STATS: ShipStats = {
   roverArmour: 1,
   boatCargoT: 0,
   boatEnergy: 0,
+  combatSpeed: 1,
+  spotBonus: 0,
+  raidChanceMult: 1,
+  blindFoldRange: 0.6,
+  blindFoldFuel: 1.25,
+  seamSense: 0,
+  shipRackBonus: 0,
   probeCapacity: 0,
   probeMaxDepth: 0,
   ratings: {

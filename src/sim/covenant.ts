@@ -6,7 +6,7 @@
 import { changeRep } from "./reputation";
 import { CLUES, CLUES_BY_ID, CLUES_FOR_FINALE, ERRANDS, ERRANDS_BY_KIND, FINALE_TEXT, type Clue, type ClueId, type ErrandDef, type ErrandKind } from "../data/clues";
 import { INTREPID_POS } from "./galaxy";
-import { hasPerk } from "./perks";
+import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { rngFor } from "./rng";
 import { bondClan } from "./sentiment";
@@ -93,7 +93,9 @@ export function noticeScan(state: GameState, bodyId: string): void {
 
 /** Sixth Sense (captain): the first look at a landing site sometimes catches a seam. About one region in three. */
 export function noticeLanding(state: GameState, bodyId: string, region: number): void {
-  if (hasPerk(state, "sixth-sense") && rngFor(state.seed, "seams-landing", bodyId, region).next() < 0.35) awardClue(state, "seams");
+  // A Covenant listener (AW-103) hears it now and then on its own.
+  const chance = Math.max(hasPerk(state, "sixth-sense") ? 0.35 : 0, effectiveStats(state).seamSense);
+  if (chance > 0 && rngFor(state.seed, "seams-landing", bodyId, region).next() < chance) awardClue(state, "seams");
 }
 
 /** Listening Post (comms): arriving at an uncharted star sometimes catches the signal. One in four. */

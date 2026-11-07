@@ -2,6 +2,8 @@
 import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
+import { fitBlocker, hullOf } from "../../sim";
+import { ShipsPanel } from "./Ships";
 import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -975,7 +977,8 @@ function Shipyard({ session }: { session: GameSession }) {
           )}
         </section>
       )}
-      <Section id="yard-ship" title={state.ship.name} level={2} summary={`${tonnes(stats.cargoCapacityT)} hold · drill ${stats.drillMaxDepthM} m`}>
+      <ShipsPanel session={session} />
+      <Section id="yard-ship" title={state.ship.name} level={2} summary={`${hullOf(state.ship).name} · ${tonnes(stats.cargoCapacityT)} hold · drill ${stats.drillMaxDepthM} m`}>
         <h3>Ship</h3>
         <dl class="kv">
           <dt>Hull mass</dt>
@@ -1065,7 +1068,10 @@ function Shipyard({ session }: { session: GameSession }) {
           <Section key={cat} id={`yard-${cat}`} title={UPGRADE_CATEGORY_NAMES[cat]} class="hub-vendor" summary={`${owned} of ${inCat.length} installed${fitting > 0 ? `, ${fitting} being fitted` : ""}`}>
             <div class="hub-cards">
               {inCat.map((u) => {
-                const installed = state.ship.upgrades.includes(u.id);
+                const builtIn = hullOf(state.ship).builtIn.includes(u.id);
+                const installed = state.ship.upgrades.includes(u.id) || builtIn;
+                // Ship classes (AW-103): not every frame takes every fitting.
+                const fit = installed ? null : fitBlocker(hullOf(state.ship), u.id);
                 const job = (state.yard ?? []).find((j) => j.kind === "install" && j.upgradeId === u.id);
                 const upkeepMult = clanMods(state).upkeep;
                 const basePrice = u.price;
@@ -1073,7 +1079,7 @@ function Shipyard({ session }: { session: GameSession }) {
                 const short = price - state.credits;
                 const req = u.requires ? UPGRADES.find((x) => x.id === u.requires) : undefined;
                 // A queued install counts toward a requirement, as the sim allows ordering the next tier behind it.
-                const missing = !!u.requires && !state.ship.upgrades.includes(u.requires) && !queuedIds.has(u.requires);
+                const missing = !!u.requires && !state.ship.upgrades.includes(u.requires) && !hullOf(state.ship).builtIn.includes(u.requires) && !queuedIds.has(u.requires);
                 const reqName = req?.name ?? u.requires ?? "";
                 // Top-tier gear waits on a research project (AW-15).
                 const gate = researchFor(u.id);
@@ -1084,7 +1090,7 @@ function Shipyard({ session }: { session: GameSession }) {
                     <div class="hub-card-head">
                       <strong>{u.name}</strong>
                       {installed ? (
-                        <span class="tag good">Installed</span>
+                        <span class="tag good">{builtIn ? "Built in" : "Installed"}</span>
                       ) : job ? (
                         <span class="tag accent-tag">Installing</span>
                       ) : (
@@ -1101,6 +1107,7 @@ function Shipyard({ session }: { session: GameSession }) {
                         {CLAN_NAMES[u.vendor]}
                       </span>
                       <PriceStandingTag state={state} clan={u.vendor} />
+                      {fit && <span class="tag danger" title={fit}>{fit.startsWith("Only fits") ? "Needs another hull" : "Doesn't fit"}</span>}
                       {missing && <span class="tag accent-tag">Requires {reqName}</span>}
                       {gated && gate && (
                         <span class="tag accent-tag" title={`Commission "${gate.name}" from ${CLAN_NAMES[gate.clan]} under Research`}>
@@ -1110,9 +1117,10 @@ function Shipyard({ session }: { session: GameSession }) {
                       )}
                     </div>
                     <div class="muted small">{u.description}</div>
-                    <div class="muted small" title={`Installed gear costs ${(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day to keep running.`}>
+                    {fit && <div class="danger small">{fit}</div>}
+                    {!builtIn && <div class="muted small" title={`Installed gear costs ${(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day to keep running.`}>
                       Upkeep {cr(u.price * UPKEEP_RATE_PER_DAY * upkeepMult)} / day
-                    </div>
+                    </div>}
                     {job && (
                       <div class="accent small">
                         Installing: ready in {formatDuration(Math.max(0, job.readyAt - state.time))}
@@ -1121,9 +1129,11 @@ function Shipyard({ session }: { session: GameSession }) {
                     {!installed && !job && (
                       <button
                         class="btn"
-                        disabled={short > 0 || missing || gated || refused}
+                        disabled={short > 0 || missing || gated || refused || !!fit}
                         title={
-                          refused
+                          fit
+                            ? fit
+                            : refused
                             ? `${CLAN_NAMES[u.vendor]} won't sell to you. Mend things (Clans, L).`
                             : gated && gate
                             ?`Needs the "${gate.name}" research project first (Research tab).`

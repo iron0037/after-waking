@@ -42,6 +42,7 @@ describe("research projects (AW-15)", () => {
   it("the Shipyard won't sell gated gear until the project is done", () => {
     const state = newGame({ seed: 4 });
     state.credits = 500_000;
+    state.ship.hull = "bulker"; // the core drill wants a Diggers frame (AW-103)
     expect(buyUpgrade(state, "deepDrill").ok).toBe(true);
     const r = buyUpgrade(state, "coreDrill");
     expect(r.ok).toBe(false);

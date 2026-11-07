@@ -8,6 +8,7 @@ import { SEAS } from "../data/seas";
 import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
+import { fleetOnDocked } from "./fleet";
 import { diggersLeadOnDocked } from "./leads";
 import { injureCrew } from "./injuries";
 import { creatureWatch } from "./creatures";
@@ -32,6 +33,9 @@ import type { Rng } from "./rng";
 import {
   addCargo,
   cargoTonnes,
+  fitBlocker,
+  hasFitted,
+  hullOf,
   removeCargo,
   ROVER_SPECIMEN_SLOTS,
   SHIP_SPECIMEN_SLOTS,
@@ -255,6 +259,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     retirementsOnDocked(state);
     helmOnDocked(state);
     covenantOnDocked(state);
+    fleetOnDocked(state);
     diggersLeadOnDocked(state, world);
     notePrices(state);
     return ok(undefined);
@@ -1688,12 +1693,15 @@ export function buyUpgrade(state: GameState, upgradeId: string): Result {
   if (!docked.ok) return docked;
   const upgrade = UPGRADES_BY_ID.get(upgradeId);
   if (!upgrade) return fail("Unknown upgrade.");
-  if (state.ship.upgrades.includes(upgradeId)) return fail("Already installed.");
+  if (hasFitted(state.ship, upgradeId)) return fail(hullOf(state.ship).builtIn.includes(upgradeId) ? "Built into this hull." : "Already installed.");
   if (upgrade.retired) return fail(upgrade.retired);
+  // Ship classes (AW-103): not every frame takes every fitting.
+  const fit = fitBlocker(hullOf(state.ship), upgradeId);
+  if (fit) return fail(fit);
   // The top tier of each kind of gear waits on a research project (AW-15).
   const gate = researchFor(upgradeId);
   if (gate && !upgradeUnlocked(state, upgradeId)) return fail(`Needs research first: "${gate.name}" (${CLAN_NAMES[gate.clan]}).`);
-  const queued = (id: string) => state.ship.upgrades.includes(id) || (state.yard ?? []).some((j) => j.upgradeId === id);
+  const queued = (id: string) => hasFitted(state.ship, id) || (state.yard ?? []).some((j) => j.upgradeId === id);
   if (upgrade.requires && !queued(upgrade.requires)) {
     return fail(`Requires ${UPGRADES_BY_ID.get(upgrade.requires)?.name ?? upgrade.requires} first.`);
   }

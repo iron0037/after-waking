@@ -61,6 +61,7 @@ describe("new gear", () => {
   it("cargo pods need the expanded hold first", () => {
     const state = newGame({ seed: 42 });
     state.credits = 200_000;
+    state.ship.hull = "firstRate"; // the starter freighter has no room for pods (AW-103)
     expect(buyUpgrade(state, "expandedHold2").ok).toBe(false);
     expect(buyUpgrade(state, "expandedHold").ok).toBe(true);
     // Cargo pods also wait on the Exchange's research (AW-15).
@@ -68,8 +69,8 @@ describe("new gear", () => {
     state.research = { "pod-frames": { startedAt: 0, readyAt: 0, done: true } };
     expect(buyUpgrade(state, "expandedHold2").ok).toBe(true);
     advanceTime(state, 5 * DAY);
-    expect(shipStats(state.ship).cargoCapacityT).toBe(450);
-    expect(effectiveStats(state).cargoCapacityT).toBe(450);
+    expect(shipStats(state.ship).cargoCapacityT).toBe(470);
+    expect(effectiveStats(state).cargoCapacityT).toBe(470);
   });
 });
 

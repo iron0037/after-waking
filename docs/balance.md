@@ -167,3 +167,18 @@ The user first asked for about one per region at home, with the charted stars th
 At one per region the starter drill can't reach most charted seams (only the home worlds are kept shallow), so a captain short on fuel and cash cycled empty home systems.
 
 The chosen variant cuts the median 60-trip net worth from 689k to 506k (novice) and from 769k to 663k (competent). The one broke career is seed 10, the worst map in every census so far.
+
+## Ship classes (AW-103, 2026-11-06)
+Competent bot, 4 seeds (42, 7, 2026, 11), 60 trips, flying for the hull's own clan (so it starts Friendly). It buys the hull once it can keep a 12k cushion, moves across, sells the freighter, and rebuys its Mk I gear on the new hull. The control is the same clan without a new hull. Rates are measured from the trip the hull was bought. Net worth counts the new hull at resale.
+
+| Hull | Bought at trip | Net / 100 days, control → hull | Net worth at 60, control → hull | t / trip | days / trip | raids |
+|---|---|---|---|---|---|---|
+| First-rate | 14–23 | 23.7k → 27.8k (+18%) | 673k → 830k | 286 → 317 | 54 → 64 | 25 → 27 |
+| Bulker | 17–27 | 21.8k → 30.7k (+41%) | 710k → 1,017k | 293 → 570 | 58 → 75 | 21 → 29 |
+| Galleon | 28–43 | 21.6k → 27.8k (+29%) | 684k → 899k | 289 → 582 | 61 → 94 | 24 → 18 |
+| Corsair | 18–27 | 22.7k → 23.2k (+2%) | 680k → 676k | 287 → 273 | 56 → 64 | 22 → 14 |
+| Destroyer | 23–34 | 21.5k → 19.7k (−8%) | 666k → 495k | 285 → 200 | 59 → 50 | 22 → 13 |
+| Listener | 17–26 | 24.5k → 21.0k (−14%) | 706k → 552k | 292 → 235 | 58 → 54 | 25 → 22 |
+| Scout | 15–31 | 21.4k → 1.0k | 617k → 146k | 282 → 78 | 58 → 51 | 22 → 20 |
+
+The bot is a miner, so this measures each hull as a mining ship. The haulers win, the Corsair breaks even, and the specialist hulls lose because the bot doesn't use what they're for (combat income, the Awaken trail, specimens and survey work). The Destroyer waits on pirate-hunting work (AW-229). The Scout can't pay its way as a miner; a captain who buys one should keep the freighter berthed for hauling. No hull run went broke.

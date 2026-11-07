@@ -53,6 +53,8 @@ import type { PeopleSettings, UniverseSettings } from "./settings";
 import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
 import { autoSpendCrew, effectiveStats } from "./perks";
 import { cargoTonnes } from "./ship";
+import { HULLS_BY_ID, type HullId } from "../data/hulls";
+import { buyHull, commandShip, hullBlockers, hullPrice, sellShip } from "./fleet";
 import { newGame, type GameState } from "./state";
 import { frontierTonnage, REGION_SIZE, regionKey, scoutedShare } from "./surface";
 import { DAY } from "./units";
@@ -67,6 +69,8 @@ export interface BotReport {
   errors: string[];
   /** Raiders who hailed on the way home (the bot pays them). */
   raids: number;
+  /** The trip at whose refit the bot moved into its new hull, if it did. */
+  hullBoughtAt?: number;
   tripSummaries: {
     system: string;
     days: number;
@@ -103,6 +107,8 @@ export interface BotOptions {
   /** New-game settings to play under (AW-205); Normal if left out. */
   universe?: UniverseSettings;
   people?: Partial<PeopleSettings>;
+  /** Buy this clan's hull once it's affordable, move across and sell the old ship (AW-103). */
+  hull?: HullId;
 }
 
 export const DEFAULT_UPGRADES = ["deepDrill", "roverSled", "expandedHold", "roverCells", "surveyArray", "auxTanks", "landingStruts"];
@@ -111,6 +117,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
   const { survey = true, upgrades = DEFAULT_UPGRADES, reserve = 12_000, novice = false, crewShare = 0 } = options;
   let rescues = 0;
   let raids = 0;
+  let hullBoughtAt: number | undefined;
   const state = newGame({ seed, ...(options.clan ? { clan: options.clan } : {}), universe: options.universe, people: options.people as PeopleSettings | undefined });
   const world = new World(state.seed);
   const salt = options.rngSalt ?? 0;
@@ -130,6 +137,16 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
   let tripsCompleted = 0;
   for (let trip = 0; trip < trips && errors.length < 20; trip++) {
     // Refit at the Intrepid. Upgrades are investments, so they're outside the trip's profit.
+    if (options.hull && (state.ship.hull ?? "freighter") !== options.hull) {
+      const hull = HULLS_BY_ID.get(options.hull);
+      if (hull && state.credits - hullPrice(state, hull) > reserve && hullBlockers(state, options.hull).length === 0) {
+        const bought = buyHull(state, options.hull);
+        if (bought.ok && commandShip(state, (state.berthed ?? []).length - 1).ok) {
+          sellShip(state, (state.berthed ?? []).length - 1);
+          hullBoughtAt = trip;
+        }
+      }
+    }
     for (const id of upgrades) {
       const upgrade = UPGRADES_BY_ID.get(id);
       if (upgrade && !state.ship.upgrades.includes(id) && state.credits - upgrade.price > reserve) buyUpgrade(state, id);
@@ -208,7 +225,7 @@ export function runBot(seed: number, trips: number, options: BotOptions = {}): B
   }
 
   raids += state.journal.filter((j) => j.text.startsWith("Raider contact")).length;
-  return { state, tripsCompleted, errors, tripSummaries, raids };
+  return { state, tripsCompleted, errors, tripSummaries, raids, hullBoughtAt };
 }
 
 /** Helm's survey obligation still to fly, if any. */

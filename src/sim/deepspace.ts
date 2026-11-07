@@ -17,12 +17,12 @@ import type { World } from "./world";
 export const BLIND_FOLD_RANGE = 0.6;
 export const BLIND_FOLD_FUEL = 1.25;
 
-/** This crew's blind-fold reach and thirst: a dark-fold pilot (AW-207) does better. */
+/** This crew's blind-fold reach and thirst: a dark-fold pilot (AW-207) or a Covenant listener (AW-103) does better. */
 export function blindFoldRange(state: GameState): number {
-  return hasTalent(state, "dark-fold") ? 0.8 : BLIND_FOLD_RANGE;
+  return Math.max(effectiveStats(state).blindFoldRange, hasTalent(state, "dark-fold") ? 0.8 : BLIND_FOLD_RANGE);
 }
 export function blindFoldFuel(state: GameState): number {
-  return hasTalent(state, "dark-fold") ? 1 : BLIND_FOLD_FUEL;
+  return Math.min(effectiveStats(state).blindFoldFuel, hasTalent(state, "dark-fold") ? 1 : BLIND_FOLD_FUEL);
 }
 /** Deep-space points must be at least this far from any star (closer, fold to the star instead). */
 export const DEEP_CLEARANCE_LY = 0.6;

@@ -175,8 +175,8 @@ export function autoSpendCrew(state: GameState, rng: Rng): void {
 /** The ship's stats as the crew actually gets to use them: hardware plus perks. */
 export function effectiveStats(state: GameState): ShipStats {
   const s = shipStats(state.ship);
-  // Lyceum captains carry the Lyceum's researchers, whose berths take hold space.
-  s.cargoCapacityT += clanMods(state).cargoT;
+  // Lyceum captains carry the Lyceum's researchers, whose berths take hold space (the Lyceum's own scout has berths for them).
+  if ((state.ship.hull ?? "freighter") !== "scout") s.cargoCapacityT += clanMods(state).cargoT;
   if (hasPerk(state, "power-management")) s.roverEnergy = Math.round(s.roverEnergy * 1.15);
   if (hasPerk(state, "rover-overhaul")) s.roverCargoT = Math.round(s.roverCargoT * 1.25);
   if (hasPerk(state, "deep-bore")) s.drillMaxDepthM = Math.round(s.drillMaxDepthM * 1.2);
@@ -229,6 +229,7 @@ export function roverSpecimenSlots(state: GameState): number {
 }
 
 export function shipSpecimenSlots(state: GameState): number {
-  return SHIP_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0) + effectiveStats(state).specimenSlotBonus;
+  const s = effectiveStats(state);
+  return SHIP_SPECIMEN_BASE + (hasPerk(state, "containment") ? 2 : 0) + s.specimenSlotBonus + s.shipRackBonus;
 }
 
