@@ -80,7 +80,7 @@ export function ShipsPanel({ session }: { session: GameSession }) {
   const berthed = state.berthed ?? [];
   const current = hullOf(state.ship);
   return (
-    <Section id="yard-ships" title="Ships" level={2} summary={`Flying the ${state.ship.name} (${current.name.toLowerCase()})${berthed.length ? ` · ${berthed.length} berthed` : ""}`}>
+    <Section id="yard-ships" title="Ships" level={2} class="yard-full" summary={`Flying the ${state.ship.name} (${current.name.toLowerCase()})${berthed.length ? ` · ${berthed.length} berthed` : ""}`}>
       <p class="muted small">
         Each clan builds one hull, and sells it only to captains it counts as friends. Ships you're not flying stay berthed at the Intrepid for
         free, with their own fittings, fuel and probes. The rover, the boat and their gear, the hold and the specimen racks go with you. A berthed

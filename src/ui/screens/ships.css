@@ -27,3 +27,12 @@
   width: 64px;
   height: 64px;
 }
+.yard-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* The Shipyard's fleet and gear rows take the full width (AW-231). */
+.hub-grid > .yard-full {
+  grid-column: 1 / -1;
+}

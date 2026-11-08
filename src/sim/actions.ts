@@ -1688,6 +1688,27 @@ export function yardUpgrades(state: GameState): readonly Upgrade[] {
   return UPGRADES.filter((u) => !u.retired || state.ship.upgrades.includes(u.id));
 }
 
+/**
+ * Where a piece of gear stands for the Shipyard's filter (AW-231):
+ * - equipped: installed, built into the hull, or being fitted;
+ * - incompatible: this hull can't take it;
+ * - purchasable: it fits and you can buy it now;
+ * - short: it fits and nothing else stands in the way, but you can't afford it;
+ * - locked: something else stands in the way (research, a prerequisite, the clan, retired gear).
+ */
+export type YardStatus = "equipped" | "incompatible" | "purchasable" | "short" | "locked";
+
+export function yardStatus(state: GameState, upgradeId: string): YardStatus {
+  const upgrade = UPGRADES_BY_ID.get(upgradeId);
+  if (!upgrade) return "locked";
+  if (hasFitted(state.ship, upgradeId) || (state.yard ?? []).some((j) => j.kind === "install" && j.upgradeId === upgradeId)) return "equipped";
+  if (fitBlocker(hullOf(state.ship), upgradeId)) return "incompatible";
+  if (upgrade.retired || !upgradeUnlocked(state, upgradeId) || clanRefuses(state, upgrade.vendor)) return "locked";
+  const queued = (id: string) => hasFitted(state.ship, id) || (state.yard ?? []).some((j) => j.upgradeId === id);
+  if (upgrade.requires && !queued(upgrade.requires)) return "locked";
+  return state.credits < upgradePriceFor(state, upgrade.vendor, upgrade.price) ? "short" : "purchasable";
+}
+
 export function buyUpgrade(state: GameState, upgradeId: string): Result {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;

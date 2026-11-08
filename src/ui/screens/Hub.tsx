@@ -2,7 +2,8 @@
 import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
-import { fitBlocker, hullOf } from "../../sim";
+import { fitBlocker, hullOf, yardStatus } from "../../sim";
+import { VEHICLE_WEAPONS } from "../../data/vehicleWeapons";
 import { ShipsPanel } from "./Ships";
 import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
 import type { ComponentChildren } from "preact";
@@ -922,6 +923,18 @@ function ProbeRack({ session, capacity }: { session: GameSession; capacity: numb
   );
 }
 
+type YardFilter = "all" | "purchasable" | "short" | "equipped" | "incompatible";
+
+const YARD_FILTERS: Record<YardFilter, string> = {
+  all: "All",
+  purchasable: "Purchasable",
+  short: "Insufficient credits",
+  equipped: "Equipped",
+  incompatible: "Incompatible",
+};
+
+let yardFilterChoice: YardFilter = "all";
+
 function Shipyard({ session }: { session: GameSession }) {
   const { state } = session;
   const stats = effectiveStats(state);
@@ -929,6 +942,14 @@ function Shipyard({ session }: { session: GameSession }) {
   const r = stats.ratings;
   const offered = yardUpgrades(state);
   const categories = (Object.keys(UPGRADE_CATEGORY_NAMES) as UpgradeCategory[]).filter((c) => offered.some((u) => u.category === c));
+  // The gear filter (AW-231), remembered while the game is open.
+  const [filter, setFilterState] = useState<YardFilter>(yardFilterChoice);
+  const setFilter = (f: YardFilter) => {
+    yardFilterChoice = f;
+    setFilterState(f);
+  };
+  const statusOf = new Map(offered.map((u) => [u.id, yardStatus(state, u.id)]));
+  const shown = filter === "all" ? offered : offered.filter((u) => statusOf.get(u.id) === filter);
   const queuedIds = new Set((state.yard ?? []).flatMap((j) => (j.kind === "install" && j.upgradeId ? [j.upgradeId] : [])));
 
   const repair = repairQuote(state);
@@ -977,10 +998,11 @@ function Shipyard({ session }: { session: GameSession }) {
           )}
         </section>
       )}
-      <ShipsPanel session={session} />
       <Section id="yard-ship" title={state.ship.name} level={2} summary={`${hullOf(state.ship).name} · ${tonnes(stats.cargoCapacityT)} hold · drill ${stats.drillMaxDepthM} m`}>
         <h3>Ship</h3>
         <dl class="kv">
+          <dt>Class</dt>
+          <dd>{hullOf(state.ship).name}</dd>
           <dt>Hull mass</dt>
           <dd>{tonnes(stats.hullMassT)}</dd>
           <dt>Cargo capacity</dt>
@@ -1004,34 +1026,12 @@ function Shipyard({ session }: { session: GameSession }) {
               <dd>{stats.deepScanLy} ly</dd>
             </>
           )}
-        </dl>
-        <h3 class="hub-gap">Drill &amp; rover</h3>
-        <dl class="kv">
           <dt>Drill depth</dt>
           <dd>
             <Perked eff={stats.drillMaxDepthM} base={hw.drillMaxDepthM} unit=" m" />
           </dd>
           <dt>Drill rate</dt>
           <dd>{stats.drillRateTph} t/h</dd>
-          <dt>Rover cargo</dt>
-          <dd>
-            {tonnes(stats.roverCargoT)}
-            {stats.roverCargoT !== hw.roverCargoT && <span class="good small"> (hardware {tonnes(hw.roverCargoT)}, +perks)</span>}
-          </dd>
-          <dt>Rover energy</dt>
-          <dd>
-            <Perked eff={stats.roverEnergy} base={hw.roverEnergy} />
-          </dd>
-          <dt>Rover climbs</dt>
-          <dd class={stats.roverCanClimb ? "good" : "muted"}>{stats.roverCanClimb ? "Mountains" : "Flat and rough only"}</dd>
-          {stats.boatEnergy > 0 && (
-            <>
-              <dt>Boat hold</dt>
-              <dd>{tonnes(stats.boatCargoT)}</dd>
-              <dt>Boat energy</dt>
-              <dd>{stats.boatEnergy}</dd>
-            </>
-          )}
         </dl>
         <h3 class="hub-gap">Landing ratings</h3>
         <dl class="kv">
@@ -1054,14 +1054,76 @@ function Shipyard({ session }: { session: GameSession }) {
         </dl>
       </Section>
 
-      <section class="hub-upgrades">
+      {/* The rover and the boat go with the captain from ship to ship (AW-103), so they get their own panels (AW-231). */}
+      <Section id="yard-stats-rover" title="Rover" level={2} summary={`${tonnes(stats.roverCargoT)} cargo · ${stats.roverEnergy} energy`}>
+        <dl class="kv">
+          <dt>Cargo</dt>
+          <dd>
+            {tonnes(stats.roverCargoT)}
+            {stats.roverCargoT !== hw.roverCargoT && <span class="good small"> (hardware {tonnes(hw.roverCargoT)}, +perks)</span>}
+          </dd>
+          <dt>Energy</dt>
+          <dd>
+            <Perked eff={stats.roverEnergy} base={hw.roverEnergy} />
+          </dd>
+          <dt>Climbs</dt>
+          <dd class={stats.roverCanClimb ? "good" : "muted"}>{stats.roverCanClimb ? "Mountains" : "Flat and rough only"}</dd>
+          <dt>Drive speed</dt>
+          <dd>{stats.roverDriveTime < 1 ? <span class="good">{Math.round((1 / stats.roverDriveTime - 1) * 100)}% faster</span> : "Standard"}</dd>
+          <dt>Charging</dt>
+          <dd>{stats.roverChargeMult > 1 ? <span class="good">×{stats.roverChargeMult}</span> : "Standard"}</dd>
+          <dt>Plating</dt>
+          <dd>
+            {stats.roverHull} hull
+            {stats.roverArmour < 1 && <span class="good small"> · stops {Math.round((1 - stats.roverArmour) * 100)}% of a bite</span>}
+          </dd>
+          <dt>Creature gear</dt>
+          <dd>
+            {state.ship.roverWrecked ? (
+              <span class="danger">Offline: wrecked; the yard can repair it</span>
+            ) : (
+              stats.vehicleWeapons.map((id) => VEHICLE_WEAPONS[id]?.name ?? id).join(", ")
+            )}
+          </dd>
+        </dl>
+      </Section>
+
+      <Section id="yard-stats-boat" title="Boat" level={2} summary={stats.boatEnergy > 0 ? `${tonnes(stats.boatCargoT)} hold · ${stats.boatEnergy} energy` : "None aboard"}>
+        {stats.boatEnergy > 0 ? (
+          <dl class="kv">
+            <dt>Hold</dt>
+            <dd>{tonnes(stats.boatCargoT)}</dd>
+            <dt>Energy</dt>
+            <dd>{stats.boatEnergy}</dd>
+            <dt>Sails on</dt>
+            <dd>{["water", stats.boatCryo && "liquid methane", stats.boatCryoDeep && "liquid nitrogen", stats.boatAcidProof && "acid"].filter(Boolean).join(", ")}</dd>
+          </dl>
+        ) : (
+          <p class="muted small">No boat aboard. The Midshipmen sell one under Boat below. It works the seas a rover can't reach, and goes with you from ship to ship.</p>
+        )}
+      </Section>
+
+      <ShipsPanel session={session} />
+
+      <section class="hub-upgrades yard-full">
         <p class="muted small hub-upkeep-note">
           Installed gear costs upkeep: {(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day, settled with the crew's wages whenever you're back
           aboard. Yours comes to <strong class="accent">{cr(dailyUpkeep(state))}</strong> a day. Orders are fitted one at a time ({UPGRADE_INSTALL_DAYS} days
           each) alongside refits and Lyceum courses; the ship can't fold out until the yard is done.
         </p>
-        {categories.map((cat) => {
-          const inCat = offered.filter((u) => u.category === cat);
+        <div class="yard-filter">
+          <label class="small" for="yard-filter">Show</label>
+          <select id="yard-filter" value={filter} onChange={(e) => setFilter((e.currentTarget as HTMLSelectElement).value as YardFilter)}>
+            {(Object.keys(YARD_FILTERS) as YardFilter[]).map((f) => (
+              <option key={f} value={f}>
+                {YARD_FILTERS[f]} ({f === "all" ? offered.length : offered.filter((u) => statusOf.get(u.id) === f).length})
+              </option>
+            ))}
+          </select>
+        </div>
+        {shown.length === 0 && <p class="muted small">Nothing in the Shipyard matches that filter.</p>}
+        {categories.filter((cat) => shown.some((u) => u.category === cat)).map((cat) => {
+          const inCat = shown.filter((u) => u.category === cat);
           const owned = inCat.filter((u) => state.ship.upgrades.includes(u.id)).length;
           const fitting = inCat.filter((u) => queuedIds.has(u.id)).length;
           return (
