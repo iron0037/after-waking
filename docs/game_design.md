@@ -268,9 +268,9 @@ Your third-rate freighter can only be improved so far. Each clan builds one hull
 | Listener (Covenant) | 1,400 | 140 | 80 | 9 | 0.28 | 80 hull, laser 4 | 1.3 g | quiet, blind folds, deep-field array built in, seam sense | 170k |
 | Corsair (Freebooters) | 1,800 | 180 | 70 | 10 | 0.35 | 160 hull, laser 14, shields 6 | 1.4 g | pirate colours, one quirk | 200k |
 | Destroyer (Midshipmen) | 1,600 | 100 | 70 | 10 | 0.40 | 220 hull, laser 18, kinetic 20, shields 10 | 1.3 g | 8 racks | 260k |
-| Galleon (Exchange) | 3,400 | 650 | 110 | 8 | 0.20 | 260 hull, laser 12, kinetic 12, shields 14 | 1.0 g, 2 atm; can't take struts or pressure hulls | none | 400k |
+| Merchantman (Exchange) | 3,400 | 650 | 110 | 8 | 0.20 | 260 hull, laser 12, kinetic 12, shields 14 | 1.0 g, 2 atm; can't take struts or pressure hulls | none | 400k |
 
-- **Combat speed** (new stat) sets running and manoeuvring in a fight: freighter 1, first-rate 1.1, bulker 0.8, scout 1.3, listener 1.05, corsair 1.15, destroyer 1.3, galleon 0.85. Raiders run 0.95–1.15.
+- **Combat speed** (new stat) sets running and manoeuvring in a fight: freighter 1, first-rate 1.1, bulker 0.8, scout 1.3, listener 1.05, corsair 1.15, destroyer 1.3, merchantman 0.85. Raiders run 0.95–1.15.
 - **Fold fuel already scales with mass**, so the heavy hulls pay for their size at every fold and landing.
 - **Listener:** +0.25 to seeing raiders first (cap 0.95), raiders come 30% less often, blind folds reach 90% of the drive's range with no extra fuel, and a 15% chance per first landing in a region to catch the seams clue.
 - **Corsair:** raiders come 40% less often; Helm's standing drops 1.5 each time you dock. It's secondhand, with one quirk rolled at purchase (tuned drive, false bulkheads, hot guns, leaky tanks, patched hull, or a known silhouette that cancels the pirate colours).
@@ -278,16 +278,16 @@ Your third-rate freighter can only be improved so far. Each clan builds one hull
 
   | Upgrade | Hulls |
   |---|---|
-  | Cargo pods (hold Mk II) | First-rate, Bulker, Galleon |
+  | Cargo pods (hold Mk II) | First-rate, Bulker, Merchantman |
   | Core drill | Bulker |
   | Pressure hull Mk III | First-rate, Bulker |
   | Fold drive coil Mk II | First-rate, Listener, Corsair, Destroyer (the scout's drive is already 13 ly) |
   | Survey array Mk II | First-rate, Scout, Listener |
   | Long-baseline array | Scout, Listener |
   | Pressure-rated probe racks | Scout |
-  | Kinetic battery | Corsair, Destroyer, Galleon |
+  | Kinetic battery | Corsair, Destroyer, Merchantman |
 
-  The scout can't take the expanded hold; the galleon can't take landing struts or pressure hulls. Built-in gear counts as installed (for "requires") and costs no upkeep. Ships that already carry restricted gear keep it. Every ending stays reachable in the starter freighter.
+  The scout can't take the expanded hold; the merchantman can't take landing struts or pressure hulls. Built-in gear counts as installed (for "requires") and costs no upkeep. Ships that already carry restricted gear keep it. Every ending stays reachable in the starter freighter.
 - **Buying:** cash only, at the Intrepid, from a clan that counts you as at least Friendly. Your own clan's discount and the builder's standing apply. A new ship is berthed with full tanks.
 - **Berthing** at the Intrepid is free. Taking command of another ship takes half a day and needs the yard idle and the hold and racks to fit. The rover, the boat and their gear (and charge), the hold and the specimens move with the captain; fitted gear, fuel, probes and battle damage stay with the ship. Outposts come later (AW-230).
 - **Selling** a berthed ship pays half of its hull and fitted gear.

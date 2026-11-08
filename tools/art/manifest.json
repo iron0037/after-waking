@@ -98,7 +98,8 @@
     {
       "id": "hull-bulker",
       "prompt": "huge wide boxy mining bulk freighter starship, heavy rust-brown hull with yellow hazard stripes, big open ore hoppers, thick stubby landing legs, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
-      "seed": 7201
+      "seed": 7201,
+      "post": "python tools/art/deshadow.py hull-bulker 7201 --color 116,103,99 --tol 16 --flat 5"
     },
     {
       "id": "hull-scout",
@@ -121,9 +122,10 @@
       "seed": 7603
     },
     {
-      "id": "hull-galleon",
-      "prompt": "very large long armed cargo freighter starship, cream and gold hull, rows of cargo containers, gun turrets at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
-      "seed": 7703
+      "id": "hull-merchantman",
+      "prompt": "one single large bulky armed merchant cargo starship with a solid elongated hull, cream and gold paint, cargo bay doors set into the hull, small gun turrets on the flanks, big engine block at the stern, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, flat even lighting with no shadow, isolated on plain gray background",
+      "seed": 8201,
+      "negative": "drop shadow, cast shadow, shadow on the ground"
     }
   ]
 }

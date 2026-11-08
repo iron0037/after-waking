@@ -4,7 +4,7 @@
  */
 import { BASE_STATS, type ClanId, type ShipStats } from "./ship";
 
-export type HullId = "freighter" | "firstRate" | "bulker" | "scout" | "listener" | "corsair" | "destroyer" | "galleon";
+export type HullId = "freighter" | "firstRate" | "bulker" | "scout" | "listener" | "corsair" | "destroyer" | "merchantman";
 
 export interface Hull {
   id: HullId;
@@ -192,8 +192,8 @@ export const HULLS: readonly Hull[] = [
     names: ["Resolute", "Vigil", "Hard Line"],
   },
   {
-    id: "galleon",
-    name: "Galleon",
+    id: "merchantman",
+    name: "Merchantman",
     vendor: "exchange",
     price: 400_000,
     blurb: "The Exchange's armed hauler: the biggest hold in the fleet and the guns to keep it. Too big to set down anywhere rough.",
@@ -223,14 +223,14 @@ export const HULLS_BY_ID: ReadonlyMap<HullId, Hull> = new Map(HULLS.map((h) => [
 
 /** Top-tier gear the starter freighter has no room for: only these hulls can take it. */
 export const HULL_ONLY: Readonly<Record<string, readonly HullId[]>> = {
-  expandedHold2: ["firstRate", "bulker", "galleon"],
+  expandedHold2: ["firstRate", "bulker", "merchantman"],
   coreDrill: ["bulker"],
   pressureHull3: ["firstRate", "bulker"],
   driveCoil2: ["firstRate", "listener", "corsair", "destroyer"],
   surveyArray2: ["firstRate", "scout", "listener"],
   longBaselineArray: ["scout", "listener"],
   probeBay2: ["scout"],
-  kineticBattery: ["corsair", "destroyer", "galleon"],
+  kineticBattery: ["corsair", "destroyer", "merchantman"],
 };
 
 /** The standing a clan wants before it sells you one of its ships. */

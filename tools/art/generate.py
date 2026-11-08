@@ -139,7 +139,8 @@ def build(asset: dict, manifest: dict, seed: int) -> Path:
     prompt = f"{manifest['style']}, {asset['prompt']}"
     folder = OUTPUT / asset["id"]
     folder.mkdir(parents=True, exist_ok=True)
-    raw = txt2img(prompt, manifest["negative"], seed, opts)
+    negative = manifest["negative"] + (f", {asset['negative']}" if asset.get("negative") else "")
+    raw = txt2img(prompt, negative, seed, opts)
     raw.save(folder / f"{seed}-raw.png")
     img = process(raw, opts)
     path = folder / f"{seed}.png"

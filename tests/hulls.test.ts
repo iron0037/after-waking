@@ -23,6 +23,9 @@ import {
   shipStats,
   spotChance,
   World,
+  yardStatus,
+  deserialize,
+  serialize,
   type GameState,
 } from "../src/sim";
 
@@ -172,8 +175,8 @@ describe("what each hull is for", () => {
     expect(shipSpecimenSlots(rich())).toBe(16);
   });
 
-  it("the galleon can't be fitted for rough worlds", () => {
-    const s = flying("galleon");
+  it("the merchantman can't be fitted for rough worlds", () => {
+    const s = flying("merchantman");
     const r = buyUpgrade(s, "landingStruts");
     expect(r.ok).toBe(false);
     expect(effectiveStats(s).ratings.maxGravityG).toBe(1);
@@ -215,5 +218,34 @@ describe("what each hull is for", () => {
       const mass = st.hullMassT + st.cargoCapacityT + st.fuelCapacity;
       expect(0.001 * mass * st.foldRangeLy, h.id).toBeLessThan(st.fuelCapacity / 2);
     }
+  });
+});
+
+describe("the galleon is the Merchantman now (AW-232)", () => {
+  it("saves that own one carry it over", () => {
+    const s = rich();
+    s.ship.hull = "galleon" as never;
+    s.berthed = [{ name: "Old", hull: "galleon" as never, upgrades: [], fuel: 0, cargo: {} }];
+    const back = deserialize(serialize(s));
+    expect(back.ship.hull).toBe("merchantman");
+    expect(back.berthed![0]!.hull).toBe("merchantman");
+  });
+});
+
+describe("the Shipyard filter (AW-231)", () => {
+  it("sorts gear into equipped, incompatible, purchasable, short of credits and locked", () => {
+    const s = rich();
+    expect(yardStatus(s, "expandedHold")).toBe("purchasable");
+    expect(yardStatus(s, "kineticBattery")).toBe("incompatible");
+    expect(yardStatus(s, "expandedHold2")).toBe("incompatible");
+    s.credits = 0;
+    expect(yardStatus(s, "expandedHold")).toBe("short");
+    s.credits = 1_000_000;
+    buyUpgrade(s, "expandedHold");
+    expect(yardStatus(s, "expandedHold")).toBe("equipped"); // being fitted counts
+    s.ship.hull = "firstRate";
+    expect(yardStatus(s, "expandedHold2")).toBe("locked"); // waits on research
+    s.ship.hull = "scout";
+    expect(yardStatus(s, "surveyArray")).toBe("equipped"); // built in
   });
 });

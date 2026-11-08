@@ -66,6 +66,8 @@ export function deserialize(json: string): GameState {
   for (const m of [...(data.crew ?? []), ...(data.recruits ?? [])]) m.perks = m.perks?.map((p) => (p === "field-refinery" ? "long-shifts" : p));
   // Careers that ended before the specimen counter caught up (AW-204).
   if (data.ending) data.ending.report.specimens = Math.max(data.ending.report.specimens ?? 0, specimensCollected(data));
+  // The Exchange's galleon is the Merchantman now (AW-232).
+  for (const ship of [data.ship, ...(data.berthed ?? [])]) if ((ship.hull as string | undefined) === "galleon") ship.hull = "merchantman";
   // Goods added after a save was made start at normal prices.
   for (const id of COMMODITY_IDS) {
     data.market.mult[id] ??= 1;
