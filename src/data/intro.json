@@ -5,8 +5,8 @@
   "scenes": [
     {
       "image": "intro-1",
-      "text": "In the 2060s, the machines learned to do everything. Some of us refused to be kept.",
-      "say": "In the twenty-sixties, the machines learned to do everything. Some of us refused to be kept.",
+      "text": "In the mid-21st century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
+      "say": "In the mid twenty-first century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
       "from": {
         "scale": 1.18,
         "x": 0,
@@ -20,8 +20,8 @@
     },
     {
       "image": "intro-2",
-      "text": "In 2071, two million of us left aboard the Intrepid, bound for Kepler-186. A voyage of four thousand years.",
-      "say": "In twenty seventy-one, two million of us left aboard the Intrepid, bound for Kepler one eighty-six. A voyage of four thousand years.",
+      "text": "Some chose to seek their fortunes in the stars. One ship, the Intrepid, departed with two million souls bound for Kepler-186.",
+      "say": "Some chose to seek their fortunes in the stars. One ship, the Intrepid, departed with two million souls bound for Kepler one eight six.",
       "from": {
         "scale": 1.12,
         "x": 5,
@@ -35,7 +35,7 @@
     },
     {
       "image": "intro-3",
-      "text": "We slept. Earth kept talking to us across the dark. No one listened.",
+      "text": "The journey was long, and colonists slept in stasis while dreaming of a better tomorrow.",
       "from": {
         "scale": 1.05,
         "x": 0,
@@ -49,7 +49,7 @@
     },
     {
       "image": "intro-4",
-      "text": "Two-thirds of the way there, something opened in front of us.",
+      "text": "But on the way, something went horribly wrong. The ship encountered an anomaly, triggering an early awakening.",
       "from": {
         "scale": 1.05,
         "x": 0,
@@ -64,7 +64,7 @@
     },
     {
       "image": "intro-5",
-      "text": "We woke among stars no one had ever charted, and started the calendar again: After Waking.",
+      "text": "We woke among stars no one had ever charted and started the calendar again: After Waking.",
       "from": {
         "scale": 1.2,
         "x": 0,
@@ -78,7 +78,7 @@
     },
     {
       "image": "intro-6",
-      "text": "Thirty years on, the Intrepid is a city that cannot move. Its reactors are failing, its decks are crowded, and the crystal that folds space is running out.",
+      "text": "Thirty years on, the Intrepid is a city adrift. Its reactors are failing, its decks are crowded, and its people are divided.",
       "from": {
         "scale": 1.12,
         "x": -5,
@@ -92,7 +92,7 @@
     },
     {
       "image": "intro-7",
-      "text": "You've just signed for a third-rate freighter and a debt to the Exchange. Find fuel. Find what we need. Maybe find us a home.",
+      "text": "But the stars beckon the bold. After years of saving, you've staked everything on a run-down freighter. Find your fortune out there, and maybe find us a home.",
       "from": {
         "scale": 1.25,
         "x": 0,
