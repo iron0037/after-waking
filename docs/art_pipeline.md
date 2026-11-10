@@ -49,3 +49,15 @@
 - A 5B DiT text-to-image model with a Qwen text encoder; Apache-2.0 weights. It's strong at layout and in-image text, which makes it a candidate for title screens, UI mockups and concept art.
 - The full bf16 weights are about 27 GB, beyond this GPU. It runs through `run_lowvram.py` with NF4 quantization and CPU offload.
 - Launch on port 7870, so it doesn't collide with the SD WebUI on 7860. Don't run both at the same time: they compete for 8 GB of VRAM.
+- `tools/art/moss.py` takes several asset ids per run, so the model (about 80 s to load) loads once. Each 1344×768 image takes about 3 minutes.
+- Close the SD WebUI first: the two can't share 8 GB.
+
+## Intro scenes (AW-234)
+- Seven panels, `intro-1` … `intro-7` in `tools/art/manifest.json`, rendered with MOSS at 1344×768 and pixel-snapped ×4 to 336×192. They're shown full-screen with `image-rendering: pixelated` and panned or zoomed by CSS.
+- Script, captions, spoken forms and motion are in `src/data/intro.json`.
+
+## Voice: Kokoro (`E:\Kokoro`)
+- Kokoro-82M, a small open (Apache-2.0) text-to-speech model, run through `kokoro-onnx` on the CPU. The venv is `E:\Kokoro\.venv`, and the models are in `E:\Kokoro\models` (`kokoro-v1.0.onnx`, `voices-v1.0.bin`), outside the repo.
+- `E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py` renders every intro line to `public/assets/intro/vo-<n>.ogg` (Ogg Vorbis, padded, normalised to −1 dBFS). `--only N` re-renders one line.
+- `--sample VOICE ...` renders one line in several voices to `tools/audio/samples/` (not committed), for choosing a narrator. The voice and speed are set in `src/data/intro.json`.
+- When a line has numbers, a `say` field gives the spoken form ("twenty seventy-one"), and the caption keeps the digits.

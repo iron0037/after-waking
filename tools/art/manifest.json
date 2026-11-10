@@ -126,6 +126,104 @@
       "prompt": "one single large bulky armed merchant cargo starship with a solid elongated hull, cream and gold paint, cargo bay doors set into the hull, small gun turrets on the flanks, big engine block at the stern, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, flat even lighting with no shadow, isolated on plain gray background",
       "seed": 8201,
       "negative": "drop shadow, cast shadow, shadow on the ground"
+    },
+    {
+      "id": "intro-1",
+      "prompt": "Earth in the 2060s at dusk. A vast city of gleaming white automated towers and sleek drone traffic fills the sky, with robotic arms and delivery drones working everywhere. In the foreground, small idle human figures sit on a plaza terrace looking up at the towers, doing nothing. Warm orange sunset light against cold blue machine glow. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Earth in the 2060s at dusk. A vast city of gleaming white automated towers and sleek drone traffic fills the sky, with robotic arms and delivery drones working everywhere. In the foreground, small idle human figures sit on a plaza terrace looking up at the towers, doing nothing. Warm orange sunset light against cold blue machine glow. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 2,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-2",
+      "prompt": "Space, Earth's blue curve filling the bottom of the frame. Leaving orbit is an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, seen from the side, its engines glowing soft blue. The Moon small in the distance, scattered stars. A sense of departure and enormous scale. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Space, Earth's blue curve filling the bottom of the frame. Leaving orbit is an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, seen from the side, its engines glowing soft blue. The Moon small in the distance, scattered stars. A sense of departure and enormous scale. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 3,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-3",
+      "prompt": "Inside a vast dim cryosleep deck aboard a generation ship: endless rows of frosted glass cryopods with sleeping people inside stretching into the distance under cold blue light. In the foreground a lone console screen glows green with scrolling lines of an incoming transmission, unread, nobody at the desk. Quiet, eerie, lonely. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Inside a vast dim cryosleep deck aboard a generation ship: endless rows of frosted glass cryopods with sleeping people inside stretching into the distance under cold blue light. In the foreground a lone console screen glows green with scrolling lines of an incoming transmission, unread, nobody at the desk. Quiet, eerie, lonely. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 3,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-4",
+      "prompt": "Deep space. Ahead of an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, a colossal rift tears open: a swirling spiral of violet, magenta and white light with jagged edges, warping the stars around it. The ship is small against the anomaly, heading straight into it. Dramatic, awe-inspiring, ominous. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Deep space. Ahead of an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, a colossal rift tears open: a swirling spiral of violet, magenta and white light with jagged edges, warping the stars around it. The ship is small against the anomaly, heading straight into it. Dramatic, awe-inspiring, ominous. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-5",
+      "prompt": "Interior of a huge observation gallery with a giant curved window. A crowd of people seen from behind, silhouetted, pressed against the glass, staring out at a sky full of strange unfamiliar stars and a teal and gold nebula never seen before. Some hold children up to see. Wonder and fear. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Interior of a huge observation gallery with a giant curved window. A crowd of people seen from behind, silhouetted, pressed against the glass, staring out at a sky full of strange unfamiliar stars and a teal and gold nebula never seen before. Some hold children up to see. Wonder and fear. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-6",
+      "prompt": "Space above a cold gray planet. an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, seen from the side, now anchored and patched, with scaffolding, added modules and docking gantries bolted on. Many tiny ships come and go around it with small engine trails. Some window lights are dark. A city that cannot move. Muted purple and teal nebula behind. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Space above a cold gray planet. an immensely long, slender generation starship of weathered white and gray segmented plating, tapering at both ends, its bow split horizontally like a slightly open jaw, a long row of tiny amber window lights along its flank, small hangar pods on its belly and a cluster of engine bells at the blunt stern, seen from the side, now anchored and patched, with scaffolding, added modules and docking gantries bolted on. Many tiny ships come and go around it with small engine trails. Some window lights are dark. A city that cannot move. Muted purple and teal nebula behind. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "intro-7",
+      "prompt": "A cavernous shipyard bay inside a generation ship. In the middle, a small battered boxy cargo freighter with a worn gray hull and faded orange stripes sits on landing struts under work lights, cargo pods on its sides, sparks from a welder nearby. A lone captain stands in front of it, small, looking up at the ship. The bay doors beyond open onto stars. Hopeful, a new beginning. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "A cavernous shipyard bay inside a generation ship. In the middle, a small battered boxy cargo freighter with a worn gray hull and faded orange stripes sits on landing struts under work lights, cargo pods on its sides, sparks from a welder nearby. A lone captain stands in front of it, small, looking up at the ship. The bay doors beyond open onto stars. Hopeful, a new beginning. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
     }
   ]
 }

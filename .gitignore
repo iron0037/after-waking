@@ -16,3 +16,6 @@ __pycache__/
 
 # Scratch measurement tests (never commit)
 tests/tmp_*
+
+# Voice samples for choosing a narrator (tools/audio/narrate.py --sample)
+tools/audio/samples/

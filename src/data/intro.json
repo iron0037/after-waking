@@ -1,0 +1,108 @@
+{
+  "_comment": "The new-career intro (AW-234). The game reads this for captions and timing; tools/audio/narrate.py reads it to render the voiceover (public/assets/intro/vo-<n>.ogg). \"say\" is how the narrator should pronounce a line when it differs from the caption. Motion: start and end transforms of the panel (scale, x and y offsets in % of the frame).",
+  "voice": "af_heart",
+  "speed": 0.92,
+  "scenes": [
+    {
+      "image": "intro-1",
+      "text": "In the 2060s, the machines learned to do everything. Some of us refused to be kept.",
+      "say": "In the twenty-sixties, the machines learned to do everything. Some of us refused to be kept.",
+      "from": {
+        "scale": 1.18,
+        "x": 0,
+        "y": -6
+      },
+      "to": {
+        "scale": 1.08,
+        "x": 0,
+        "y": 4
+      }
+    },
+    {
+      "image": "intro-2",
+      "text": "In 2071, two million of us left aboard the Intrepid, bound for Kepler-186. A voyage of four thousand years.",
+      "say": "In twenty seventy-one, two million of us left aboard the Intrepid, bound for Kepler one eighty-six. A voyage of four thousand years.",
+      "from": {
+        "scale": 1.12,
+        "x": 5,
+        "y": 0
+      },
+      "to": {
+        "scale": 1.12,
+        "x": -5,
+        "y": 0
+      }
+    },
+    {
+      "image": "intro-3",
+      "text": "We slept. Earth kept talking to us across the dark. No one listened.",
+      "from": {
+        "scale": 1.05,
+        "x": 0,
+        "y": 0
+      },
+      "to": {
+        "scale": 1.22,
+        "x": 0,
+        "y": 2
+      }
+    },
+    {
+      "image": "intro-4",
+      "text": "Two-thirds of the way there, something opened in front of us.",
+      "from": {
+        "scale": 1.05,
+        "x": 0,
+        "y": 0
+      },
+      "to": {
+        "scale": 1.35,
+        "x": 0,
+        "y": 0
+      },
+      "flash": true
+    },
+    {
+      "image": "intro-5",
+      "text": "We woke among stars no one had ever charted, and started the calendar again: After Waking.",
+      "from": {
+        "scale": 1.2,
+        "x": 0,
+        "y": 5
+      },
+      "to": {
+        "scale": 1.08,
+        "x": 0,
+        "y": -3
+      }
+    },
+    {
+      "image": "intro-6",
+      "text": "Thirty years on, the Intrepid is a city that cannot move. Its reactors are failing, its decks are crowded, and the crystal that folds space is running out.",
+      "from": {
+        "scale": 1.12,
+        "x": -5,
+        "y": 0
+      },
+      "to": {
+        "scale": 1.12,
+        "x": 5,
+        "y": 0
+      }
+    },
+    {
+      "image": "intro-7",
+      "text": "You've just signed for a third-rate freighter and a debt to the Exchange. Find fuel. Find what we need. Maybe find us a home.",
+      "from": {
+        "scale": 1.25,
+        "x": 0,
+        "y": 3
+      },
+      "to": {
+        "scale": 1.06,
+        "x": 0,
+        "y": 0
+      }
+    }
+  ]
+}

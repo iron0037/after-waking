@@ -1,4 +1,5 @@
 import { useState } from "preact/hooks";
+import { Intro } from "./Intro";
 import { CAPTAIN_CLANS } from "../data/clans";
 import { FIRST_NAMES, SURNAMES } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
@@ -18,14 +19,15 @@ function randomName(): string {
   return `${first} ${last}`;
 }
 
-type Page = "menu" | "new" | "options" | "hall";
+type Page = "menu" | "new" | "options" | "hall" | "intro";
 
 /** The title screen: New Game, Continue Game and Options; new-game settings live on their own page. */
 export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) {
   const saved = GameSession.load();
   const [page, setPage] = useState<Page>("menu");
   if (page === "new") return <NewGame saved={!!saved} onStart={onStart} onBack={() => setPage("menu")} />;
-  if (page === "options") return <Options onBack={() => setPage("menu")} />;
+  if (page === "options") return <Options onBack={() => setPage("menu")} onIntro={() => setPage("intro")} />;
+  if (page === "intro") return <Intro onDone={() => setPage("options")} />;
   if (page === "hall") return <HallOfFame onBack={() => setPage("menu")} />;
   const finished = !!saved?.state.ending;
   const hallSize = readHall().length;
@@ -65,13 +67,16 @@ export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) 
   );
 }
 
-function Options({ onBack }: { onBack: () => void }) {
+function Options({ onBack, onIntro }: { onBack: () => void; onIntro: () => void }) {
   return (
     <div class="title-screen">
       <div class="title-card title-menu">
         <h2>Options</h2>
         <p class="muted">Coming soon: sound and music, text size, difficulty (fuel strictness, combat speed, clock pressure), and keyboard shortcuts.</p>
         <div class="title-buttons">
+          <button class="btn big" onClick={onIntro}>
+            Watch the intro
+          </button>
           <button class="btn big" onClick={onBack}>
             Back
           </button>
@@ -92,9 +97,11 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
   const [universe, setUniverse] = useState<UniverseSettings>(DEFAULT_UNIVERSE);
   const [people, setPeople] = useState<PeopleSettings>(DEFAULT_PEOPLE);
 
+  // A new career opens with the intro (AW-234); the session is made first, so skipping goes straight in.
+  const [begun, setBegun] = useState<GameSession | null>(null);
   const start = () => {
     const n = Number.parseInt(seed, 10);
-    onStart(
+    setBegun(
       GameSession.fresh(
         Number.isFinite(n) ? Math.abs(n) : 1,
         name.trim() || FALLBACK_NAME,
@@ -107,6 +114,8 @@ function NewGame({ saved, onStart, onBack }: { saved: boolean; onStart: (s: Game
       ),
     );
   };
+
+  if (begun) return <Intro onDone={() => onStart(begun)} />;
 
   if (step === "universe") {
     return (

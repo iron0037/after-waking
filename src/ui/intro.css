@@ -1,0 +1,178 @@
+/* The new-career intro (AW-234). */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  overflow: hidden;
+  cursor: pointer;
+  animation: intro-in 0.8s ease-out;
+}
+.intro.leaving {
+  animation: intro-out 0.7s ease-in forwards;
+}
+@keyframes intro-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes intro-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Each panel fills the frame; the current one fades in over the last, then pans and zooms. */
+.intro-panel {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 1.4s ease-in-out;
+}
+/* Panels already shown stay up underneath, so the next one crossfades over them. */
+.intro-panel.on,
+.intro-panel.past {
+  opacity: 1;
+}
+/* Behind the closing title, the last picture dims. */
+.intro.finished .intro-panel {
+  opacity: 0.3;
+}
+.intro-panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  transform: translate(var(--x0), var(--y0)) scale(var(--s0));
+}
+.intro-panel.on img,
+.intro-panel.past img {
+  animation: intro-pan var(--dur) ease-in-out forwards;
+}
+@keyframes intro-pan {
+  from {
+    transform: translate(var(--x0), var(--y0)) scale(var(--s0));
+  }
+  to {
+    transform: translate(var(--x1), var(--y1)) scale(var(--s1));
+  }
+}
+
+/* The anomaly opens: a white flash just past the middle of its panel. */
+.intro-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: intro-flash var(--dur) linear forwards;
+}
+@keyframes intro-flash {
+  0%,
+  52% {
+    opacity: 0;
+  }
+  56% {
+    opacity: 0.85;
+  }
+  75%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Letterbox bars. */
+.intro-bars::before,
+.intro-bars::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  z-index: 2;
+}
+.intro-bars::before {
+  top: 0;
+}
+.intro-bars::after {
+  bottom: 0;
+}
+
+.intro-caption {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: calc(9vh + 18px);
+  transform: translateX(-50%);
+  width: min(880px, calc(100% - 32px));
+  margin: 0;
+  padding: 10px 16px;
+  text-align: center;
+  font-size: clamp(15px, 2.1vw, 22px);
+  line-height: 1.45;
+  color: #f1ead8;
+  background: rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 #000;
+  animation: intro-caption 1.2s ease-out 0.4s both;
+}
+@keyframes intro-caption {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+.intro-title {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(32px, 7vw, 72px);
+  letter-spacing: 0.35em;
+  color: var(--accent, #ffb347);
+  text-shadow: 0 0 24px rgba(255, 179, 71, 0.35);
+  animation: intro-caption 1.6s ease-out both;
+}
+
+.intro-controls {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 16px;
+  left: 16px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+}
+.intro-dots {
+  display: flex;
+  gap: 6px;
+  margin-right: auto;
+}
+.intro-dots span {
+  width: 7px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.intro-dots span.past {
+  background: rgba(255, 255, 255, 0.55);
+}
+.intro-dots span.on {
+  background: var(--accent, #ffb347);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro-panel.on img,
+  .intro-panel.past img {
+    animation: none;
+    transform: scale(1.06);
+  }
+  .intro-flash {
+    display: none;
+  }
+}
