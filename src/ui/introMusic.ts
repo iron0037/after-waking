@@ -17,7 +17,7 @@ export const INTRO_CHORDS: readonly (readonly number[])[] = [
 ];
 const TITLE_CHORD = [36, 43, 50, 52]; // Cadd9: After Waking
 
-const LEVEL = 0.16;
+const LEVEL = 0.26;
 const GLIDE_S = 2.5;
 
 const hz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
