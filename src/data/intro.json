@@ -1,6 +1,6 @@
 {
   "_comment": "The new-career intro (AW-234). The game reads this for captions and timing; tools/audio/narrate.py reads it to render the voiceover (public/assets/intro/vo-<n>.ogg). \"say\" is how the narrator should pronounce a line when it differs from the caption. Motion: start and end transforms of the panel (scale, x and y offsets in % of the frame).",
-  "voice": "af_heart",
+  "voice": "bf_emma",
   "speed": 0.92,
   "scenes": [
     {

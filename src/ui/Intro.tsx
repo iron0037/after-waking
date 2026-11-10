@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from "preact/hooks";
 import script from "../data/intro.json";
+import { IntroMusic } from "./introMusic";
 import "./intro.css";
 
 interface Motion {
@@ -48,6 +49,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const [leaving, setLeaving] = useState(false);
   const [durations, setDurations] = useState<number[]>(() => SCENES.map((s) => estimate(s.text) + LEAD_S + TAIL_S));
   const audio = useRef<HTMLAudioElement[]>([]);
+  const music = useRef<IntroMusic | null>(null);
   const finished = index >= SCENES.length;
 
   // Load every clip up front; once a clip's length is known, its panel lasts as long as the line.
@@ -61,13 +63,25 @@ export function Intro({ onDone }: { onDone: () => void }) {
       return a;
     });
     for (const s of SCENES) new Image().src = `./assets/intro/${s.image}.png`;
-    return () => audio.current.forEach((a) => a.pause());
+    // The music (AW-235). Begin or "Watch the intro" was just clicked, so the browser lets it play.
+    try {
+      music.current = new IntroMusic(new AudioContext());
+      music.current.start();
+      if (readMuted()) music.current.setMuted(true);
+    } catch {
+      music.current = null;
+    }
+    return () => {
+      audio.current.forEach((a) => a.pause());
+      music.current?.stop(0.3);
+    };
   }, []);
 
   const leave = () => {
     if (leaving) return;
     setLeaving(true);
     audio.current.forEach((a) => a.pause());
+    music.current?.stop(0.7);
     window.setTimeout(onDone, 700);
   };
 
@@ -75,10 +89,13 @@ export function Intro({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     if (leaving) return;
     if (finished) {
+      music.current?.finale(TITLE_S);
       const t = window.setTimeout(leave, TITLE_S * 1000);
       return () => window.clearTimeout(t);
     }
     const clip = audio.current[index];
+    // The anomaly's swell peaks with the flash (56% of the panel; see intro.css).
+    music.current?.scene(index, SCENES[index]?.flash ? (durations[index] ?? 8) * 0.56 : undefined);
     const start = window.setTimeout(() => {
       if (clip && !muted) {
         clip.currentTime = 0;
@@ -115,6 +132,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
     } catch {
       /* private window: the choice lasts this visit */
     }
+    music.current?.setMuted(m);
     const clip = audio.current[index];
     if (m) clip?.pause();
     else if (clip && !finished) clip.play().catch(() => {});
@@ -157,7 +175,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
             <span key={i} class={i === index ? "on" : i < index ? "past" : ""} />
           ))}
         </span>
-        <button class="btn small" onClick={toggleMute} title={muted ? "Turn the narration on" : "Mute the narration"}>
+        <button class="btn small" onClick={toggleMute} title={muted ? "Turn the narration and music on" : "Mute the narration and music"}>
           {muted ? "Sound off" : "Sound on"}
         </button>
         <button class="btn" onClick={leave} title="Skip the intro (Esc)">
