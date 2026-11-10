@@ -35,7 +35,7 @@
     },
     {
       "image": "intro-3",
-      "text": "The journey was long, and colonists slept in stasis while dreaming of a better tomorrow.",
+      "text": "The journey was long, and we slept in stasis while dreaming of a better tomorrow.",
       "from": {
         "scale": 1.05,
         "x": 0,
@@ -49,7 +49,7 @@
     },
     {
       "image": "intro-4",
-      "text": "But on the way, something went horribly wrong. The ship encountered an anomaly, triggering an early awakening.",
+      "text": "But on the way, something went horribly wrong. The ship encountered an anomaly, which led to an unplanned awakening.",
       "from": {
         "scale": 1.05,
         "x": 0,
