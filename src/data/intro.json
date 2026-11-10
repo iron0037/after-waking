@@ -5,8 +5,8 @@
   "scenes": [
     {
       "image": "intro-1",
-      "text": "In the mid-21st century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
-      "say": "In the mid twenty-first century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
+      "text": "In the late 21st century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
+      "say": "In the late twenty-first century, mankind was surpassed by AI in all respects, triggering an existential crisis.",
       "from": {
         "scale": 1.18,
         "x": 0,
