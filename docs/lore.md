@@ -46,7 +46,7 @@ In the 2060s, superintelligent AI made human labor obsolete on Earth. Some human
 
 ## Society: The Clans
 
-The council governs weakly and the economy is capitalist. Clans are the real power, and each tracks its own reputation with you. **[DECIDED] Every clan has a specialty**: what it sells best, which crew it trains best, and what jobs it posts. **Any clan can found outposts**, so supply runs go to whoever holds a distant world.
+The council governs weakly and the economy is capitalist. Clans are the real power, and each tracks its own reputation with you. **[DECIDED] Every clan has a specialty**: what it sells best, which crew it trains best, and what jobs it posts. **Each clan runs small outposts** (a research station, a pirate's den, a refinery and so on; see game_design.md), so supply runs and passenger runs go to whoever holds a distant world.
 
 | Clan | Specialty | Sells / trains | Posts jobs for |
 |---|---|---|---|

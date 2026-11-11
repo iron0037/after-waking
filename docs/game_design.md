@@ -27,7 +27,7 @@ Working title **[DECIDED]**: ***After Waking***
 |---|---|
 | **Job board** | Deliver cargo, carry passengers, scout uncharted worlds, bounties. Handcrafted story jobs are mixed in with procedural ones, so the board doesn't go stale. |
 | **Combat and reputation** | Pirates, rival captains, aliens. Reputation is tracked **per clan and per alien race**, and actions affect several at once. Attacking an Exchange freighter pleases the Freebooters and angers the Exchange. |
-| **Outposts** **[CUT? → mid-game]** | Found an outpost on a surveyed world by delivering colonists and supplies. It grows over time, produces resources, becomes a refuel point and can be raided. I'd keep this simple: 3–4 upgrade tiers, not a city builder. |
+| **Outposts** **[DECIDED, see Outposts]** | Small clan-run establishments on planet surfaces: fuel, a small shipyard, harder jobs, and passenger runs. Founding your own comes later (AW-239). |
 | **Crew** **[DECIDED: humans only]** | Six stations: Captain, Science, Navigation, Engineering, Comms, Medical. Skills improve through training and use. **No androids, ever.** Alien crew become possible only after first contact with a civilization willing to serve. That makes recruiting them a real milestone, not a shop option. |
 
 ## Endings: Consolidated from Six
@@ -494,6 +494,49 @@ Avoid: **Homeworld** (a major franchise), **ADR1FT** (an existing game, too clos
   - Helm–Freebooters −0.6; Exchange–Freebooters −0.5; Lyceum–Covenant −0.5; Exchange–Diggers −0.2; Helm–Covenant −0.2.
 - **Drift.** Standing relaxes toward where it started by 15% a year, so one bad year isn't permanent.
 - **Seen in:** the Clans panel, standing tags on contract cards and Shipyard prices, and a journal line whenever a tier changes.
+
+## Outposts (AW-23) **[DECIDED 2026-11-11]**
+Small, permanent establishments, from about 40 people to a few hundred. Not cities. Each is run by one clan.
+
+| Clan | Outpost | Placed |
+|---|---|---|
+| Lyceum | Research station | A living world, preferring rare life |
+| Freebooters | Pirate's den | Isolated: uncharted, far from the Intrepid |
+| Diggers | Refinery | The richest ore world they can find |
+| Exchange | Trading post | A busy charted star with easy landing |
+| Covenant | Telescope array | Remote, airless and quiet, toward the edge |
+| Midshipmen | Drydock | A charted system on the main routes |
+| Helm | Patrol station | The charted system worst hit by raiders, where it cuts raids |
+
+- **Where:** on planet surfaces, one per region. Several can share a system or a world. An outpost may sit on a world the starting ship can't land on. Orbital and deep-space outposts come later (AW-238).
+- **How many:** a new-game universe setting, 0–7, default 3. The seed picks which clans. Careers already under way get the default 3; nothing already generated changes.
+- **On the charts:** every outpost is known from the start except the pirate's den. You find the den by visiting its system, or the Freebooters tell you once you're Friendly.
+- **Getting in:** land in the outpost's region. The ship sets down on its pad and the Outpost panel opens; no rover is needed. From orbit it shows on the region chart.
+- **Services:**
+  - Fuel at a markup.
+  - A small shipyard with some of the owning clan's own gear.
+  - A board with one or two harder, better-paid jobs.
+  - The trading post buys cargo.
+  - The Corsair is sold only at a pirate's den, so a career without one has no Corsair. Rare outpost-only gear comes later (AW-241).
+- **The pirate's den:** landing clearance is rolled on Freebooter standing: Hostile 0%, Cool 25%, Neutral 50%, Friendly 80%, Trusted 100%. Refused, a den ship comes after you through the usual raider encounter, and you can't land again that visit.
+- **Freebooter standing:**
+  - Any fight with raiders costs −4 with the Freebooters, on top of the existing spillover from Helm.
+  - Happy officers raise their own clan's standing (every clan), about +1 a month each, capped.
+- **Jobs:**
+  - Passenger runs from the Intrepid to outposts ("passengers", not colonists). Passengers take about 1 t of hold each. They're offered only if the current ship can land there.
+  - Outpost jobs use the existing kinds (supply runs, surveys, specimens) with bigger quantities, tighter deadlines and 1.6–2× the pay, each with its clan's flavor. The patrol station posts pirate hunts (AW-229).
+- **Later:** founding your own outposts (AW-239), and hostile actions against or between outposts (AW-240).
+- **Build order:**
+  1. Placement, the setting and map markers.
+  2. Landing at outposts and the Outpost panel (fuel, shipyard, the Corsair).
+  3. Den clearance and the reputation rules.
+  4. Outpost jobs and passenger runs.
+
+## Specimen jobs (AW-242) **[DECIDED 2026-11-11]**
+- The Meadow starter job stays. After it, the Lyceum posts specimen jobs one at a time.
+- **Feasible only:** a job is posted only for a species that lives on worlds the Intrepid knows, in enough numbers to fill it.
+- **Fauna:** creature jobs appear only if the rover's current gear gives at least a 50% capture chance against that species.
+- Pay scales with rarity and distance.
 
 ## Surface Creatures (AW-215, AW-216, AW-217) **[DECIDED 2026-11-03]**
 Unintelligent animals of the land and seas, collected as specimens like plants. Code: `src/data/creatures.ts` (27 species), `src/sim/creatures.ts`, gear in `src/data/vehicleWeapons.ts`.
