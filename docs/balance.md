@@ -182,3 +182,13 @@ Competent bot, 4 seeds (42, 7, 2026, 11), 60 trips, flying for the hull's own cl
 | Scout | 15–31 | 21.4k → 1.0k | 617k → 146k | 282 → 78 | 58 → 51 | 22 → 20 |
 
 The bot is a miner, so this measures each hull as a mining ship. The haulers win, the Corsair breaks even, and the specialist hulls lose because the bot doesn't use what they're for (combat income, the Awaken trail, specimens and survey work). The Destroyer waits on pirate-hunting work (AW-229). The Scout can't pay its way as a miner; a captain who buys one should keep the freighter berthed for hauling. No hull run went broke.
+
+## Outposts (AW-23, 2026-11-11)
+Career report (6 seeds, 60 trips), with outpost placement only against the full outpost rules (Helm's raid cut, happy-crew goodwill, the Freebooter fight penalty):
+
+| Profile | Credits at trip 60, before → after | Broke |
+|---|---|---|
+| Competent | 653k → 654k | 0/6 → 0/6 |
+| Novice | 470k → 462k | 0/6 → 0/6 |
+
+The bot never lands at outposts, buys from them or signs their jobs, so this measures only the side effects. The outpost jobs pay 1.4× an Intrepid job for bigger loads and shorter deadlines (cut from 1.8× before release). Passenger runs pay about 140 cr a passenger plus 350 cr per light-year. Both need playtesting.

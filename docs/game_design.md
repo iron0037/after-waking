@@ -526,6 +526,27 @@ Small, permanent establishments, from about 40 people to a few hundred. Not citi
   - Passenger runs from the Intrepid to outposts ("passengers", not colonists). Passengers take about 1 t of hold each. They're offered only if the current ship can land there.
   - Outpost jobs use the existing kinds (supply runs, surveys, specimens) with bigger quantities, tighter deadlines and 1.6–2× the pay, each with its clan's flavor. The patrol station posts pirate hunts (AW-229).
 - **Later:** founding your own outposts (AW-239), and hostile actions against or between outposts (AW-240).
+- **As built:**
+  - **Placement** (`src/sim/outposts.ts`):
+    - Each clan scores every surface world for appeal, times 0.6 if the star already has an outpost, times 0.4 beyond 15 atm or 2.2 g, times seeded jitter.
+    - Only worlds the best-fitted ship could land on count (a Bulker with struts, pressure hulls, cryo, corrosion and radiation shielding).
+    - The pad is the region's landing tile; the buildings stand three hexes east.
+  - **Services** (`src/sim/outpostservices.ts`):
+    - Fuel ×1.5.
+    - Five of the clan's own fittings, at +15% and fitted in 2 days.
+    - Trading post ×0.9, through the same sale code as the Intrepid (crew share, payroll).
+  - **The den** (`land()`):
+    - Clearance is rolled once per system visit and both flags reset on the next fold.
+    - Refused, a den picket (gunboat, corsair or marauder) opens as a hail, demanding 25–40% of the hold.
+  - **Helm:** a patrol station leaves 30% of its system's raiders (`lanePirateActivity` stays the raw figure that placement uses).
+  - **Jobs** (`src/sim/outpostjobs.ts`):
+    - Contracts carry `postedAt` and `turnInAt` (outpost ids; none means the Intrepid).
+    - Passenger runs: 6–40 passengers, sized to 30% of the hold, at 140 cr each + 350 cr/ly + 1,500 cr. One on the Intrepid's board at a time.
+    - An outpost's board fills with up to 2 jobs when you land, at most every 60 days:
+      - supply runs at 1.4× pay;
+      - surveys of 3 worlds within 6 ly (Covenant, Helm);
+      - specimens at 1.5× the count and 1.4× the pay (Lyceum);
+      - hunts for 1–2 raiders beaten after signing, at 6,000 cr each + 2,000 (Helm, and sometimes the Midshipmen).
 - **Build order:**
   1. Placement, the setting and map markers.
   2. Landing at outposts and the Outpost panel (fuel, shipyard, the Corsair).

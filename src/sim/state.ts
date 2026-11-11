@@ -165,6 +165,8 @@ export interface GameState {
   /** Pirate's dens this visit (AW-23): the system whose den refused you, or cleared you. Reset on every fold. */
   denBarred?: string;
   denCleared?: string;
+  /** When each outpost's board next fills up (AW-23), by outpost id. */
+  outpostBoardAt?: Record<string, number>;
   /** Goodwill your happy officers are building with their clans, not yet a whole point (AW-23). */
   crewGoodwill?: Partial<Record<ClanId, number>>;
   /** How far along the Awaken path (M5): the number of clues in the Covenant's dossier. */

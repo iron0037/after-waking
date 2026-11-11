@@ -5,6 +5,10 @@
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import { CLAN_NAMES } from "../../../data/ship";
 import {
+  acceptContract,
+  completeContract,
+  contractPayout,
+  contractProgress,
   buyHull,
   buyOutpostFuel,
   buyOutpostGear,
@@ -28,6 +32,62 @@ import { cr, tonnes } from "../../format";
 import { Section } from "../../Section";
 import type { GameSession } from "../../session";
 
+/** The outpost's own board, and the work to hand in here (AW-23). */
+function OutpostJobs({ session, outpostId }: { session: GameSession; outpostId: string }) {
+  const { state } = session;
+  const all = state.contracts ?? [];
+  const offered = all.filter((c) => c.status === "offered" && c.postedAt === outpostId);
+  const due = all.filter((c) => c.status === "active" && c.turnInAt === outpostId);
+  const activeCount = all.filter((c) => c.status === "active").length;
+  if (offered.length === 0 && due.length === 0) {
+    return (
+      <>
+        <h3 class="hub-gap">Jobs</h3>
+        <p class="muted small">No work on the board here right now. It fills up again every couple of months.</p>
+      </>
+    );
+  }
+  return (
+    <>
+      <h3 class="hub-gap">Jobs</h3>
+      <ul class="outpost-list">
+        {due.map((c) => {
+          const p = contractProgress(state, c);
+          return (
+            <li key={c.id} title={c.text}>
+              <span>
+                {c.title} <span class="accent">{cr(contractPayout(state, c))}</span>
+                <div class="muted small">{p.label}</div>
+              </span>
+              <button class="btn small primary" disabled={!p.ready} title={p.ready ? "Hand it in" : `Not yet: ${p.label}`} onClick={() => session.act((s) => completeContract(s, c.id))}>
+                {c.kind === "passengers" ? "Set down" : "Hand in"}
+              </button>
+            </li>
+          );
+        })}
+        {offered.map((c) => (
+          <li key={c.id} title={c.text}>
+            <span>
+              {c.title} <span class="accent">{cr(contractPayout(state, c))}</span>
+              <div class="muted small">
+                {c.text} {c.durationDays} days.
+              </div>
+            </span>
+            <button
+              class="btn small"
+              disabled={activeCount >= 4}
+              title={activeCount >= 4 ? "You can hold at most 4 active contracts." : "Sign here; hand it in here too."}
+              onClick={() => session.act((s) => acceptContract(s, c.id))}
+            >
+              Sign
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function OutpostPanel({ session }: { session: GameSession }) {
   const { state, world } = session;
   const o = currentOutpost(state, world);
@@ -46,6 +106,8 @@ export function OutpostPanel({ session }: { session: GameSession }) {
         {outpostTitle(o)}, {o.population} people.
       </p>
       <p class="muted small">{type.blurb}</p>
+
+      <OutpostJobs session={session} outpostId={o.id} />
 
       <h3 class="hub-gap">Fuel</h3>
       <p class="small">

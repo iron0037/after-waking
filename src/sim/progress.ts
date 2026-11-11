@@ -92,6 +92,8 @@ export function contractTargetsByBody(state: GameState): Map<string, Contract[]>
     if (c.status !== "active") continue;
     if (c.kind === "specimens" && c.bodyId) add(c.bodyId, c);
     if (c.kind === "specimens" && c.species) for (const id of c.bodyIds ?? []) add(id, c);
+    // Work handed in at an outpost (AW-23) points at the outpost's world.
+    if ((c.kind === "passengers" || c.kind === "deliver") && c.turnInAt && c.bodyId) add(c.bodyId, c);
     if (c.kind === "survey") for (const id of c.surveyBodyIds ?? []) if (!state.surveyedBodies.includes(id)) add(id, c);
     if (c.kind === "probe" && c.bodyId && !contractProgress(state, c).ready) add(c.bodyId, c);
   }

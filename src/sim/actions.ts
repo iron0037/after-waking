@@ -10,6 +10,7 @@ import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFo
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { fleetOnDocked } from "./fleet";
 import { denClearanceChance, outpostAt } from "./outposts";
+import { refreshOutpostBoard } from "./outpostjobs";
 import { guardJob, homeReserve, strandingBlocker } from "./saferange";
 import { diggersLeadOnDocked } from "./leads";
 import { injureCrew } from "./injuries";
@@ -652,6 +653,12 @@ export function land(state: GameState, world: World, region: number): Result {
   revealAt(state, world, body.id, state.location.ship as Vec2);
   if (hasPerk(state, "pinpoint-landing") && state.location.kind === "surface") state.location.freeHop = true;
   log(state, "travel", `Set down on ${body.name}, region ${region + 1} of ${body.regions}.`);
+  // An outpost here puts its work on the board (AW-23).
+  const outpost = outpostAt(world, body.id, region);
+  if (outpost) {
+    refreshOutpostBoard(state, world, outpost);
+    log(state, "info", `${outpost.name} is beside the pad. Its fuel, shop and jobs are in the Outpost panel.`);
+  }
   senseRegionDeposits(state, world, body.id, region);
   noticeLanding(state, body.id, region);
   return ok(undefined);

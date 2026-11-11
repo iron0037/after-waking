@@ -224,6 +224,48 @@
         1344,
         768
       ]
+    },
+    {
+      "id": "outpost-lyceum",
+      "prompt": "small science research station with glass greenhouse domes, white prefab lab modules and a little landing pad, green growing plants under the domes, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9102
+    },
+    {
+      "id": "outpost-freebooters",
+      "prompt": "ramshackle pirate hideout of mismatched scrap metal shacks, salvaged ship hulls and red warning lights, a crude landing pad, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9200
+    },
+    {
+      "id": "outpost-diggers",
+      "prompt": "small mining refinery with smelter chimneys, ore conveyor belts and slag heaps, rust brown and orange industrial buildings, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9300
+    },
+    {
+      "id": "outpost-exchange",
+      "prompt": "small trading post with cream and gold warehouses, stacked cargo containers and a market hall with awnings, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9402
+    },
+    {
+      "id": "outpost-covenant",
+      "prompt": "array of radio telescope dishes and antenna masts around a small dark violet control building, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9500
+    },
+    {
+      "id": "outpost-midshipmen",
+      "prompt": "small spaceship drydock with a long slipway and gantry cranes over a half-built hull, navy blue machine shops, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9602
+    },
+    {
+      "id": "outpost-helm",
+      "prompt": "small military patrol base with a radar tower, gun emplacements and a walled compound, blue and white buildings, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
+      "negative": "drop shadow, cast shadow, people, text",
+      "seed": 9700
     }
   ]
 }

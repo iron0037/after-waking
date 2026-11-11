@@ -48,6 +48,7 @@ import type { Deposit } from "./surface";
 import { landingAccess } from "./environment";
 import { findPath } from "./pathfinding";
 import { Rng } from "./rng";
+import { ok } from "./result";
 import { OFFICER_STATIONS } from "../data/crew";
 import type { PeopleSettings, UniverseSettings } from "./settings";
 import { hireRecruit, levelForXp, officerAt, signingFee } from "./crew";
@@ -451,6 +452,9 @@ function clampTo(v: number, size: number): number {
 
 /** Fly; if a raider meets us on the way (AW-20), answer the hail, pay, and carry on: the honest freighter. */
 function flyPaying(state: GameState, world: World, target: FlightTarget): Result<unknown> {
+  // Already there (a survey run can leave the ship in orbit over its next world).
+  const loc = state.location;
+  if ("bodyId" in target && loc.kind === "space" && loc.orbiting === target.bodyId) return ok(undefined);
   const r = flyTo(state, world, target);
   if (r.ok || !state.encounter) return r;
   answerContact(state, "hail");

@@ -175,6 +175,8 @@ export function autoSpendCrew(state: GameState, rng: Rng): void {
 /** The ship's stats as the crew actually gets to use them: hardware plus perks. */
 export function effectiveStats(state: GameState): ShipStats {
   const s = shipStats(state.ship);
+  // Passengers bound for an outpost ride in the hold, a tonne apiece with their kit (AW-23).
+  for (const c of state.contracts ?? []) if (c.kind === "passengers" && c.status === "active") s.cargoCapacityT -= c.passengers ?? 0;
   // Lyceum captains carry the Lyceum's researchers, whose berths take hold space (the Lyceum's own scout has berths for them).
   if ((state.ship.hull ?? "freighter") !== "scout") s.cargoCapacityT += clanMods(state).cargoT;
   if (hasPerk(state, "power-management")) s.roverEnergy = Math.round(s.roverEnergy * 1.15);

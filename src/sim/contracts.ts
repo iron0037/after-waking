@@ -8,6 +8,8 @@
 import { changeRep, clanRefuses, contractRepGain, REP_LAPSE, repPayMult, TIER_INFO } from "./reputation";
 import { fuelPriceFor, NEW_SPECIES_BONUS } from "./actions";
 import { specimenJob } from "./specimenjobs";
+import { contractSignedHere, contractTurnInHere, PASSENGER_T, passengerJob } from "./outpostjobs";
+import { currentOutpost } from "./outpostservices";
 import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
@@ -16,14 +18,14 @@ import { bondClan, cheerAll } from "./sentiment";
 import { effectiveStats, hasPerk } from "./perks";
 import { fail, ok, type Result } from "./result";
 import { Rng } from "./rng";
-import { removeCargo } from "./ship";
+import { cargoTonnes, removeCargo } from "./ship";
 import type { GameState } from "./state";
 import { DAY } from "./units";
 import { fuelPrice } from "./economy";
 import { distanceLy } from "./galaxy";
 import { World } from "./world";
 
-export type ContractKind = "deliver" | "specimens" | "survey" | "probe";
+export type ContractKind = "deliver" | "specimens" | "survey" | "probe" | "passengers" | "hunt";
 export type ContractStatus = "offered" | "active" | "done" | "failed";
 
 export interface Contract {
@@ -58,6 +60,13 @@ export interface Contract {
   depth?: number;
   /** When it was signed (dives before this don't count). */
   acceptedAt?: number;
+  // outposts (AW-23): where it's signed and where it's handed in (an outpost id; none means the Intrepid)
+  postedAt?: string;
+  turnInAt?: string;
+  /** passengers: how many ride out (each takes PASSENGER_T of hold) */
+  passengers?: number;
+  /** hunt: raiders beaten before it was signed (count holds how many more it needs) */
+  beatenAtStart?: number;
   /** What was actually paid on completion (reward plus the comms officer's bonus). */
   paid?: number;
 }
@@ -359,7 +368,7 @@ export function tickContracts(state: GameState): void {
   state.nextContractAt ??= state.time + 40 * DAY;
   while (state.time >= state.nextContractAt) {
     const rng = new Rng(state.rngState);
-    const offered = state.contracts.filter((c) => c.status === "offered").length;
+    const offered = state.contracts.filter((c) => c.status === "offered" && !c.postedAt).length;
     if (offered < 4) {
       const serial = state.contracts.length + 1;
       const job = deliveryContract(rng, state.time, serial);
@@ -371,6 +380,12 @@ export function tickContracts(state: GameState): void {
     if (!hasSurvey) {
       const survey = standingSurvey(state, rng, state.contracts.length + 1);
       if (survey && !clanRefuses(state, survey.clan)) state.contracts.push(survey);
+    }
+    // Passenger runs to the clans' outposts (AW-23): one on the board at a time.
+    const hasPassengers = state.contracts.some((c) => c.kind === "passengers" && (c.status === "offered" || c.status === "active"));
+    if (!hasPassengers && rng.chance(0.5)) {
+      const job = passengerJob(state, worldFor(state.seed, state.worldGen ?? 1), rng, state.contracts.length + 1);
+      if (job && !clanRefuses(state, job.clan)) state.contracts.push(job);
     }
     // The Lyceum's specimen work (AW-242): one job at a time, and only one it knows can be done.
     const hasSpecimenJob = state.contracts.some((c) => c.kind === "specimens" && !c.starter && (c.status === "offered" || c.status === "active"));
@@ -429,6 +444,16 @@ export function contractProgress(state: GameState, c: Contract): ContractProgres
       );
       return { have: done ? 1 : 0, need: 1, ready: done, label: done ? "profile taken, probe recovered" : "dive not yet flown" };
     }
+    case "passengers": {
+      const there = !!c.turnInAt && currentOutpost(state)?.id === c.turnInAt;
+      const n = c.passengers ?? 0;
+      return { have: there ? 1 : 0, need: 1, ready: there, label: there ? `${n} passengers ready to set down` : `${n} passengers aboard` };
+    }
+    case "hunt": {
+      const have = Math.max(0, (state.stats.raidersBeaten ?? 0) - (c.beatenAtStart ?? 0));
+      const need = c.count ?? 1;
+      return { have: Math.min(have, need), need, ready: have >= need, label: `${Math.min(have, need)} / ${need} raiders beaten` };
+    }
     case "survey": {
       const ids = c.surveyBodyIds ?? [];
       const have = ids.filter((id) => state.surveyedBodies.includes(id)).length;
@@ -442,9 +467,17 @@ function findContract(state: GameState, id: string): Contract | undefined {
 }
 
 export function acceptContract(state: GameState, id: string): Result<Contract> {
-  if (state.location.kind !== "intrepid") return fail("Contracts are signed aboard the Intrepid.");
   const c = findContract(state, id);
   if (!c || c.status !== "offered") return fail("That contract isn't on offer.");
+  const here = contractSignedHere(state, c);
+  if (!here.ok) return here;
+  // Passengers board when you sign, and need the hold space (AW-23).
+  if (c.kind === "passengers") {
+    const free = effectiveStats(state).cargoCapacityT - cargoTonnes(state.ship.cargo);
+    const need = (c.passengers ?? 0) * PASSENGER_T;
+    if (free < need) return fail(`They need ${need} t of hold; you have ${Math.floor(Math.max(0, free))} t free.`);
+  }
+  if (c.kind === "hunt") c.beatenAtStart = state.stats.raidersBeaten ?? 0;
   if ((state.contracts ?? []).filter((x) => x.status === "active").length >= 4) return fail("You can hold at most 4 active contracts.");
   c.status = "active";
   c.acceptedAt = state.time;
@@ -478,9 +511,10 @@ export function contractPayout(state: GameState, c: Contract): number {
 }
 
 export function completeContract(state: GameState, id: string): Result<number> {
-  if (state.location.kind !== "intrepid") return fail("Turn contracts in aboard the Intrepid.");
   const c = findContract(state, id);
   if (!c || c.status !== "active") return fail("That contract isn't active.");
+  const here = contractTurnInHere(state, c);
+  if (!here.ok) return here;
   const progress = contractProgress(state, c);
   if (!progress.ready) return fail(`Not yet: ${progress.label}.`);
 

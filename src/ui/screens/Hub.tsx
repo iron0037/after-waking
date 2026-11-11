@@ -2,7 +2,7 @@
 import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
-import { fitBlocker, hullOf, yardStatus } from "../../sim";
+import { fitBlocker, hullOf, turnInOutpost, yardStatus } from "../../sim";
 import { VEHICLE_WEAPONS } from "../../data/vehicleWeapons";
 import { ShipsPanel } from "./Ships";
 import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
@@ -662,6 +662,7 @@ function ContractCard({ session, c }: { session: GameSession; c: Contract }) {
         </span>
       </div>
       <div class="muted small">{c.text}</div>
+      {turnInOutpost(state, c) && <div class="small">Hand in at <strong>{turnInOutpost(state, c)!.name}</strong>, not the Intrepid.</div>}
       <ContractAlso state={state} c={c} />
       {c.kind === "probe" && c.bodyId && (
         <div class="small">
@@ -804,7 +805,8 @@ function Jobs({ session }: { session: GameSession }) {
   useArchiveTopic(session, "contracts");
   const contracts = session.state.contracts ?? [];
   const active = contracts.filter((c) => c.status === "active");
-  const offered = contracts.filter((c) => c.status === "offered");
+  // An outpost's own offers are signed at the outpost (AW-23), so they stay off the Intrepid's board.
+  const offered = contracts.filter((c) => c.status === "offered" && !c.postedAt);
   const past = contracts.filter((c) => c.status === "done" || c.status === "failed");
 
   return (

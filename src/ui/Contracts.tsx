@@ -51,6 +51,11 @@ function targetsOf(session: GameSession, c: Contract): Target[] {
     const p = contractProgress(state, c);
     return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: `${p.have} / ${p.need} samples` }];
   }
+  // Passengers and outpost supplies go to the outpost's world (AW-23).
+  if ((c.kind === "passengers" || c.kind === "deliver") && c.turnInAt && c.bodyId) {
+    const p = contractProgress(state, c);
+    return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: "hand in at the outpost" }];
+  }
   if (c.kind === "probe" && c.bodyId) {
     const p = contractProgress(state, c);
     return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: `down to ${bandPhrase(c.depth ?? 1)}` }];
