@@ -52,7 +52,7 @@ Epilogue slides would reflect everything you achieved.
   - **Folded plicite:** the mineral specimen. Plicite is "made to be found".
   - **Song moss:** the plant that hums at 432 Hz, an old Earth tuning standard.
   - **The fold curve:** the Covenant's recorder, carried through three folds, shows fold fuel fits the formula to the twelfth decimal.
-  - **The missing world:** the first-year catalogue lists a world the charts don't. Its orbit is empty and perfectly clean.
+  - **The missing world:** the first-year catalog lists a world the charts don't. Its orbit is empty and perfectly clean.
   - **The impossible signal:** a 432 Hz carrier repeating the Intrepid's pre-anomaly maintenance codes.
   - **The seams:** terrain that repeats hex for hex.
   - **A log from the future:** your own journal entry, dated years ahead.
@@ -91,7 +91,7 @@ Epilogue slides would reflect everything you achieved.
   - **Plicite drifts:** fuel you can mine far from port.
   - **Pirate bases:** where raiders come from, and a big prize.
   - **The edge:** past the Verge, the scanner returns a perfectly regular nothing. This is the Awaken finale.
-- **Rumours** are sold at the Intrepid, and at outposts later.
+- **Rumors** are sold at the Intrepid, and at outposts later.
   - Each one names an area that may or may not hold what it claims.
   - Buying several lets you narrow the area down.
   - The Intrepid's own log of where it came out of the anomaly is a free, true first lead. The mouth has drifted since.
@@ -266,14 +266,14 @@ Your third-rate freighter can only be improved so far. Each clan builds one hull
 | Bulker (Diggers) | 3,000 | 500 | 100 | 8 | 0.18 | 160 hull, laser 4 | 2.2 g, 15 atm, corrosion lining built in | drills 1.5 t/h, lift-offs ×0.85 | 180k |
 | Scout (Lyceum) | 1,100 | 80 | 110 | 13 | 0.40 | 60 hull, laser 4 | 1.3 g | survey array built in, 28 racks, room for the Lyceum's researchers | 150k |
 | Listener (Covenant) | 1,400 | 140 | 80 | 9 | 0.28 | 80 hull, laser 4 | 1.3 g | quiet, blind folds, deep-field array built in, seam sense | 170k |
-| Corsair (Freebooters) | 1,800 | 180 | 70 | 10 | 0.35 | 160 hull, laser 14, shields 6 | 1.4 g | pirate colours, one quirk | 200k |
+| Corsair (Freebooters) | 1,800 | 180 | 70 | 10 | 0.35 | 160 hull, laser 14, shields 6 | 1.4 g | pirate colors, one quirk | 200k |
 | Destroyer (Midshipmen) | 1,600 | 100 | 70 | 10 | 0.40 | 220 hull, laser 18, kinetic 20, shields 10 | 1.3 g | 8 racks | 260k |
 | Merchantman (Exchange) | 3,400 | 650 | 110 | 8 | 0.20 | 260 hull, laser 12, kinetic 12, shields 14 | 1.0 g, 2 atm; can't take struts or pressure hulls | none | 400k |
 
-- **Combat speed** (new stat) sets running and manoeuvring in a fight: freighter 1, first-rate 1.1, bulker 0.8, scout 1.3, listener 1.05, corsair 1.15, destroyer 1.3, merchantman 0.85. Raiders run 0.95–1.15.
+- **Combat speed** (new stat) sets running and maneuvering in a fight: freighter 1, first-rate 1.1, bulker 0.8, scout 1.3, listener 1.05, corsair 1.15, destroyer 1.3, merchantman 0.85. Raiders run 0.95–1.15.
 - **Fold fuel already scales with mass**, so the heavy hulls pay for their size at every fold and landing.
 - **Listener:** +0.25 to seeing raiders first (cap 0.95), raiders come 30% less often, blind folds reach 90% of the drive's range with no extra fuel, and a 15% chance per first landing in a region to catch the seams clue.
-- **Corsair:** raiders come 40% less often; Helm's standing drops 1.5 each time you dock. It's secondhand, with one quirk rolled at purchase (tuned drive, false bulkheads, hot guns, leaky tanks, patched hull, or a known silhouette that cancels the pirate colours).
+- **Corsair:** raiders come 40% less often; Helm's standing drops 1.5 each time you dock. It's secondhand, with one quirk rolled at purchase (tuned drive, false bulkheads, hot guns, leaky tanks, patched hull, or a known silhouette that cancels the pirate colors).
 - **Upgrades the starter can't take:** Mk II and top-tier gear needs a hull built for it.
 
   | Upgrade | Hulls |
@@ -343,9 +343,9 @@ The first slice of the ships-of-the-line model. Pirates only; rival captains, al
 
 Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives can't run or close; crippled weapons can't fire; blinded sensors miss more. Lasers are steady at any range, kinetic batteries hit hard up close and miss at long range. Science level sharpens aim; engineering level speeds repairs.
 
-**Endings.** Either side can **strike its colours**. Pirates strike when badly hurt or disarmed. You win their bounty (Helm pays for raiders) and salvage. If you strike, or your hull fails, they take most of the hold and your credits are safe: they want cargo, not a murder charge. You can also **escape** by opening range and folding when the drive is ready. Nobody dies in v1; damage carries over until the Intrepid's yard repairs it (credits and days).
+**Endings.** Either side can **strike its colors**. Pirates strike when badly hurt or disarmed. You win their bounty (Helm pays for raiders) and salvage. If you strike, or your hull fails, they take most of the hold and your credits are safe: they want cargo, not a murder charge. You can also **escape** by opening range and folding when the drive is ready. Nobody dies in v1; damage carries over until the Intrepid's yard repairs it (credits and days).
 
-**Gear.** Midshipmen and Helm sell weapons (laser battery, kinetic battery), deflector shields and armour plate. The stock freighter carries one light laser. Captain and comms experience come from encounters; the gunnery and evasion perks already planned come alive.
+**Gear.** Midshipmen and Helm sell weapons (laser battery, kinetic battery), deflector shields and armor plate. The stock freighter carries one light laser. Captain and comms experience come from encounters; the gunnery and evasion perks already planned come alive.
 
 **Balance target.** An honest freighter that pays costs about 5% of career income; a fitted ship that fights well breaks even or profits on bounties. The bot pays by default, so the career report measures the cost.
 
@@ -509,12 +509,12 @@ Unintelligent animals of the land and seas, collected as specimens like plants. 
   - Never within 2 hexes of the freighter, and no fight starts there: the ship is always safe.
 - **Badlands:** an uncharted living world ruled by apex predators (15% of uncharted living worlds, 30% on Plentiful). Hunters dominate, and four Badlands-only species (shriek pack, blight mantis, razorback ravager, hollow king) are worth the most at the Lyceum.
 - **Roaming:** as time passes on the surface, creatures within 14 hexes move: hunters close in, skittish ones flee, the rest wander near home. Wandering uses its own dice, so it never shifts storms, prices or finds.
-- **Seen (AW-225):** every creature standing on swept ground anywhere on the world is on the map and in the sidebar list. The map shows a paw on a dark disc in the temperament's colour (green docile, white skittish, yellow territorial, red hostile), ringed by rarity like the plants. The pixel portraits are in the selected-plant and selected-creature panels.
+- **Seen (AW-225):** every creature standing on swept ground anywhere on the world is on the map and in the sidebar list. The map shows a paw on a dark disc in the temperament's color (green docile, white skittish, yellow territorial, red hostile), ringed by rarity like the plants. The pixel portraits are in the selected-plant and selected-creature panels.
 - **Attempts, as odds (AW-225, replacing the round-by-round chase and its playback):**
   - Clicking a creature shows the odds, the energy it should take against what the rover can spare (the drive home plus 15% of a charge, at least 8, is kept back), the time, the gear used, and for hunters the chance someone is hurt and the chance the rover is wrecked if it fails.
   - The rover stays where it is. If it works, the energy it took comes off the cells. If it fails, the rover is left with just enough to get home.
   - **Chases (skittish and docile):** creature speed against the rover's motors, the gear's reach, and nets for the big ones. A runner as fast as the rover gets away about half the time from a stock prod; motors and the tangle cannon make it near-certain.
-  - **Fights (territorial and hostile):** shots needed (gear damage, aim from the science officer) against how many rounds the hunter spends biting once it closes (reach buys free rounds), set against the rover's plating and armour.
+  - **Fights (territorial and hostile):** shots needed (gear damage, aim from the science officer) against how many rounds the hunter spends biting once it closes (reach buys free rounds), set against the rover's plating and armor.
   - **Short energy:** if the job should take more than the rover can spare, the odds fall with the shortfall.
   - **A hunter catching the rover mid-job** is settled the same way, at once. A failure stops the drive with just enough energy to get home.
 - **Taken alive (user's rule):** a creature brought down is stunned. In a capture it goes into the sample cases if there's room. Otherwise it lies where it fell as a pickup for 30 days.
@@ -528,7 +528,7 @@ Unintelligent animals of the land and seas, collected as specimens like plants. 
   - Every rover carries a stun prod (user's choice): 1 hex, weak, 0.6 energy a shot.
   - Lyceum: net launcher (7,000 cr, 2 hexes) and tangle cannon (16,000 cr, 3 hexes, holds far better). Nets take a hunter only once it's worn down to 40%.
   - Midshipmen: stun gun (9,000 cr, 3 hexes) and rover laser (20,000 cr, 4 hexes, the hardest hitter, 2.2 energy a shot).
-  - Diggers: rover armour (10,000 cr, +30 plating and a quarter off each bite). The existing uprated motors now also set chase speed.
+  - Diggers: rover armor (10,000 cr, +30 plating and a quarter off each bite). The existing uprated motors now also set chase speed.
   - Gear mounts on the boat too.
 - **Perks:** Fauna Handler (science) makes creature injuries one step lighter. Science level sharpens aim.
 - **Bots:** they rarely land on living worlds. Across 12 careers, a handful of fights and two wrecks; the career report stays within noise.
@@ -552,7 +552,7 @@ Your starting clan shapes the early game. Every perk is small but felt, and each
 | Clan | Perk | Cost / friction |
 |---|---|---|
 | **Exchange** *(user's idea)* | Loan interest halved; sell 3% better | The Exchange's brokers add 5% to your plicite, and a missed payment carries a double late fee. *(Rebalanced in AW-174: the old fuel discount made it the strongest clan.)* |
-| **Helm** | Fold-drive refits 15% faster; the three nearest uncharted stars come scanned | Helm colours draw raiders: pirates hail you 20% more often *(stands in for enforcement jobs, which don't exist)* |
+| **Helm** | Fold-drive refits 15% faster; the three nearest uncharted stars come scanned | Helm colors draw raiders: pirates hail you 20% more often *(stands in for enforcement jobs, which don't exist)* |
 | **Midshipmen** | 10% off Midshipmen gear; start with a seasoned (level 3) Midshipman engineer | Fussy about maintenance: equipment upkeep costs 20% more |
 | **Diggers** | Drill rate +15%; the Diggers' assay office passes you a rich, unknown, drivable seam on a scanned world each year, the first at launch, the rest at the first docking a year after the last (`src/sim/leads.ts`) | A 5% tithe on platinum and plicite sales |
 | **Lyceum** | Orbital scans and surveys take half the time; specimens sell for 15% more | Lyceum researchers' berths take 10 t of hold |
