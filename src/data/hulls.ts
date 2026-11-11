@@ -147,7 +147,7 @@ export const HULLS: readonly Hull[] = [
     name: "Corsair",
     vendor: "freebooters",
     price: 200_000,
-    blurb: "A refitted prize from the Freebooters' yards. Raiders take it for one of their own; Helm notices whenever you dock.",
+    blurb: "Built in the pirate dens from salvaged prizes, and sold nowhere else. Raiders take it for one of their own; Helm notices whenever you dock.",
     pros: ["Raiders come for you less often", "Fold 10 ly, quick cruise", "Real guns, quick in a fight", "One quirk from its last owner"],
     cons: ["Helm's opinion of you slips each time you dock", "180 t hold"],
     base: (s) => {

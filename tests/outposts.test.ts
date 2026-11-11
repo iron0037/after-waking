@@ -71,3 +71,14 @@ describe("outposts (AW-23)", () => {
     expect(outpostKnown(s, den)).toBe(true);
   });
 });
+
+describe("outposts stand where a ship could land (AW-23)", () => {
+  it("every outpost world is landable with the best fittings there are", async () => {
+    const { landingAccess, shipStats } = await import("../src/sim");
+    const best = shipStats({ name: "", hull: "bulker", upgrades: ["landingStruts", "pressureHull2", "pressureHull3", "cryoHull", "corrosionHull", "radShielding"], fuel: 0, cargo: {} }).ratings;
+    for (const base of [42, 7, 2026, 11, 99, 5, 13]) {
+      const world = at(base, 7);
+      for (const o of outposts(world)) expect(landingAccess(world.body(o.bodyId).body, best).ok, `${base} ${o.clan}`).toBe(true);
+    }
+  });
+});

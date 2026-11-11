@@ -25,6 +25,9 @@ import {
   World,
   yardStatus,
   deserialize,
+  DEFAULT_UNIVERSE,
+  outposts,
+  universeSeed,
   serialize,
   type GameState,
 } from "../src/sim";
@@ -92,11 +95,20 @@ describe("buying a hull", () => {
     expect(hullBlockers(rich(), "freighter").length).toBeGreaterThan(0);
   });
 
-  it("a corsair comes with a quirk from its last owner", () => {
+  it("a corsair comes with a quirk from its last owner, and is sold only at a pirate's den (AW-23)", () => {
     const s = rich();
-    const r = buyHull(s, "corsair");
+    expect(hullBlockers(s, "corsair").join()).toMatch(/no pirate's den in this Verge/); // seed 42's three outposts include no den
+    const seed = universeSeed(42, { ...DEFAULT_UNIVERSE, outposts: 7 });
+    const t = newGame({ seed });
+    t.credits = 1_000_000;
+    t.reputation = { freebooters: 30 };
+    expect(hullBlockers(t, "corsair").join()).toMatch(/only at a pirate's den/);
+    const den = outposts(new World(seed)).find((o) => o.clan === "freebooters")!;
+    t.location = { kind: "surface", systemId: den.systemId, bodyId: den.bodyId, region: den.region, rover: null, ship: den.pad, globalCoords: true };
+    const r = buyHull(t, "corsair");
     if (!r.ok) throw new Error(r.reason);
     expect(QUIRKS_BY_ID.get(r.value.quirk ?? "")).toBeDefined();
+    expect(t.berthed).toHaveLength(1); // waiting at the Intrepid
   });
 });
 

@@ -9,6 +9,7 @@ import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { fleetOnDocked } from "./fleet";
+import { denClearanceChance, outpostAt } from "./outposts";
 import { guardJob, homeReserve, strandingBlocker } from "./saferange";
 import { diggersLeadOnDocked } from "./leads";
 import { injureCrew } from "./injuries";
@@ -17,7 +18,7 @@ import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
-import { driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
+import { denPicket, driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
 import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
 import { CLAN_NAMES, UPGRADES, UPGRADES_BY_ID, type Upgrade } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
@@ -240,6 +241,9 @@ export function fold(state: GameState, world: World, targetId: string): Result {
   state.interdictionClear = undefined;
   state.ship.fuel = Math.max(0, state.ship.fuel - plan.fuel);
   state.stats.folds++;
+  // A new system: the dens' towers judge you afresh (AW-23).
+  state.denBarred = undefined;
+  state.denCleared = undefined;
   // Folding is instant (lore). The drive's refit clock starts now.
   state.foldReadyAt = state.time + plan.refitMinutes;
   // The crew tops up the rover's cells from the reactor during the pre-fold checks.
@@ -598,6 +602,9 @@ export function landingBlockers(state: GameState, world: World, region: number):
   }
   const fuel = surfaceBurnFuel(state, body);
   if (fuel > state.ship.fuel) blockers.push(`Descent needs ${fuel} fuel.`);
+  // A pirate's den that turned you away won't hear you again until you've left the system (AW-23).
+  const den = outpostAt(world, body.id, region);
+  if (den?.clan === "freebooters" && state.denBarred === currentSystemId(state)) blockers.push(`${den.name} won't clear you again this visit.`);
   return blockers;
 }
 
@@ -617,6 +624,18 @@ export function land(state: GameState, world: World, region: number): Result {
   const body = orbitingBody(state, world) as Body;
   const loc = state.location;
   if (loc.kind !== "space") return fail("Not in orbit.");
+  // A pirate's den clears you to land, or doesn't (AW-23): the better the Freebooters think of you, the likelier.
+  const den = outpostAt(world, body.id, region);
+  if (den?.clan === "freebooters" && state.denCleared !== loc.systemId) {
+    const cleared = withRng(state, (rng) => rng.next()) < denClearanceChance(state);
+    if (!cleared) {
+      state.denBarred = loc.systemId;
+      denPicket(state, world, loc.systemId, den.name);
+      return fail(`${den.name}'s tower refuses you clearance, and a den ship is coming up to see you off.`);
+    }
+    state.denCleared = loc.systemId;
+    log(state, "info", `${den.name}'s tower clears you to land.`);
+  }
   state.ship.fuel -= surfaceBurnFuel(state, body);
   advanceTime(state, DESCENT_MINUTES);
   state.location = {
@@ -1373,12 +1392,20 @@ function atIntrepid(state: GameState): Result {
 export function sell(state: GameState, id: CommodityId, tonnes?: number): Result<number> {
   const docked = atIntrepid(state);
   if (!docked.ok) return docked;
+  return sellCargo(state, id, tonnes, 1);
+}
+
+/**
+ * Sell from the hold at the Intrepid's prices times `rate` (an outpost's trading post pays a little less, AW-23).
+ * The clan's cut, the crew's share and the payroll come out as at the Intrepid. Callers check where the ship is.
+ */
+export function sellCargo(state: GameState, id: CommodityId, tonnes: number | undefined, rate: number): Result<number> {
   const amount = removeCargo(state.ship.cargo, id, tonnes ?? Infinity);
   if (amount <= 0) return fail(`No ${COMMODITIES[id].name.toLowerCase()} aboard.`);
   // The captain's clan: Exchange sells a little better; the Diggers tithe precious metals.
   const mods = clanMods(state);
   const tithe = ["platinum", "plicite", "platinumConc"].includes(id) ? 1 - mods.tithe : 1;
-  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.7 : 1) * crewBonuses(state).salePrice * mods.salePrice * tithe);
+  const credits = Math.round(sellCommodity(state.market, id, amount, hasPerk(state, "bulk-seller") ? 0.7 : 1) * crewBonuses(state).salePrice * mods.salePrice * tithe * rate);
   awardXp(state, "captain", credits / 500);
   state.credits += credits;
   state.stats.earned += credits;

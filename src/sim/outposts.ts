@@ -9,9 +9,11 @@ import { COMMODITIES } from "../data/commodities";
 import { OUTPOST_TYPES } from "../data/outposts";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import type { Body } from "./bodies";
-import { pirateActivity } from "./combat";
+import { lanePirateActivity } from "./combat";
+import { landingAccess } from "./environment";
+import { shipStats } from "./ship";
 import { distanceLy, type StarSystem } from "./galaxy";
-import { tierOf } from "./reputation";
+import { tierOf, type RepTier } from "./reputation";
 import { rngFor } from "./rng";
 import { outpostCountOf } from "./settings";
 import type { GameState } from "./state";
@@ -42,6 +44,15 @@ interface Candidate {
 }
 
 const gentle = (b: Body) => b.gravityG <= 1.3 && b.pressureAtm <= 2.5;
+
+/** The best landing ratings any ship can be fitted to: outposts stand only where someone could set down. */
+const BEST_RATINGS = shipStats({
+  name: "",
+  hull: "bulker",
+  upgrades: ["landingStruts", "pressureHull2", "pressureHull3", "cryoHull", "corrosionHull", "radShielding"],
+  fuel: 0,
+  cargo: {},
+}).ratings;
 const oreValue = (b: Body) => Object.entries(b.resources).reduce((v, [id, r]) => v + (r ?? 0) * (COMMODITIES[id as keyof typeof COMMODITIES]?.basePrice ?? 0), 0);
 
 /** How much a clan wants to settle here; 0 means never. */
@@ -68,7 +79,7 @@ function appeal(clan: ClanId, c: Candidate, world: World, isolation: number): nu
       return sys.charted && !sys.home ? (gentle(body) ? 1.5 : 0.5) / (1 + Math.abs(ly - 9) / 3) : 0;
     case "helm":
       // Where the raiders are worst.
-      return sys.charted && !sys.home ? pirateActivity(world, sys.id) * (gentle(body) ? 1.5 : 1) * 10 : 0;
+      return sys.charted && !sys.home ? lanePirateActivity(world, sys.id) * (gentle(body) ? 1.5 : 1) * 10 : 0;
   }
 }
 
@@ -89,7 +100,7 @@ export function outposts(world: World): readonly Outpost[] {
   const candidates: Candidate[] = [];
   for (const sys of world.galaxy.systems) {
     const ly = distanceLy(world.galaxy, "intrepid", sys.id);
-    for (const body of world.system(sys.id).bodies) if (body.regions > 0) candidates.push({ sys, body, ly });
+    for (const body of world.system(sys.id).bodies) if (body.regions > 0 && landingAccess(body, BEST_RATINGS).ok) candidates.push({ sys, body, ly });
   }
   // How far each star is from its nearest neighbor, in ly (the den likes lonely stars).
   const isolation = new Map(
@@ -151,6 +162,13 @@ export function outpostKnown(state: GameState, o: Outpost): boolean {
   if (state.visitedSystems.includes(o.systemId)) return true;
   const tier = tierOf(state, "freebooters");
   return tier === "friendly" || tier === "trusted";
+}
+
+/** Landing clearance at a pirate's den, by your Freebooter standing (AW-23). */
+export const DEN_CLEARANCE: Record<RepTier, number> = { hostile: 0, cool: 0.25, neutral: 0.5, friendly: 0.8, trusted: 1 };
+
+export function denClearanceChance(state: GameState): number {
+  return DEN_CLEARANCE[tierOf(state, "freebooters")];
 }
 
 /** The outposts the captain knows of. */

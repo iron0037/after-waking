@@ -9,7 +9,7 @@ import { hasPerk } from "./perks";
 import { CLAN_TIES } from "../data/clans";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { log, type GameState } from "./state";
-import { YEAR } from "./units";
+import { DAY, YEAR } from "./units";
 
 export const CLAN_IDS = Object.keys(CLAN_NAMES) as ClanId[];
 
@@ -137,8 +137,30 @@ export function changeRep(state: GameState, clan: ClanId, amount: number, reason
   }
 }
 
+/** An officer this happy speaks well of you to their own clan (AW-23). */
+export const HAPPY_OFFICER = 70;
+/** Points a month each happy officer earns their clan's goodwill, and the most a clan's officers earn together. */
+export const CREW_GOODWILL_PER_MONTH = 1;
+export const CREW_GOODWILL_CAP = 3;
+
+/** Happy officers raise their clans' opinion of you, a point at a time. */
+function tickCrewGoodwill(state: GameState, minutes: number): void {
+  const months = minutes / (30 * DAY);
+  if (months <= 0) return;
+  const happy = new Map<ClanId, number>();
+  for (const m of state.crew ?? []) if (m.clan && (m.happiness ?? 0) >= HAPPY_OFFICER) happy.set(m.clan, (happy.get(m.clan) ?? 0) + 1);
+  for (const [clan, n] of happy) {
+    state.crewGoodwill ??= {};
+    const due = (state.crewGoodwill[clan] ?? 0) + Math.min(CREW_GOODWILL_CAP, n * CREW_GOODWILL_PER_MONTH) * months;
+    const whole = Math.floor(due);
+    state.crewGoodwill[clan] = due - whole;
+    if (whole > 0) changeRep(state, clan, whole, `Your ${CLAN_NAMES[clan]} officers speak well of you`, false);
+  }
+}
+
 /** Slow drift back toward each clan's starting standing. Called as time passes. */
 export function tickReputation(state: GameState, minutes: number): void {
+  tickCrewGoodwill(state, minutes);
   if (!state.reputation) return;
   const k = 1 - Math.exp((-REP_DRIFT_PER_YEAR * minutes) / YEAR);
   for (const clan of CLAN_IDS) {

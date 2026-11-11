@@ -5,6 +5,7 @@
  */
 import { peopleOf, pirateChanceMult, pirateStrengthMult } from "./settings";
 import { changeRep } from "./reputation";
+import { outposts } from "./outposts";
 import { clanMods } from "./clan";
 import {
   HEAD_BOUNTY,
@@ -162,12 +163,57 @@ export function holdValue(state: GameState): number {
  * the exception, AW-169; aliens take over out there, M6).
  */
 export function pirateActivity(world: World, systemId: string): number {
+  // A Helm patrol station (AW-23) keeps the raiders down in its system.
+  const patrolled = outposts(world).some((o) => o.clan === "helm" && o.systemId === systemId);
+  return lanePirateActivity(world, systemId) * (patrolled ? HELM_STATION_RAIDS : 1);
+}
+
+/** Raiders in a system's lanes before any Helm patrol station: what the station's placement looks at. */
+export function lanePirateActivity(world: World, systemId: string): number {
   const sys = world.galaxy.systems.find((s) => s.id === systemId);
   if (!sys || sys.home) return 0;
   if (sys.charted) return RAID_BASE;
   const ly = dist(sys.pos, INTREPID_POS);
   const fade = Math.max(0, Math.min(1, (RAID_FADE_END_LY - ly) / (RAID_FADE_END_LY - RAID_FADE_START_LY)));
   return RAID_BASE * 0.85 * fade;
+}
+
+/** A Helm patrol station leaves this share of its system's raiders. */
+export const HELM_STATION_RAIDS = 0.3;
+
+/** Any fight with raiders (a battle that gets as far as a turn) costs this with the Freebooters (AW-23). */
+export const FREEBOOTER_FIGHT_REP = -4;
+
+/**
+ * A pirate's den refused you clearance (AW-23): one of its ships comes up to see you off. It opens as an
+ * ordinary raider hail: pay, talk, run or fight.
+ */
+export function denPicket(state: GameState, world: World, systemId: string, denName: string): void {
+  const sys = world.galaxy.systems.find((s) => s.id === systemId);
+  const ly = sys ? dist(sys.pos, INTREPID_POS) : 15;
+  const picked = withRng(state, (rng) => {
+    const r = rng.weighted(RAIDERS.filter((x) => x.id !== "skiff").map((x) => [x, x.id === "corsair" ? 3 : x.id === "gunboat" ? 2 : 1] as const));
+    return { r, cap: rng.pick(RAIDER_CAPTAINS), demand: rng.range(0.25, 0.4) };
+  });
+  const { r, cap, demand } = picked;
+  void ly;
+  state.encounter = {
+    stage: "hail",
+    raider: r.id,
+    raiderName: r.name,
+    captain: cap,
+    bounty: Math.round(r.bounty * pirateStrengthMult(peopleOf(state)) * (hasTalent(state, "bounty-hunter") ? 1.5 : 1)),
+    nerve: r.nerve,
+    enemy: raiderSide(r, state),
+    demand,
+    range: 2,
+    turn: 0,
+    talked: false,
+    systemId,
+    xpStart: xpSnapshot(state),
+    log: [`${denName}'s tower won't clear you. A ${r.name} climbs out of the den under Captain ${cap}: "You're not on our list. ${Math.round(demand * 100)}% of the hold buys you a quiet departure."`],
+  };
+  log(state, "warning", `${denName} refused you clearance and sent a ${r.name} under ${cap} to see you off.`);
 }
 
 /** Raiders' base chance at a busy charted star, and where uncharted space thins them out to nothing. */
@@ -837,6 +883,8 @@ function xpSnapshot(state: GameState): Partial<Record<Station, number>> {
 function finish(state: GameState, outcome: EncounterOutcome, text: string, cargoLost: number, bounty: number): EncounterResult {
   const e = state.encounter;
   if (e) e.log.push(text);
+  // Shooting at raiders sours the Freebooters on you (AW-23), whoever started it.
+  if (e && e.turn > 0) changeRep(state, "freebooters", FREEBOOTER_FIGHT_REP, `Fought the ${e.raiderName}`);
   state.encounter = undefined;
   awardXp(state, "captain", 10);
   // What the encounter taught each of them.

@@ -3,7 +3,7 @@
  * same grid of regions the rover drives across. Terrain tint comes from the same
  * noise as the planet art; the orbital scan's signal is the amber glow over each region.
  */
-import { knownOutposts, outpostTitle, type Outpost } from "../../../sim";
+import { denClearanceChance, knownOutposts, outpostTitle, type Outpost } from "../../../sim";
 import type { ComponentChildren } from "preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../../data/commodities";
@@ -138,7 +138,8 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       ? ` · life signs: ${sites === 0 ? "none" : `${sites} plant site${sites === 1 ? "" : "s"}`}${rareHere.length ? ` (rare: ${rareHere.join(", ")})` : ""}`
       : "";
     const station = outpostHere.get(r);
-    const post = station ? ` · ■ ${outpostTitle(station)}` : "";
+    const clearance = station?.clan === "freebooters" ? ` (landing clearance ${Math.round(denClearanceChance(state) * 100)}%, by your Freebooter standing)` : "";
+    const post = station ? ` · ■ ${outpostTitle(station)}${clearance}` : "";
     return `Region ${r + 1}${post} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 

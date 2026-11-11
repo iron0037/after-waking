@@ -395,3 +395,17 @@
   margin: 6px 0 2px;
   cursor: pointer;
 }
+/* Outpost panel (AW-23). */
+.outpost-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+.outpost-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.9em;
+}

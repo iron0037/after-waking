@@ -300,6 +300,53 @@ function shipSurfaceSprite(): HTMLImageElement | null {
   return shipSurfaceImg && shipSurfaceImg.complete && shipSurfaceImg.naturalWidth > 0 ? shipSurfaceImg : null;
 }
 
+const outpostImgs = new Map<string, HTMLImageElement>();
+
+/** An outpost's buildings from above (tools/art/manifest.json, "outpost-<clan>"); null until loaded. */
+function outpostSprite(clan: string): HTMLImageElement | null {
+  if (typeof Image === "undefined") return null;
+  let img = outpostImgs.get(clan);
+  if (!img) {
+    img = new Image();
+    img.src = `./assets/outpost-${clan}.png`;
+    outpostImgs.set(clan, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
+/** Where an outpost's buildings stand: beside its landing pad, so the ship has room to set down. */
+export function outpostSite(pad: Vec2): Vec2 {
+  return { x: pad.x + 3, y: pad.y };
+}
+
+/** A clan outpost's buildings (AW-23): its sprite, or a small teal block if the sprite isn't there. */
+export function drawOutpost(ctx: CanvasRenderingContext2D, L: Layout, pad: Vec2, clan: string): void {
+  const at = outpostSite(pad);
+  const x = cx(L, at.x, at.y);
+  const y = cy(L, at.x, at.y);
+  const sprite = outpostSprite(clan);
+  ctx.setLineDash([]);
+  if (sprite) {
+    const long = L.tw * 3;
+    const k = long / Math.max(sprite.naturalWidth, sprite.naturalHeight);
+    const w = sprite.naturalWidth * k;
+    const h = sprite.naturalHeight * k;
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, x - w / 2, y - h / 2, w, h);
+    ctx.imageSmoothingEnabled = prev;
+    return;
+  }
+  const s = L.tw * 0.9;
+  ctx.fillStyle = "rgba(5, 7, 15, 0.45)";
+  ctx.fillRect(x - s + 2, y - s * 0.6 + 2, s * 2, s * 1.2);
+  ctx.fillStyle = UI.outpost;
+  ctx.strokeStyle = "#05070f";
+  ctx.lineWidth = Math.max(1, L.tw * 0.06);
+  ctx.fillRect(x - s, y - s * 0.6, s * 2, s * 1.2);
+  ctx.strokeRect(x - s, y - s * 0.6, s * 2, s * 1.2);
+}
+
 /** The freighter on its pad: the pixel-art sprite, or a little drawn lander if the sprite isn't loaded. */
 export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): void {
   const x = cx(L, at.x, at.y);

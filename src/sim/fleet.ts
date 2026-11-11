@@ -12,6 +12,9 @@ import { fail, ok, type Result } from "./result";
 import { bondClan } from "./sentiment";
 import { cargoTonnes, hullOf, isVehicleGear, specimenCount, type ShipState } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
+import { worldFor } from "./contracts";
+import { outposts } from "./outposts";
+import { currentOutpost } from "./outpostservices";
 
 const TIER_ORDER: RepTier[] = ["hostile", "cool", "neutral", "friendly", "trusted"];
 
@@ -30,7 +33,12 @@ export function hullBlockers(state: GameState, id: HullId): string[] {
   const hull = HULLS_BY_ID.get(id);
   if (!hull || !hull.vendor) return ["Nobody builds that hull new."];
   const out: string[] = [];
-  if (state.location.kind !== "intrepid") out.push("Ships are bought at the Intrepid.");
+  // The Corsair is sold only at a pirate's den (AW-23); every other hull at the Intrepid.
+  if (hull.id === "corsair") {
+    const world = worldFor(state.seed, state.worldGen ?? 1);
+    if (!outposts(world).some((o) => o.clan === "freebooters")) out.push("There's no pirate's den in this Verge, so no Corsairs.");
+    else if (currentOutpost(state, world)?.clan !== "freebooters") out.push("Sold only at a pirate's den.");
+  } else if (state.location.kind !== "intrepid") out.push("Ships are bought at the Intrepid.");
   const tier = tierOf(state, hull.vendor);
   if (clanRefuses(state, hull.vendor)) out.push(`${CLAN_NAMES[hull.vendor]} won't deal with you.`);
   else if (TIER_ORDER.indexOf(tier) < TIER_ORDER.indexOf(HULL_STANDING))
@@ -70,7 +78,13 @@ export function buyHull(state: GameState, id: HullId, name?: string): Result<Shi
   state.shipsBought = (state.shipsBought ?? 0) + 1;
   changeRep(state, vendor, 5, `Bought a ${hull.name.toLowerCase()}`);
   bondClan(state, vendor, 4);
-  log(state, "trade", `Bought the ${ship.name}, a ${CLAN_NAMES[vendor]} ${hull.name.toLowerCase()}, for ${price.toLocaleString()} cr. She's berthed at the Intrepid with full tanks.`);
+  log(
+    state,
+    "trade",
+    state.location.kind === "intrepid"
+      ? `Bought the ${ship.name}, a ${CLAN_NAMES[vendor]} ${hull.name.toLowerCase()}, for ${price.toLocaleString()} cr. She's berthed at the Intrepid with full tanks.`
+      : `Bought the ${ship.name}, a ${CLAN_NAMES[vendor]} ${hull.name.toLowerCase()}, for ${price.toLocaleString()} cr. A Freebooter crew will fly her to the Intrepid; she'll be berthed there, tanks full, when you next dock.`,
+  );
   return ok(ship);
 }
 

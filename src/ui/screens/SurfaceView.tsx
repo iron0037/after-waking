@@ -55,6 +55,7 @@ import {
   mapPixelSize,
   moveRoverTo,
   safeRangeOn,
+  knownOutposts,
   setSafeRange,
   strandingBlocker,
   neighbors,
@@ -155,6 +156,7 @@ import {
   drawTooltip,
   drawCreatures,
   type CreatureMark,
+  drawOutpost,
   TEMPERAMENT_COLOR,
   fitSize,
   tileAt,
@@ -171,6 +173,7 @@ import {
 import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
 import { CreaturePanel } from "./surface/CreaturePanel";
+import { OutpostPanel } from "./surface/OutpostPanel";
 import { CompIcon, useSpriteIndex } from "../compendiumSprites";
 import { FLORA_BY_NAME } from "../../data/catalog";
 import { terrainCache, type RegionImage } from "./surface/terrainImage";
@@ -834,6 +837,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
     if (hexSel && hexData) drawSelectedHex(ctx, L, hexSel);
     if (tile) drawSensorRange(ctx, L, tile, sweep);
+    // The clans' outposts on this world (AW-23), beside their pads.
+    for (const o of knownOutposts(state, session.world)) if (o.bodyId === loc.bodyId) drawOutpost(ctx, L, o.pad, o.clan);
     drawShipBeacon(ctx, L, ship, t);
     drawShip(ctx, L, ship);
     // Flagged but unidentified: a "?" until the sensors get close (the sweep in progress identifies some).
@@ -1460,6 +1465,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           </div>
         </Section>
 
+        {/* A clan outpost in this region (AW-23): fuel, its shop, the trading post. */}
+        <OutpostPanel session={session} />
         <RoverPanel
           rover={rover}
           parkedBoat={parkedBoat}
