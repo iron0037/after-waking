@@ -160,6 +160,8 @@ export interface GameState {
   /** The Archive's guidance (AW-24): entries read, and whether it's speaking at all (on unless false). */
   archiveSeen?: string[];
   guidance?: boolean;
+  /** Safe range (AW-237): the rover and boat won't drive or work past what gets them home. On unless false. */
+  safeRange?: boolean;
   /** How far along the Awaken path (M5): the number of clues in the Covenant's dossier. */
   awakening?: number;
   /** The Covenant's dossier (AW-25): clues found, errands taken, the impossible journal entry, and when the trail pointed onward. */

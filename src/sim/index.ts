@@ -1,5 +1,6 @@
 export * from "./actions";
 export * from "./fleet";
+export * from "./saferange";
 export * from "../data/hulls";
 export * from "./burnpath";
 export * from "./vehicles";

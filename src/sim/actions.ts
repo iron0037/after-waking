@@ -9,6 +9,7 @@ import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { fleetOnDocked } from "./fleet";
+import { guardJob, homeReserve, strandingBlocker } from "./saferange";
 import { diggersLeadOnDocked } from "./leads";
 import { injureCrew } from "./injuries";
 import { creatureWatch } from "./creatures";
@@ -821,6 +822,9 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   const { surface, rover, bodyId } = ctx.value;
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
+  // Safe range (AW-237): not somewhere it can't get home from.
+  const stranding = strandingBlocker(state, world, x, y);
+  if (stranding) return fail(stranding);
   const boat = vehicleOf(rover) === "boat";
   const path = findPath(surface, rover, { x, y }, vehicleMobility(state));
   const energyMult = routeEnergyMult(state);
@@ -1010,6 +1014,8 @@ export function prospect(state: GameState, world: World, key: SiteKey): Result<S
   const { rover } = ctx.value;
   if (know.prospected.includes(d.id)) return ok(d);
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
+  const safe = guardJob(state, world, PROSPECT_ENERGY, "taking core samples");
+  if (!safe.ok) return safe;
   useSpareCells(state, rover, PROSPECT_ENERGY);
   if (rover.energy < PROSPECT_ENERGY) return fail("Not enough rover energy to take core samples.");
   rover.energy -= PROSPECT_ENERGY;
@@ -1055,7 +1061,11 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   if (room <= 0.05) return fail(vehicleOf(rover) === "boat" ? "The boat's hold is full." : "The rover's cargo bed is full.");
 
+  // Safe range (AW-237): the drill stops short of the energy the trip home needs.
+  const reserve = homeReserve(state, world);
   if (!know.drillSites.includes(d.id)) {
+    const safe = guardJob(state, world, DRILL_SETUP_ENERGY, "setting up the drill rig");
+    if (!safe.ok) return safe;
     useSpareCells(state, rover, DRILL_SETUP_ENERGY);
     if (rover.energy < DRILL_SETUP_ENERGY) return fail("Not enough energy to set up the drill rig.");
     rover.energy -= DRILL_SETUP_ENERGY;
@@ -1067,9 +1077,11 @@ export function drill(state: GameState, world: World, key: SiteKey, maxHours = I
   const rate = drillRate(state, d);
   // Rich Veins: more ore per tonne of seam worked.
   const yieldMult = hasPerk(state, "rich-veins") ? 1.1 : 1;
-  useSpareCells(state, rover, Math.min(remaining / rate, room / (rate * yieldMult), maxHours) * DRILL_ENERGY_PER_HOUR);
-  let hours = Math.min(remaining / rate, room / (rate * yieldMult), maxHours, rover.energy / DRILL_ENERGY_PER_HOUR);
-  if (hours <= 0.01) return fail("Not enough rover energy to run the drill.");
+  useSpareCells(state, rover, Math.min(remaining / rate, room / (rate * yieldMult), maxHours) * DRILL_ENERGY_PER_HOUR + reserve);
+  let hours = Math.min(remaining / rate, room / (rate * yieldMult), maxHours, Math.max(0, rover.energy - reserve) / DRILL_ENERGY_PER_HOUR);
+  if (hours <= 0.01) {
+    return fail(reserve > 0 && rover.energy > 0.01 * DRILL_ENERGY_PER_HOUR ? `Safe range: the drill would leave too little to get home (the trip takes ${reserve.toFixed(1)}).` : "Not enough rover energy to run the drill.");
+  }
 
   const { body } = world.body(bodyId);
   const crew = crewBonuses(state);
@@ -1215,6 +1227,8 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   const slots = roverSpecimenSlots(state);
   if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
+  const safe = guardJob(state, world, SAMPLE_ENERGY, "sampling");
+  if (!safe.ok) return safe;
   useSpareCells(state, rover, SAMPLE_ENERGY);
   if (rover.energy < SAMPLE_ENERGY) return fail("Not enough rover energy to run the sample kit.");
   rover.energy -= SAMPLE_ENERGY;

@@ -96,6 +96,7 @@ describe("Long Shifts (AW-213)", () => {
     const surface = world.surface(loc.bodyId);
     const next = neighbors(rover.x, rover.y).find((n) => canEnter(surface, n.x, n.y, { canClimb: false }))!;
     rover.energy = 0;
+    s.safeRange = false; // this is about the cells; Safe range (AW-237) would refuse the drive outright
     const moved = moveRoverTo(s, world, next.x, next.y);
     expect(moved.ok && moved.value.stopped).toBeTruthy();
   });

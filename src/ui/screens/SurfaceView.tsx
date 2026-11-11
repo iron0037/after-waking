@@ -54,6 +54,9 @@ import {
   launchBoatBlockers,
   mapPixelSize,
   moveRoverTo,
+  safeRangeOn,
+  setSafeRange,
+  strandingBlocker,
   neighbors,
   isExplored,
   normalizeKnowledge,
@@ -588,6 +591,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   const drive = async (path: PathStep[], quiet = false): Promise<boolean> => {
     if (!rover || session.busy || path.length === 0) return false;
+    // Safe range (AW-237): refuse the whole trip up front rather than drive part of it.
+    const end = path[path.length - 1] as Vec2;
+    const unsafe = strandingBlocker(session.state, session.world, end.x, end.y);
+    if (unsafe) {
+      session.notify(unsafe, "error");
+      return false;
+    }
     const steps = affordablePrefix(path, rover.energy);
     if (steps.length === 0) {
       session.notify(`${isBoat ? "Boat" : "Rover"} energy is too low to move.`, "error");
@@ -968,7 +978,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           color: bad || strands ? UI.danger : UI.good,
         });
         if (bad) lines.push({ text: "Not enough energy", color: UI.danger });
-        else if (strands) lines.push({ text: `Too far to return to ${homeName}`, color: UI.danger });
+        else if (strands) lines.push({ text: `Too far to return to ${homeName}${safeRangeOn(state) ? " · Safe range won't go" : ""}`, color: UI.danger });
       } else if (site && atSite(tile)) {
         lines.push({ text: `${isBoat ? "Boat" : "Rover"} is in range`, color: UI.good });
       } else if (!(rover.x === tile.x && rover.y === tile.y)) {
@@ -1460,6 +1470,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           state={state}
           homeEnergy={homeEnergy}
           stranded={stranded}
+          onSafeRange={(on) => session.act((st) => setSafeRange(st, on), { timelapse: false })}
         />
         <ShipPanel vehicles={[rover, roverAboard, parkedBoat].filter((v): v is RoverState => v !== null)} stats={stats} state={state} bodyId={loc.bodyId} />
 
@@ -1752,6 +1763,7 @@ function RoverPanel({
   state,
   homeEnergy,
   stranded,
+  onSafeRange,
 }: {
   rover: RoverState | null;
   /** The boat moored offshore while the rover is ashore. */
@@ -1765,8 +1777,10 @@ function RoverPanel({
   state: GameState;
   homeEnergy: number | null;
   stranded: boolean;
+  onSafeRange: (on: boolean) => void;
 }) {
   const boat = rover !== null && vehicleOf(rover) === "boat";
+  const safe = safeRangeOn(state);
   const noun = boat ? "boat" : "rover";
   const energyLow = rover !== null && (stranded || rover.energy < energyMax * 0.3);
   const tight = rover !== null && !stranded && homeEnergy !== null && rover.energy < homeEnergy * 1.3;
@@ -1802,6 +1816,13 @@ function RoverPanel({
               <p class="accent small act-note">Energy is getting tight: the trip home takes {homeEnergy.toFixed(1)}.</p>
             )
           )}
+          <label
+            class="small safe-range"
+            title={`Safe range: the ${noun} won't drive anywhere it couldn't get back to ${homeName} from, and drilling, prospecting and sampling stop short of the energy the trip home needs.`}
+          >
+            <input type="checkbox" checked={safe} onChange={(e) => onSafeRange((e.currentTarget as HTMLInputElement).checked)} /> Safe range
+            <span class="muted">{safe ? "· won't strand itself" : "· off: it can run itself dry"}</span>
+          </label>
           {rover.disabled ? (
             <p class="danger small act-note">Wrecked by a creature: it can't move. Recall it with the ship.</p>
           ) : (

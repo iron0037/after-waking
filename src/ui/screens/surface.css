@@ -387,3 +387,11 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+/* Safe range switch in the rover panel (AW-237). */
+.safe-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px;
+  cursor: pointer;
+}

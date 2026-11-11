@@ -111,7 +111,7 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
     - **After a catch:** "Confirmed: <species>".
   - **Where:** they come up in about 8% of returning deep-layer dives and 15% of abyss dives on gas giants, half that on ice giants.
   - **Value:** they sell for 4–8× a plant sample, plus the usual new-species bonus.
-  - **Compendium:** they're catalogued as flora, so they fill entries there.
+  - **Compendium:** they're cataloged as flora, so they fill entries there.
   - **Generation:** their climate list is empty, so no surface ever grows them and world generation is unchanged.
 
 ### Probes and remote operation **[PROPOSED, lore fit]**
@@ -134,7 +134,7 @@ The code is in `src/sim/probes.ts`, with content in `src/data/probes.ts`.
 | Fold harmonics | Helm | Fold coil Mk II | 8 t plicite, charts from 6 systems, 15k |
 | Plicite-bit metallurgy | Diggers | Plicite-bit core drill | 25 t titanium, 4 t plicite, 12k |
 | Crust acoustics | Helm | Deep-crust sounding array | detailed surveys of 10 worlds, 10k |
-| Deep-atmosphere modelling | Lyceum | Pressure-rated probe racks | 2 readings at depth 3+, 1 t helium-3, 12k |
+| Deep-atmosphere modeling | Lyceum | Pressure-rated probe racks | 2 readings at depth 3+, 1 t helium-3, 12k |
 | Modular pod frames | Exchange | Cargo pods | 30 t titanium, 30 t copper, 10k |
 | Compact fusion cells | Midshipmen | Fusion cell pack | 15 t uranium, 3 t deuterium, 12k |
 
@@ -179,6 +179,15 @@ Starflight's instant pickup is out. Exploring and extracting take time, and that
    - A portable refinery turns it into concentrate, which is lighter and more valuable, but takes extra days, power and a bay slot.
    - That makes it a cargo-versus-time-versus-equipment tradeoff.
 5. **Load and leave**, or stake a claim to come back. A claim could later become an outpost.
+
+### Safe range **[DECIDED 2026-11-10]** (AW-237)
+- **What it does.** A per-career switch in the rover panel, on by default (older saves too). The rover or boat won't drive anywhere it couldn't get home from: the ship, the water beside it for the boat, or the moored boat for a rover put ashore.
+- **Jobs too.** Prospecting, drill setup and sampling are refused if they'd eat into the trip home. The drill stops short of the energy the trip home needs instead of running the cells flat.
+- **Energy counted.** "Energy in hand" includes the Long Shifts spare pack if it's still carried.
+- **Already short.** A vehicle that's already short of home may still limp homeward (any move that doesn't add to what it needs), never further out.
+- **Not covered.** A breakdown while drilling, or a creature fight, can still cost energy. Fights already keep the drive home in reserve (`energyReserve`).
+- **Turning it off** brings back the old behavior: drives stop where the cells run dry.
+- The rules are in `src/sim/saferange.ts`. The surface screen refuses the whole drive up front, and its hover tooltip says "Safe range won't go".
 
 ### Specimens
 - Track, stun and contain lifeforms. Containment needs life support matched to the specimen's environment.
