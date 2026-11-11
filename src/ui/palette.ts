@@ -8,6 +8,8 @@ export const UI = {
   text: "#d7e3f4",
   muted: "#7f8fa8",
   accent: "#ffb347",
+  /** Clan outposts (AW-23). */
+  outpost: "#6fdccb",
   cyan: "#5fd4ff",
   good: "#7ee787",
   danger: "#ff6b6b",

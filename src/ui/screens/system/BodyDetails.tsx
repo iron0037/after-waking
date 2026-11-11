@@ -1,4 +1,5 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
+import { OUTPOST_TYPES, outpostTitle, type Outpost } from "../../../sim";
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import { SEAS } from "../../../data/seas";
 import type { Ratings } from "../../../data/ship";
@@ -117,10 +118,13 @@ export function Exploration({
   state,
   progress,
   contracts,
+  outposts = [],
 }: {
   state: GameState;
   progress: BodyProgress;
   contracts: Contract[];
+  /** Known clan outposts on this world (AW-23). */
+  outposts?: Outpost[];
 }) {
   const landed = progress.regionsVisited > 0;
   const showSurface = progress.regions > 0 && (progress.scanned || landed);
@@ -140,6 +144,14 @@ export function Exploration({
           <dd class={progress.surveyed ? "good" : "muted"}>{progress.surveyed ? "Done" : "Not yet"}</dd>
         </dl>
       )}
+      {outposts.map((o) => (
+        <div key={o.id} class="sys-contract" title={OUTPOST_TYPES[o.clan].blurb}>
+          <span class="sys-outpost">■</span> <b>{outpostTitle(o)}</b>
+          <div class="muted small">
+            {o.population} people · region {o.region + 1}. Land in that region to use it.
+          </div>
+        </div>
+      ))}
       {contracts.map((c) => {
         const p = contractProgress(state, c);
         return (

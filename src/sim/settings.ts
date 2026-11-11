@@ -31,6 +31,8 @@ export interface UniverseSettings {
   ore: Abundance;
   life: Abundance;
   hostile: HostileLife;
+  /** Clans with an outpost (AW-23): 0–7, default 3. */
+  outposts?: number;
 }
 
 export interface PeopleSettings {
@@ -45,7 +47,7 @@ export interface PeopleSettings {
 
 export type GameSettings = UniverseSettings & PeopleSettings;
 
-export const DEFAULT_UNIVERSE: UniverseSettings = { stars: 22, ore: "normal", life: "normal", hostile: "normal" };
+export const DEFAULT_UNIVERSE: UniverseSettings = { stars: 22, ore: "normal", life: "normal", hostile: "normal", outposts: 3 };
 export const DEFAULT_PEOPLE: PeopleSettings = {
   crewXp: "normal",
   reliability: "normal",
@@ -62,6 +64,9 @@ export const LEGACY_PEOPLE: PeopleSettings = { ...DEFAULT_PEOPLE, reliability: "
 const SEED_SPAN = 2 ** 32;
 const ABUNDANCE_CODE: Abundance[] = ["normal", "scarce", "plentiful"];
 const HOSTILE_CODE: HostileLife[] = ["normal", "none", "plentiful"];
+/** Outpost counts in code order: code 0 is the default 3, so seeds from before outposts get the default. */
+const OUTPOST_CODE = [3, 0, 1, 2, 4, 5, 6, 7];
+export const OUTPOST_DEFAULT = 3;
 
 /** The seed the player typed (the low 32 bits). */
 export function baseSeed(seed: number): number {
@@ -72,7 +77,8 @@ export function baseSeed(seed: number): number {
 export function universeSeed(base: number, u: UniverseSettings): number {
   const stars = STAR_COUNTS.indexOf(u.stars);
   const code =
-    Math.max(0, stars) + 4 * ABUNDANCE_CODE.indexOf(u.ore) + 12 * ABUNDANCE_CODE.indexOf(u.life) + 36 * Math.max(0, HOSTILE_CODE.indexOf(u.hostile ?? "normal"));
+    Math.max(0, stars) + 4 * ABUNDANCE_CODE.indexOf(u.ore) + 12 * ABUNDANCE_CODE.indexOf(u.life) + 36 * Math.max(0, HOSTILE_CODE.indexOf(u.hostile ?? "normal")) +
+    108 * Math.max(0, OUTPOST_CODE.indexOf(u.outposts ?? OUTPOST_DEFAULT));
   return baseSeed(Math.abs(Math.floor(base))) + code * SEED_SPAN;
 }
 
@@ -84,7 +90,13 @@ export function universeOf(seed: number): UniverseSettings {
     ore: ABUNDANCE_CODE[Math.floor(code / 4) % 3] ?? "normal",
     life: ABUNDANCE_CODE[Math.floor(code / 12) % 3] ?? "normal",
     hostile: HOSTILE_CODE[Math.floor(code / 36) % 3] ?? "normal",
+    outposts: OUTPOST_CODE[Math.floor(code / 108) % 8] ?? OUTPOST_DEFAULT,
   };
+}
+
+/** How many clans have an outpost in this universe. */
+export function outpostCountOf(seed: number): number {
+  return universeOf(seed).outposts ?? OUTPOST_DEFAULT;
 }
 
 export function chartedStars(stars: StarCount): number {
@@ -174,6 +186,7 @@ export function settingsLine(s: GameSettings): string {
     `ore ${s.ore}`,
     `life ${s.life}`,
     `hostile life ${s.hostile ?? "normal"}`,
+    `${s.outposts ?? OUTPOST_DEFAULT} outposts`,
     `leveling ${s.crewXp}`,
     `reliability ${s.reliability}`,
     s.turnover ? "turnover on" : "turnover off",

@@ -83,6 +83,15 @@ function Segmented<T extends string | number>({ name, choices, value, onPick }: 
   );
 }
 
+/** 0–7 clans with an outpost (AW-23). */
+const OUTPOST_CHOICES: SettingChoice<number>[] = Array.from({ length: 8 }, (_, n) => ({ value: n, label: String(n) }));
+
+function outpostHint(n: number): string {
+  if (n === 0) return "No outposts: the Intrepid is the only port in the Verge.";
+  if (n === 7) return "Every clan keeps an outpost out in the Verge.";
+  return `${n} of the seven clans keep${n === 1 ? "s" : ""} a small outpost out in the Verge: fuel, a shipyard and harder jobs, far from home.`;
+}
+
 const STAR_CHOICES: SettingChoice<StarCount>[] = [...STAR_COUNTS].sort((a, b) => a - b).map((n) => ({ value: n, label: String(n) }));
 
 export function NewGameSettings({
@@ -121,6 +130,9 @@ export function NewGameSettings({
         </Row>
         <Row label="Hostile life" hint={HINTS.hostile[universe.hostile]}>
           <Segmented name="Hostile life" choices={SETTING_LABELS.hostile} value={universe.hostile} onPick={u("hostile")} />
+        </Row>
+        <Row label="Clan outposts" hint={outpostHint(universe.outposts ?? 3)}>
+          <Segmented name="Clan outposts" choices={OUTPOST_CHOICES} value={universe.outposts ?? 3} onPick={u("outposts")} />
         </Row>
       </section>
       <section class="settings-group">

@@ -3,6 +3,7 @@
  * same grid of regions the rover drives across. Terrain tint comes from the same
  * noise as the planet art; the orbital scan's signal is the amber glow over each region.
  */
+import { knownOutposts, outpostTitle, type Outpost } from "../../../sim";
 import type { ComponentChildren } from "preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../../data/commodities";
@@ -93,6 +94,8 @@ function regionAt(layout: Layout, u: number, v: number): number {
 // --- component ---------------------------------------------------------------------------
 
 export function RegionPicker({ session, body, state, world, sensorTier, reachM, selected, landable = true, remote = false, onSelect, action }: RegionPickerProps) {
+  // Known clan outposts on this world, by region (AW-23).
+  const outpostHere = new Map<number, Outpost>(knownOutposts(state, world).filter((o) => o.bodyId === body.id).map((o) => [o.region, o]));
   useArchiveTopic(session, "region-chart");
   const [hover, setHover] = useState<number | null>(null);
   const sizeRef = useRef({ w: 1, h: 1 });
@@ -134,7 +137,9 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
     const alive = life
       ? ` · life signs: ${sites === 0 ? "none" : `${sites} plant site${sites === 1 ? "" : "s"}`}${rareHere.length ? ` (rare: ${rareHere.join(", ")})` : ""}`
       : "";
-    return `Region ${r + 1} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
+    const station = outpostHere.get(r);
+    const post = station ? ` · ■ ${outpostTitle(station)}` : "";
+    return `Region ${r + 1}${post} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 
   const draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
@@ -190,6 +195,20 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
         ctx.fillRect(x + 3, y + ch - 3 - barH, (cw - 6) * Math.max(0.08, explored), barH);
       }
     });
+
+    // Clan outposts (AW-23): a teal square in the region's top-left corner.
+    for (const [r, _o] of outpostHere) {
+      const cell = layout.cells[r];
+      if (!cell) continue;
+      const s = Math.max(6, Math.min(10, ((cell.x1 - cell.x0) * w) / 6));
+      const x = cell.x0 * w + 4;
+      const y = cell.y0 * h + 4;
+      ctx.fillStyle = UI.outpost;
+      ctx.fillRect(x, y, s, s);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#05070f";
+      ctx.strokeRect(x, y, s, s);
+    }
 
     // Life signs: small green leaves along the bottom-right of each region, one per plant site (up to 5).
     if (life) {

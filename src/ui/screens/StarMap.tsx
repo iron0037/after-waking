@@ -32,6 +32,9 @@ import {
   KIND_LABEL,
   landableBodies,
   contractTargetsBySystem,
+  knownOutposts,
+  outpostTitle,
+  type Outpost,
   explorationScore,
   effectiveStats,
   hasPerk,
@@ -142,6 +145,9 @@ export function StarMap({ session }: { session: GameSession }) {
   const fromId = currentSystemId(state);
   const docked = state.location.kind === "intrepid";
   const targets = contractTargets(session);
+  /** The clans' outposts the captain knows of, by star (AW-23). */
+  const outpostStars = new Map<string, Outpost[]>();
+  for (const o of knownOutposts(state, world)) outpostStars.set(o.systemId, [...(outpostStars.get(o.systemId) ?? []), o]);
   /** Stars where an active Covenant errand waits: system id -> what it asks. */
   const covenantStars = new Map<string, string>();
   for (const o of covenantErrands(state, world)) if (o.state?.status === "active" && o.systemId) covenantStars.set(o.systemId, o.title);
@@ -969,6 +975,19 @@ export function StarMap({ session }: { session: GameSession }) {
       ctx.restore();
     }
 
+    if (outpostStars.has(n.id)) {
+      // A small teal square, lower right: a clan outpost here.
+      const sx = x + r + 4;
+      const sy = y + r + 4;
+      ctx.save();
+      ctx.fillStyle = UI.outpost;
+      ctx.strokeStyle = UI.space;
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(sx, sy, 7, 7);
+      ctx.strokeRect(sx, sy, 7, 7);
+      ctx.restore();
+    }
+
     if (covenantStars.has(n.id)) {
       // The Covenant's mark: a faint dotted violet ring with a dot, understated.
       ctx.save();
@@ -1065,6 +1084,7 @@ export function StarMap({ session }: { session: GameSession }) {
       const intel = pirateIntel(state, world, n.id);
       lines.push({ text: `Raiders: ${intel.label}`, color: INTEL_COLOR[intel.level] });
     }
+    for (const o of outpostStars.get(n.id) ?? []) lines.push({ text: `■ ${outpostTitle(o)}`, color: UI.outpost });
     const covenantAsk = covenantStars.get(n.id);
     if (covenantAsk) lines.push({ text: `◌ Covenant: ${covenantAsk}`, color: UI.covenant });
     const jobs = targets.get(n.id) ?? [];
@@ -1119,7 +1139,7 @@ export function StarMap({ session }: { session: GameSession }) {
         </div>
         <div class="sm-legend">
           <div>
-            <span class="good">◆</span> visited · <span class="sm-bang">!</span> contract work outstanding
+            <span class="good">◆</span> visited · <span class="sm-bang">!</span> contract work outstanding · <span class="sm-outpost">■</span> clan outpost
           </div>
           <div>
             <span class="sm-ring">◯</span> ring: how thoroughly explored (full ring = painted)

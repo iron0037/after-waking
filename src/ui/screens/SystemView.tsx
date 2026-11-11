@@ -2,6 +2,7 @@
  * The system orrery: where the ship is, where everything else is, and how to get there.
  * Flight is animated with time compression; the sim only advances when the burn completes.
  */
+import { knownOutposts, type Outpost } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   bodyProgress,
@@ -122,6 +123,9 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   // Recomputed per render (not per animation frame): exploration rings and contract markers.
   const progress = new Map(detail.bodies.map((b) => [b.id, bodyProgress(state, b)] as const));
   const targets = contractTargets(state);
+  // The clans' outposts the captain knows of, by world (AW-23).
+  const outpostsByBody = new Map<string, Outpost[]>();
+  for (const o of knownOutposts(state, session.world)) outpostsByBody.set(o.bodyId, [...(outpostsByBody.get(o.bodyId) ?? []), o]);
   // The Covenant's errand here, if there is one; the missing-world kind also draws its empty orbit.
   const errand = errandHere(state, world);
   const ghostAU = errand?.def.kind === "missing-world" ? ghostOrbitAU(world, systemId) : null;
@@ -544,6 +548,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             hoverId={hoverId}
             progress={progress}
             targets={targets}
+            outposts={outpostsByBody}
             landable={new Set(landableBodies(state, session.world, detail.system.id).map((b) => b.id))}
             onSelect={select}
             onHover={(id) => !busy && setHoverId(id)}
@@ -557,6 +562,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
               state={state}
               progress={progress.get(selected.id) ?? bodyProgress(state, selected)}
               contracts={targets.get(selected.id) ?? []}
+              outposts={outpostsByBody.get(selected.id) ?? []}
             />
 
             {!orbitingSel && planRes && (

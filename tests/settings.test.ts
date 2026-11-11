@@ -49,7 +49,7 @@ describe("universe settings (AW-205)", () => {
     const u: UniverseSettings = { stars: 30, ore: "plentiful", life: "scarce", hostile: "none" };
     const seed = universeSeed(42, u);
     expect(seed).toBeGreaterThan(2 ** 32);
-    expect(universeOf(seed)).toEqual(u);
+    expect(universeOf(seed)).toEqual({ ...u, outposts: 3 }); // left out, outposts take the default (AW-23)
     expect(baseSeed(seed)).toBe(42);
     expect(universeOf(42)).toEqual(DEFAULT_UNIVERSE);
     // The game state carries the packed seed, so every World built from it agrees.

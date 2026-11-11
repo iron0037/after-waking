@@ -1,4 +1,5 @@
 /** Every body in the system, moons indented under their parents. */
+import { outpostTitle, type Outpost } from "../../../sim";
 import { useEffect, useRef } from "preact/hooks";
 import { bodyNickname, bodyPosition, dist, type BodyProgress, type Contract, type SystemDetail, type Vec2 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
@@ -16,13 +17,15 @@ export interface BodyListProps {
   hoverId: string | null;
   progress: Map<string, BodyProgress>;
   targets: Map<string, Contract[]>;
+  /** The clans' outposts the captain knows of, by world (AW-23). */
+  outposts?: Map<string, Outpost[]>;
   /** Scanned bodies the current ship can land on and mine. */
   landable: Set<string>;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
 
-export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId, selectedId, hoverId, progress, targets, landable, onSelect, onHover }: BodyListProps) {
+export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId, selectedId, hoverId, progress, targets, outposts, landable, onSelect, onHover }: BodyListProps) {
   const box = useRef<HTMLDivElement>(null);
 
   // Keep the selected row visible when the selection came from the map.
@@ -76,6 +79,11 @@ export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId
                   {jobs.length > 0 && (
                     <span class="sys-job" title={`Contract: ${jobs.map((c) => c.title).join("; ")}`}>
                       ◆
+                    </span>
+                  )}
+                  {(outposts?.get(b.id) ?? []).length > 0 && (
+                    <span class="sys-outpost" title={(outposts?.get(b.id) ?? []).map(outpostTitle).join("; ")}>
+                      {" "}■
                     </span>
                   )}
                 </td>
