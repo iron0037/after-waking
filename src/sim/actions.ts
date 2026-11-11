@@ -48,7 +48,7 @@ import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverSta
 import { FLORA_BY_NAME } from "../data/catalog";
 import { CREATURES_BY_NAME } from "../data/creatures";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
-import { specimenKey } from "./contracts";
+import { specimenFits, specimenKey } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
 import { helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
@@ -1797,9 +1797,9 @@ export function specimenHolds(state: GameState): Map<string, SpecimenHold> {
     if (!h) out.set(key, (h = { contract: false, research: 0, projects: [] }));
     return h;
   };
-  const contractBodies = new Set((state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens").map((c) => c.bodyId));
+  const jobs = (state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens");
   const racks = state.ship.specimens ?? {};
-  for (const key of Object.keys(racks)) if (contractBodies.has(key.split("|")[0] ?? "")) get(key).contract = true;
+  for (const key of Object.keys(racks)) if (jobs.some((c) => specimenFits(c, key))) get(key).contract = true;
   for (const p of trackedProjects(state)) {
     for (const req of p.needs) {
       if (req.kind !== "specimens") continue;

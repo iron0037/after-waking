@@ -91,6 +91,7 @@ export function contractTargetsByBody(state: GameState): Map<string, Contract[]>
   for (const c of state.contracts ?? []) {
     if (c.status !== "active") continue;
     if (c.kind === "specimens" && c.bodyId) add(c.bodyId, c);
+    if (c.kind === "specimens" && c.species) for (const id of c.bodyIds ?? []) add(id, c);
     if (c.kind === "survey") for (const id of c.surveyBodyIds ?? []) if (!state.surveyedBodies.includes(id)) add(id, c);
     if (c.kind === "probe" && c.bodyId && !contractProgress(state, c).ready) add(c.bodyId, c);
   }

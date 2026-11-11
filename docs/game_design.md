@@ -537,6 +537,13 @@ Small, permanent establishments, from about 40 people to a few hundred. Not citi
 - **Feasible only:** a job is posted only for a species that lives on worlds the Intrepid knows, in enough numbers to fill it.
 - **Fauna:** creature jobs appear only if the rover's current gear gives at least a 50% capture chance against that species.
 - Pay scales with rarity and distance.
+- **As built** (`src/sim/specimenjobs.ts`):
+  - "Known worlds" are living worlds in charted or visited systems that the current ship can land on.
+  - The Lyceum wants twice the plant sites the job needs (counted exactly), or three times the animals (estimated from regions).
+  - Plant jobs ask for 2–6 samples and animal jobs for 1–3, fewer for rarer species.
+  - Pay is 1.8× the counter price, plus 300 cr per light-year to the nearest world, plus 1,500 cr (2,500 for animals). A species not yet catalogued also earns the first-specimen bonus.
+  - Specimens of the species from any world count. Land species only for now; sea life could follow.
+  - At most one job at a time, and none if the Lyceum is hostile.
 
 ## Surface Creatures (AW-215, AW-216, AW-217) **[DECIDED 2026-11-03]**
 Unintelligent animals of the land and seas, collected as specimens like plants. Code: `src/data/creatures.ts` (27 species), `src/sim/creatures.ts`, gear in `src/data/vehicleWeapons.ts`.

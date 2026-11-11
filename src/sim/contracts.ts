@@ -6,7 +6,8 @@
  * advanceTime), so it writes journal entries and runs its RNG directly.
  */
 import { changeRep, clanRefuses, contractRepGain, REP_LAPSE, repPayMult, TIER_INFO } from "./reputation";
-import { fuelPriceFor } from "./actions";
+import { fuelPriceFor, NEW_SPECIES_BONUS } from "./actions";
+import { specimenJob } from "./specimenjobs";
 import { COMMODITIES, GAS_IDS, type CommodityId, type GasId } from "../data/commodities";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { awardXp, crewBonuses } from "./crew";
@@ -41,9 +42,12 @@ export interface Contract {
   // deliver
   commodity?: CommodityId;
   tonnes?: number;
-  // specimens
+  // specimens: from one world (bodyId, the Meadow starter), or of one species from anywhere (AW-242)
   bodyId?: string;
   count?: number;
+  species?: string;
+  /** Worlds the species is known on, nearest first (a hint, not a rule). */
+  bodyIds?: string[];
   // survey
   surveyBodyIds?: string[];
   /** A Preferred Captain's private offer. */
@@ -66,6 +70,19 @@ export function specimenKey(bodyId: string, species: string): string {
 export function specimensFrom(specimens: Record<string, number> | undefined, bodyId: string): number {
   let n = 0;
   for (const [key, count] of Object.entries(specimens ?? {})) if (key.startsWith(`${bodyId}|`)) n += count;
+  return n;
+}
+
+/** Does this rack ("bodyId|species") count toward a specimen contract? */
+export function specimenFits(c: Contract, key: string): boolean {
+  if (c.species) return key.split("|")[1] === c.species;
+  return key.startsWith(`${c.bodyId}|`);
+}
+
+/** Specimens in these racks that count toward a specimen contract. */
+export function contractSpecimens(specimens: Record<string, number> | undefined, c: Contract): number {
+  let n = 0;
+  for (const [key, count] of Object.entries(specimens ?? {})) if (specimenFits(c, key)) n += count;
   return n;
 }
 
@@ -355,6 +372,12 @@ export function tickContracts(state: GameState): void {
       const survey = standingSurvey(state, rng, state.contracts.length + 1);
       if (survey && !clanRefuses(state, survey.clan)) state.contracts.push(survey);
     }
+    // The Lyceum's specimen work (AW-242): one job at a time, and only one it knows can be done.
+    const hasSpecimenJob = state.contracts.some((c) => c.kind === "specimens" && !c.starter && (c.status === "offered" || c.status === "active"));
+    if (!hasSpecimenJob && !clanRefuses(state, "lyceum") && rng.chance(0.6)) {
+      const job = specimenJob(state, worldFor(state.seed, state.worldGen ?? 1), rng, state.contracts.length + 1);
+      if (job) state.contracts.push(job);
+    }
     // Preferred Captain (comms): now and then a clan offers private work, bigger and better paid.
     if (hasPerk(state, "preferred-captain") && rng.chance(0.5) && !state.contracts.some((c) => c.status === "offered" && c.exclusive)) {
       state.contracts.push(exclusiveContract(rng, state.contracts.length + 1));
@@ -393,11 +416,11 @@ export function contractProgress(state: GameState, c: Contract): ContractProgres
     }
     case "specimens": {
       const rover = state.location.kind === "surface" ? state.location.rover?.specimens : undefined;
-      const aboard = specimensFrom(state.ship.specimens, c.bodyId ?? "");
-      const have = aboard + specimensFrom(rover, c.bodyId ?? "");
+      const aboard = contractSpecimens(state.ship.specimens, c);
+      const have = aboard + contractSpecimens(rover, c);
       const need = c.count ?? 0;
       // Only samples in the ship's racks can be turned in.
-      return { have, need, ready: aboard >= need, label: `${have} / ${need} samples collected` };
+      return { have, need, ready: aboard >= need, label: `${have} / ${need} ${c.species ? c.species : "samples"} collected` };
     }
     case "probe": {
       const since = c.acceptedAt ?? 0;
@@ -466,7 +489,7 @@ export function completeContract(state: GameState, id: string): Result<number> {
     let left = c.count ?? 0;
     const specimens = state.ship.specimens ?? {};
     for (const key of Object.keys(specimens)) {
-      if (left <= 0 || !key.startsWith(`${c.bodyId}|`)) continue;
+      if (left <= 0 || !specimenFits(c, key)) continue;
       const take = Math.min(left, specimens[key] ?? 0);
       specimens[key] = (specimens[key] ?? 0) - take;
       if ((specimens[key] ?? 0) <= 0) delete specimens[key];
@@ -475,7 +498,12 @@ export function completeContract(state: GameState, id: string): Result<number> {
   }
   c.status = "done";
   state.stats.contractsDone = (state.stats.contractsDone ?? 0) + 1;
-  const pay = contractPayout(state, c);
+  let pay = contractPayout(state, c);
+  // A species the Lyceum hadn't catalogued earns its first-specimen bonus, as a sale would.
+  if (c.species && !state.catalogedSpecies.includes(c.species)) {
+    state.catalogedSpecies.push(c.species);
+    pay += NEW_SPECIES_BONUS;
+  }
   c.paid = pay;
   state.credits += pay;
   state.stats.earned += pay;

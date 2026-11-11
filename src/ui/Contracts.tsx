@@ -37,6 +37,16 @@ function targetsOf(session: GameSession, c: Contract): Target[] {
       note: "survey",
     }));
   }
+  // A species job (AW-242): the worlds it's known on, as hints; samples from anywhere count.
+  if (c.kind === "specimens" && c.species) {
+    const p = contractProgress(state, c);
+    return (c.bodyIds ?? []).map((id, i) => ({
+      key: id,
+      ...contractBodyNames(session, id),
+      done: p.ready,
+      note: i === 0 ? `${p.have} / ${p.need} · known here` : "known here",
+    }));
+  }
   if (c.kind === "specimens" && c.bodyId) {
     const p = contractProgress(state, c);
     return [{ key: c.bodyId, ...contractBodyNames(session, c.bodyId), done: p.ready, note: `${p.have} / ${p.need} samples` }];

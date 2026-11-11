@@ -91,7 +91,7 @@ import {
   shipTile,
   SHIFT_FACTOR,
   specimenCount,
-  specimensFrom,
+  contractSpecimens,
   step,
   stowRover,
   surfaceDeposit,
@@ -1887,7 +1887,9 @@ function ShipPanel({
   const fuelPct = pct(state.ship.fuel, stats.fuelCapacity);
   const roverSamples = vehicles.reduce((n, v) => n + specimenCount(v.specimens), 0);
   const shipSamples = specimenCount(state.ship.specimens);
-  const jobs = (state.contracts ?? []).filter((c) => c.status === "active" && c.kind === "specimens" && c.bodyId === bodyId);
+  const jobs = (state.contracts ?? []).filter(
+    (c) => c.status === "active" && c.kind === "specimens" && (c.bodyId === bodyId || (!!c.species && (c.bodyIds ?? []).includes(bodyId))),
+  );
   return (
     <Section id="ship" title="Ship hold" summary={`${tonnes(hold)} / ${tonnes(stats.cargoCapacityT)}`}>
       <dl class="kv">
@@ -1915,8 +1917,8 @@ function ShipPanel({
         </>
       )}
       {jobs.map((c) => {
-        const inRover = vehicles.reduce((n, v) => n + specimensFrom(v.specimens, bodyId), 0);
-        const aboard = specimensFrom(state.ship.specimens, bodyId);
+        const inRover = vehicles.reduce((n, v) => n + contractSpecimens(v.specimens, c), 0);
+        const aboard = contractSpecimens(state.ship.specimens, c);
         const need = c.count ?? 0;
         const have = inRover + aboard;
         return (

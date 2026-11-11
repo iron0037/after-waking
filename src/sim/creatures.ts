@@ -347,25 +347,30 @@ export interface CaptureOdds {
   hullLoss: number;
 }
 
-/** The odds of taking this creature from where the vehicle is now. Null if it isn't there to try. */
-export function captureOdds(state: GameState, world: World, key: SiteKey): CaptureOdds | null {
-  const loc = state.location;
-  if (loc.kind !== "surface" || !loc.rover) return null;
-  const v = loc.rover;
-  const c = creatureByKey(state, world, loc.bodyId, key);
-  if (!c || c.down) return null;
-  const surface = world.surface(loc.bodyId);
+/** What the gear and the fight (or chase) come to, before the drive out and the energy budget. */
+interface EncounterOdds {
+  chance: number;
+  /** Energy for the job itself, not the drive. */
+  energy: number;
+  minutes: number;
+  injuryRisk: number;
+  wreckRisk: number;
+  method: string;
+  notes: string[];
+  hullLoss: number;
+}
+
+/**
+ * The odds against a creature of this kind, from alongside it: the gear, the crew's aim and the fight or the chase.
+ * `hp` is how worn down it is, `scared` whether it runs from the start, `hull` the plating the vehicle has now and
+ * `speed` how fast it chases (vehicleChaseSpeed). captureOdds adds the drive out and back and the energy budget.
+ */
+function encounterOdds(state: GameState, entry: CreatureEntry, hp: number, scared: boolean, hull: number, speed: number, vehicle: "rover" | "boat"): EncounterOdds {
   const notes: string[] = [];
   const gear = vehicleWeapons(state);
-  const budget = Math.max(0, v.energy - energyReserve(state, world, v));
-  const hunter = isHunter(c.entry);
-  const roverSpeed = vehicleChaseSpeed(state, v);
-  const theirSpeed = c.entry.speed / 6;
-
-  // Out to it and back: the rover ends where it started.
-  const path = hexDistance(v, c) <= 1 ? [] : findPath(surface, v, c, mobilityOf(state, v));
-  const approachEnergy = path ? 2 * routeEnergy(state, path) : Infinity;
-  const approachMinutes = path ? 2 * path.reduce((m, s) => m + s.minutes, 0) * 1.5 : 0;
+  const hunter = isHunter(entry);
+  const roverSpeed = speed;
+  const theirSpeed = entry.speed / 6;
 
   // The stunner that does the most per shot, aimed by the science officer.
   const sci = stationLevel(state, "science");
@@ -373,15 +378,15 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
   const nets = gear.filter((w) => w.kind === "net").sort((a, b) => b.hit - a.hit);
   const aim = (w: VehicleWeapon) => Math.min(0.95, w.hit + 0.02 * Math.max(0, sci - 1));
   const best = [...stunners].sort((a, b) => b.damage * aim(b) - a.damage * aim(a))[0] ?? null;
-  const stunShots = best ? Math.ceil(c.hp / Math.max(0.1, best.damage * aim(best))) : Infinity;
+  const stunShots = best ? Math.ceil(hp / Math.max(0.1, best.damage * aim(best))) : Infinity;
   const stunEnergy = best ? stunShots * best.energy : Infinity;
   const net = nets[0] ?? null;
-  const netHold = net ? (net.hit / (c.entry.size === 2 ? 1.6 : 1)) * (hunter ? 0.7 : 1) : 0;
+  const netHold = net ? (net.hit / (entry.size === 2 ? 1.6 : 1)) * (hunter ? 0.7 : 1) : 0;
   const netEnergy = net ? (1 / Math.max(0.05, netHold)) * net.energy : Infinity;
 
   let chance = 1;
-  let energy = approachEnergy;
-  let minutes = approachMinutes;
+  let energy = 0;
+  let minutes = 0;
   let method = "nothing";
   let injuryRisk = 0;
   let wreckRisk = 0;
@@ -390,11 +395,10 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
   // What a hunter's bites do over so many rounds alongside: plating lost, and the risk to the crew and the rover.
   const bitesOver = (rounds: number): number => {
     const dodge = roverSpeed > 1 ? 0.1 : 0;
-    const perBite = c.entry.attack * effectiveStats(state).roverArmour;
+    const perBite = entry.attack * effectiveStats(state).roverArmour;
     const expectedDamage = rounds * perBite * (0.6 - dodge);
-    const hull = hullOf(state, v);
     hullLoss = Math.min(hull - 1, expectedDamage);
-    const perInjury = c.entry.danger > 0 ? Math.min(0.6, perBite / 25) : 0;
+    const perInjury = entry.danger > 0 ? Math.min(0.6, perBite / 25) : 0;
     injuryRisk = 1 - Math.pow(1 - perInjury, rounds * (0.6 - dodge));
     wreckRisk = Math.max(0, Math.min(0.7, expectedDamage / Math.max(1, hull) - 0.6));
     if (expectedDamage > hull * 0.6) notes.push("It bites harder than the plating can take for long: armor would help.");
@@ -416,18 +420,17 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
     const freeRounds = (reach - 1) / Math.max(0.2, theirSpeed);
     const biteRounds = Math.max(0, shots - freeRounds);
     const expectedDamage = bitesOver(biteRounds);
-    chance *= Math.max(0.03, Math.min(0.97, 1.15 - (0.6 * expectedDamage) / Math.max(1, hullOf(state, v))));
+    chance *= Math.max(0.03, Math.min(0.97, 1.15 - (0.6 * expectedDamage) / Math.max(1, hull)));
     minutes += shots * ROUND_MINUTES;
     if (freeRounds < 1) notes.push(`It closes before the ${method} can wear it down: longer-reaching gear would help.`);
   } else {
     // A chase: skittish ones run from the start; docile ones only once they're shot at.
-    const scared = c.entry.temperament === "skittish" || !!state.fauna?.[loc.bodyId]?.[c.key]?.spooked;
     const useNet = net !== null && (best === null || netEnergy <= stunEnergy);
     method = useNet ? (net as VehicleWeapon).name : (best?.name ?? "nothing");
     energy += useNet ? netEnergy : stunEnergy;
     const reach = useNet ? (net as VehicleWeapon).range : (best?.range ?? 1);
     const ratio = theirSpeed / Math.max(0.2, roverSpeed);
-    const lead = scared ? c.entry.sense : 1;
+    const lead = scared ? entry.sense : 1;
     const chaseHexes = lead * Math.max(0.5, ratio) * 1.5;
     energy += chaseHexes * CHASE_ENERGY_PER_HEX;
     minutes += chaseHexes * CHASE_MINUTES_PER_HEX + (useNet ? 2 : stunShots) * ROUND_MINUTES;
@@ -435,8 +438,43 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
     const catchChance = scared ? 1.1 - 1.2 * (ratio - 0.7) + 0.12 * (reach - 1) : 1 - 0.2 * Math.max(0, ratio - 1) + 0.05 * (reach - 1);
     chance *= Math.max(0.05, Math.min(0.97, catchChance));
     if (useNet) chance *= Math.min(1, 0.6 + netHold);
-    if (scared && ratio > 1) notes.push(`It's faster than the ${vehicleOf(v) === "boat" ? "boat" : "rover"}: uprated motors or longer-reaching gear would help.`);
+    if (scared && ratio > 1) notes.push(`It's faster than the ${vehicle}: uprated motors or longer-reaching gear would help.`);
   }
+  return { chance, energy, minutes, injuryRisk, wreckRisk, method, notes, hullLoss };
+}
+
+/**
+ * The odds of taking a creature of this kind with the gear aboard now, met fresh and unhurt, from alongside it with
+ * the rover's (or for sea life, the boat's) plating whole. For deciding whether a specimen job is fair to post (AW-242).
+ */
+export function speciesCaptureChance(state: GameState, entry: CreatureEntry): number {
+  const boat = !!entry.aquatic;
+  const speed = boat ? 1 : 1 / Math.max(0.3, effectiveStats(state).roverDriveTime);
+  const odds = encounterOdds(state, entry, entry.hp, entry.temperament === "skittish", vehicleHullMax(state), speed, boat ? "boat" : "rover");
+  return Math.max(0, Math.min(0.97, odds.chance));
+}
+
+/** The odds of taking this creature from where the vehicle is now. Null if it isn't there to try. */
+export function captureOdds(state: GameState, world: World, key: SiteKey): CaptureOdds | null {
+  const loc = state.location;
+  if (loc.kind !== "surface" || !loc.rover) return null;
+  const v = loc.rover;
+  const c = creatureByKey(state, world, loc.bodyId, key);
+  if (!c || c.down) return null;
+  const surface = world.surface(loc.bodyId);
+  const budget = Math.max(0, v.energy - energyReserve(state, world, v));
+
+  // Out to it and back: the rover ends where it started.
+  const path = hexDistance(v, c) <= 1 ? [] : findPath(surface, v, c, mobilityOf(state, v));
+  const approachEnergy = path ? 2 * routeEnergy(state, path) : Infinity;
+  const approachMinutes = path ? 2 * path.reduce((m, s) => m + s.minutes, 0) * 1.5 : 0;
+
+  const scared = c.entry.temperament === "skittish" || !!state.fauna?.[loc.bodyId]?.[c.key]?.spooked;
+  const fight = encounterOdds(state, c.entry, c.hp, scared, hullOf(state, v), vehicleChaseSpeed(state, v), vehicleOf(v) === "boat" ? "boat" : "rover");
+  let chance = fight.chance;
+  const energy = approachEnergy + fight.energy;
+  const minutes = approachMinutes + fight.minutes;
+  const notes = fight.notes;
 
   if (!path) {
     chance = 0;
@@ -451,11 +489,11 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
     energy: Math.min(energy, Math.max(budget, 0)),
     budget,
     minutes: Math.max(ROUND_MINUTES, minutes),
-    injuryRisk,
-    wreckRisk,
-    method,
+    injuryRisk: fight.injuryRisk,
+    wreckRisk: fight.wreckRisk,
+    method: fight.method,
     notes,
-    hullLoss,
+    hullLoss: fight.hullLoss,
   };
 }
 
