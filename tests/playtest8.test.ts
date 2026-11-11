@@ -34,7 +34,7 @@ describe("species bonus", () => {
     expect(journal).toMatch(/2 specimen/);
   });
 
-  it("older saves keep their catalogue, keyed by species", () => {
+  it("older saves keep their catalog, keyed by species", () => {
     const state = newGame({ seed: 42 });
     state.catalogedSpecies = ["s0.p1|glass reed", "s1.p2|glass reed"];
     expect(deserialize(serialize(state)).catalogedSpecies).toEqual(["glass reed"]);

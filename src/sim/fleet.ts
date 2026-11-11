@@ -54,7 +54,7 @@ function defaultName(state: GameState, hull: Hull): string {
   return `${hull.names[0]} ${n}`;
 }
 
-/** Buy a new ship from its clan's yard. It's berthed at the Intrepid, fuelled, ready to take command of. */
+/** Buy a new ship from its clan's yard. It's berthed at the Intrepid, fueled, ready to take command of. */
 export function buyHull(state: GameState, id: HullId, name?: string): Result<ShipState> {
   const blockers = hullBlockers(state, id);
   if (blockers.length > 0) return fail(blockers[0]!);
@@ -153,9 +153,9 @@ export function sellShip(state: GameState, index: number): Result<number> {
   return ok(value);
 }
 
-/** Pirate colours (the corsair): Helm marks it each time you dock. */
-export const PIRATE_COLOURS_REP = -1.5;
+/** Pirate colors (the corsair): Helm marks it each time you dock. */
+export const PIRATE_COLORS_REP = -1.5;
 
 export function fleetOnDocked(state: GameState): void {
-  if ((state.ship.hull ?? "freighter") === "corsair") changeRep(state, "helm", PIRATE_COLOURS_REP, "Docked under pirate colours", false);
+  if ((state.ship.hull ?? "freighter") === "corsair") changeRep(state, "helm", PIRATE_COLORS_REP, "Docked under pirate colors", false);
 }

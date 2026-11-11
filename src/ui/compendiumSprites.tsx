@@ -2,7 +2,7 @@
  * Compendium sprites (AW-28): one 64 px pixel-art cell per entry, packed in public/assets/compendium/atlas.webp with an
  * index.json mapping compendium keys ("flora:glass-reed", "gem:plicite-geode", "mineral:copper") to cells.
  * Built by tools/art/compendium/build_atlas.py. Until the atlas has loaded (or if it is missing) the icon falls back
- * to the entry's colour swatch.
+ * to the entry's color swatch.
  */
 import { useEffect, useState } from "preact/hooks";
 import "./compendium.css";
@@ -24,13 +24,13 @@ const INDEX_URL = "./assets/compendium/index.json";
  * resolved against the stylesheet that uses it (assets/ in a production build), not the page.
  */
 const atlasHref = (): string => new URL(ATLAS_URL, document.baseURI).href;
-/** The colour of an undiscovered entry's silhouette. */
+/** The color of an undiscovered entry's silhouette. */
 const SILHOUETTE = [0x26, 0x32, 0x4d] as const;
 
 let loaded: SpriteIndex | null = null;
 let pending: Promise<SpriteIndex | null> | null = null;
 
-/** The atlas with every visible pixel painted the silhouette colour (alpha kept): one plain image instead of a CSS mask per card. */
+/** The atlas with every visible pixel painted the silhouette color (alpha kept): one plain image instead of a CSS mask per card. */
 async function makeSilhouettes(img: HTMLImageElement): Promise<string | null> {
   try {
     const canvas = document.createElement("canvas");
@@ -97,7 +97,7 @@ export function useSpriteIndex(): SpriteIndex | null {
 
 /**
  * A compendium entry's icon. `found` shows the sprite; an undiscovered entry shows only its dark silhouette
- * (the shape, none of the colour or name). With no sprite available it falls back to the colour swatch / hatching.
+ * (the shape, none of the color or name). With no sprite available it falls back to the color swatch / hatching.
  */
 export function CompIcon({ index, entryKey, color, found }: { index: SpriteIndex | null; entryKey: string; color: string; found: boolean }) {
   const cell = index?.sprites[entryKey];

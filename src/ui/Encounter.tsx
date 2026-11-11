@@ -296,7 +296,7 @@ const ORDER_GROUPS: { key: OrderKey; label: string; options: OrderOption[] }[] =
     options: [
       { id: "quiet", label: "Quiet", hint: "Stay quiet and keep the channel clear." },
       { id: "demand", label: "Demand surrender", hint: "Demand their surrender. Only works once they're beaten (low hull or disarmed); better with a good comms officer." },
-      { id: "strike", label: "Strike colours", hint: "Strike your colours: they strip 70% of the hold and let you go. Your credits are safe. Ends the fight at once." },
+      { id: "strike", label: "Strike colors", hint: "Strike your colors: they strip 70% of the hold and let you go. Your credits are safe. Ends the fight at once." },
     ],
   },
 ];
@@ -407,7 +407,7 @@ function Battle({ session }: { session: GameSession }) {
         {!auto && (
           <div class="btn-row enc-actions">
             <button class={`btn big enc-execute ${striking ? "danger" : "primary"}`} onClick={execute}>
-              {striking ? "Strike colours" : "Execute turn"} <span class="enc-key">Enter</span>
+              {striking ? "Strike colors" : "Execute turn"} <span class="enc-key">Enter</span>
             </button>
           </div>
         )}
@@ -616,7 +616,7 @@ const OUTCOME: Record<EncounterOutcome, { title: string; cls: string }> = {
   "slipped past": { title: "Slipped past", cls: "good" },
   won: { title: "Victory", cls: "good" },
   "driven off": { title: "They broke off", cls: "good" },
-  surrendered: { title: "Colours struck", cls: "danger" },
+  surrendered: { title: "Colors struck", cls: "danger" },
   overwhelmed: { title: "Overwhelmed", cls: "danger" },
 };
 

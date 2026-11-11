@@ -191,7 +191,7 @@ function drawOrbits(ctx: CanvasRenderingContext2D, proj: Projection, scene: Scen
   ctx.restore();
 }
 
-/** The empty lane the Covenant's catalogue says should hold a world: a faint dashed ring with a small note. */
+/** The empty lane the Covenant's catalog says should hold a world: a faint dashed ring with a small note. */
 function drawGhostOrbit(ctx: CanvasRenderingContext2D, proj: Projection, au: number): void {
   const r = proj.radiusPx(au);
   if (r < 8) return;
@@ -207,7 +207,7 @@ function drawGhostOrbit(ctx: CanvasRenderingContext2D, proj: Projection, au: num
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   ctx.fillStyle = rgba(UI.covenant, 0.6);
-  ctx.fillText("catalogue: world V?", proj.cx, proj.cy - r - 3);
+  ctx.fillText("catalog: world V?", proj.cx, proj.cy - r - 3);
   ctx.restore();
 }
 
@@ -440,7 +440,7 @@ function drawLabels(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<string
     drawn.push({ b, x, y, flip, focus, box: { id: b.id, x0: flip ? x - tw : x, x1: flip ? x : x + tw, y0: y - 7, y1: y + 7 } });
   }
 
-  // The captain's own names for worlds: a smaller grey second line, only where it doesn't collide with another label or world.
+  // The captain's own names for worlds: a smaller gray second line, only where it doesn't collide with another label or world.
   ctx.font = FONT(10);
   for (const { b, x, y, flip, focus, box } of drawn) {
     const nick = bodyNickname(state, b);

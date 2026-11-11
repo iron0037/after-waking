@@ -184,7 +184,7 @@ export interface GameState {
   /** Clan relations (AW-22): each clan's standing with you (-100..100; missing means its starting value), and recent changes. */
   reputation?: Partial<Record<ClanId, number>>;
   repLog?: RepChange[];
-  /** The captain's own names for worlds, by body id (shown under the catalogue name). */
+  /** The captain's own names for worlds, by body id (shown under the catalog name). */
   nicknames?: Record<string, string>;
   /** Projects whose needs are pinned to the ship status window and star map. */
   trackedResearch?: string[];

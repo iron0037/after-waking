@@ -3,11 +3,11 @@
  * generated with Stable Diffusion + the pixel-art LoRA and tiled with the "tiling" option; see docs/art_pipeline.md).
  *
  * One texture set serves every world: each (body kind, terrain) pair picks a texture and recolours it so its
- * average colour is the kind's palette colour (`TERRAIN_COLORS`). The result keeps the texture's detail and
- * its colour variation around the mean. Lava is used as painted. Until the atlas has loaded (or if it fails)
- * `tintedTexture` returns null and the map falls back to flat palette colours.
+ * average color is the kind's palette color (`TERRAIN_COLORS`). The result keeps the texture's detail and
+ * its color variation around the mean. Lava is used as painted. Until the atlas has loaded (or if it fails)
+ * `tintedTexture` returns null and the map falls back to flat palette colors.
  *
- * Three terrains get more than a plain recolour (see terrainImage.ts):
+ * Three terrains get more than a plain recolor (see terrainImage.ts):
  *  - plains on living temperate worlds blend quiet steppe with lush meadow near the water (`lushRule`);
  *  - liquid is shaded by depth, darker offshore (`liquidRule`, `depthGradient`), over a nearly flat water tile;
  *  - ice and snow are toned down (darker, greyer, low contrast) so markers read against them.
@@ -22,7 +22,7 @@ export const TEX = 192;
 /** HEX pixels per texture pixel when the map is painted (above 1 stretches the texture, so its detail reads at the default zoom). */
 export const TEX_SCALE = 1.5;
 const COLS = 4;
-/** Each tile sits in the atlas with PAD pixels of its own wrapped edge around it, so lossy compression never bleeds a neighbour's colour in. */
+/** Each tile sits in the atlas with PAD pixels of its own wrapped edge around it, so lossy compression never bleeds a neighbor's color in. */
 const PAD = 8;
 const CELL = TEX + 2 * PAD;
 
@@ -65,19 +65,19 @@ const PEAKS_AMOUNT = 0.6;
 const STEPPE_TINT = [150, 156, 92] as const;
 /** The lush meadow tile is toned down from the full-strength grass the first pass painted everywhere. */
 const LUSH_AMOUNT = 0.55;
-/** Share of its colour that grassland gives up toward grey (steppe, then meadow), so it sits back on the map. */
+/** Share of its color that grassland gives up toward gray (steppe, then meadow), so it sits back on the map. */
 const STEPPE_DESAT = 0.12;
 const LUSH_DESAT = 0.1;
-/** Ice and snow are painted darker and greyer than their palette colour (ice worlds most), so markers stand out on them. */
+/** Ice and snow are painted darker and greyer than their palette color (ice worlds most), so markers stand out on them. */
 const ICE_TONE = 0.8;
 const ICE_WORLD_TONE = 0.7;
-const ICE_GREY = 0.18;
+const ICE_GRAY = 0.18;
 const ICE_ROCK_TONE = 0.8;
-const ICE_ROCK_GREY = 0.35;
+const ICE_ROCK_GRAY = 0.35;
 /** How much of the water tile's speckle shows (it is mostly flat). */
 const WATER_DETAIL = 0.12;
 
-/** Decoded texture: RGB bytes, TEX x TEX, plus the mean colour. */
+/** Decoded texture: RGB bytes, TEX x TEX, plus the mean color. */
 interface Decoded {
   rgb: Uint8ClampedArray;
   mean: [number, number, number];
@@ -90,7 +90,7 @@ let detail: Float32Array | null = null;
 
 let enabled = true;
 
-/** Turns the textures off (flat palette colours) or back on; affects images built afterwards. */
+/** Turns the textures off (flat palette colors) or back on; affects images built afterwards. */
 export function setTexturesEnabled(on: boolean): void {
   enabled = on;
 }
@@ -151,7 +151,7 @@ export function loadTextures(): void {
       ctx.drawImage(img, 0, 0);
       setAtlasPixels(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
     } catch {
-      // Stay on flat colours.
+      // Stay on flat colors.
     }
   };
   img.onerror = () => {
@@ -185,23 +185,23 @@ function parseHex(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-/** The hex colour of a kind's terrain; liquid is the sea's own colour on a world with an exotic sea (AW-189). */
+/** The hex color of a kind's terrain; liquid is the sea's own color on a world with an exotic sea (AW-189). */
 export function terrainHex(kind: BodyKind, terrain: number, sea?: SeaKind): string {
   if (sea && terrain === Terrain.liquid) return SEAS[sea].color;
   return TERRAIN_COLORS[kind][terrain] as string;
 }
 
-/** The palette colour a terrain is recoloured to (ice and snow are pulled toward a darker blue-grey). */
+/** The palette color a terrain is recoloured to (ice and snow are pulled toward a darker blue-gray). */
 function paletteColor(kind: BodyKind, terrain: number, sea?: SeaKind): [number, number, number] {
   const pal = parseHex(terrainHex(kind, terrain, sea));
   if (kind === "ice" && terrain !== Terrain.ice && terrain !== Terrain.lava && terrain !== Terrain.liquid) {
     // The bare ground between the sheets: greyer and darker than the palette's blue, mountains most.
-    return desaturate(pal, ICE_ROCK_GREY).map((v) => v * ICE_ROCK_TONE * (terrain === Terrain.mountain ? 0.9 : 1)) as [number, number, number];
+    return desaturate(pal, ICE_ROCK_GRAY).map((v) => v * ICE_ROCK_TONE * (terrain === Terrain.mountain ? 0.9 : 1)) as [number, number, number];
   }
   if (terrain !== Terrain.ice) return pal;
   const tone = kind === "ice" ? ICE_WORLD_TONE : ICE_TONE;
   const lum = 0.3 * pal[0] + 0.59 * pal[1] + 0.11 * pal[2];
-  return pal.map((v) => (v + (lum - v) * ICE_GREY) * tone) as [number, number, number];
+  return pal.map((v) => (v + (lum - v) * ICE_GRAY) * tone) as [number, number, number];
 }
 
 function desaturate(pal: readonly [number, number, number], by: number): [number, number, number] {
@@ -210,7 +210,7 @@ function desaturate(pal: readonly [number, number, number], by: number): [number
 }
 
 /** `tex` recoloured so its mean is `pal`, keeping `amount` of its contrast. */
-function recolour(tex: Decoded, pal: readonly [number, number, number], amount: number): Uint8ClampedArray {
+function recolor(tex: Decoded, pal: readonly [number, number, number], amount: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(TEX * TEX * 3);
   for (let i = 0; i < out.length; i += 3) {
     for (let c = 0; c < 3; c++) {
@@ -227,7 +227,7 @@ function texture(name: TexName): Decoded | null {
 
 /**
  * The texture for `terrain` on a `kind` world, recoloured to the palette (RGB bytes, TEX x TEX, wrapping),
- * or null if textures aren't available. (Liquid comes back at its mid-depth colour; the map shades it by depth
+ * or null if textures aren't available. (Liquid comes back at its mid-depth color; the map shades it by depth
  * with `depthGradient` and `waterDetail` instead.)
  */
 export function tintedTexture(kind: BodyKind, terrain: number, sea?: SeaKind): Uint8ClampedArray | null {
@@ -241,7 +241,7 @@ export function tintedTexture(kind: BodyKind, terrain: number, sea?: SeaKind): U
   if (!tex) return null;
   let out: Uint8ClampedArray;
   if (terrain === Terrain.lava) {
-    out = new Uint8ClampedArray(tex.rgb); // painted colours as they are
+    out = new Uint8ClampedArray(tex.rgb); // painted colors as they are
   } else {
     const amount = name === "steppe" ? STEPPE_AMOUNT : name === "shrub" ? SHRUB_AMOUNT : name === "scree" ? SCREE_AMOUNT : name === "peaks" ? PEAKS_AMOUNT : (AMOUNT[terrain] ?? 1);
     let pal = paletteColor(kind, terrain, sea);
@@ -249,7 +249,7 @@ export function tintedTexture(kind: BodyKind, terrain: number, sea?: SeaKind): U
       pal = pal.map((v, c) => (v + ((STEPPE_TINT[c] as number) - v) * 0.3) * 0.95) as [number, number, number];
       pal = desaturate(pal, STEPPE_DESAT);
     }
-    out = recolour(tex, pal, amount);
+    out = recolor(tex, pal, amount);
   }
   tinted.set(key, out);
   return out;
@@ -281,7 +281,7 @@ export function lushTexture(kind: BodyKind): Uint8ClampedArray | null {
   if (hit) return hit;
   const tex = texture("grass");
   if (!tex) return null;
-  const out = recolour(tex, desaturate(paletteColor(kind, Terrain.plain), LUSH_DESAT), LUSH_AMOUNT);
+  const out = recolor(tex, desaturate(paletteColor(kind, Terrain.plain), LUSH_DESAT), LUSH_AMOUNT);
   tinted.set(key, out);
   return out;
 }
@@ -305,8 +305,8 @@ export function liquidRule(kind: BodyKind, sea?: SeaKind): LiquidRule {
 export const DEPTH_STEPS = 12;
 
 /**
- * The liquid's colour at each depth, shallow (step 0) to deep, as RGB triples: the palette colour in between,
- * lightened toward the shore and darkened to a deep tone offshore. It works from the body kind's liquid colour,
+ * The liquid's color at each depth, shallow (step 0) to deep, as RGB triples: the palette color in between,
+ * lightened toward the shore and darkened to a deep tone offshore. It works from the body kind's liquid color,
  * so methane and acid seas deepen the same way water does.
  */
 export function depthGradient(kind: BodyKind, sea?: SeaKind): Float32Array {
@@ -327,7 +327,7 @@ export function depthGradient(kind: BodyKind, sea?: SeaKind): Float32Array {
 
 /**
  * The calm-water tile as brightness factors around 1 (TEX x TEX, wrapping): a faint, non-directional speckle
- * to lay over the depth colour. Null until textures are ready.
+ * to lay over the depth color. Null until textures are ready.
  */
 export function waterDetail(): Float32Array | null {
   if (!atlas || !enabled) return null;
@@ -351,7 +351,7 @@ const swatches = new Map<string, string>();
 
 /**
  * A small sample of the textured terrain as a data URL, for the map legend; null until the
- * textures load (the legend falls back to the flat palette colour).
+ * textures load (the legend falls back to the flat palette color).
  */
 export function terrainSwatch(kind: BodyKind, terrain: number, size = 28, sea?: SeaKind): string | null {
   const key = `${kind}:${terrain}:${size}${sea && terrain === Terrain.liquid ? ":" + sea : ""}`;

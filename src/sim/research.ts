@@ -63,7 +63,7 @@ export function requirementProgress(state: GameState, req: Requirement): Require
     }
     case "species": {
       const have = state.catalogedSpecies.length;
-      return of(have, req.count, `${req.count} species catalogued by the Lyceum (${have} so far)`);
+      return of(have, req.count, `${req.count} species cataloged by the Lyceum (${have} so far)`);
     }
     case "readings": {
       const have = Object.values(state.atmoReadings ?? {}).reduce((n, depths) => n + depths.filter((d) => d >= req.depth).length, 0);

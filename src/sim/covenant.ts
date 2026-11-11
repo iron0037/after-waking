@@ -220,7 +220,7 @@ export function doErrand(state: GameState, world: World): Result<Clue | null> {
 
 /**
  * Where the missing world should be, for drawing its empty lane in the system view: the widest gap
- * between neighbouring orbits (in the middle, geometrically), or just beyond the outermost world.
+ * between neighboring orbits (in the middle, geometrically), or just beyond the outermost world.
  */
 export function ghostOrbitAU(world: World, systemId: string): number {
   const orbits = world.system(systemId).bodies.map((b) => b.orbitAU).filter((a) => a > 0).sort((a, b) => a - b);

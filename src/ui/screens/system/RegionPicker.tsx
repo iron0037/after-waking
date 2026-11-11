@@ -39,7 +39,7 @@ export interface RegionPickerProps {
   state: GameState;
   world: World;
   sensorTier: number;
-  /** Drill reach in metres: tier 2+ sensors count only seams within it. */
+  /** Drill reach in meters: tier 2+ sensors count only seams within it. */
   reachM: number;
   selected: number;
   /** False when the ship can't set down: the chart stays readable and selectable, just framed as intel. */
@@ -70,7 +70,7 @@ interface Layout {
 
 /**
  * The same cols × rows grid the rover drives across (sim surfaceLayout), so a region's
- * neighbours on this chart are the ones the rover reaches by driving over the border.
+ * neighbors on this chart are the ones the rover reaches by driving over the border.
  */
 export function regionLayout(body: Body): Layout {
   const { cols, rows, regions } = surfaceLayout(body);
@@ -234,7 +234,7 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       });
     }
 
-    // Known, untapped deposits: a row of commodity-coloured dots along the top of their region.
+    // Known, untapped deposits: a row of commodity-colored dots along the top of their region.
     const byRegion = new Map<number, KnownDeposit[]>();
     for (const k of known) byRegion.set(k.region, [...(byRegion.get(k.region) ?? []), k]);
     for (const [r, list] of byRegion) {

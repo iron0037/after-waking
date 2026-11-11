@@ -194,7 +194,7 @@ const HAPPINESS_TIP =
 const LOYALTY_TIP =
   "Their long-term bond with you. It grows with sustained happiness, bonuses and work for their clan, and sinks when they're unhappy for long. Freebooters start low. Low spirits and low loyalty together make an officer give notice.";
 
-/** Low / Medium / High, coloured; with Read the Room also the exact 0-100 score and a bar. */
+/** Low / Medium / High, colored; with Read the Room also the exact 0-100 score and a bar. */
 function Mood({ value, exact }: { value: number; exact: boolean }) {
   const level = moodLevel(value);
   return (

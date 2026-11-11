@@ -19,7 +19,7 @@ describe("catalog", () => {
     for (const id of ORE_IDS) expect(MINERAL_SPECIMENS.some((g) => g.host === id)).toBe(true);
   });
 
-  it("living worlds draw catalogued species", () => {
+  it("living worlds draw cataloged species", () => {
     const world = new World(42);
     const living = world.galaxy.systems.flatMap((s) => world.system(s.id).bodies).filter((b) => b.life);
     expect(living.length).toBeGreaterThan(0);

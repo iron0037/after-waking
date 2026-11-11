@@ -209,7 +209,7 @@
 .deposit-table tbody tr.dim .leaf-mark {
   background: #4f7a5a;
 }
-/* Specimen rarity: a ring around the leaf (grey common, green uncommon, gold rare) */
+/* Specimen rarity: a ring around the leaf (gray common, green uncommon, gold rare) */
 .leaf-mark.rar1,
 .leaf-mark.rar2,
 .leaf-mark.rar3 {

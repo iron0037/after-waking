@@ -66,7 +66,7 @@ interface Camera {
 
 const HOME_CAMERA: Camera = { view: HOME_VIEW, anchor: null };
 
-/** Least zoom H gives when the ship is drifting between bodies (so centring on it is visible). */
+/** Least zoom H gives when the ship is drifting between bodies (so centering on it is visible). */
 const DRIFT_HOME_ZOOM = 3;
 
 interface Flight {
@@ -403,7 +403,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const planFuelShort = planRes?.ok === true && planRes.value.fuel > state.ship.fuel;
   const access = selected ? landingAccess(selected, stats.ratings) : null;
   const landBlockers = canPickRegion && access?.ok ? landingBlockers(state, world, region) : [];
-  // Start drawing the region about to be landed in (and its neighbours) now, so the surface is ready when it opens.
+  // Start drawing the region about to be landed in (and its neighbors) now, so the surface is ready when it opens.
   const prefetchBodyId = canPickRegion && access?.ok && selected ? selected.id : null;
   useEffect(() => {
     if (prefetchBodyId === null) return;
@@ -455,7 +455,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           </button>
         )}
         <div class="viewport-hint">
-          Drag to pan · scroll to zoom · click to select · H home (centre on ship) · radial scale is logarithmic, moon orbits are exaggerated
+          Drag to pan · scroll to zoom · click to select · H home (center on ship) · radial scale is logarithmic, moon orbits are exaggerated
         </div>
       </div>
 

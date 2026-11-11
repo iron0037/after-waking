@@ -12,7 +12,7 @@ export type Requirement =
   | { kind: "cargo"; commodity: CommodityId; tonnes: number }
   /** Detailed orbital surveys you've flown (data, not used up). */
   | { kind: "surveys"; count: number }
-  /** Species the Lyceum has catalogued from your samples. */
+  /** Species the Lyceum has cataloged from your samples. */
   | { kind: "species"; count: number }
   /** Atmospheric readings at this depth band or deeper, across all giants. */
   | { kind: "readings"; depth: number; count: number }
@@ -75,7 +75,7 @@ export const RESEARCH: readonly ResearchProject[] = [
     name: "Long-baseline interferometry",
     clan: "lyceum",
     unlocks: "longBaselineArray",
-    blurb: "Stretch a deep-field array's eye across a kilometre of boom and it sees five light-years out. The Lyceum needs charts from many stars to calibrate it, and xenon for the thrusters that hold the booms true.",
+    blurb: "Stretch a deep-field array's eye across a kilometer of boom and it sees five light-years out. The Lyceum needs charts from many stars to calibrate it, and xenon for the thrusters that hold the booms true.",
     cost: 15_000,
     days: 28,
     needs: [
@@ -98,7 +98,7 @@ export const RESEARCH: readonly ResearchProject[] = [
   },
   {
     id: "deep-atmosphere",
-    name: "Deep-atmosphere modelling",
+    name: "Deep-atmosphere modeling",
     clan: "lyceum",
     unlocks: "probeBay2",
     blurb: "Before the Lyceum will rate a probe for the abyss, it wants real readings from the deep layers of more than one giant.",

@@ -77,7 +77,7 @@ export interface ShipStats {
   combatSpeed: number;
   /** Added to the chance of seeing a raider before it sees you (a quiet hull). */
   spotBonus: number;
-  /** Multiplies how often raiders come for you (a quiet hull, pirate colours). */
+  /** Multiplies how often raiders come for you (a quiet hull, pirate colors). */
   raidChanceMult: number;
   /** A blind fold's share of the drive's range, and its extra thirst; a talent can do better. */
   blindFoldRange: number;
@@ -154,7 +154,7 @@ export const UPGRADE_CATEGORY_NAMES: Record<UpgradeCategory, string> = {
   boat: "Boat",
   mining: "Mining",
   sensors: "Sensors",
-  combat: "Weapons & defences",
+  combat: "Weapons & defenses",
 };
 
 export interface Upgrade {
@@ -420,7 +420,7 @@ export const UPGRADES: readonly Upgrade[] = [
       s.rareLifeSense = true;
     },
   },
-  // --- weapons & defences (combat v1) -----------------------------------------------------
+  // --- weapons & defenses (combat v1) -----------------------------------------------------
   {
     id: "laserBattery",
     category: "combat",
@@ -457,7 +457,7 @@ export const UPGRADES: readonly Upgrade[] = [
   {
     id: "armorPlate",
     category: "combat",
-    name: "Armour plate",
+    name: "Armor plate",
     vendor: "diggers",
     price: 16_000,
     description: "+60 hull points in a fight. Adds 60 t of hull mass, so folds cost a little more.",
@@ -559,7 +559,7 @@ export const UPGRADES: readonly Upgrade[] = [
   {
     id: "roverArmour",
     category: "rover",
-    name: "Rover armour",
+    name: "Rover armor",
     vendor: "diggers",
     price: 10_000,
     description: "Bolted plate over the cab and cells: the rover takes far more punishment, and a quarter less from each bite.",
@@ -649,7 +649,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Long-baseline array",
     vendor: "lyceum",
     price: 70_000,
-    description: "A deep-field array with booms a kilometre long: sweeps 5 ly per scan, faint returns out to 7.5 ly.",
+    description: "A deep-field array with booms a kilometer long: sweeps 5 ly per scan, faint returns out to 7.5 ly.",
     apply: (s) => {
       s.deepScanLy = Math.max(s.deepScanLy, 5);
       s.hullMassT += 10;

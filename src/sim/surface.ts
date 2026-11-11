@@ -184,7 +184,7 @@ export function exploredFraction(k: RegionKnowledge | undefined): number {
   return count / TILES;
 }
 
-/** The handful of catalogued plant species that grow on a living world, by climate; stable per body. */
+/** The handful of cataloged plant species that grow on a living world, by climate; stable per body. */
 export function bodySpecies(seed: number, body: Body): string[] {
   // Life on a world with exotic seas lives in the sea (AW-189).
   if (!body.life || body.sea) return [];
@@ -547,7 +547,7 @@ export function generateRegion(seed: number, body: Body, region: number): Region
   const terrain = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      // Sample at each hex's true centre in planet-wide space: no row skew, no seams.
+      // Sample at each hex's true center in planet-wide space: no row skew, no seams.
       const p = hexWorldPos(origin.x + x, origin.y + y);
       const e = fbm(noiseSeed, p.x / 14, p.y / 14, 4);
       const rough = fbm(noiseSeed ^ 0x9e3779b9, p.x / 5, p.y / 5, 2);

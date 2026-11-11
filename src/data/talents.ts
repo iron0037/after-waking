@@ -31,7 +31,7 @@ export interface TalentDef {
 }
 
 export const TALENTS: TalentDef[] = [
-  { id: "archive-tracker", station: "science", name: "Archive tracker", text: "Spent years cataloguing the Archive's seed vaults: rare plants show on the orbital region chart." },
+  { id: "archive-tracker", station: "science", name: "Archive tracker", text: "Spent years cataloging the Archive's seed vaults: rare plants show on the orbital region chart." },
   { id: "deep-sky", station: "science", name: "Deep-sky astronomer", text: "Knows the dark between the stars: deep-field sweeps reach 50% farther." },
   { id: "gem-cutter", station: "science", name: "Gem cutter", text: "Knows what collectors pay for: mineral specimens fetch twice as much." },
   { id: "dark-fold", station: "navigation", name: "Dark-fold pilot", text: "Flew Helm's survey folds: blind folds reach 80% of the drive's range and burn no extra plicite." },

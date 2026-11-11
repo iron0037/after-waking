@@ -59,7 +59,7 @@ export function fitSize(w: number, h: number): number {
   return Math.max(3, Math.min((w - MARGIN_X * 2) / unitW, (h - MARGIN_TOP - MARGIN_BOTTOM) / unitH));
 }
 
-/** Where the map's centre sits on screen: the middle of the area above the footer. */
+/** Where the map's center sits on screen: the middle of the area above the footer. */
 export function viewCenter(w: number, h: number): Vec2 {
   return { x: w / 2, y: MARGIN_TOP + (h - MARGIN_TOP - MARGIN_BOTTOM) / 2 };
 }
@@ -89,7 +89,7 @@ export function tileAt(L: Layout, px: number, py: number): Vec2 | null {
   return t.x < 0 || t.y < 0 || t.x >= L.cols || t.y >= L.rows ? null : t;
 }
 
-/** Canvas pixel position of a tile's centre. */
+/** Canvas pixel position of a tile's center. */
 export function tileCenter(L: Layout, t: Vec2): Vec2 {
   const c = hexToPixel(t.x, t.y, L.size);
   return { x: L.ox + c.x, y: L.oy + c.y };
@@ -290,7 +290,7 @@ const SHIP_SPRITE_PAD = 2;
 
 /**
  * The landed freighter seen from above (nose up), with a dark-and-amber outline and a see-through shadow so it
- * stands out on grey rock (AW-212); null if it is missing, broken or still loading.
+ * stands out on gray rock (AW-212); null if it is missing, broken or still loading.
  */
 function shipSurfaceSprite(): HTMLImageElement | null {
   if (!shipSurfaceImg && typeof Image !== "undefined") {
@@ -497,7 +497,7 @@ export interface UnknownMark {
   kind: "deposit" | "flora";
 }
 
-/** A dashed grey outline (diamond for a deposit, circle for a plant site) with a "?": something's there. */
+/** A dashed gray outline (diamond for a deposit, circle for a plant site) with a "?": something's there. */
 export function drawUnknowns(ctx: CanvasRenderingContext2D, L: Layout, marks: readonly UnknownMark[], timeMs: number): void {
   const r = Math.max(5, L.tw * 0.36);
   const glow = 0.65 + 0.2 * Math.sin(timeMs / 600);
@@ -554,7 +554,7 @@ export function drawFlora(
     ctx.beginPath();
     ctx.arc(x, y, u + 2, 0, Math.PI * 2);
     ctx.fill();
-    // Rarity ring: grey common, green uncommon, gold rare.
+    // Rarity ring: gray common, green uncommon, gold rare.
     const rarity = FLORA_BY_NAME.get(f.species)?.rarity;
     if (rarity) {
       ctx.strokeStyle = RARITY_COLOR[rarity];
@@ -809,7 +809,7 @@ function roverPoint(L: Layout, at: Vec2, shift: boolean): { x: number; y: number
 }
 
 /**
- * The rover at a canvas pixel position (a tile centre, or in between mid-drive; see `tileCenter`). `shift` nudges
+ * The rover at a canvas pixel position (a tile center, or in between mid-drive; see `tileCenter`). `shift` nudges
  * it off the ship's pad.
  * With the top-down sprite, `heading` (degrees, 0 = north, clockwise) rotates it; otherwise
  * `facing` is +1 or -1 and mirrors the side-view sprite to the direction of travel.
@@ -1136,7 +1136,7 @@ export interface CreatureMark {
   down: boolean;
 }
 
-/** Paw colours by temperament: green docile, white skittish, yellow territorial, red hostile. */
+/** Paw colors by temperament: green docile, white skittish, yellow territorial, red hostile. */
 export const TEMPERAMENT_COLOR: Record<CreatureMark["temperament"], string> = {
   docile: "#7ee787",
   skittish: "#e8edf5",
@@ -1145,7 +1145,7 @@ export const TEMPERAMENT_COLOR: Record<CreatureMark["temperament"], string> = {
 };
 
 /**
- * Creatures on swept ground: a paw on a dark disc in the temperament's colour, ringed by rarity like the plants. A
+ * Creatures on swept ground: a paw on a dark disc in the temperament's color, ringed by rarity like the plants. A
  * downed creature is greyed with a "z"; the selected one pulses.
  */
 export function drawCreatures(ctx: CanvasRenderingContext2D, L: Layout, marks: readonly CreatureMark[], selected: string | null, timeMs: number): void {

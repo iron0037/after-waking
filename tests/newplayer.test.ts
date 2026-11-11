@@ -104,7 +104,7 @@ describe("starter contracts", () => {
       }
       expect(knowledge(state, meadow.id, region).explored.length).toBeGreaterThan(0);
       expect(exploredFraction(knowledge(state, meadow.id, region))).toBeGreaterThan(0);
-      // At least the landing; the rover may also have driven in from a neighbouring region.
+      // At least the landing; the rover may also have driven in from a neighboring region.
       expect(regionRecap(state, world, meadow.id, region)?.visits).toBeGreaterThanOrEqual(1);
       expect(launch(state, world).ok).toBe(true);
     }

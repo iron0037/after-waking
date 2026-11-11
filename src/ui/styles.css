@@ -908,7 +908,7 @@ table.data th.num {
   margin: 0;
 }
 
-/* --- specimen rarity: grey common, green uncommon, gold rare ------------------------------ */
+/* --- specimen rarity: gray common, green uncommon, gold rare ------------------------------ */
 
 .rar1 {
   --rar: #8a94a6;
@@ -1039,7 +1039,7 @@ table.data th.num {
   }
 }
 
-/* Creatures (AW-216): a swatch of the species colour. */
+/* Creatures (AW-216): a swatch of the species color. */
 .creature-dot {
   font-style: normal;
   display: inline-block;

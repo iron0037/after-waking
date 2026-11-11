@@ -137,7 +137,7 @@ describe("pirates (combat v1)", () => {
     expect(wins).toBeGreaterThanOrEqual(7);
   });
 
-  it("striking your colours costs most of the hold but nothing else", () => {
+  it("striking your colors costs most of the hold but nothing else", () => {
     const world = new World(SEED);
     const state = hailed(world);
     answerHail(state, "fight");

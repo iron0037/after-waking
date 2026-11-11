@@ -10,7 +10,7 @@ export type ProbeDepth = 1 | 2 | 3 | 4;
 export interface DepthBand {
   depth: ProbeDepth;
   name: string;
-  /** Kilometres below the cloud tops (flavour). */
+  /** Kilometers below the cloud tops (flavour). */
   km: number;
   /** Chance the probe is lost, before the pilot's skill and choices. */
   risk: number;
@@ -94,7 +94,7 @@ export interface ProbeEvent {
 export const PROBE_EVENTS: readonly ProbeEvent[] = [
   {
     id: "storm",
-    text: "A storm band blocks the descent: walls of cloud moving at four hundred metres a second.",
+    text: "A storm band blocks the descent: walls of cloud moving at four hundred meters a second.",
     options: [
       { label: "Ride the downdraft", risk: 0.04, hours: -2 },
       { label: "Steer around it", risk: -0.02, hours: 3 },

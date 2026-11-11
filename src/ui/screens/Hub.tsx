@@ -1103,8 +1103,6 @@ function Shipyard({ session }: { session: GameSession }) {
         )}
       </Section>
 
-      <ShipsPanel session={session} />
-
       <section class="hub-upgrades yard-full">
         <p class="muted small hub-upkeep-note">
           Installed gear costs upkeep: {(UPKEEP_RATE_PER_DAY * 100).toFixed(2)}% of its price per day, settled with the crew's wages whenever you're back
@@ -1220,6 +1218,9 @@ function Shipyard({ session }: { session: GameSession }) {
           );
         })}
       </section>
+
+      {/* Ships come last: captains shop for gear far more often than for hulls. */}
+      <ShipsPanel session={session} />
     </div>
   );
 }

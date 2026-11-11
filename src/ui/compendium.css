@@ -16,7 +16,7 @@
   image-rendering: pixelated;
   box-shadow: inset 0 0 0 1px var(--border);
 }
-/* Not yet found: only the dark outline of the specimen, on the same panel (a pre-coloured copy of the atlas, no CSS mask). */
+/* Not yet found: only the dark outline of the specimen, on the same panel (a pre-colored copy of the atlas, no CSS mask). */
 .comp-card.unknown .comp-icon.sprite.silhouette {
   background-image: var(--comp-silhouettes);
   background-color: var(--bg);

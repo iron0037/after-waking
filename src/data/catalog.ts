@@ -1,6 +1,6 @@
 /**
  * The compendium's database: every collectible in the game, so completionists can see how much
- * of the Verge they've catalogued. Living worlds draw their flora from FLORA by climate;
+ * of the Verge they've cataloged. Living worlds draw their flora from FLORA by climate;
  * drilling sometimes turns up a MINERAL_SPECIMENS find from the ore being worked.
  *
  * Each entry will get its own pixel sprite (tools/art); until then `color` stands in.
@@ -42,7 +42,7 @@ export const FLORA: readonly FloraEntry[] = [
   // --- cold ---------------------------------------------------------------------------------
   { id: "frost-lantern", name: "frost lantern", climates: ["cold"], rarity: 1, color: "#9fe7ff", blurb: "Glowing bulbs that grow beneath clear ice, lighting their own small caverns." },
   { id: "glass-reed", name: "glass reed", climates: ["cold", "temperate"], rarity: 1, color: "#d8f3ff", blurb: "Silica-walled stalks that ring like chimes when the wind moves them." },
-  { id: "snowcap-lichen", name: "snowcap lichen", climates: ["cold"], rarity: 1, color: "#e9eef2", blurb: "Crusts the color of old snow. It grows a millimetre a decade and has all the time in the world." },
+  { id: "snowcap-lichen", name: "snowcap lichen", climates: ["cold"], rarity: 1, color: "#e9eef2", blurb: "Crusts the color of old snow. It grows a millimeter a decade and has all the time in the world." },
   { id: "needle-moss", name: "needle moss", climates: ["cold"], rarity: 1, color: "#7fb59a", blurb: "Stiff, frost-hardened tufts that puncture careless glove seams." },
   { id: "rime-fern", name: "rime fern", climates: ["cold"], rarity: 2, color: "#b4d6e6", blurb: "Its fronds collect frost in perfect geometric patterns, then drink it at noon." },
   { id: "pale-crawler", name: "pale crawler", climates: ["cold", "temperate"], rarity: 2, color: "#cfd8c8", blurb: "A creeping mat that edges toward warmth. Slowly, but measurably." },
@@ -60,7 +60,7 @@ export const FLORA: readonly FloraEntry[] = [
   { id: "thread-grass", name: "thread grass", climates: ["temperate"], rarity: 1, color: "#9cc06a", blurb: "Blades thin as hair, so dense the rover leaves tracks for a week." },
   { id: "hollow-cap", name: "hollow cap", climates: ["temperate"], rarity: 2, color: "#c9a98a", blurb: "Fungus-like domes, empty inside except for a single seed that rattles." },
   { id: "silver-fern", name: "silver fern", climates: ["temperate"], rarity: 2, color: "#c4d0d4", blurb: "Mirrored undersides that flash in the sun, turning whole hillsides to signals." },
-  { id: "drift-pod", name: "drift pod", climates: ["temperate", "warm"], rarity: 2, color: "#e7d3a1", blurb: "Seed pods lifted by little gas bladders. They follow the wind for hundreds of kilometres." },
+  { id: "drift-pod", name: "drift pod", climates: ["temperate", "warm"], rarity: 2, color: "#e7d3a1", blurb: "Seed pods lifted by little gas bladders. They follow the wind for hundreds of kilometers." },
   { id: "coil-bloom", name: "coil bloom", climates: ["temperate"], rarity: 2, color: "#e58fb4", blurb: "A flower that unrolls like a spring at dawn and snaps shut at dusk." },
   { id: "cradle-tree", name: "cradle tree", climates: ["temperate"], rarity: 3, color: "#7a9e4f", blurb: "A knee-high tree whose branches curl into nests. Something used them once." },
   { id: "song-moss", name: "song moss", climates: ["temperate"], rarity: 3, color: "#8fd1b8", blurb: "Vibrates at a steady 432 hertz. The Covenant has opinions about why." },
@@ -70,7 +70,7 @@ export const FLORA: readonly FloraEntry[] = [
   { id: "brine-reed", name: "brine reed", climates: ["warm", "temperate"], rarity: 1, color: "#9ab89a", blurb: "Thrives in salt flats, sweating crystals from its stems." },
   { id: "heat-mat", name: "heat mat", climates: ["warm"], rarity: 1, color: "#b0703c", blurb: "A low, leathery carpet that cracks into hexagons in the dry season." },
   { id: "glasswing-bloom", name: "glasswing bloom", climates: ["warm"], rarity: 2, color: "#b4e6f0", blurb: "Petals thin enough to see through, veined like insect wings." },
-  { id: "smoke-fern", name: "smoke fern", climates: ["warm"], rarity: 2, color: "#8e8a86", blurb: "Releases a grey haze of spores when disturbed. Seal your suit." },
+  { id: "smoke-fern", name: "smoke fern", climates: ["warm"], rarity: 2, color: "#8e8a86", blurb: "Releases a gray haze of spores when disturbed. Seal your suit." },
   { id: "dune-runner", name: "dune runner", climates: ["warm"], rarity: 2, color: "#d4b483", blurb: "A tumbleweed that rolls uphill. The Lyceum has three theories and no proof." },
   { id: "pyre-lily", name: "pyre lily", climates: ["warm"], rarity: 3, color: "#ff7a3d", blurb: "Blooms only after wildfire, from seeds that wait decades for the heat." },
   { id: "mirror-palm", name: "mirror palm", climates: ["warm"], rarity: 3, color: "#d6e2e6", blurb: "Fronds coated in a reflective wax so perfect it looks machined." },
@@ -91,14 +91,14 @@ export const FLORA: readonly FloraEntry[] = [
 ];
 
 export const MINERAL_SPECIMENS: readonly MineralSpecimen[] = [
-  { id: "banded-geode", name: "banded iron geode", host: "ironNickel", rarity: 1, color: "#9a5b44", blurb: "Stripes of rust and steel-grey, laid down over ages of ancient seas." },
+  { id: "banded-geode", name: "banded iron geode", host: "ironNickel", rarity: 1, color: "#9a5b44", blurb: "Stripes of rust and steel-gray, laid down over ages of ancient seas." },
   { id: "meteoric-lattice", name: "meteoric lattice", host: "ironNickel", rarity: 2, color: "#b7b3ad", blurb: "Iron-nickel etched with crossing crystal bands that only form cooling in space." },
   { id: "copper-dendrite", name: "native copper dendrite", host: "copper", rarity: 1, color: "#d2804a", blurb: "Pure copper grown in fern-like branches through the rock." },
   { id: "malachite-rosette", name: "malachite rosette", host: "copper", rarity: 2, color: "#3fae7a", blurb: "Concentric green rings, polished smooth by groundwater." },
   { id: "rutile-needles", name: "rutile needle crystal", host: "titanium", rarity: 1, color: "#c9874a", blurb: "Golden needles of titanium oxide caught in clear quartz." },
   { id: "star-ilmenite", name: "star ilmenite", host: "titanium", rarity: 3, color: "#5a5e66", blurb: "A black crystal that throws a six-rayed star when you turn it in the light." },
   { id: "monazite-pearl", name: "monazite sand pearl", host: "rareEarths", rarity: 1, color: "#d9b07a", blurb: "Rounded grains of rare-earth phosphate, heavy for their size." },
-  { id: "bastnasite-prism", name: "bastnäsite prism", host: "rareEarths", rarity: 2, color: "#e0a87a", blurb: "A honey-coloured prism, glassy and almost too regular." },
+  { id: "bastnasite-prism", name: "bastnäsite prism", host: "rareEarths", rarity: 2, color: "#e0a87a", blurb: "A honey-colored prism, glassy and almost too regular." },
   { id: "pitchblende-nodule", name: "pitchblende nodule", host: "uranium", rarity: 1, color: "#3a3a32", blurb: "Black, greasy, heavy, and hot on the dosimeter. Kept in lead." },
   { id: "autunite-plate", name: "autunite glow-plate", host: "uranium", rarity: 3, color: "#c8f04a", blurb: "Thin yellow-green plates that fluoresce under the cabin's UV lamp." },
   { id: "platinum-nugget", name: "platinum nugget", host: "platinum", rarity: 1, color: "#e6e1ff", blurb: "Water-worn and heavy, the kind prospectors on Earth once dreamed about." },

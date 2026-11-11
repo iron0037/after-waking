@@ -90,7 +90,7 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
   const rnd = stream(h("art"));
   const liquidWorld = body.surface === "liquid";
   // A global ocean has no dry land at all: sea level above every peak (depth still shades the water).
-  // Worlds with exotic seas (methane, ammonia, acid) have lowland seas in the sea's own colour (AW-189).
+  // Worlds with exotic seas (methane, ammonia, acid) have lowland seas in the sea's own color (AW-189).
   const sea = liquidWorld ? 1.05 : body.sea ? 0.44 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
   const capLat = body.tempC > 45 ? 9 : Math.max(0.3, Math.min(1.42, 1.45 - (15 - body.tempC) * 0.025));
   const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
@@ -236,7 +236,7 @@ function drawCraters(g: CanvasRenderingContext2D, seed: number, body: Body, size
     if (z < 0.12) continue;
     const x = R + R * Math.cos(lat) * Math.sin(lon);
     const y = R - R * Math.sin(lat);
-    // Squash along the direction to the centre.
+    // Squash along the direction to the center.
     const ang = Math.atan2(y - R, x - R);
     g.beginPath();
     g.ellipse(x, y, rad, rad * Math.max(0.25, z), ang, 0, Math.PI * 2);

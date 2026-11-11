@@ -21,7 +21,7 @@ export function useArchiveTopic(session: GameSession, trigger: ArchiveTrigger, a
 /**
  * `floating`: a window is open over the game (an encounter, the journal, a dive...). Normally the card is a strip docked
  * between the screen and the journal footer, so it takes room instead of covering anything; over a window it
- * floats in the left margin, above the dimmed overlay, where the centred window leaves room.
+ * floats in the left margin, above the dimmed overlay, where the centered window leaves room.
  */
 export function ArchivePanel({ session, floating }: { session: GameSession; floating: boolean }) {
   useSession(session);

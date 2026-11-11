@@ -128,7 +128,7 @@ function live(state: GameState, bodyId: string, spawn: SurfaceCreature): LiveCre
 export function creaturesNear(state: GameState, world: World, bodyId: string, center: Vec2, radius: number): LiveCreature[] {
   const surface = world.surface(bodyId);
   const out: LiveCreature[] = [];
-  // Creatures can roam into a neighbouring region, so look a leash further than asked.
+  // Creatures can roam into a neighboring region, so look a leash further than asked.
   for (const region of surface.regionsNear(center, radius + LEASH + 2)) {
     for (const spawn of surface.creatures(region)) {
       const c = live(state, bodyId, spawn);
@@ -397,7 +397,7 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
     const perInjury = c.entry.danger > 0 ? Math.min(0.6, perBite / 25) : 0;
     injuryRisk = 1 - Math.pow(1 - perInjury, rounds * (0.6 - dodge));
     wreckRisk = Math.max(0, Math.min(0.7, expectedDamage / Math.max(1, hull) - 0.6));
-    if (expectedDamage > hull * 0.6) notes.push("It bites harder than the plating can take for long: armour would help.");
+    if (expectedDamage > hull * 0.6) notes.push("It bites harder than the plating can take for long: armor would help.");
     return expectedDamage;
   };
 

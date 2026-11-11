@@ -1,5 +1,5 @@
 /**
- * Rover routing on hex terrain: cheapest path by travel time (A* over six neighbours). Works on
+ * Rover routing on hex terrain: cheapest path by travel time (A* over six neighbors). Works on
  * any TileSource, so routes run across region borders on the planet-wide surface.
  */
 import type { TileSource } from "./bodysurface";

@@ -38,7 +38,7 @@ export function orbitSummary(detail: SystemDetail, body: Body): string {
   return `Orbits ${detail.system.name} at ${fmtAU(body.orbitAU)} AU · period ${period}`;
 }
 
-/** The captain's own name for a world, shown under the catalogue name with a "Name it" control. */
+/** The captain's own name for a world, shown under the catalog name with a "Name it" control. */
 function NicknameLine({ session, body }: { session: GameSession; body: Body }) {
   const current = bodyNickname(session.state, body);
   const [editing, setEditing] = useState(false);

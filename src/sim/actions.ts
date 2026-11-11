@@ -884,12 +884,12 @@ export function sensorSweep(state: GameState, bodyId: string): SensorSweep {
   };
 }
 
-/** Would a sweep centred at `center` detect this deposit? */
+/** Would a sweep centered at `center` detect this deposit? */
 export function detectsDeposit(sweep: SensorSweep, center: Vec2, d: { x: number; y: number; hidden?: boolean }): boolean {
   return (!d.hidden || sweep.hiddenSeams) && hexDistance(d, center) <= sweep.depositRange;
 }
 
-/** Would a sweep centred at `center` detect this plant site? */
+/** Would a sweep centered at `center` detect this plant site? */
 export function detectsFlora(sweep: SensorSweep, center: Vec2, f: { x: number; y: number; hidden?: boolean }): boolean {
   return (!f.hidden || sweep.hiddenFlora) && hexDistance(f, center) <= sweep.floraRange;
 }

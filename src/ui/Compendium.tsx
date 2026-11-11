@@ -82,7 +82,7 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
         <div class="journal-head">
           <h2>Compendium</h2>
           <span class="muted">
-            {totals.all.found} / {totals.all.total} catalogued
+            {totals.all.found} / {totals.all.total} cataloged
           </span>
           <button class="btn" onClick={onClose}>
             Close
@@ -141,7 +141,7 @@ export function Compendium({ session, onClose }: { session: GameSession; onClose
           )}
           {tab === "artifacts" && (
             <p class="muted">
-              Ruins and derelicts haven't been found in the Verge yet. When they are, what you recover will be catalogued here.
+              Ruins and derelicts haven't been found in the Verge yet. When they are, what you recover will be cataloged here.
             </p>
           )}
         </div>

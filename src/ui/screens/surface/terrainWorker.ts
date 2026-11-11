@@ -56,7 +56,7 @@ export interface RegionPayload {
 export interface BuiltMessage {
   type: "built";
   id: number;
-  /** Whether the terrain was drawn with the textures (false: flat palette colours). */
+  /** Whether the terrain was drawn with the textures (false: flat palette colors). */
   textured: boolean;
   /** Set when the region could not be built. */
   failed?: boolean;

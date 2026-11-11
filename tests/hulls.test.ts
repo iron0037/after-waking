@@ -70,7 +70,7 @@ describe("the starter freighter only grows so far", () => {
 });
 
 describe("buying a hull", () => {
-  it("needs the builder's friendship and the cash, and berths the ship fuelled", () => {
+  it("needs the builder's friendship and the cash, and berths the ship fueled", () => {
     const s = newGame({ seed: 42 });
     s.credits = 1_000_000;
     expect(hullBlockers(s, "bulker").join()).toMatch(/friends/);

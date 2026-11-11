@@ -42,15 +42,15 @@ export const CLUES: readonly Clue[] = [
   {
     id: "missing-world",
     title: "The missing world",
-    hint: "The Covenant's old catalogue lists a world the Helm's charts don't.",
-    found: "Where the first-year catalogue listed a world, you found an orbit with nothing in it: no debris, no dust, a perfectly circular lane of empty space.",
+    hint: "The Covenant's old catalog lists a world the Helm's charts don't.",
+    found: "Where the first-year catalog listed a world, you found an orbit with nothing in it: no debris, no dust, a perfectly circular lane of empty space.",
     covenant: "\"Worlds don't leave. They get removed. And whatever removed it tidied up afterwards.\"",
   },
   {
     id: "signal",
     title: "The impossible signal",
     hint: "Someone should listen on 432 hertz out past the charted stars.",
-    found: "A carrier on 432 hertz from no source at all, repeating a pattern your comms officer recognised: the Intrepid's own maintenance codes, from before the anomaly.",
+    found: "A carrier on 432 hertz from no source at all, repeating a pattern your comms officer recognized: the Intrepid's own maintenance codes, from before the anomaly.",
     covenant: "\"Nobody out here should know those codes. Unless they were never out here at all.\"",
   },
   {
@@ -106,7 +106,7 @@ export const ERRANDS: readonly ErrandDef[] = [
     kind: "missing-world",
     clue: "missing-world",
     title: "Count the worlds at {star}",
-    ask: "\"Our copy of the first-year catalogue lists one more world at {star} than the Helm's charts do. The Helm says it was a clerical error. Go and look where it should be.\"",
+    ask: "\"Our copy of the first-year catalog lists one more world at {star} than the Helm's charts do. The Helm says it was a clerical error. Go and look where it should be.\"",
     action: "Search the empty orbit",
     hours: 8,
     afterClues: 1,

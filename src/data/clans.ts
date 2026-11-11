@@ -85,7 +85,7 @@ export const CAPTAIN_CLANS: Record<ClanId, CaptainClan> = {
   },
   helm: {
     perk: "Fold-drive refits 15% faster, and Helm's charts of three more stars come with you.",
-    cost: "Helm colours draw raiders: pirates hail you 20% more often.",
+    cost: "Helm colors draw raiders: pirates hail you 20% more often.",
     mods: { foldRefit: 0.85, raidChance: 1.2 },
   },
   midshipmen: {

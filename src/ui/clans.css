@@ -26,7 +26,7 @@
   margin-left: 4px;
 }
 
-/* tier colours: hostile red, cool amber, neutral grey, friendly green, trusted bright */
+/* tier colors: hostile red, cool amber, neutral gray, friendly green, trusted bright */
 .tier-hostile { --tier: var(--danger); }
 .tier-cool { --tier: var(--accent); }
 .tier-neutral { --tier: var(--muted); }

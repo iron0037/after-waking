@@ -198,7 +198,7 @@ const ZOOM_STEP = 1.6;
 const MIN_HEX_PX = 2.5;
 /** Time constant (ms) of the camera easing toward the rover while following. */
 const FOLLOW_MS = 90;
-/** While not following, a drive that takes the rover this close to the view's edge (px) re-centres the camera. */
+/** While not following, a drive that takes the rover this close to the view's edge (px) re-centers the camera. */
 const EDGE_PX = 48;
 
 /** Compass heading (0 = north, clockwise) of a single hex step; null if the tiles aren't adjacent. */
@@ -216,7 +216,7 @@ interface Hover {
 
 /**
  * The map camera. `center` is in unit hex-pixel space (hexToPixel(x, y, 1)); `zoom` multiplies the size at
- * which one region fills the view. While `follow` is on, the centre eases toward the rover (or the ship).
+ * which one region fills the view. While `follow` is on, the center eases toward the rover (or the ship).
  */
 interface Camera {
   center: Vec2;
@@ -327,8 +327,8 @@ function sensedSites(state: GameState, surface: BodySurface, bodyId: string, reg
   return out;
 }
 
-/** A region and its (up to eight) neighbours on the surface grid. */
-function regionAndNeighbours(surface: BodySurface, region: number): number[] {
+/** A region and its (up to eight) neighbors on the surface grid. */
+function regionAndNeighbors(surface: BodySurface, region: number): number[] {
   const o = surface.origin(region);
   const out: number[] = [];
   for (let dy = -1; dy <= 1; dy++) {
@@ -635,7 +635,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   /**
    * Drive to a tile. With `approach` (deposits and plants) the rover goes onto the site itself, even when
-   * it is already beside it; it settles for the nearest open neighbour only if the site can't be entered.
+   * it is already beside it; it settles for the nearest open neighbor only if the site can't be entered.
    * Resolves true once the rover is there.
    */
   const driveTo = async (target: Vec2, approach: boolean, quiet = false): Promise<boolean> => {
@@ -681,7 +681,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const hd = headingRef.current;
     const cam = camRef.current;
 
-    // Where the rover is (unit hex-pixel space): mid-drive it slides between hex centres along the path.
+    // Where the rover is (unit hex-pixel space): mid-drive it slides between hex centers along the path.
     let tile: Vec2 | null = rover ? { x: rover.x, y: rover.y } : null;
     let roverUnit: Vec2 | null = tile ? unitPos(tile) : null;
     let spent = 0;
@@ -757,8 +757,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // The active region first, so it is never the one left waiting for the build budget.
     const order = [...regions].sort((a, b) => (a.region === active ? -1 : b.region === active ? 1 : 0));
     for (const r of order) {
-      // Each image borrows a tile of fog from its neighbours, so their sweeps are part of its signature.
-      const sig = regionAndNeighbours(surface, r.region)
+      // Each image borrows a tile of fog from its neighbors, so their sweeps are part of its signature.
+      const sig = regionAndNeighbors(surface, r.region)
         .map((n) => `${n}:${sigOf(n)}`)
         .join("|");
       const img = cache.painted(r.region, sig, explored, r.region === active);
@@ -1178,7 +1178,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       return;
     }
     if (key === "h") {
-      // Home: centre the map on the ship, as a list click centres on a deposit.
+      // Home: center the map on the ship, as a list click centers on a deposit.
       if (session.state.encounter || session.encounterDebrief) return;
       if (rover) centreOn(ship);
       else setFollowing(true); // no rover out: the camera already follows the ship, so just pick it back up
@@ -1625,7 +1625,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </table>
               <div class="muted small tbl-note">
                 Everything found on this world, nearest first. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a row to select it and
-                centre the map; click it again to deselect.
+                center the map; click it again to deselect.
               </div>
               <div class="flora-legend-row">
                 <RarityLegend />
@@ -1732,7 +1732,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               </table>
               <div class="muted small tbl-note">
                 Everything found on this world. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort;
-                click a row to select it and centre the map, again to deselect. Hover a commodity for its last known price at the Intrepid.
+                click a row to select it and center the map, again to deselect. Hover a commodity for its last known price at the Intrepid.
               </div>
             </Section>
           );

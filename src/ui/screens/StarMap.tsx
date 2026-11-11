@@ -398,7 +398,7 @@ export function StarMap({ session }: { session: GameSession }) {
     view.current.userMoved = false;
   };
 
-  // H = home: centre on the ship (the same as the button). A ref so the listener always sees the current position.
+  // H = home: center on the ship (the same as the button). A ref so the listener always sees the current position.
   const centerRef = useRef(centerOnShip);
   centerRef.current = centerOnShip;
 
@@ -688,7 +688,7 @@ export function StarMap({ session }: { session: GameSession }) {
     const zone = emergenceZone(world);
     if (!zone) return;
     const v = view.current;
-    const [x, y] = toScreen(zone.centre);
+    const [x, y] = toScreen(zone.center);
     const r = zone.r * v.scale;
     ctx.save();
     ctx.beginPath();
@@ -1131,7 +1131,7 @@ export function StarMap({ session }: { session: GameSession }) {
             <span class="sm-blind">···</span> blind range · <span class="sm-anomaly">◎</span> deep site · <span class="sm-faint">?</span> faint return
           </div>
         </div>
-        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · H: home (centre on ship) · Esc: clear</div>
+        <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · H: home (center on ship) · Esc: clear</div>
       </div>
 
       <aside class="side">

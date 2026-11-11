@@ -171,7 +171,7 @@ export const ARCHIVE: readonly ArchiveEntry[] = [
     trigger: "specimens",
     title: "Living specimens",
     text:
-      "Life sampled from the surface is kept alive in the ship's racks. The Lyceum buys specimens, and pays extra for each species it has not yet catalogued. Contracts and research may ask for particular species: keep those aboard.",
+      "Life sampled from the surface is kept alive in the ship's racks. The Lyceum buys specimens, and pays extra for each species it has not yet cataloged. Contracts and research may ask for particular species: keep those aboard.",
   },
   {
     id: "probe",
@@ -206,7 +206,7 @@ export const ARCHIVE: readonly ArchiveEntry[] = [
     trigger: "raider",
     title: "Raiders",
     text:
-      "Raiders prey on laden freighters, as you fold out of a system or along a burn within it. They size you up first: a well-armed ship is seldom troubled. You may pay, talk, run or fight. A captain who strikes their colours loses most of the hold but keeps the ship and the crew. Your officers can fight or flee for you if you prefer.",
+      "Raiders prey on laden freighters, as you fold out of a system or along a burn within it. They size you up first: a well-armed ship is seldom troubled. You may pay, talk, run or fight. A captain who strikes their colors loses most of the hold but keeps the ship and the crew. Your officers can fight or flee for you if you prefer.",
   },
   {
     id: "damage",

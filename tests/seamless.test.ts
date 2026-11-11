@@ -9,7 +9,7 @@ import { newGame, type GameState } from "../src/sim/state";
 import { REGION_SIZE } from "../src/sim/surface";
 import { World } from "../src/sim/world";
 
-/** Land on the first easy world in s0 that has a region with a right-hand neighbour. */
+/** Land on the first easy world in s0 that has a region with a right-hand neighbor. */
 function landNearBorder(seed: number): { state: GameState; world: World; bodyId: string; region: number } {
   const world = new World(seed);
   const state = newGame({ seed });
@@ -36,7 +36,7 @@ describe("seamless planet surface (AW-78)", () => {
       expect(surface.regionAt(o.x, o.y)).toBe(r);
       expect(surface.regionAt(o.x + REGION_SIZE - 1, o.y + REGION_SIZE - 1)).toBe(r);
     }
-    // Elevation is sampled from one planet-wide field, so neighbours across a border are close.
+    // Elevation is sampled from one planet-wide field, so neighbors across a border are close.
     const o1 = surface.origin(1);
     let jump = 0;
     for (let y = o1.y; y < o1.y + REGION_SIZE; y++) {

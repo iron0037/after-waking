@@ -1,5 +1,5 @@
 /**
- * Worlds the captain has given their own names (AW-147). Catalogue names stay as they are; the
+ * Worlds the captain has given their own names (AW-147). Catalog names stay as they are; the
  * nickname shows beneath them, like the scouts' "the Meadow".
  */
 import type { Body } from "./bodies";

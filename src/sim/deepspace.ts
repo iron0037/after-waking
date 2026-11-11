@@ -129,8 +129,8 @@ export interface DeepScanResult {
   radius: number;
 }
 
-/** Where a sweep is centred: the deep-space point, or the star system you're in. */
-export function scanCentre(state: GameState, world: World): Vec2 | null {
+/** Where a sweep is centered: the deep-space point, or the star system you're in. */
+export function scanCenter(state: GameState, world: World): Vec2 | null {
   const loc = state.location;
   if (loc.kind === "deep") return loc.pos;
   if (loc.kind === "space") return world.galaxy.systems.find((s) => s.id === loc.systemId)?.pos ?? null;
@@ -142,7 +142,7 @@ export function deepScanBlockers(state: GameState, world: World): string[] {
   const out: string[] = [];
   if (effectiveStats(state).deepScanLy <= 0) out.push("Needs a deep-field array (the Lyceum sells them at the Shipyard).");
   if (state.encounter) out.push("A raider has you under its guns.");
-  if (!scanCentre(state, world)) out.push(state.location.kind === "surface" ? "Launch from the surface first." : "Undock first: the Intrepid's own noise swamps the array.");
+  if (!scanCenter(state, world)) out.push(state.location.kind === "surface" ? "Launch from the surface first." : "Undock first: the Intrepid's own noise swamps the array.");
   return out;
 }
 
@@ -153,16 +153,16 @@ export function deepScanBlockers(state: GameState, world: World): string[] {
 export function scanDeep(state: GameState, world: World): Result<DeepScanResult> {
   const blockers = deepScanBlockers(state, world);
   if (blockers.length > 0) return fail(blockers[0] as string);
-  const centre = scanCentre(state, world) as Vec2;
+  const center = scanCenter(state, world) as Vec2;
   const radius = effectiveStats(state).deepScanLy;
   advanceTime(state, DEEP_SCAN_MINUTES);
   state.deepScans ??= [];
-  state.deepScans.push({ x: centre.x, y: centre.y, r: radius, t: state.time });
+  state.deepScans.push({ x: center.x, y: center.y, r: radius, t: state.time });
   state.deepKnown ??= {};
   const found: DeepSite[] = [];
   let faint = 0;
   for (const site of deepSites(world)) {
-    const d = dist(site.pos, centre);
+    const d = dist(site.pos, center);
     if (d <= radius) {
       if (state.deepKnown[site.id] !== "known") found.push(site);
       state.deepKnown[site.id] = "known";
@@ -217,14 +217,14 @@ export const EMERGENCE_RADIUS_LY = 5;
  * Where the Intrepid came out of the anomaly, from its own navigation log (AW-200): a free, true
  * first lead. The mouth has drifted since, but it is still inside this circle.
  */
-export function emergenceZone(world: World): { centre: Vec2; r: number } | null {
+export function emergenceZone(world: World): { center: Vec2; r: number } | null {
   const mouth = deepSites(world).find((s) => s.kind === "anomaly");
   if (!mouth) return null;
   const rng = rngFor(world.seed, "deep", "emergence");
   const a = rng.range(0, Math.PI * 2);
   const off = rng.range(0.8, EMERGENCE_RADIUS_LY - 1.5);
-  const centre = { x: Math.round((mouth.pos.x + Math.cos(a) * off) * 10) / 10, y: Math.round((mouth.pos.y + Math.sin(a) * off) * 10) / 10 };
-  return { centre, r: EMERGENCE_RADIUS_LY };
+  const center = { x: Math.round((mouth.pos.x + Math.cos(a) * off) * 10) / 10, y: Math.round((mouth.pos.y + Math.sin(a) * off) * 10) / 10 };
+  return { center, r: EMERGENCE_RADIUS_LY };
 }
 
 /** The Helm hands over the emergence record to any captain with a deep-field array. */

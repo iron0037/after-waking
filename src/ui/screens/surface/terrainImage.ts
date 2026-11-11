@@ -1,5 +1,5 @@
 /**
- * Renders each region's terrain once into offscreen images: every hex filled with its terrain colour and
+ * Renders each region's terrain once into offscreen images: every hex filled with its terrain color and
  * hillshaded relief. The images are drawn at a fixed hex size (`HEX`) and scaled to the screen when blitted.
  *
  * The pixel work (terrainPixels.ts) is slow, so `TerrainCache` runs it in a Web Worker (terrainWorker.ts) and
@@ -7,8 +7,8 @@
  * pixels synchronously on the main thread.
  *
  * Images live in planet-wide "HEX pixel" space (hexToPixel(gx, gy, HEX)). Each one covers its region plus a
- * one-tile margin borrowed from the neighbours, and sits on whole-pixel offsets of that shared space, so
- * neighbouring images overlap pixel for pixel and the seams between regions don't show.
+ * one-tile margin borrowed from the neighbors, and sits on whole-pixel offsets of that shared space, so
+ * neighboring images overlap pixel for pixel and the seams between regions don't show.
  */
 import type { BodyKind, BodySurface } from "../../../sim";
 import { hexCorners } from "../../../sim";
@@ -63,7 +63,7 @@ export function buildTerrainImage(surface: BodySurface, region: number, kind: Bo
   return pixelsToImage(computeTerrainPixels(surface, region, kind));
 }
 
-/** Offsets of a hexagon's six corners from its centre, at the size the swept-ground clip uses (a hair oversized so neighbours leave no seams). */
+/** Offsets of a hexagon's six corners from its center, at the size the swept-ground clip uses (a hair oversized so neighbors leave no seams). */
 const CLIP_SIZE = HEX + 0.6;
 const CLIP_DX: number[] = [];
 const CLIP_DY: number[] = [];
@@ -94,7 +94,7 @@ export function composeFromMask(terrain: RegionImage, fogged: RegionImage, surfa
   const ctx = canvas.getContext("2d");
   if (!ctx) return out;
   ctx.drawImage(fogged.canvas, 0, 0);
-  // All swept hexes as one clip (a hair oversized so neighbours leave no seams), then the colour image through it.
+  // All swept hexes as one clip (a hair oversized so neighbors leave no seams), then the color image through it.
   // (The corner maths is inlined: this runs for thousands of hexes whenever the rover sweeps new ground.)
   const { x0, y0, x1, y1 } = tileRange(surface, terrain.region);
   const w = x1 - x0 + 1;
@@ -474,14 +474,14 @@ export class TerrainCache {
     this.pump();
   }
 
-  /** Full-colour terrain of a region (null if it isn't built yet: it is on its way, or the frame's budget is spent). */
+  /** Full-color terrain of a region (null if it isn't built yet: it is on its way, or the frame's budget is spent). */
   terrain(region: number, force = false): RegionImage | null {
     return this.entry(region, force)?.terrain ?? null;
   }
 
   private compose(e: CacheEntry, region: number, sig: string, explored: (gx: number, gy: number) => boolean): RegionImage {
     if (!e.painted || e.paintedSig !== sig) {
-      // The signature covers the neighbours' whole fog; only the tiles this image shows matter.
+      // The signature covers the neighbors' whole fog; only the tiles this image shows matter.
       const mask = exploredMask(this.surface, region, explored);
       if (!e.painted || !e.paintedMask || !sameMask(mask, e.paintedMask)) {
         e.painted = composeFromMask(e.terrain, e.fogged, this.surface, mask);

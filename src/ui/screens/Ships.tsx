@@ -195,7 +195,7 @@ function HullCard({ session, hull }: { session: GameSession; hull: Hull }) {
           </li>
         ))}
       </ul>
-      <button class="btn" disabled={blockers.length > 0} title={blockers[0] ?? `Buy for ${cr(price)}. She's berthed here, fuelled.`} onClick={() => session.act((s) => buyHull(s, hull.id))}>
+      <button class="btn" disabled={blockers.length > 0} title={blockers[0] ?? `Buy for ${cr(price)}. She's berthed here, fueled.`} onClick={() => session.act((s) => buyHull(s, hull.id))}>
         Buy
       </button>
       {blockers.length > 0 && <div class="muted small">{blockers[0]}</div>}

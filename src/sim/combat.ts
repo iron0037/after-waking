@@ -582,7 +582,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
 
   if (orders.comms === "strike") {
     const lost = takeShare(state, 0.7);
-    return ok({ lines, result: finish(state, "surrendered", `You strike your colours. The ${e.raiderName}'s crew strip ${lost.toFixed(1)} t from the hold and let you go.`, lost, 0) });
+    return ok({ lines, result: finish(state, "surrendered", `You strike your colors. The ${e.raiderName}'s crew strip ${lost.toFixed(1)} t from the hold and let you go.`, lost, 0) });
   }
 
   const nav = stationLevel(state, "navigation");
@@ -595,7 +595,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
 
   // 1. Maneuver: opposite wishes are settled by speed.
   const want = (h: Orders["helm"]) => (h === "close" ? -1 : h === "open" ? 1 : 0);
-  // Wrecked drives can't manoeuvre at all (AW-221).
+  // Wrecked drives can't maneuver at all (AW-221).
   const mine = me.damage.drives >= 100 ? 0 : want(orders.helm);
   const theirs = them.damage.drives >= 100 ? 0 : want(theirHelm);
   // Evasive Pilot (navigation) wins more maneuvers; Overdrive (engineering) pushes the drives when breaking away.
@@ -619,7 +619,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
       move = mine !== 0 ? mine : theirs;
       winner = mine !== 0 && theirs !== 0 ? "both" : mine !== 0 ? "me" : "them";
     } else {
-      say(mine !== 0 ? "Your damaged drives can't make the manoeuvre." : `The ${e.raiderName}'s damaged drives can't make the manoeuvre.`);
+      say(mine !== 0 ? "Your damaged drives can't make the maneuver." : `The ${e.raiderName}'s damaged drives can't make the maneuver.`);
     }
   }
   const before = e.range;
@@ -682,7 +682,7 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   saveDamage(state, me);
 
   // 5. Endings.
-  if (them.hull <= 0) return ok({ lines, result: won(state, `The ${e.raiderName}'s reactor scrams. ${e.captain} strikes their colours.`) });
+  if (them.hull <= 0) return ok({ lines, result: won(state, `The ${e.raiderName}'s reactor scrams. ${e.captain} strikes their colors.`) });
   if (me.hull <= 0) {
     injureCrew(state, { cause: `hurt when the ${e.raiderName} boarded`, weights: OVERWHELMED_SEVERITY, lighten: hasPerk(state, "combat-medic") ? 1 : 0 });
     const lost = takeShare(state, 0.7);
@@ -691,10 +691,10 @@ export function combatTurn(state: GameState, orders: Orders): Result<TurnReport>
   const beaten = them.hull / them.hullMax < e.nerve || them.damage.weapons >= 70;
   if (orders.comms === "demand") {
     awardXp(state, "comms", 2);
-    if (beaten && withRng(state, (rng) => rng.next()) < 0.5 + 0.04 * comms) return ok({ lines, result: won(state, `"Enough!" ${e.captain} strikes their colours.`) });
+    if (beaten && withRng(state, (rng) => rng.next()) < 0.5 + 0.04 * comms) return ok({ lines, result: won(state, `"Enough!" ${e.captain} strikes their colors.`) });
     say(beaten ? `${e.captain} isn't ready to quit.` : `${e.captain} laughs at your demand.`);
   } else if (them.hull / them.hullMax < e.nerve / 2 && withRng(state, (rng) => rng.next()) < 0.5) {
-    return ok({ lines, result: won(state, `Holed and burning, the ${e.raiderName} strikes its colours.`) });
+    return ok({ lines, result: won(state, `Holed and burning, the ${e.raiderName} strikes its colors.`) });
   }
   if (e.turn >= 20) return ok({ lines, result: finish(state, "driven off", `After a long fight the ${e.raiderName} gives up and fades into the glare.`, 0, 0) });
   return ok({ lines, result: null });
@@ -877,8 +877,8 @@ export function orderAdvice(state: GameState): OrderAdvice {
   const noGuns = me.damage.weapons >= 100 || me.laser + me.kinetic <= 0;
 
   if (me.damage.drives >= 100) {
-    advice.helm.close = "Your drives are dead: you can't manoeuvre.";
-    advice.helm.open = "Your drives are dead: you can't manoeuvre.";
+    advice.helm.close = "Your drives are dead: you can't maneuver.";
+    advice.helm.open = "Your drives are dead: you can't maneuver.";
   } else if (e.range === 0) {
     advice.helm.close = "Already at close range.";
   }

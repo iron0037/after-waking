@@ -1,10 +1,10 @@
 /**
- * The pixel work behind the surface map's terrain images: every hex filled with its terrain colour and hillshaded
+ * The pixel work behind the surface map's terrain images: every hex filled with its terrain color and hillshaded
  * relief, in planet-wide "HEX pixel" space (hexToPixel(gx, gy, HEX)). DOM-free, so it runs on the main thread (the
  * synchronous fallback) or inside the terrain worker (terrainWorker.ts) with identical results.
  *
- * Each image covers its region plus a one-tile margin borrowed from the neighbours, and sits on whole-pixel offsets
- * of that shared space, so neighbouring images overlap pixel for pixel and the seams between regions don't show.
+ * Each image covers its region plus a one-tile margin borrowed from the neighbors, and sits on whole-pixel offsets
+ * of that shared space, so neighboring images overlap pixel for pixel and the seams between regions don't show.
  */
 import type { BodyKind, BodySurface } from "../../../sim";
 import { hexToPixel, REGION_SIZE, Terrain } from "../../../sim";
@@ -28,7 +28,7 @@ export const HEX = 14;
 const SQRT3 = Math.sqrt(3);
 /** Vertical spacing of hex rows in unit-width "world" space. */
 const ROW_H = SQRT3 / 2;
-/** Tiles of neighbouring regions painted around each region image (so the images overlap at the seams). */
+/** Tiles of neighboring regions painted around each region image (so the images overlap at the seams). */
 const MARGIN = 1;
 /** Extra elevation samples beyond the margin that the hillshade's slope reads. */
 const ELEV_PAD = MARGIN + 2;
@@ -50,9 +50,9 @@ const seaNodes = new WeakMap<BodySurface, Map<number, number>>();
 
 /**
  * Sea level read off the map itself: the sim's liquid line drifts by up to +-0.15 across a planet, so the elevation
- * where land meets liquid is measured (at each shore, midway between the liquid tile and its land neighbour) and
+ * where land meets liquid is measured (at each shore, midway between the liquid tile and its land neighbor) and
  * averaged around a lattice node. NaN where there are no shores in reach. Depends only on the surface, never on the
- * region being drawn, so neighbouring images agree.
+ * region being drawn, so neighboring images agree.
  */
 function seaNode(surface: BodySurface, ni: number, nj: number): number {
   let cache = seaNodes.get(surface);
@@ -147,7 +147,7 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
   const height = Math.max(1, py1 - py0);
   const data = new Uint8ClampedArray(width * height * 4);
   const out: RegionPixels = { x: px0, y: py0, region, width, height, data };
-  // A world with an exotic sea paints its liquid in the sea's colour (data/seas.ts, AW-189).
+  // A world with an exotic sea paints its liquid in the sea's color (data/seas.ts, AW-189).
   const seaKind = surface.body.sea;
   const palette = TERRAIN_COLORS[kind].map(parseHex);
   if (seaKind) palette[Terrain.liquid] = parseHex(terrainHex(kind, Terrain.liquid, seaKind));
@@ -161,7 +161,7 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
   const hasSea = kind === "terrestrial" || kind === "ocean" || seaKind !== undefined;
   const image = { data };
 
-  // Elevation around the region (with a pad from the neighbours, so the hillshade runs on across the seams).
+  // Elevation around the region (with a pad from the neighbors, so the hillshade runs on across the seams).
   const span = REGION_SIZE + 2 * ELEV_PAD;
   const ex0 = o.x - ELEV_PAD;
   const ey0 = o.y - ELEV_PAD;
@@ -242,7 +242,7 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
     RF = smoothField(rockGrid);
     MF = smoothField(mountGrid);
   }
-  /** Slope over one tile width centred on the pixel, toward the south-east. */
+  /** Slope over one tile width centered on the pixel, toward the south-east. */
   const slopeScale = hexW / (2 * D);
   const at = (px: number, py: number): number => E[(py - py0 + D) * bw + (px - px0 + D)] as number;
 

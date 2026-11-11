@@ -107,7 +107,7 @@ describe("the emergence zone (AW-200)", () => {
       const w = new World(seed);
       const m = deepSites(w).find((s) => s.kind === "anomaly")!;
       const zone = emergenceZone(w)!;
-      expect(dist(zone.centre, m.pos)).toBeLessThan(zone.r - 1);
+      expect(dist(zone.center, m.pos)).toBeLessThan(zone.r - 1);
     }
     const state = newGame({ seed: 42 });
     expect(emergenceKnown(state)).toBe(false);
