@@ -200,11 +200,11 @@ function hullOf(state: GameState, v: RoverState): number {
 }
 
 function dockOf(state: GameState, world: World, v: RoverState): Vec2 {
-  return (vehicleOf(v) === "boat" ? boatDock(state, world) : null) ?? shipTile(state, world);
+  return (vehicleOf(v) === "boat" ? boatDock(state, world, v) : null) ?? shipTile(state, world);
 }
 
-function mobilityOf(state: GameState, v: RoverState): Mobility {
-  return vehicleOf(v) === "boat" ? boatMobility() : roverMobility(state);
+function mobilityOf(state: GameState, world: World, v: RoverState): Mobility {
+  return vehicleOf(v) === "boat" ? boatMobility(shipTile(state, world)) : roverMobility(state);
 }
 
 /** Energy kept back in any fight: the drive home, plus 15% of a full charge (at least 8). */
@@ -212,7 +212,7 @@ export function energyReserve(state: GameState, world: World, v: RoverState): nu
   const loc = state.location;
   if (loc.kind !== "surface") return 0;
   const surface = world.surface(loc.bodyId);
-  const home = findPath(surface, v, dockOf(state, world, v), mobilityOf(state, v));
+  const home = findPath(surface, v, dockOf(state, world, v), mobilityOf(state, world, v));
   return routeEnergy(state, home) + Math.max(8, 0.15 * vehicleEnergyMax(state, vehicleOf(v)));
 }
 
@@ -465,7 +465,7 @@ export function captureOdds(state: GameState, world: World, key: SiteKey): Captu
   const budget = Math.max(0, v.energy - energyReserve(state, world, v));
 
   // Out to it and back: the rover ends where it started.
-  const path = hexDistance(v, c) <= 1 ? [] : findPath(surface, v, c, mobilityOf(state, v));
+  const path = hexDistance(v, c) <= 1 ? [] : findPath(surface, v, c, mobilityOf(state, world, v));
   const approachEnergy = path ? 2 * routeEnergy(state, path) : Infinity;
   const approachMinutes = path ? 2 * path.reduce((m, s) => m + s.minutes, 0) * 1.5 : 0;
 

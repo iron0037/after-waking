@@ -13,6 +13,11 @@ export interface Mobility {
   roughAsPlain?: boolean;
   /** The boat: open water only (AW-17). */
   water?: boolean;
+  /**
+   * The boat may also pass over the ship's own hex, from the water on one side of it to the water
+   * on another (AW-245): a ship standing between two lakes can reach both.
+   */
+  ship?: Vec2;
 }
 
 /** A boat's step across open water. */
@@ -48,9 +53,10 @@ function source(tiles: TileSource | RegionMap): TileSource {
 export function canEnter(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility): boolean {
   const t = source(tiles).terrainAt(x, y);
   if (t === null) return false;
-  if (mobilityOf(mobility).water) return t === Terrain.liquid;
+  const m = mobilityOf(mobility);
+  if (m.water) return t === Terrain.liquid || (!!m.ship && m.ship.x === x && m.ship.y === y);
   const passable = TERRAIN_INFO[t].passable;
-  return passable === "yes" || (passable === "climb" && mobilityOf(mobility).canClimb);
+  return passable === "yes" || (passable === "climb" && m.canClimb);
 }
 
 export function stepCost(tiles: TileSource | RegionMap, x: number, y: number, mobility: boolean | Mobility = false): { minutes: number; energy: number } {

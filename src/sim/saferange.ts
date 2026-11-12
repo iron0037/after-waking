@@ -32,7 +32,7 @@ function surfaceOf(state: GameState, world: World) {
  * Energy to get from `from` home, or null if there's no route. If home can't be entered (a moored
  * boat out on the water), the cheapest hex beside it will do, as the surface screen plans it.
  */
-export function energyHomeFrom(state: GameState, world: World, from: Vec2, mobility: Mobility = vehicleMobility(state)): number | null {
+export function energyHomeFrom(state: GameState, world: World, from: Vec2, mobility: Mobility = vehicleMobility(state, world)): number | null {
   const surface = surfaceOf(state, world);
   if (!surface) return null;
   const home = vehicleHome(state, world);
@@ -69,7 +69,7 @@ export function strandingBlocker(state: GameState, world: World, x: number, y: n
   const noun = vehicleOf(v) === "boat" ? "boat" : "rover";
   const home = vehicleHome(state, world);
   const where = vehicleOf(v) !== "boat" && loc.parkedBoat ? "the boat" : "the ship";
-  const path = findPath(surface, v, { x, y }, vehicleMobility(state));
+  const path = findPath(surface, v, { x, y }, vehicleMobility(state, world));
   if (!path) return null; // no route at all: the drive itself says so
   const go = routeEnergy(state, path);
   const back = energyHomeFrom(state, world, { x, y });

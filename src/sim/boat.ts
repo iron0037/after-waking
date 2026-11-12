@@ -19,13 +19,19 @@ export const BOAT_TRANSFER_MINUTES = 20;
 /** Lowering the boat from the cargo bay into the water. */
 export const BOAT_LAUNCH_MINUTES = 20;
 
-/** The water hex beside the ship where the boat launches and ties up, or null if the ship isn't on a shore. */
-export function boatDock(state: GameState, world: World): Vec2 | null {
+/**
+ * The water hex beside the ship where the boat launches and ties up, or null if the ship isn't on a
+ * shore. A ship can stand between two waters (AW-245): `near` picks the hex closest to it.
+ */
+export function boatDock(state: GameState, world: World, near?: Vec2): Vec2 | null {
   const loc = state.location;
   if (loc.kind !== "surface") return null;
   const surface = world.surface(loc.bodyId);
   const home = shipTile(state, world);
-  return neighbors(home.x, home.y).find((n) => surface.terrainAt(n.x, n.y) === Terrain.liquid) ?? null;
+  const docks = neighbors(home.x, home.y).filter((n) => surface.terrainAt(n.x, n.y) === Terrain.liquid);
+  if (docks.length === 0) return null;
+  if (!near) return docks[0]!;
+  return docks.reduce((best, d) => (hexDistance(d, near) < hexDistance(best, near) ? d : best));
 }
 
 /**
@@ -35,7 +41,7 @@ export function boatDock(state: GameState, world: World): Vec2 | null {
 export function vehicleHome(state: GameState, world: World): Vec2 {
   const loc = state.location;
   if (loc.kind !== "surface") return { x: 0, y: 0 };
-  if (loc.rover && vehicleOf(loc.rover) === "boat") return boatDock(state, world) ?? shipTile(state, world);
+  if (loc.rover && vehicleOf(loc.rover) === "boat") return boatDock(state, world, loc.rover) ?? shipTile(state, world);
   if (loc.parkedBoat) return { x: loc.parkedBoat.x, y: loc.parkedBoat.y };
   return shipTile(state, world);
 }
@@ -68,13 +74,13 @@ export function launchBoatBlockers(state: GameState, world: World): string[] {
   return [];
 }
 
-/** Charge the boat (and the rover, if it's coming along) and lower it into the water beside the ship. */
-export function launchBoat(state: GameState, world: World, withRover = false): Result<{ chargedHours: number }> {
+/** Charge the boat (and the rover, if it's coming along) and lower it into the water beside the ship, on the side nearest `toward`. */
+export function launchBoat(state: GameState, world: World, withRover = false, toward?: Vec2): Result<{ chargedHours: number }> {
   const blockers = launchBoatBlockers(state, world);
   if (blockers.length > 0) return fail(blockers[0] as string);
   const loc = state.location as Extract<GameState["location"], { kind: "surface" }>;
   const stats = effectiveStats(state);
-  const dock = boatDock(state, world) as Vec2;
+  const dock = boatDock(state, world, toward) as Vec2;
   const boatStored = Math.min(stats.boatEnergy, state.ship.boatEnergy ?? stats.boatEnergy);
   const roverStored = Math.min(stats.roverEnergy, state.ship.roverEnergy ?? stats.roverEnergy);
   // Both sets of cells charge from the same reactor, one after the other.

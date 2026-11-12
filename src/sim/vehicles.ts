@@ -16,9 +16,9 @@ export function vehicleOf(v: RoverState): Vehicle {
   return v.vehicle ?? "rover";
 }
 
-/** The boat sails liquid hexes only. */
-export function boatMobility(): Mobility {
-  return { canClimb: false, water: true };
+/** The boat sails liquid hexes only, and can pass over the ship's hex (`ship`) between waters (AW-245). */
+export function boatMobility(ship?: Vec2): Mobility {
+  return ship ? { canClimb: false, water: true, ship: { x: ship.x, y: ship.y } } : { canClimb: false, water: true };
 }
 
 /** Is this hex open water (where only the boat can work)? */

@@ -830,9 +830,9 @@ export function routeEnergy(state: GameState, path: readonly { energy: number }[
 }
 
 /** How the vehicle being driven gets around: the boat on water, the rover on land. */
-export function vehicleMobility(state: GameState): Mobility {
+export function vehicleMobility(state: GameState, world: World): Mobility {
   const loc = state.location;
-  return loc.kind === "surface" && loc.rover && vehicleOf(loc.rover) === "boat" ? boatMobility() : roverMobility(state);
+  return loc.kind === "surface" && loc.rover && vehicleOf(loc.rover) === "boat" ? boatMobility(shipTile(state, world)) : roverMobility(state);
 }
 
 /** Multiplier on route minutes: the drive motors are the rover's; the boat keeps its own pace. */
@@ -848,11 +848,14 @@ export function moveRoverTo(state: GameState, world: World, x: number, y: number
   const { surface, rover, bodyId } = ctx.value;
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   if (rover.x === x && rover.y === y) return ok({ steps: 0, stopped: null });
+  // The boat may pass over the ship's hex between waters, but can't stop there (AW-245).
+  const shipAt = shipTile(state, world);
+  if (vehicleOf(rover) === "boat" && shipAt.x === x && shipAt.y === y) return fail("The boat can't come ashore. Sail it beside the ship to stow it.");
   // Safe range (AW-237): not somewhere it can't get home from.
   const stranding = strandingBlocker(state, world, x, y);
   if (stranding) return fail(stranding);
   const boat = vehicleOf(rover) === "boat";
-  const path = findPath(surface, rover, { x, y }, vehicleMobility(state));
+  const path = findPath(surface, rover, { x, y }, vehicleMobility(state, world));
   const energyMult = routeEnergyMult(state);
   // The drive motors are the rover's; the boat keeps its own pace.
   const minutesMult = vehicleMinutesMult(state);
@@ -1945,7 +1948,7 @@ export function hexInfo(state: GameState, world: World, x: number, y: number): H
     const base: HexRoute = { vehicle: v, km: km(loc.rover), reachable: false };
     if (loc.rover.x === x && loc.rover.y === y) route = { ...base, reachable: true, hours: 0, energy: 0, enough: true };
     else {
-      const mobility = vehicleMobility(state);
+      const mobility = vehicleMobility(state, world);
       const path = canEnter(surface, x, y, mobility) ? findPath(surface, loc.rover, here, mobility) : null;
       if (!path) {
         route = {

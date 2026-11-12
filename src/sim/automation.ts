@@ -84,8 +84,8 @@ export function workDeposit(state: GameState, world: World, key: SiteKey, maxTon
   // Seabed deposits are worked from the boat (AW-17), docking at the water beside the ship.
   const wet = siteOnWater(world, loc.bodyId, deposit);
   const vehicle = wet ? "boat" : "rover";
-  const mobility = wet ? boatMobility() : roverMobility(state);
-  const dock = () => (wet ? boatDock(state, world) : shipTile(state, world));
+  const mobility = wet ? boatMobility(shipTile(state, world)) : roverMobility(state);
+  const dock = () => (wet ? boatDock(state, world, rover(state) ?? deposit) : shipTile(state, world));
   if (wet && !dock()) return fail("The ship needs to stand at the water's edge for the boat to work that seam. Hop it to a shore.");
   const out0 = rover(state);
   if (out0 && vehicleOf(out0) !== vehicle) return fail(wet ? "Stow the rover first: this seam needs the boat." : "Bring the boat in first: this deposit needs the rover.");
@@ -144,7 +144,7 @@ export function workDeposit(state: GameState, world: World, key: SiteKey, maxTon
 
     // Out of the hangar, cells charged.
     if (!rover(state)) {
-      const deployed = wet ? launchBoat(state, world) : deployRover(state, world);
+      const deployed = wet ? launchBoat(state, world, false, deposit) : deployRover(state, world);
       if (!deployed.ok) return fail(deployed.reason);
     }
     const r = rover(state) as RoverState;

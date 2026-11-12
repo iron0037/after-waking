@@ -364,7 +364,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const energyMax = vehicle ? vehicleEnergyMax(state, vehicle) : stats.roverEnergy;
   const cargoMax = vehicle ? vehicleCargoT(state, vehicle) : stats.roverCargoT;
   const busy = session.busy;
-  const mover: Mover = { mobility: vehicleMobility(state), energyMult: routeEnergyMult(state), minutesMult: vehicleMinutesMult(state) };
+  const mover: Mover = { mobility: vehicleMobility(state, world), energyMult: routeEnergyMult(state), minutesMult: vehicleMinutesMult(state) };
   const canClimb = mover.mobility.canClimb;
 
   const [selectedKey, setSelectedKeyRaw] = useState<string | null>(null);

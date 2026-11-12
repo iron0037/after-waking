@@ -212,3 +212,58 @@ describe("boat UI helpers (AW-17)", () => {
     expect(vehicleMinutesMult(state)).toBe(1);
   });
 });
+
+/** A plain hex the ship can stand on between two waters the boat can't otherwise sail between. */
+function twoLakeScenario(): { world: World; state: GameState; shore: Vec2; a: Vec2; b: Vec2 } {
+  for (const seed of [SEED, 7, 2026, 1, 2, 3]) {
+    const world = new World(seed);
+    for (const sys of world.galaxy.systems) {
+      for (const body of world.system(sys.id).bodies) {
+        if (body.kind !== "terrestrial") continue;
+        if (!landingAccess(body, BASE_STATS.ratings).ok) continue;
+        const surface = world.surface(body.id);
+        for (let region = 0; region < Math.min(body.regions, 4); region++) {
+          const o = surface.origin(region);
+          for (let y = o.y + 2; y < o.y + 46; y++) {
+            for (let x = o.x + 2; x < o.x + 46; x++) {
+              if (surface.terrainAt(x, y) !== Terrain.plain) continue;
+              const wet = neighbors(x, y).filter((n) => surface.terrainAt(n.x, n.y) === Terrain.liquid);
+              for (const a of wet) {
+                for (const b of wet) {
+                  if (a === b || findPath(surface, a, b, boatMobility())) continue; // already joined by water
+                  const state = newGame({ seed });
+                  state.ship.upgrades.push("boat");
+                  state.location = { kind: "surface", systemId: sys.id, bodyId: body.id, region, rover: null, ship: { x, y }, globalCoords: true };
+                  return { world, state, shore: { x, y }, a, b };
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  throw new Error("no two-lake shore on these seeds");
+}
+
+describe("a ship between two waters (AW-245)", () => {
+  it("the boat can pass over the ship's hex into the other water, but not stop there", () => {
+    const { world, state, shore, a, b } = twoLakeScenario();
+    expect(launchBoat(state, world, false, a).ok).toBe(true);
+    const loc = state.location as { rover: { x: number; y: number } | null };
+    expect(loc.rover).toMatchObject(a);
+    expect(moveRoverTo(state, world, shore.x, shore.y).ok).toBe(false);
+    const r = moveRoverTo(state, world, b.x, b.y);
+    if (!r.ok) throw new Error(r.reason);
+    expect(loc.rover).toMatchObject(b);
+    // Home is now the water on this side, and the boat stows from here.
+    expect(vehicleHome(state, world)).toEqual(b);
+    expect(stowRover(state, world).ok).toBe(true);
+  });
+
+  it("launches into the water nearest where it's headed", () => {
+    const { world, state, b } = twoLakeScenario();
+    expect(launchBoat(state, world, false, b).ok).toBe(true);
+    expect((state.location as { rover: Vec2 | null }).rover).toMatchObject(b);
+  });
+});

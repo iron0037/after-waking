@@ -46,7 +46,7 @@ export function autoExploreBlockers(state: GameState, world: World): string[] {
 /** Energy to reach every tile near the region from `from` (Dijkstra on the rover's step costs). */
 function energyMap(state: GameState, world: World, bodyId: string, from: Vec2, box: { x0: number; y0: number; x1: number; y1: number }): Map<number, number> {
   const surface = world.surface(bodyId);
-  const mobility = vehicleMobility(state);
+  const mobility = vehicleMobility(state, world);
   const mult = routeEnergyMult(state);
   const w = surface.width;
   const key = (x: number, y: number) => y * w + x;
@@ -106,7 +106,7 @@ function driveHome(state: GameState, world: World): boolean {
   const ship = shipTile(state, world);
   if (hexDistance(loc.rover, ship) <= 1) return true;
   const surface = world.surface(loc.bodyId);
-  const mobility = vehicleMobility(state);
+  const mobility = vehicleMobility(state, world);
   const spots = [ship, ...neighbors(ship.x, ship.y)].filter((p) => canEnter(surface, p.x, p.y, mobility));
   for (const p of spots.sort((a, b) => hexDistance(a, loc.rover!) - hexDistance(b, loc.rover!))) {
     const r = moveRoverTo(state, world, p.x, p.y);
