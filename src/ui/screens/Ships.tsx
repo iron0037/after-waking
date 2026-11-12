@@ -13,7 +13,7 @@ import {
   hullBlockers,
   hullOf,
   hullPrice,
-  hullsForSale,
+  hullsSoldHere,
   QUIRKS_BY_ID,
   resaleValue,
   sellShip,
@@ -95,7 +95,7 @@ export function ShipsPanel({ session }: { session: GameSession }) {
       </div>
       <h3 class="hub-gap">From the clans' yards</h3>
       <div class="hub-cards">
-        {hullsForSale().map((h) => (
+        {hullsSoldHere(state).map((h) => (
           <HullCard key={h.id} session={session} hull={h} />
         ))}
       </div>

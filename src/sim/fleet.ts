@@ -23,6 +23,16 @@ export function hullsForSale(): readonly Hull[] {
   return HULLS.filter((h) => h.vendor !== null);
 }
 
+/**
+ * The hulls on sale where the captain is (AW-249): the clans' yards at the Intrepid, and the Corsair
+ * only at a pirate's den, where she's a surprise.
+ */
+export function hullsSoldHere(state: GameState): readonly Hull[] {
+  if (state.location.kind === "intrepid") return hullsForSale().filter((h) => h.id !== "corsair");
+  if (currentOutpost(state, worldFor(state.seed, state.worldGen ?? 1))?.clan === "freebooters") return hullsForSale().filter((h) => h.id === "corsair");
+  return [];
+}
+
 /** What a hull costs this captain: their own clan's discount and the builder's view of them. */
 export function hullPrice(state: GameState, hull: Hull): number {
   return hull.vendor ? upgradePriceFor(state, hull.vendor, hull.price) : hull.price;
@@ -33,6 +43,8 @@ export function hullBlockers(state: GameState, id: HullId): string[] {
   const hull = HULLS_BY_ID.get(id);
   if (!hull || !hull.vendor) return ["Nobody builds that hull new."];
   const out: string[] = [];
+  // One ship of each class (AW-249).
+  if ([state.ship, ...(state.berthed ?? [])].some((s) => (s.hull ?? "freighter") === id)) out.push(`You already own a ${hull.name}: one ship of each class.`);
   // The Corsair is sold only at a pirate's den (AW-23); every other hull at the Intrepid.
   if (hull.id === "corsair") {
     const world = worldFor(state.seed, state.worldGen ?? 1);

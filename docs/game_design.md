@@ -288,7 +288,7 @@ Your third-rate freighter can only be improved so far. Each clan builds one hull
   | Kinetic battery | Corsair, Destroyer, Merchantman |
 
   The scout can't take the expanded hold; the merchantman can't take landing struts or pressure hulls. Built-in gear counts as installed (for "requires") and costs no upkeep. Ships that already carry restricted gear keep it. Every ending stays reachable in the starter freighter.
-- **Buying:** cash only, at the Intrepid, from a clan that counts you as at least Friendly. Your own clan's discount and the builder's standing apply. A new ship is berthed with full tanks.
+- **Buying:** cash only, at the Intrepid, from a clan that counts you as at least Friendly. Your own clan's discount and the builder's standing apply. A new ship is berthed with full tanks, and her fold drive is ready (AW-244: each ship keeps her own refit). One ship of each class (AW-249). The Intrepid's yard lists only what it sells: the Corsair appears only at a pirate's den.
 - **Berthing** at the Intrepid is free. Taking command of another ship takes half a day and needs the yard idle and the hold and racks to fit. The rover, the boat and their gear (and charge), the hold and the specimens move with the captain; fitted gear, fuel, probes and battle damage stay with the ship. Outposts come later (AW-230).
 - **Selling** a berthed ship pays half of its hull and fitted gear.
 - **Not in v1:** Exchange financing, enlisted crew limits per hull, ship renaming.

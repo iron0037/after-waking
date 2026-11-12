@@ -5,6 +5,7 @@ import {
   blindFoldFuel,
   blindFoldRange,
   buyHull,
+  hullsSoldHere,
   buyUpgrade,
   commandBlockers,
   commandShip,
@@ -91,6 +92,21 @@ describe("buying a hull", () => {
     expect(reputation(s, "diggers")).toBeGreaterThan(25);
   });
 
+  it("one ship of each class, and the Intrepid lists only what it sells (AW-249)", () => {
+    const s = rich();
+    s.reputation = { helm: 30 };
+    expect(buyHull(s, "firstRate").ok).toBe(true);
+    expect(hullBlockers(s, "firstRate").join()).toMatch(/already own a First-rate/);
+    expect(buyHull(s, "firstRate").ok).toBe(false);
+    // Still true when she's the ship in use.
+    expect(commandShip(s, 0).ok).toBe(true);
+    expect(hullBlockers(s, "firstRate").join()).toMatch(/already own/);
+    const here = hullsSoldHere(s).map((h) => h.id);
+    expect(here).not.toContain("corsair");
+    expect(here).not.toContain("freighter");
+    expect(here).toContain("bulker");
+  });
+
   it("the starter freighter isn't for sale", () => {
     expect(hullBlockers(rich(), "freighter").length).toBeGreaterThan(0);
   });
@@ -109,6 +125,7 @@ describe("buying a hull", () => {
     if (!r.ok) throw new Error(r.reason);
     expect(QUIRKS_BY_ID.get(r.value.quirk ?? "")).toBeDefined();
     expect(t.berthed).toHaveLength(1); // waiting at the Intrepid
+    expect(hullsSoldHere(t).map((h) => h.id)).toEqual(["corsair"]);
   });
 });
 
