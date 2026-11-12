@@ -5,6 +5,7 @@
  */
 import { denClearanceChance, knownOutposts, outpostTitle, type Outpost } from "../../../sim";
 import type { ComponentChildren } from "preact";
+import { drawOutpostIcon } from "../../OutpostIcon";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../../data/commodities";
 import {
@@ -139,7 +140,7 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       : "";
     const station = outpostHere.get(r);
     const clearance = station?.clan === "freebooters" ? ` (landing clearance ${Math.round(denClearanceChance(state) * 100)}%, by your Freebooter standing)` : "";
-    const post = station ? ` · ■ ${outpostTitle(station)}${clearance}` : "";
+    const post = station ? ` · ${outpostTitle(station)}${clearance}` : "";
     return `Region ${r + 1}${post} · signal ${strength}${est}${alive}${seen}${r === hunch ? " · your gut says here" : ""}`;
   };
 
@@ -196,20 +197,6 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
         ctx.fillRect(x + 3, y + ch - 3 - barH, (cw - 6) * Math.max(0.08, explored), barH);
       }
     });
-
-    // Clan outposts (AW-23): a teal square in the region's top-left corner.
-    for (const [r, _o] of outpostHere) {
-      const cell = layout.cells[r];
-      if (!cell) continue;
-      const s = Math.max(6, Math.min(10, ((cell.x1 - cell.x0) * w) / 6));
-      const x = cell.x0 * w + 4;
-      const y = cell.y0 * h + 4;
-      ctx.fillStyle = UI.outpost;
-      ctx.fillRect(x, y, s, s);
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "#05070f";
-      ctx.strokeRect(x, y, s, s);
-    }
 
     // Life signs: small green leaves along the bottom-right of each region, one per plant site (up to 5).
     if (life) {
@@ -336,6 +323,8 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       ctx.stroke();
       const mx = x + cw / 2;
       const my = y + ch / 2;
+      // An outpost's mark takes the center of its region (below).
+      if (outpostHere.has(selected)) ctx.globalAlpha = 0;
       ctx.lineWidth = 1.2;
       ctx.strokeStyle = rgba(UI.accent, 0.9);
       ctx.beginPath();
@@ -350,6 +339,15 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       ctx.lineTo(mx, my + 7);
       ctx.stroke();
       ctx.restore();
+    }
+
+    // Clan outposts (AW-23, AW-246): a large mark in the middle of the region, where the outpost stands.
+    for (const r of outpostHere.keys()) {
+      const cell = layout.cells[r];
+      if (!cell) continue;
+      const cw = (cell.x1 - cell.x0) * w;
+      const ch = (cell.y1 - cell.y0) * h;
+      drawOutpostIcon(ctx, cell.x0 * w + cw / 2, cell.y0 * h + ch / 2, Math.max(7, Math.min(13, Math.min(cw, ch) * 0.3)));
     }
   };
 

@@ -378,6 +378,16 @@
   color: #ffd447;
 }
 /* Clan outposts (AW-23). */
-.sys-outpost {
+/* A known clan outpost on this world (AW-246). */
+.sys-tag-outpost {
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 10px;
   color: #6fdccb;
+  border: 1px solid #2c6b62;
+  border-radius: 8px;
+  cursor: help;
+}
+.outpost-icon {
+  vertical-align: -2px;
 }

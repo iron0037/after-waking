@@ -1,5 +1,6 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { OUTPOST_TYPES, outpostTitle, type Outpost } from "../../../sim";
+import { OutpostIcon } from "../../OutpostIcon";
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import { SEAS } from "../../../data/seas";
 import type { Ratings } from "../../../data/ship";
@@ -146,7 +147,7 @@ export function Exploration({
       )}
       {outposts.map((o) => (
         <div key={o.id} class="sys-contract" title={OUTPOST_TYPES[o.clan].blurb}>
-          <span class="sys-outpost">■</span> <b>{outpostTitle(o)}</b>
+          <OutpostIcon /> <b>{outpostTitle(o)}</b>
           <div class="muted small">
             {o.population} people · region {o.region + 1}. Land in that region to use it.
           </div>

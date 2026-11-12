@@ -61,6 +61,7 @@ import { DeepSweepPanel } from "../DeepSweep";
 import { AnomalyPanel, EdgePanel } from "../Ending";
 import { RescuePanel } from "../Rescue";
 import { useArchiveTopic } from "../ArchivePanel";
+import { drawOutpostIcon, OutpostIcon } from "../OutpostIcon";
 import "./starmap.css";
 import "../covenant.css";
 
@@ -976,16 +977,8 @@ export function StarMap({ session }: { session: GameSession }) {
     }
 
     if (outpostStars.has(n.id)) {
-      // A small teal square, lower right: a clan outpost here.
-      const sx = x + r + 4;
-      const sy = y + r + 4;
-      ctx.save();
-      ctx.fillStyle = UI.outpost;
-      ctx.strokeStyle = UI.space;
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(sx, sy, 7, 7);
-      ctx.strokeRect(sx, sy, 7, 7);
-      ctx.restore();
+      // The outpost mark, lower right: a clan outpost here.
+      drawOutpostIcon(ctx, x + r + 8, y + r + 8, 7);
     }
 
     if (covenantStars.has(n.id)) {
@@ -1084,7 +1077,7 @@ export function StarMap({ session }: { session: GameSession }) {
       const intel = pirateIntel(state, world, n.id);
       lines.push({ text: `Raiders: ${intel.label}`, color: INTEL_COLOR[intel.level] });
     }
-    for (const o of outpostStars.get(n.id) ?? []) lines.push({ text: `■ ${outpostTitle(o)}`, color: UI.outpost });
+    for (const o of outpostStars.get(n.id) ?? []) lines.push({ text: `Outpost: ${outpostTitle(o)}`, color: UI.outpost });
     const covenantAsk = covenantStars.get(n.id);
     if (covenantAsk) lines.push({ text: `◌ Covenant: ${covenantAsk}`, color: UI.covenant });
     const jobs = targets.get(n.id) ?? [];
@@ -1139,7 +1132,7 @@ export function StarMap({ session }: { session: GameSession }) {
         </div>
         <div class="sm-legend">
           <div>
-            <span class="good">◆</span> visited · <span class="sm-bang">!</span> contract work outstanding · <span class="sm-outpost">■</span> clan outpost
+            <span class="good">◆</span> visited · <span class="sm-bang">!</span> contract work outstanding · <OutpostIcon size={12} /> clan outpost
           </div>
           <div>
             <span class="sm-ring">◯</span> ring: how thoroughly explored (full ring = painted)

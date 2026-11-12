@@ -82,8 +82,8 @@ export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId
                     </span>
                   )}
                   {(outposts?.get(b.id) ?? []).length > 0 && (
-                    <span class="sys-outpost" title={(outposts?.get(b.id) ?? []).map(outpostTitle).join("; ")}>
-                      {" "}■
+                    <span class="sys-tag-outpost" title={(outposts?.get(b.id) ?? []).map(outpostTitle).join("; ")}>
+                      outpost
                     </span>
                   )}
                 </td>
