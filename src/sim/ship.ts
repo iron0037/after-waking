@@ -28,6 +28,11 @@ export interface ShipState {
   specimens?: Record<string, number>;
   /** Atmospheric probes in the bay. */
   probes?: number;
+  /**
+   * A berthed ship's own fold-drive refit, if it was still running when the crew left her (AW-244).
+   * The ship in use keeps hers in GameState.foldReadyAt.
+   */
+  foldReadyAt?: number;
 }
 
 export const SHIP_SPECIMEN_SLOTS = 16;

@@ -9,6 +9,7 @@ import {
   commandBlockers,
   commandShip,
   effectiveStats,
+  formatDuration,
   hullBlockers,
   hullOf,
   hullPrice,
@@ -130,6 +131,7 @@ function ShipCard({ session, ship, index }: { session: GameSession; ship: ShipSt
       <div class="muted small">
         {tonnes(stats.cargoCapacityT)} hold · fuel {Math.round(ship.fuel)} / {stats.fuelCapacity} · {gear} fitting{gear === 1 ? "" : "s"}
         {ship.damage && " · battle damage"}
+        {index !== null && (ship.foldReadyAt ?? 0) > state.time && ` · drive refit ${formatDuration(ship.foldReadyAt! - state.time)}`}
       </div>
       {index !== null && (
         <div class="hub-actions ship-actions">

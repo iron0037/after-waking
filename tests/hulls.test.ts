@@ -122,10 +122,14 @@ describe("taking command of another ship", () => {
     s.ship.fuel = 12;
     s.ship.cargo = { ironNickel: 150 };
     s.ship.specimens = { "x|Glassweed": 3 };
+    const ready = (s.foldReadyAt = s.time + 5 * 24 * 60); // the freighter's drive was mid-refit
     buyHull(s, "bulker");
     const r = commandShip(s, 0);
     if (!r.ok) throw new Error(r.reason);
     expect(s.ship.hull).toBe("bulker");
+    // A new ship's drive is ready; the freighter keeps her own refit (AW-244).
+    expect(s.foldReadyAt).toBeLessThanOrEqual(s.time);
+    expect(s.berthed![0]!.foldReadyAt).toBe(ready);
     expect(s.ship.upgrades).toEqual(expect.arrayContaining(["roverCells", "boat"]));
     expect(s.ship.upgrades).not.toContain("expandedHold");
     expect(s.ship.roverEnergy).toBeGreaterThanOrEqual(55); // and it charges while the crew moves across
@@ -139,9 +143,12 @@ describe("taking command of another ship", () => {
     expect(old.fuel).toBe(12);
     expect(old.cargo).toEqual({});
     expect(effectiveStats(s).roverEnergy).toBeGreaterThan(shipStats({ name: "", upgrades: [], fuel: 0, cargo: {}, hull: "bulker" }).roverEnergy);
-    // And back again.
+    // And back again: her refit has run on while she was berthed.
     expect(commandShip(s, 0).ok).toBe(true);
     expect(s.ship.hull ?? "freighter").toBe("freighter");
+    expect(s.foldReadyAt).toBe(ready);
+    expect(s.ship.foldReadyAt).toBeUndefined();
+    expect(s.berthed![0]!.foldReadyAt).toBeUndefined();
     expect(s.ship.upgrades).toEqual(expect.arrayContaining(["expandedHold", "probeBay", "roverCells", "boat"]));
   });
 

@@ -141,6 +141,12 @@ export function commandShip(state: GameState, index: number): Result<ShipState> 
     else delete next[key];
     delete prev[key];
   }
+  // The fold drive's refit belongs to the ship (AW-244): the old one keeps hers, and the new one
+  // brings her own, so a ship fresh from the yard can fold straight away.
+  if (state.foldReadyAt > state.time) prev.foldReadyAt = state.foldReadyAt;
+  else delete prev.foldReadyAt;
+  state.foldReadyAt = next.foldReadyAt ?? 0;
+  delete next.foldReadyAt;
   berthed.splice(index, 1, prev);
   state.berthed = berthed;
   state.ship = next;
