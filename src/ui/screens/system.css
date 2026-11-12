@@ -103,6 +103,45 @@
   color: var(--accent);
   cursor: help;
 }
+/* Landing tiers (AW-247): the name says whether the ship can set down there. */
+.sys-name.land-now {
+  color: var(--good);
+}
+.sys-name.land-gear {
+  color: var(--muted);
+}
+.sys-name.land-never {
+  color: #56627a;
+}
+.sys-name.land-unknown {
+  color: var(--muted);
+  font-style: italic;
+}
+.sys-table tbody tr.selected .sys-name {
+  color: inherit;
+}
+/* Under the viewport tools, clear of the hint line (which wraps on narrow windows). */
+.sys-legend {
+  position: absolute;
+  left: 12px;
+  top: 46px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(5, 7, 15, 0.75);
+  border: 1px solid var(--grid, #16213a);
+  border-radius: 4px;
+  pointer-events: none;
+  user-select: none;
+}
+.sys-legend span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
 .sys-table tbody tr.selected .sys-calm {
   color: var(--good);
 }

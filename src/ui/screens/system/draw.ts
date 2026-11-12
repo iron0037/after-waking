@@ -15,6 +15,7 @@ import {
   type FlightPlan,
   type FlightTarget,
   type GameState,
+  type LandingTier,
   type SystemDetail,
   type Vec2,
   type World,
@@ -64,6 +65,8 @@ export interface Scene {
   targets: Map<string, Contract[]>;
   /** The Covenant's missing world: the empty orbit to draw faintly (AU), while that errand is active here. */
   ghostAU?: number | null;
+  /** Landing rings (AW-247): each scanned body's tier, while the overlay is on. */
+  landing?: Map<string, LandingTier> | null;
 }
 
 export interface HitTarget {
@@ -108,8 +111,11 @@ export function drawOrrery(ctx: CanvasRenderingContext2D, w: number, h: number, 
     const p = pos.get(b.id) as Vec2;
     const r = discRadius(b, proj.zoom);
     drawBodyDisc(ctx, b, p, r, proj, state.seed, state.scannedBodies.includes(b.id));
+    const tier = scene.landing?.get(b.id);
+    if (tier === "now" || tier === "gear") drawLandingRing(ctx, p, r, tier);
     const prog = scene.progress.get(b.id);
-    if (prog && prog.regionsVisited > 0) drawProgressRing(ctx, p, r, prog.explored);
+    // The exploration ring steps out to make room for a landing ring.
+    if (prog && prog.regionsVisited > 0) drawProgressRing(ctx, p, r + (scene.landing ? 2 : 0), prog.explored);
     if (scene.targets.has(b.id)) drawContractMark(ctx, p, r);
     // Moons are small and crowd their parent, so give them a generous click target.
     hits.push({ id: b.id, x: p.x, y: p.y, r: b.parentId ? Math.max(r + 5, 13) : Math.max(r, 6) });
@@ -361,6 +367,28 @@ function drawSphere(ctx: CanvasRenderingContext2D, body: Body, p: Vec2, r: numbe
   }
 }
 
+/**
+ * The landing ring (AW-247), hugging the disc: solid green if the ship can land now, dashed and
+ * dimmer if a better-fitted ship could. Green and unbroken, so it never reads as the selection's
+ * spinning orange brackets, which stay outermost.
+ */
+function drawLandingRing(ctx: CanvasRenderingContext2D, p: Vec2, r: number, tier: "now" | "gear"): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r + 2, 0, Math.PI * 2);
+  if (tier === "now") {
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = UI.good;
+  } else {
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = rgba(UI.good, 0.6);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** A thin painted ring around a world the player has landed on: the arc is how much surface is mapped. */
 function drawProgressRing(ctx: CanvasRenderingContext2D, p: Vec2, r: number, explored: number): void {
   const ringR = r + 3.5;
@@ -477,7 +505,7 @@ function drawHighlights(ctx: CanvasRenderingContext2D, scene: Scene, pos: Map<st
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.arc(p.x, p.y, discRadius(hover, proj.zoom) + 5, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, discRadius(hover, proj.zoom) + (scene.landing ? 6.5 : 5), 0, Math.PI * 2);
     ctx.stroke();
   }
 

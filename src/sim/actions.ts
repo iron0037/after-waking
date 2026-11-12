@@ -27,6 +27,7 @@ import { burnPath } from "./burnpath";
 import { boatMobility, siteOnWater, vehicleCargoT, vehicleEnergyMax, vehicleOf, vehiclesOut } from "./vehicles";
 import { fuelPrice, sellCommodity, sellPrice } from "./economy";
 import { landingAccess } from "./environment";
+import { landingTier, type LandingTier } from "./landing";
 import { deepId, distanceLy, INTREPID_POS, isDeepId, positionOf, SPECTRAL } from "./galaxy";
 import { canEnter, findPath, type Mobility } from "./pathfinding";
 import type { BodySurface, SiteKey, SurfaceDeposit, SurfaceFlora } from "./bodysurface";
@@ -584,6 +585,14 @@ export function landableBodies(state: GameState, world: World, systemId: string)
   return world
     .system(systemId)
     .bodies.filter((b) => b.regions > 0 && Object.keys(b.resources).length > 0 && landingAccess(b, ratings).ok);
+}
+
+/** Each scanned body's landing tier for the ship in use (AW-247); unscanned bodies are left out. */
+export function landingTiers(state: GameState, world: World, systemId: string): Map<string, LandingTier> {
+  const ratings = effectiveStats(state).ratings;
+  const out = new Map<string, LandingTier>();
+  for (const b of world.system(systemId).bodies) if (state.scannedBodies.includes(b.id)) out.set(b.id, landingTier(b, ratings));
+  return out;
 }
 
 export function landingBlockers(state: GameState, world: World, region: number): string[] {

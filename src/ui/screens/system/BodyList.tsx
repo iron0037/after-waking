@@ -1,9 +1,17 @@
 /** Every body in the system, moons indented under their parents. */
-import { outpostTitle, type Outpost } from "../../../sim";
+import { outpostTitle, type LandingTier, type Outpost } from "../../../sim";
 import { useEffect, useRef } from "preact/hooks";
 import { bodyNickname, bodyPosition, dist, type BodyProgress, type Contract, type SystemDetail, type Vec2 } from "../../../sim";
 import { BODY_COLOR } from "../../palette";
 import { fmtAU, progressLabel, shortKind } from "./util";
+
+/** The name's color says whether the ship can land there (AW-247); the tooltip says it in words. */
+const TIER_TITLE: Record<LandingTier | "unknown", string> = {
+  now: "Your ship can land here",
+  gear: "Your ship can't land here, but a better-fitted one could",
+  never: "No ship can land here",
+  unknown: "Not scanned yet",
+};
 
 export interface BodyListProps {
   detail: SystemDetail;
@@ -19,13 +27,13 @@ export interface BodyListProps {
   targets: Map<string, Contract[]>;
   /** The clans' outposts the captain knows of, by world (AW-23). */
   outposts?: Map<string, Outpost[]>;
-  /** Scanned bodies the current ship can land on and mine. */
-  landable: Set<string>;
+  /** Scanned bodies' landing tiers for the ship in use (AW-247). */
+  tiers: Map<string, LandingTier>;
   onSelect: (id: string) => void;
   onHover: (id: string | null) => void;
 }
 
-export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId, selectedId, hoverId, progress, targets, outposts, landable, onSelect, onHover }: BodyListProps) {
+export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId, selectedId, hoverId, progress, targets, outposts, tiers, onSelect, onHover }: BodyListProps) {
   const box = useRef<HTMLDivElement>(null);
 
   // Keep the selected row visible when the selection came from the map.
@@ -62,10 +70,12 @@ export function BodyList({ detail, time, shipPos, nicknames, scanned, orbitingId
               <tr key={b.id} class={cls} onClick={() => onSelect(b.id)} onMouseEnter={() => onHover(b.id)}>
                 <td class={b.parentId ? "sys-moon" : ""}>
                   <span class="sys-dot" style={{ background: BODY_COLOR[b.kind] }} />
-                  {b.name}
+                  <span class={`sys-name land-${tiers.get(b.id) ?? "unknown"}`} title={TIER_TITLE[tiers.get(b.id) ?? "unknown"]}>
+                    {b.name}
+                  </span>
                   {nick && <span class="muted"> · {nick}</span>}
                   {scanned.includes(b.id) && <span class="sys-scanned" title="Scanned" />}
-                  {scanned.includes(b.id) && landable.has(b.id) && (
+                  {tiers.get(b.id) === "now" && (
                     <span class="good" title="Your ship can land here and mine">
                       {" "}
                       ▼

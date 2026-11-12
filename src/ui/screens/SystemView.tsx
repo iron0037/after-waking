@@ -2,7 +2,7 @@
  * The system orrery: where the ship is, where everything else is, and how to get there.
  * Flight is animated with time compression; the sim only advances when the burn completes.
  */
-import { knownOutposts, type Outpost } from "../../sim";
+import { knownOutposts, landingTiers, type Outpost } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   bodyProgress,
@@ -15,7 +15,6 @@ import {
   formatDuration,
   land,
   landingAccess,
-  landableBodies,
   landingBlockers,
   scanBody,
   effectiveStats,
@@ -39,6 +38,7 @@ import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
 import { BodyList } from "./system/BodyList";
+import { UI } from "../palette";
 import {
   focusView,
   HOME_VIEW,
@@ -69,6 +69,8 @@ const HOME_CAMERA: Camera = { view: HOME_VIEW, anchor: null };
 
 /** Least zoom H gives when the ship is drifting between bodies (so centering on it is visible). */
 const DRIFT_HOME_ZOOM = 3;
+/** Whether the orbit map rings landable worlds (AW-247): a view setting, kept in this browser. */
+const RINGS_KEY = "after-waking/landing-rings";
 
 interface Flight {
   route: Route;
@@ -304,12 +306,35 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const homeRef = useRef(goHome);
   homeRef.current = goHome;
 
+  // Landing rings on the orbit map (AW-247): a per-player view setting, remembered in this browser.
+  const [landingRings, setLandingRings] = useState(() => {
+    try {
+      return localStorage.getItem(RINGS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleRings = () => {
+    const on = !landingRings;
+    setLandingRings(on);
+    try {
+      localStorage.setItem(RINGS_KEY, on ? "1" : "0");
+    } catch {
+      // Not remembered; it still works for this visit.
+    }
+  };
+  const toggleRingsRef = useRef(toggleRings);
+  toggleRingsRef.current = toggleRings;
+  const tiers = landingTiers(state, world, detail.system.id);
+
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
       const el = ev.target;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
       if ((ev.key === "h" || ev.key === "H") && !session.state.encounter && !session.encounterDebrief) homeRef.current();
+      // G for ground: the landing rings (AW-247).
+      if (ev.key === "g" || ev.key === "G") toggleRingsRef.current();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -396,6 +421,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
       progress,
       targets,
       ghostAU,
+      landing: landingRings ? tiers : null,
     });
     hitsRef.current = result.hits;
     headingRef.current = result.heading;
@@ -452,14 +478,39 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           <button class="btn" onClick={() => setCamera(HOME_CAMERA)} disabled={isHomeView(camera.view)} title="Reset view (zoom and pan)">
             Reset view
           </button>
+          <button
+            class={`btn ${landingRings ? "primary" : ""}`}
+            aria-pressed={landingRings}
+            onClick={toggleRings}
+            title="Ring the worlds your ship can land on (G)"
+          >
+            Landing
+          </button>
         </div>
+        {landingRings && (
+          <div class="sys-legend">
+            <span>
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" fill="none" stroke={UI.good} stroke-width="2" />
+              </svg>
+              land now
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" fill="none" stroke={UI.good} stroke-opacity="0.6" stroke-width="1.5" stroke-dasharray="3 3" />
+              </svg>
+              needs better gear
+            </span>
+            <span>no ring: can't land, or not scanned</span>
+          </div>
+        )}
         {flying && (
           <button class="btn sys-skip" onClick={finishFlight}>
             Skip ▸▸
           </button>
         )}
         <div class="viewport-hint">
-          Drag to pan · scroll to zoom · click to select · H home (center on ship) · radial scale is logarithmic, moon orbits are exaggerated
+          Drag to pan · scroll to zoom · click to select · H home (center on ship) · G landing rings · radial scale is logarithmic, moon orbits are exaggerated
         </div>
       </div>
 
@@ -549,7 +600,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             progress={progress}
             targets={targets}
             outposts={outpostsByBody}
-            landable={new Set(landableBodies(state, session.world, detail.system.id).map((b) => b.id))}
+            tiers={tiers}
             onSelect={select}
             onHover={(id) => !busy && setHoverId(id)}
           />

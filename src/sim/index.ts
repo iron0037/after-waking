@@ -1,6 +1,7 @@
 export * from "./actions";
 export * from "./fleet";
 export * from "./saferange";
+export * from "./landing";
 export * from "./specimenjobs";
 export * from "./outposts";
 export * from "./outpostservices";

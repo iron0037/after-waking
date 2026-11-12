@@ -11,7 +11,7 @@ import { CLAN_NAMES, type ClanId } from "../data/ship";
 import type { Body } from "./bodies";
 import { lanePirateActivity } from "./combat";
 import { landingAccess } from "./environment";
-import { shipStats } from "./ship";
+import { BEST_LANDING_RATINGS } from "./landing";
 import { distanceLy, type StarSystem } from "./galaxy";
 import { tierOf, type RepTier } from "./reputation";
 import { rngFor } from "./rng";
@@ -45,14 +45,8 @@ interface Candidate {
 
 const gentle = (b: Body) => b.gravityG <= 1.3 && b.pressureAtm <= 2.5;
 
-/** The best landing ratings any ship can be fitted to: outposts stand only where someone could set down. */
-const BEST_RATINGS = shipStats({
-  name: "",
-  hull: "bulker",
-  upgrades: ["landingStruts", "pressureHull2", "pressureHull3", "cryoHull", "corrosionHull", "radShielding"],
-  fuel: 0,
-  cargo: {},
-}).ratings;
+/** Outposts stand only where someone could set down. */
+const BEST_RATINGS = BEST_LANDING_RATINGS;
 const oreValue = (b: Body) => Object.entries(b.resources).reduce((v, [id, r]) => v + (r ?? 0) * (COMMODITIES[id as keyof typeof COMMODITIES]?.basePrice ?? 0), 0);
 
 /** How much a clan wants to settle here; 0 means never. */
