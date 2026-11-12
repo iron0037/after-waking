@@ -183,6 +183,26 @@ describe("probes v2: jobs, readings, floating life", () => {
     expect(contractProgress(state, job).ready).toBe(true);
   });
 
+  it("survey jobs ask only for data the captain doesn't have, and count dives flown before signing (AW-248)", async () => {
+    const { contractProgress, deepestProfile, probeSurveyContract, Rng } = await import("../src/sim");
+    const state = newGame({ seed: 42 });
+    state.ship.upgrades.push("probeBay");
+    const first = probeSurveyContract(state, new Rng(5), 900)!;
+    // A dive already flown to that giant, as deep as the job asks: the job is done on the board.
+    state.probeHistory = [{ bodyId: first.bodyId!, depth: first.depth as 2 | 3, outcome: "recovered", t: 0 }];
+    expect(contractProgress(state, first).ready).toBe(true);
+    // A lost probe brought nothing back.
+    state.probeHistory = [{ bodyId: first.bodyId!, depth: 4, outcome: "lost", t: 0 }];
+    expect(contractProgress(state, first).ready).toBe(false);
+    // New jobs never ask for a profile already taken that deep.
+    state.probeHistory = [{ bodyId: first.bodyId!, depth: 4, outcome: "recovered", t: 0 }];
+    for (let i = 0; i < 40; i++) {
+      const job = probeSurveyContract(state, new Rng(i), 1000 + i);
+      if (job) expect(job.depth!).toBeGreaterThan(deepestProfile(state, job.bodyId!));
+      if (job) expect(job.bodyId).not.toBe(first.bodyId);
+    }
+  });
+
   it("returned probes chart the atmosphere: true values in the planner, and readings the Lyceum buys once", async () => {
     const { atmosphereCharted, sellReadings, unsoldReadings } = await import("../src/sim");
     const world = new World(42);

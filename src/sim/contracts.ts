@@ -315,17 +315,26 @@ export function gasDeliveryContract(rng: Rng, serial: number): Contract {
 
 const PROBE_SURVEY_PAY = [0, 1_500, 3_500, 6_000, 9_000];
 
-/** An atmospheric survey: dive a named giant to a depth band and bring the probe back. */
+/** The deepest band the captain has profiled this giant to with a probe that came back (0: never). */
+export function deepestProfile(state: GameState, bodyId: string): number {
+  return (state.probeHistory ?? []).reduce((d, h) => (h.bodyId === bodyId && h.outcome !== "lost" ? Math.max(d, h.depth) : d), 0);
+}
+
+/**
+ * An atmospheric survey: dive a named giant to a depth band and bring the probe back. Never one the
+ * captain has already profiled that deep (AW-248), so the board only asks for data they don't have.
+ */
 export function probeSurveyContract(state: GameState, rng: Rng, serial: number): Contract | null {
   const world = worldFor(state.seed, state.worldGen ?? 1);
   const range = effectiveStats(state).foldRangeLy;
+  const maxDepth = Math.max(2, effectiveStats(state).probeMaxDepth);
   const giants = world.galaxy.systems
     .filter((s) => s.charted && distanceLy(world.galaxy, "intrepid", s.id) <= range)
-    .flatMap((s) => world.system(s.id).bodies.filter((b) => b.kind === "gasGiant" || b.kind === "iceGiant").map((b) => ({ s, b })));
+    .flatMap((s) => world.system(s.id).bodies.filter((b) => b.kind === "gasGiant" || b.kind === "iceGiant").map((b) => ({ s, b })))
+    .filter(({ b }) => deepestProfile(state, b.id) < maxDepth);
   if (giants.length === 0) return null;
   const { s, b } = rng.pick(giants);
-  const maxDepth = Math.max(2, effectiveStats(state).probeMaxDepth);
-  const depth = rng.int(2, maxDepth);
+  const depth = rng.int(Math.max(2, deepestProfile(state, b.id) + 1), maxDepth);
   const ly = distanceLy(world.galaxy, "intrepid", s.id);
   const clan: ClanId = rng.chance(0.6) ? "lyceum" : "helm";
   const band = ["", "cloud tops", "middle decks", "deep layers", "abyss"][depth];
@@ -438,10 +447,8 @@ export function contractProgress(state: GameState, c: Contract): ContractProgres
       return { have, need, ready: aboard >= need, label: `${have} / ${need} ${c.species ? c.species : "samples"} collected` };
     }
     case "probe": {
-      const since = c.acceptedAt ?? 0;
-      const done = (state.probeHistory ?? []).some(
-        (d) => d.bodyId === c.bodyId && d.depth >= (c.depth ?? 1) && d.outcome !== "lost" && d.t >= since,
-      );
+      // Any recovered dive that deep counts, even one flown before signing (AW-248): the data is the data.
+      const done = deepestProfile(state, c.bodyId ?? "") >= (c.depth ?? 1);
       return { have: done ? 1 : 0, need: 1, ready: done, label: done ? "profile taken, probe recovered" : "dive not yet flown" };
     }
     case "passengers": {
