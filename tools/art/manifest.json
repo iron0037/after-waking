@@ -16,7 +16,8 @@
     {
       "id": "freighter",
       "prompt": "small boxy cargo freighter starship, worn gray hull with faded orange stripes, cargo pods, top-down view, isolated on plain gray background",
-      "seed": 1556087656
+      "seed": 1556087656,
+      "note": "Retired (AW-253): don't promote. public/assets/freighter.png is now made from freighter-landed by tools/art/outline_freighter.py."
     },
     {
       "id": "rover",

@@ -1,6 +1,7 @@
 """
 Makes public/assets/freighter-surface.png from freighter-landed.png (AW-212): the landed freighter on the
-surface map, readable on grey rock.
+surface map, readable on grey rock. Also writes public/assets/freighter.png, the same ship with its shadow
+dropped, for the Shipyard (AW-253): the starter freighter has one look everywhere.
 
 - The baked-in shadow (opaque grey-purple touching the outside) becomes translucent dark, so it darkens the
   ground under it instead of reading as more grey hull.
@@ -13,6 +14,7 @@ from PIL import Image
 
 SRC = "public/assets/freighter-landed.png"
 DST = "public/assets/freighter-surface.png"
+YARD = "public/assets/freighter.png"
 SHADOW_RGB = (92, 83, 87)
 SHADOW_OUT = (8, 6, 14, 110)
 DARK = (24, 16, 10, 255)
@@ -89,3 +91,14 @@ for y in range(-PAD, H + PAD):
             o[x + PAD, y + PAD] = AMBER
 out.save(DST)
 print(f"wrote {DST} ({out.width}x{out.height})")
+
+# The Shipyard's picture: hull pixels only, trimmed.
+yard = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+y_px = yard.load()
+for y in range(H):
+    for x in range(W):
+        if hull(x, y):
+            y_px[x, y] = px[x, y]
+yard = yard.crop(yard.getbbox())
+yard.save(YARD)
+print(f"wrote {YARD} ({yard.width}x{yard.height})")
