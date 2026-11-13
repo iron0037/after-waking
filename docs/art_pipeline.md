@@ -39,6 +39,11 @@
 3. **Background removal** for sprites (e.g. `rembg`), then trim.
 4. Integer-scale upward in-engine. Never use smooth filtering.
 
+### Variants of an existing asset (img2img)
+A manifest entry with `"init"` (a file under `tools/art/output/`) and `"denoise"` repaints that image through `/sdapi/v1/img2img` instead of starting from noise, so the result keeps the original's design.
+
+Image-to-image keeps the outline, so it won't add parts outside it. For the landed ships (AW-252), `tools/art/landing_legs.py` first sketches four splayed legs with foot pads behind each hull's raw image. The `hull-<id>-landed` entries then repaint that sketch at denoise 0.4. `tools/art/outline_hulls.py` turns the promoted `hull-<id>-landed.png` into the surface map's `hull-<id>-surface.png`.
+
 ### Consistency rules
 - One checkpoint and one LoRA weight for the whole project.
 - A fixed style suffix appended to every prompt.

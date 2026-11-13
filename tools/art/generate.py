@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent
 OUTPUT = ROOT / "output"
 PUBLIC = ROOT.parent.parent / "public" / "assets"
 API = "http://127.0.0.1:7860/sdapi/v1/txt2img"
+IMG2IMG = "http://127.0.0.1:7860/sdapi/v1/img2img"
 
 
 def load_manifest() -> dict:
@@ -46,6 +47,29 @@ def txt2img(prompt: str, negative: str, seed: int, opts: dict) -> Image.Image:
         "height": opts["height"],
     }
     req = urllib.request.Request(API, json.dumps(body).encode(), {"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=900) as resp:
+        data = json.load(resp)
+    return Image.open(io.BytesIO(base64.b64decode(data["images"][0]))).convert("RGB")
+
+
+def img2img(prompt: str, negative: str, seed: int, opts: dict, init: Image.Image) -> Image.Image:
+    """Repaint an existing raw image (an asset's "init"), keeping its design; "denoise" sets how much changes."""
+    buf = io.BytesIO()
+    init.convert("RGB").resize((opts["width"], opts["height"])).save(buf, format="PNG")
+    body = {
+        "prompt": prompt,
+        "negative_prompt": negative,
+        "seed": seed,
+        "steps": opts["steps"],
+        "cfg_scale": opts["cfg"],
+        "sampler_name": opts["sampler"],
+        "scheduler": opts["scheduler"],
+        "width": opts["width"],
+        "height": opts["height"],
+        "init_images": [base64.b64encode(buf.getvalue()).decode()],
+        "denoising_strength": opts.get("denoise", 0.5),
+    }
+    req = urllib.request.Request(IMG2IMG, json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=900) as resp:
         data = json.load(resp)
     return Image.open(io.BytesIO(base64.b64decode(data["images"][0]))).convert("RGB")
@@ -140,7 +164,8 @@ def build(asset: dict, manifest: dict, seed: int) -> Path:
     folder = OUTPUT / asset["id"]
     folder.mkdir(parents=True, exist_ok=True)
     negative = manifest["negative"] + (f", {asset['negative']}" if asset.get("negative") else "")
-    raw = txt2img(prompt, negative, seed, opts)
+    # "init": an earlier raw image (output/<id>/<seed>-raw.png) to repaint instead of starting from noise.
+    raw = img2img(prompt, negative, seed, opts, Image.open(OUTPUT / asset["init"])) if asset.get("init") else txt2img(prompt, negative, seed, opts)
     raw.save(folder / f"{seed}-raw.png")
     img = process(raw, opts)
     path = folder / f"{seed}.png"

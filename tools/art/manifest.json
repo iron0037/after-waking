@@ -266,6 +266,64 @@
       "prompt": "small military patrol base with a radar tower, gun emplacements and a walled compound, blue and white buildings, top-down view looking straight down from above, a small compact base on bare ground, isolated on plain gray background",
       "negative": "drop shadow, cast shadow, people, text",
       "seed": 9700
+    },
+    {
+      "id": "hull-firstRate-landed",
+      "prompt": "sleek streamlined cargo freighter starship, clean pale gray hull with crisp blue stripes, compact cargo pods, twin engines, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9910,
+      "init": "hull-firstRate-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames"
+    },
+    {
+      "id": "hull-bulker-landed",
+      "prompt": "huge wide boxy mining bulk freighter starship, heavy rust-brown hull with yellow hazard stripes, big open ore hoppers, thick stubby landing legs, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9920,
+      "init": "hull-bulker-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames",
+      "colors": 32,
+      "post": "python tools/art/deshadow.py hull-bulker-landed 9920 --color 119,108,106 --tol 16 --flat 5"
+    },
+    {
+      "id": "hull-scout-landed",
+      "prompt": "small slender long-range scout starship, narrow needle-shaped hull, two long fuel tanks along its sides, sensor dish at the nose, white hull with teal trim, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9931,
+      "init": "hull-scout-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames"
+    },
+    {
+      "id": "hull-listener-landed",
+      "prompt": "small dark stealthy starship, matte black and dark green hull, long antenna booms and a large dish, faint violet running lights, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9941,
+      "init": "hull-listener-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames"
+    },
+    {
+      "id": "hull-corsair-landed",
+      "prompt": "rugged patched pirate raider starship, mismatched hull plates, red and black paint, gun turrets, oversized engines, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9951,
+      "init": "hull-corsair-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames"
+    },
+    {
+      "id": "hull-destroyer-landed",
+      "prompt": "sleek angular warship starship, navy blue and steel gray armored hull, gun turrets along the spine, sharp prow, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, isolated on plain gray background",
+      "seed": 9960,
+      "init": "hull-destroyer-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, flying, engine flames"
+    },
+    {
+      "id": "hull-merchantman-landed",
+      "prompt": "one single large bulky armed merchant cargo starship with a solid elongated hull, cream and gold paint, cargo bay doors set into the hull, small gun turrets on the flanks, big engine block at the stern, parked on the ground with four landing legs splayed out at the corners, top-down view looking straight down, nose pointing toward the top of the image, symmetrical, flat even lighting with no shadow, isolated on plain gray background",
+      "seed": 9970,
+      "init": "hull-merchantman-landed/init.png",
+      "denoise": 0.4,
+      "negative": "drop shadow, cast shadow, shadow on the ground, drop shadow, cast shadow, flying, engine flames"
     }
   ]
 }

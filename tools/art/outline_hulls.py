@@ -1,6 +1,7 @@
 """
-Makes public/assets/hull-<id>-surface.png from each clan hull's sprite (AW-251): the landed ship on the
-surface map, readable on any ground, like freighter-surface.png (tools/art/outline_freighter.py).
+Makes public/assets/hull-<id>-surface.png from each clan hull's landed sprite, hull-<id>-landed.png (AW-251,
+AW-252): the landed ship on the surface map, readable on any ground, like freighter-surface.png
+(tools/art/outline_freighter.py). The landed sprites come from tools/art/landing_legs.py and generate.py.
 
 - The hull gets a 1 px dark outline and a 1 px amber rim outside it.
 - A see-through dark shadow falls down and to the right, so it sits on the ground.
@@ -62,4 +63,4 @@ def surface(src: str, dst: str) -> None:
 
 
 for h in HULLS:
-    surface(f"public/assets/hull-{h}.png", f"public/assets/hull-{h}-surface.png")
+    surface(f"public/assets/hull-{h}-landed.png", f"public/assets/hull-{h}-surface.png")

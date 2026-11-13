@@ -359,8 +359,9 @@ export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, hul
   const sprite = shipSurfaceSprite(hull);
   if (sprite) {
     // The hull's longer side spans about two hexes: bigger than the rover, still clear of the hexes around it.
-    // The sprite carries its own shadow.
-    const long = L.tw * 2;
+    // The clan hulls' sprites include their splayed landing legs (AW-252), so they draw a little larger to
+    // keep the hull itself about the freighter's size. The sprite carries its own shadow.
+    const long = L.tw * (hull === "freighter" ? 2 : 2.6);
     const k = long / (Math.max(sprite.naturalWidth, sprite.naturalHeight) - 2 * SHIP_SPRITE_PAD);
     const w = sprite.naturalWidth * k;
     const h = sprite.naturalHeight * k;
