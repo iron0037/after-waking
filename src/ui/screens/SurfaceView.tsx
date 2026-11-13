@@ -375,6 +375,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const [hexSel, setHexSelRaw] = useState<Vec2 | null>(null);
   // Lists: deposits by distance (default) or commodity name; worked-out and sampled sites always sink to the bottom.
   const [depSort, setDepSort] = useState<"dist" | "name">("dist");
+  // Flora and creatures sort the same way (AW-250).
+  const [floraSort, setFloraSort] = useState<"dist" | "name">("dist");
+  const [creatureSort, setCreatureSort] = useState<"dist" | "name">("dist");
   // "Show more" for the sampled / worked-out rows past the room the lists keep for them.
   const [showAllDone, setShowAllDone] = useState(false);
   // One selection at a time: a deposit, a flora site, or a bare hex.
@@ -840,7 +843,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // The clans' outposts on this world (AW-23), beside their pads.
     for (const o of knownOutposts(state, session.world)) if (o.bodyId === loc.bodyId) drawOutpost(ctx, L, o.pad, o.clan);
     drawShipBeacon(ctx, L, ship, t);
-    drawShip(ctx, L, ship);
+    drawShip(ctx, L, ship, state.ship.hull ?? "freighter");
     // Flagged but unidentified: a "?" until the sensors get close (the sweep in progress identifies some).
     const unknowns = sensedSites(state, surface, loc.bodyId, inView).filter((u) => !rc || (!rc.deposits.has(u.key) && !rc.flora.has(u.key)));
     drawUnknowns(ctx, L, unknowns, t);
@@ -873,7 +876,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     } else if (hover && hopping && !isShipTile(hover.tile)) {
       // Ghost ship where it would set down.
       ctx.globalAlpha = 0.55;
-      drawShip(ctx, L, hover.tile);
+      drawShip(ctx, L, hover.tile, state.ship.hull ?? "freighter");
       ctx.globalAlpha = 1;
       drawHoverTile(ctx, L, hover.tile);
     } else if (hover) drawHoverTile(ctx, L, hover.tile);
@@ -1545,14 +1548,22 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             <table class="data deposit-table">
               <thead>
                 <tr>
-                  <th>Creature</th>
-                  <th class="num">Dist</th>
+                  <th class={`sortable ${creatureSort === "name" ? "on" : ""}`} title="Sort by name" onClick={() => setCreatureSort("name")}>
+                    Creature{creatureSort === "name" ? " ▴" : ""}
+                  </th>
+                  <th class={`num sortable ${creatureSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setCreatureSort("dist")}>
+                    Dist{creatureSort === "dist" ? " ▴" : ""}
+                  </th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {[...creatures]
-                  .sort((a, b) => hexDistance(home, a) - hexDistance(home, b))
+                  .sort((a, b) =>
+                    creatureSort === "name"
+                      ? a.entry.name.localeCompare(b.entry.name) || hexDistance(home, a) - hexDistance(home, b)
+                      : hexDistance(home, a) - hexDistance(home, b),
+                  )
                   .map((c) => (
                     <tr
                       key={c.key}
@@ -1582,7 +1593,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         )}
 
         {floraFound.length > 0 && (() => {
-          const rows = floraFound.map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" })).sort((x, y) => x.dist - y.dist);
+          const rows = floraFound
+            .map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" }))
+            .sort((x, y) => (floraSort === "name" ? x.m.f.species.localeCompare(y.m.f.species) || x.dist - y.dist : x.dist - y.dist));
           const open = rows.filter((r) => !r.sampled);
           const done = rows.filter((r) => r.sampled);
           // Untapped sites always show; sampled ones fill whatever room is left.
@@ -1621,8 +1634,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               <table class="data deposit-table">
                 <thead>
                   <tr>
-                    <th>Species</th>
-                    <th class="num">Dist</th>
+                    <th class={`sortable ${floraSort === "name" ? "on" : ""}`} title="Sort by species name" onClick={() => setFloraSort("name")}>
+                      Species{floraSort === "name" ? " ▴" : ""}
+                    </th>
+                    <th class={`num sortable ${floraSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setFloraSort("dist")}>
+                      Dist{floraSort === "dist" ? " ▴" : ""}
+                    </th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -1642,8 +1659,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 </tbody>
               </table>
               <div class="muted small tbl-note">
-                Everything found on this world, nearest first. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a row to select it and
-                center the map; click it again to deselect.
+                Everything found on this world. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort; click a
+                row to select it and center the map, again to deselect.
               </div>
               <div class="flora-legend-row">
                 <RarityLegend />

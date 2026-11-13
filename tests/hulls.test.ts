@@ -285,3 +285,10 @@ describe("the Shipyard filter (AW-231)", () => {
     expect(yardStatus(s, "surveyArray")).toBe("equipped"); // built in
   });
 });
+
+describe("every class looks like itself on the surface (AW-251)", () => {
+  it("has a landed sprite", () => {
+    const files = Object.keys(import.meta.glob("../public/assets/*-surface.png", { query: "?url", eager: false })).map((p) => p.split("/").pop());
+    for (const h of HULLS) expect(files).toContain(h.id === "freighter" ? "freighter-surface.png" : `hull-${h.id}-surface.png`);
+  });
+});

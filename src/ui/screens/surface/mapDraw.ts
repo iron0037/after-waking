@@ -283,21 +283,24 @@ export function drawRegionBorders(ctx: CanvasRenderingContext2D, L: Layout, regi
   ctx.restore();
 }
 
-let shipSurfaceImg: HTMLImageElement | null = null;
+const shipSurfaceImgs = new Map<string, HTMLImageElement>();
 
-/** Transparent margin around the hull in freighter-surface.png, made by tools/art/outline_freighter.py. */
+/** Transparent margin around the hull in the surface sprites (tools/art/outline_freighter.py, outline_hulls.py). */
 const SHIP_SPRITE_PAD = 2;
 
 /**
- * The landed freighter seen from above (nose up), with a dark-and-amber outline and a see-through shadow so it
- * stands out on gray rock (AW-212); null if it is missing, broken or still loading.
+ * The landed ship seen from above (nose up), with a dark-and-amber outline and a see-through shadow so it
+ * stands out on gray rock (AW-212). Each class has its own (AW-251); null if missing, broken or still loading.
  */
-function shipSurfaceSprite(): HTMLImageElement | null {
-  if (!shipSurfaceImg && typeof Image !== "undefined") {
-    shipSurfaceImg = new Image();
-    shipSurfaceImg.src = "./assets/freighter-surface.png";
+function shipSurfaceSprite(hull: string): HTMLImageElement | null {
+  if (typeof Image === "undefined") return null;
+  let img = shipSurfaceImgs.get(hull);
+  if (!img) {
+    img = new Image();
+    img.src = hull === "freighter" ? "./assets/freighter-surface.png" : `./assets/hull-${hull}-surface.png`;
+    shipSurfaceImgs.set(hull, img);
   }
-  return shipSurfaceImg && shipSurfaceImg.complete && shipSurfaceImg.naturalWidth > 0 ? shipSurfaceImg : null;
+  return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
 const outpostImgs = new Map<string, HTMLImageElement>();
@@ -347,13 +350,13 @@ export function drawOutpost(ctx: CanvasRenderingContext2D, L: Layout, pad: Vec2,
   ctx.strokeRect(x - s, y - s * 0.6, s * 2, s * 1.2);
 }
 
-/** The freighter on its pad: the pixel-art sprite, or a little drawn lander if the sprite isn't loaded. */
-export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2): void {
+/** The ship on its pad: its class's pixel-art sprite, or a little drawn lander if the sprite isn't loaded. */
+export function drawShip(ctx: CanvasRenderingContext2D, L: Layout, at: Vec2, hull = "freighter"): void {
   const x = cx(L, at.x, at.y);
   const y = cy(L, at.x, at.y);
   const s = L.tw * 0.5;
   ctx.setLineDash([]);
-  const sprite = shipSurfaceSprite();
+  const sprite = shipSurfaceSprite(hull);
   if (sprite) {
     // The hull's longer side spans about two hexes: bigger than the rover, still clear of the hexes around it.
     // The sprite carries its own shadow.
