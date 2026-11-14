@@ -56,7 +56,8 @@ map, a star system, and a planet's surface.
 
 1. **Framework, on the surface view** (AW-255): the action rail, the panel toggle, and the surface
    view's Rover and Ship buttons moved onto the rail.
-2. **Surface view:** reorder its components (planet → ship → rover or boat → selected hex) and give
-   each a summary.
+2. **Surface view** (done): planet → outpost → ship → rover or boat → the lists (Deposits found,
+   Flora, Creatures) → the selection's detail, which scrolls into view when picked. Every component
+   has a summary, and the "select something" placeholder is gone.
 3. **System view:** split the world details and add selection filtering.
 4. **Star map:** the same treatment.

@@ -374,6 +374,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const [creatureKey, setCreatureKeyRaw] = useState<string | null>(null);
   // A plain hex the player clicked (no site on it): the Selected Hex card.
   const [hexSel, setHexSelRaw] = useState<Vec2 | null>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedKey || floraKey || creatureKey || hexSel) detailRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [selectedKey, floraKey, creatureKey, hexSel]);
   // Lists: deposits by distance (default) or commodity name; worked-out and sampled sites always sink to the bottom.
   const [depSort, setDepSort] = useState<"dist" | "name">("dist");
   // Flora and creatures sort the same way (AW-250).
@@ -1462,6 +1466,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
         {/* A clan outpost in this region (AW-23): fuel, its shop, the trading post. */}
         <OutpostPanel session={session} />
+        <ShipPanel vehicles={[rover, roverAboard, parkedBoat].filter((v): v is RoverState => v !== null)} stats={stats} state={state} bodyId={loc.bodyId} />
         <RoverPanel
           rover={rover}
           parkedBoat={parkedBoat}
@@ -1474,192 +1479,6 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
           stranded={stranded}
           onSafeRange={(on) => session.act((st) => setSafeRange(st, on), { timelapse: false })}
         />
-        <ShipPanel vehicles={[rover, roverAboard, parkedBoat].filter((v): v is RoverState => v !== null)} stats={stats} state={state} bodyId={loc.bodyId} />
-
-        {(() => {
-          // The other site on the same hex, if any, so it can be reached from here too.
-          const twinDep = selectedFlora ? depositAt(selectedFlora.f) : undefined;
-          const twinFlora = !selectedFlora && selected ? floraAt(selected.d) : undefined;
-          if (!twinDep && !twinFlora) return null;
-          return (
-            <div class="panel small twin-note">
-              Also on this hex:{" "}
-              {twinDep ? (
-                <button class="btn" onClick={() => setSelectedKey(twinDep.d.key)}>
-                  {COMMODITIES[twinDep.d.commodity].name} deposit
-                </button>
-              ) : (
-                twinFlora && (
-                  <button class="btn" onClick={() => setFloraKey(twinFlora.f.key)}>
-                    {twinFlora.f.species}
-                  </button>
-                )
-              )}
-            </div>
-          );
-        })()}
-        {selectedCreature ? (
-          <CreaturePanel session={session} creature={selectedCreature} rover={rover} goTo={() => driveTo(selectedCreature, true, true)} busy={busy} />
-        ) : selectedFlora ? (
-          <FloraPanel
-            session={session}
-            site={selectedFlora.f}
-            know={selectedFlora.know}
-            rover={rover}
-            atSite={atSite(selectedFlora.f)}
-            goTo={() => driveTo(selectedFlora.f, true, true)}
-            drive={() => void driveTo(selectedFlora.f, true)}
-            busy={busy}
-          />
-        ) : hexSel && hexData ? (
-          <HexPanel info={hexData} onClose={() => setHexSelRaw(null)} />
-        ) : selected ? (
-          <DepositPanel
-            session={session}
-            dep={selected.d}
-            know={selected.know}
-            rover={rover}
-            atSite={atSite(selected.d)}
-            goTo={() => driveTo(selected.d, true, true)}
-            drive={() => void driveTo(selected.d, true)}
-            work={(max) => void doWork(selected, max)}
-            busy={busy}
-          />
-        ) : (
-          <div class="panel muted small">
-            {discovered.length > 0 || floraFound.length > 0
-              ? "Select a deposit or plant site on the map or in the list."
-              : rover
-                ? `No deposits detected nearby yet. ${isBoat ? "Sail the boat" : "Drive the rover"} around to sweep with its sensors.`
-                : "Deploy the rover to start surveying."}
-          </div>
-        )}
-
-        {creatures.length > 0 && (
-          <Section id="creatures" title="Creatures" summary={`${creatures.length}`}>
-            <table class="data deposit-table">
-              <thead>
-                <tr>
-                  <th class={`sortable ${creatureSort === "name" ? "on" : ""}`} title="Sort by name" onClick={() => setCreatureSort("name")}>
-                    Creature{creatureSort === "name" ? " ▴" : ""}
-                  </th>
-                  <th class={`num sortable ${creatureSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setCreatureSort("dist")}>
-                    Dist{creatureSort === "dist" ? " ▴" : ""}
-                  </th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...creatures]
-                  .sort((a, b) =>
-                    creatureSort === "name"
-                      ? a.entry.name.localeCompare(b.entry.name) || hexDistance(home, a) - hexDistance(home, b)
-                      : hexDistance(home, a) - hexDistance(home, b),
-                  )
-                  .map((c) => (
-                    <tr
-                      key={c.key}
-                      class={`${c.key === creatureKey ? "sel" : ""} ${c.down ? "dim" : ""}`}
-                      onClick={() => setCreatureKey(c.key === creatureKey ? null : c.key)}
-                      title={c.entry.blurb}
-                    >
-                      <td>
-                        <span class="creature-dot" style={{ background: TEMPERAMENT_COLOR[c.entry.temperament] }} />
-                        {c.entry.name}
-                      </td>
-                      <td class="num">{hexDistance(home, c)}</td>
-                      <td>
-                        {c.down ? (
-                          <span class="muted">out cold</span>
-                        ) : isHunter(c.entry) ? (
-                          <span class="tag danger">{c.entry.temperament === "hostile" ? "hunter" : "territorial"}</span>
-                        ) : (
-                          <span class="muted">{c.entry.temperament}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </Section>
-        )}
-
-        {floraFound.length > 0 && (() => {
-          const rows = floraFound
-            .map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" }))
-            .sort((x, y) => (floraSort === "name" ? x.m.f.species.localeCompare(y.m.f.species) || x.dist - y.dist : x.dist - y.dist));
-          const open = rows.filter((r) => !r.sampled);
-          const done = rows.filter((r) => r.sampled);
-          // Untapped sites always show; sampled ones fill whatever room is left.
-          const doneShown = showAllDone ? done : done.slice(0, Math.max(0, LIST_ROOM - open.length));
-          const row = ({ m, dist, sampled }: (typeof rows)[number]) => {
-            const { f } = m;
-            const rarity = floraRarity(f.species);
-            const wanted = specimenResearchUses(state, f.species);
-            const tip = [rarity ? `${f.species}: ${RARITY_LABEL[rarity]} specimen` : "", wanted.length ? `Research wants it: ${wanted.join(", ")}` : ""].filter(Boolean).join(". ");
-            return (
-              <tr
-                key={f.key}
-                class={`${f.key === selectedFlora?.f.key ? "sel" : ""} ${sampled ? "dim" : ""}`}
-                title={f.region !== active ? `In region ${f.region + 1}` : undefined}
-                onClick={() => {
-                  if (f.key === selectedFlora?.f.key) setFloraKey(null);
-                  else {
-                    setFloraKey(f.key);
-                    centreOn(f);
-                  }
-                }}
-              >
-                <td title={tip || undefined}>
-                  <LeafMark species={f.species} />
-                  {f.species}
-                  {wanted.length > 0 && !sampled && <span class="tag" title={`Bio-Assay: ${wanted.join(", ")}`}> research</span>}
-                  {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
-                </td>
-                <td class="num">{dist}</td>
-                <td>{sampled ? <span class="muted">sampled ✓</span> : <span class="tag new">new</span>}</td>
-              </tr>
-            );
-          };
-          return (
-            <Section id="flora" title="Flora" summary={`${open.length} to sample${done.length ? ` · ${done.length} sampled` : ""}`}>
-              <table class="data deposit-table">
-                <thead>
-                  <tr>
-                    <th class={`sortable ${floraSort === "name" ? "on" : ""}`} title="Sort by species name" onClick={() => setFloraSort("name")}>
-                      Species{floraSort === "name" ? " ▴" : ""}
-                    </th>
-                    <th class={`num sortable ${floraSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setFloraSort("dist")}>
-                      Dist{floraSort === "dist" ? " ▴" : ""}
-                    </th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {open.map(row)}
-                  {open.length > 0 && done.length > 0 && (
-                    <tr class="sep-row">
-                      <td colSpan={3}>Sampled ({done.length})</td>
-                    </tr>
-                  )}
-                  {doneShown.map(row)}
-                  {doneShown.length < done.length && (
-                    <tr class="sep-row more-row" onClick={() => setShowAllDone(true)}>
-                      <td colSpan={3}>Show {done.length - doneShown.length} more sampled</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-              <div class="muted small tbl-note">
-                Everything found on this world. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort; click a
-                row to select it and center the map, again to deselect.
-              </div>
-              <div class="flora-legend-row">
-                <RarityLegend />
-              </div>
-            </Section>
-          );
-        })()}
 
         {discovered.length > 0 && (() => {
           const rows = discovered.map((m) => ({ m, dist: hexDistance(home, m.d), status: depositStatus(m.know, m.d) }));
@@ -1764,6 +1583,197 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             </Section>
           );
         })()}
+
+        {floraFound.length > 0 && (() => {
+          const rows = floraFound
+            .map((m) => ({ m, dist: hexDistance(home, m.f), sampled: floraStatus(m.know, m.f) === "sampled" }))
+            .sort((x, y) => (floraSort === "name" ? x.m.f.species.localeCompare(y.m.f.species) || x.dist - y.dist : x.dist - y.dist));
+          const open = rows.filter((r) => !r.sampled);
+          const done = rows.filter((r) => r.sampled);
+          // Untapped sites always show; sampled ones fill whatever room is left.
+          const doneShown = showAllDone ? done : done.slice(0, Math.max(0, LIST_ROOM - open.length));
+          const row = ({ m, dist, sampled }: (typeof rows)[number]) => {
+            const { f } = m;
+            const rarity = floraRarity(f.species);
+            const wanted = specimenResearchUses(state, f.species);
+            const tip = [rarity ? `${f.species}: ${RARITY_LABEL[rarity]} specimen` : "", wanted.length ? `Research wants it: ${wanted.join(", ")}` : ""].filter(Boolean).join(". ");
+            return (
+              <tr
+                key={f.key}
+                class={`${f.key === selectedFlora?.f.key ? "sel" : ""} ${sampled ? "dim" : ""}`}
+                title={f.region !== active ? `In region ${f.region + 1}` : undefined}
+                onClick={() => {
+                  if (f.key === selectedFlora?.f.key) setFloraKey(null);
+                  else {
+                    setFloraKey(f.key);
+                    centreOn(f);
+                  }
+                }}
+              >
+                <td title={tip || undefined}>
+                  <LeafMark species={f.species} />
+                  {f.species}
+                  {wanted.length > 0 && !sampled && <span class="tag" title={`Bio-Assay: ${wanted.join(", ")}`}> research</span>}
+                  {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
+                </td>
+                <td class="num">{dist}</td>
+                <td>{sampled ? <span class="muted">sampled ✓</span> : <span class="tag new">new</span>}</td>
+              </tr>
+            );
+          };
+          return (
+            <Section id="flora" title="Flora" summary={`${open.length} to sample${done.length ? ` · ${done.length} sampled` : ""}`}>
+              <table class="data deposit-table">
+                <thead>
+                  <tr>
+                    <th class={`sortable ${floraSort === "name" ? "on" : ""}`} title="Sort by species name" onClick={() => setFloraSort("name")}>
+                      Species{floraSort === "name" ? " ▴" : ""}
+                    </th>
+                    <th class={`num sortable ${floraSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setFloraSort("dist")}>
+                      Dist{floraSort === "dist" ? " ▴" : ""}
+                    </th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {open.map(row)}
+                  {open.length > 0 && done.length > 0 && (
+                    <tr class="sep-row">
+                      <td colSpan={3}>Sampled ({done.length})</td>
+                    </tr>
+                  )}
+                  {doneShown.map(row)}
+                  {doneShown.length < done.length && (
+                    <tr class="sep-row more-row" onClick={() => setShowAllDone(true)}>
+                      <td colSpan={3}>Show {done.length - doneShown.length} more sampled</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <div class="muted small tbl-note">
+                Everything found on this world. Distance in tiles from {rover ? `the ${noun}` : "the ship"}. Click a column header to sort; click a
+                row to select it and center the map, again to deselect.
+              </div>
+              <div class="flora-legend-row">
+                <RarityLegend />
+              </div>
+            </Section>
+          );
+        })()}
+
+        {creatures.length > 0 && (
+          <Section id="creatures" title="Creatures" summary={`${creatures.length} seen`}>
+            <table class="data deposit-table">
+              <thead>
+                <tr>
+                  <th class={`sortable ${creatureSort === "name" ? "on" : ""}`} title="Sort by name" onClick={() => setCreatureSort("name")}>
+                    Creature{creatureSort === "name" ? " ▴" : ""}
+                  </th>
+                  <th class={`num sortable ${creatureSort === "dist" ? "on" : ""}`} title="Sort by distance" onClick={() => setCreatureSort("dist")}>
+                    Dist{creatureSort === "dist" ? " ▴" : ""}
+                  </th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...creatures]
+                  .sort((a, b) =>
+                    creatureSort === "name"
+                      ? a.entry.name.localeCompare(b.entry.name) || hexDistance(home, a) - hexDistance(home, b)
+                      : hexDistance(home, a) - hexDistance(home, b),
+                  )
+                  .map((c) => (
+                    <tr
+                      key={c.key}
+                      class={`${c.key === creatureKey ? "sel" : ""} ${c.down ? "dim" : ""}`}
+                      onClick={() => setCreatureKey(c.key === creatureKey ? null : c.key)}
+                      title={c.entry.blurb}
+                    >
+                      <td>
+                        <span class="creature-dot" style={{ background: TEMPERAMENT_COLOR[c.entry.temperament] }} />
+                        {c.entry.name}
+                      </td>
+                      <td class="num">{hexDistance(home, c)}</td>
+                      <td>
+                        {c.down ? (
+                          <span class="muted">out cold</span>
+                        ) : isHunter(c.entry) ? (
+                          <span class="tag danger">{c.entry.temperament === "hostile" ? "hunter" : "territorial"}</span>
+                        ) : (
+                          <span class="muted">{c.entry.temperament}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </Section>
+        )}
+
+        {/* What's selected, on the map or in a list above: its detail comes last (docs/ui_design.md). */}
+        <div ref={detailRef} class="side-detail">
+        {(() => {
+          // The other site on the same hex, if any, so it can be reached from here too.
+          const twinDep = selectedFlora ? depositAt(selectedFlora.f) : undefined;
+          const twinFlora = !selectedFlora && selected ? floraAt(selected.d) : undefined;
+          if (!twinDep && !twinFlora) return null;
+          return (
+            <div class="panel small twin-note">
+              Also on this hex:{" "}
+              {twinDep ? (
+                <button class="btn" onClick={() => setSelectedKey(twinDep.d.key)}>
+                  {COMMODITIES[twinDep.d.commodity].name} deposit
+                </button>
+              ) : (
+                twinFlora && (
+                  <button class="btn" onClick={() => setFloraKey(twinFlora.f.key)}>
+                    {twinFlora.f.species}
+                  </button>
+                )
+              )}
+            </div>
+          );
+        })()}
+        {selectedCreature ? (
+          <CreaturePanel session={session} creature={selectedCreature} rover={rover} goTo={() => driveTo(selectedCreature, true, true)} busy={busy} />
+        ) : selectedFlora ? (
+          <FloraPanel
+            session={session}
+            site={selectedFlora.f}
+            know={selectedFlora.know}
+            rover={rover}
+            atSite={atSite(selectedFlora.f)}
+            goTo={() => driveTo(selectedFlora.f, true, true)}
+            drive={() => void driveTo(selectedFlora.f, true)}
+            busy={busy}
+          />
+        ) : hexSel && hexData ? (
+          <HexPanel info={hexData} onClose={() => setHexSelRaw(null)} />
+        ) : selected ? (
+          <DepositPanel
+            session={session}
+            dep={selected.d}
+            know={selected.know}
+            rover={rover}
+            atSite={atSite(selected.d)}
+            goTo={() => driveTo(selected.d, true, true)}
+            drive={() => void driveTo(selected.d, true)}
+            work={(max) => void doWork(selected, max)}
+            busy={busy}
+          />
+        ) : (
+          discovered.length === 0 &&
+          floraFound.length === 0 &&
+          creatures.length === 0 && (
+            <div class="panel muted small">
+              {rover
+                ? `Nothing detected nearby yet. ${isBoat ? "Sail the boat" : "Drive the rover"} around to sweep with its sensors.`
+                : "Deploy the rover to start surveying."}
+            </div>
+          )
+        )}
+
+        </div>
       </aside>
     </>
   );
@@ -1907,7 +1917,7 @@ function ShipPanel({
     (c) => c.status === "active" && c.kind === "specimens" && (c.bodyId === bodyId || (!!c.species && (c.bodyIds ?? []).includes(bodyId))),
   );
   return (
-    <Section id="ship" title="Ship hold" summary={`${tonnes(hold)} / ${tonnes(stats.cargoCapacityT)}`}>
+    <Section id="ship" title="Ship" summary={`hold ${tonnes(hold)} / ${tonnes(stats.cargoCapacityT)} · fuel ${Math.round(state.ship.fuel)}`}>
       <dl class="kv">
         <dt>Hold</dt>
         <dd>
@@ -1996,7 +2006,7 @@ function HexPanel({ info, onClose }: { info: HexInfo; onClose: () => void }) {
   const vName = route ? (route.vehicle === "boat" ? "Boat" : "Rover") : "";
   const go = route?.vehicle === "boat" ? "sail" : "drive";
   return (
-    <Section id="hex" title="Selected hex" class="deposit-panel hex-panel" revealKey={`${info.x},${info.y}`}>
+    <Section id="hex" title="Selected hex" class="deposit-panel hex-panel" revealKey={`${info.x},${info.y}`} summary={info.terrain}>
       <div class="hex-head">
         <span class="hex-title">{info.terrain}</span>
         {!info.explored && (
@@ -2109,7 +2119,7 @@ function FloraPanel({
     if (r.ok) session.notify(`Collected a living sample of ${site.species}.`);
   };
   return (
-    <Section id="plants" title="Selected plants" class="deposit-panel" revealKey={site.key}>
+    <Section id="plants" title="Selected plants" class="deposit-panel" revealKey={site.key} summary={site.species}>
       <div class="creature-head">
         {floraEntry && <CompIcon index={sprites} entryKey={compendiumKey("flora", floraEntry.id)} color={floraEntry.color} found />}
         <div>
@@ -2253,7 +2263,7 @@ function DepositPanel({
   };
 
   return (
-    <Section id="deposit" title="Selected deposit" class="deposit-panel" revealKey={dep.key}>
+    <Section id="deposit" title="Selected deposit" class="deposit-panel" revealKey={dep.key} summary={commodity.name}>
       <div class="dep-title" title={commodity.blurb}>
         <i class="swatch big" style={{ background: status === "depleted" ? "#5b6472" : commodity.color }} />
         <span>{commodity.name}</span>

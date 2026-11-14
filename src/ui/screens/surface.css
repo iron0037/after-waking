@@ -361,3 +361,13 @@
   padding: 3px 0;
   font-size: 0.9em;
 }
+
+/* The selection's detail, under the lists (docs/ui_design.md). */
+.side-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.side-detail:empty {
+  display: none;
+}

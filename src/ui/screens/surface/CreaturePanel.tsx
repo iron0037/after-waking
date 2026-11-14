@@ -63,7 +63,7 @@ export function CreaturePanel({
   };
 
   return (
-    <Section id="creature" title="Selected creature" class="deposit-panel" revealKey={c.key}>
+    <Section id="creature" title="Selected creature" class="deposit-panel" revealKey={c.key} summary={c.entry.name}>
       <div class="creature-head">
         <CompIcon index={sprites} entryKey={compendiumKey("fauna", c.entry.id)} color={c.entry.color} found />
         <div>
