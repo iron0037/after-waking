@@ -1226,9 +1226,34 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         else doLaunch(false);
       }
     } else if (key === "f") {
-      if (selected) void doWork(selected, lastHaulTarget > 0 ? lastHaulTarget : Infinity);
-      else session.notify("Select a deposit first.", "error");
+      // The selected deposit, or the one the vehicle is beside (AW-258).
+      const mark = selected ?? hereDep;
+      if (mark) void doWork(mark, lastHaulTarget > 0 ? lastHaulTarget : Infinity);
+      else session.notify("Select a deposit, or drive up to one.", "error");
     }
+  };
+
+  // The site the rover or boat is on or beside (AW-258): the selected one if it's that close, else the nearest.
+  // Its verbs go on the action rail, so you needn't find it in the panel.
+  const hereOf = <T,>(items: T[], at: (t: T) => Vec2, chosen: T | null | undefined): T | null => {
+    if (!rover) return null;
+    const close = items.filter((t) => hexDistance(rover, at(t)) <= 1 && vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, at(t)), "deposit") === null);
+    if (chosen && close.includes(chosen)) return chosen;
+    return close.sort((a, b) => hexDistance(rover, at(a)) - hexDistance(rover, at(b)))[0] ?? null;
+  };
+  const hereDep = hereOf(
+    discovered.filter((m) => depositStatus(m.know, m.d) !== "depleted"),
+    (m) => m.d,
+    discovered.find((m) => m.d.key === selected?.d.key),
+  );
+  const hereFlora = hereOf(
+    floraFound.filter((m) => floraStatus(m.know, m.f) !== "sampled"),
+    (m) => m.f,
+    floraFound.find((m) => m.f.key === selectedFlora?.f.key),
+  );
+  const workHere = (mark: DepositMark): void => {
+    setSelectedKey(mark.d.key);
+    void doWork(mark, lastHaulTarget > 0 ? lastHaulTarget : Infinity);
   };
 
   const activeMap = currentRegion(state, world);
@@ -1405,6 +1430,60 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         detail: `The ${noun} can't get home on its own. The ship hops over and winches ${isBoat || parkedBoat ? "everything" : "it"} aboard: ${RECALL_FUEL} fuel and 3 h.`,
                         blocked: state.ship.fuel < RECALL_FUEL ? `Needs ${RECALL_FUEL} fuel.` : null,
                         onClick: () => session.act((s, w) => recallRover(s, w)),
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              label: "Here",
+              actions: [
+                ...(hereDep && !hereDep.know.prospected.includes(hereDep.d.id)
+                  ? [
+                      {
+                        id: "prospect",
+                        icon: "prospect" as const,
+                        label: `Prospect the ${COMMODITIES[hereDep.d.commodity].name.toLowerCase()}`,
+                        detail: "Take core samples to learn the seam's grade and size.",
+                        blocked: rover && rover.energy < PROSPECT_ENERGY ? `Core samples need ${PROSPECT_ENERGY} ${noun} energy.` : null,
+                        onClick: () => {
+                          setSelectedKey(hereDep.d.key);
+                          session.act((s, w) => prospect(s, w, hereDep.d.key));
+                        },
+                      },
+                    ]
+                  : []),
+                ...(hereDep
+                  ? [
+                      {
+                        id: "work",
+                        icon: "drill" as const,
+                        label: `${isBoat ? "Dredge" : "Mine"} the ${COMMODITIES[hereDep.d.commodity].name.toLowerCase()}`,
+                        hotkey: "F",
+                        detail: `The crew ${isBoat ? "dredge" : "drill"} it and haul loads to the ship${lastHaulTarget > 0 ? `, ${lastHaulTarget} t` : " until the hold is full or the seam runs out"}.`,
+                        blocked: workBlockers(state, world, hereDep.know, hereDep.d)[0] ?? null,
+                        onClick: () => workHere(hereDep),
+                      },
+                    ]
+                  : []),
+                ...(hereFlora
+                  ? [
+                      {
+                        id: "sample",
+                        icon: "sample" as const,
+                        label: `Sample the ${hereFlora.f.species}`,
+                        detail: "Take a living sample into the sample cases.",
+                        blocked:
+                          rover && specimenCount(rover.specimens) >= roverSpecimenSlots(state)
+                            ? `The ${noun}'s sample cases are full: stow at the ship.`
+                            : rover && rover.energy < SAMPLE_ENERGY
+                              ? `The sample kit needs ${SAMPLE_ENERGY} ${noun} energy.`
+                              : null,
+                        onClick: () => {
+                          setFloraKey(hereFlora.f.key);
+                          const r = session.act((s, w) => collectSample(s, w, hereFlora.f.key));
+                          if (r.ok) session.notify(`Collected a living sample of ${hereFlora.f.species}.`);
+                        },
                       },
                     ]
                   : []),

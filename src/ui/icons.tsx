@@ -16,7 +16,10 @@ export type IconName =
   | "board"
   | "rescue"
   | "move"
-  | "liftoff";
+  | "liftoff"
+  | "prospect"
+  | "drill"
+  | "sample";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -98,6 +101,30 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="M12 3v18M3 12h18" />
       <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
+    </>
+  ),
+  // A magnifier over a core: prospect.
+  prospect: (
+    <>
+      <circle cx="10" cy="10" r="6" />
+      <path d="M14.5 14.5L20 20" />
+      <path d="M8 10h4M10 8v4" />
+    </>
+  ),
+  // A pick: work the deposit.
+  drill: (
+    <>
+      <path d="M4 8c4-4 12-4 16 0" />
+      <path d="M12 5.5V20" />
+      <path d="M10 20h4" />
+    </>
+  ),
+  // A sample tube with a sprig in it: collect a living sample.
+  sample: (
+    <>
+      <path d="M9 3h6" />
+      <path d="M10 3v14a2 2 0 0 0 4 0V3" />
+      <path d="M12 15c0-3 1.5-4.5 3.5-5M12 12.5c0-2-1-3-2.5-3.5" />
     </>
   ),
   // Up to orbit.
