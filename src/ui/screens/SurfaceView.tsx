@@ -75,6 +75,7 @@ import {
   roverChargePerHour,
   roverMobility,
   siteOnWater,
+  siteReach,
   roverSpecimenSlots,
   routeEnergyMult,
   hasPerk,
@@ -130,7 +131,7 @@ import { UI } from "../palette";
 import { useSession, type GameSession } from "../session";
 import { useArchiveTopic } from "../ArchivePanel";
 import { RescuePanel } from "../Rescue";
-import { floraRarity, LeafMark, RARITY_LABEL, RarityLegend } from "../rarity";
+import { CreatureGlyph, floraRarity, LeafMark, RARITY_LABEL, RarityLegend } from "../rarity";
 import { terrainHex, terrainSwatch } from "./surface/terrainTextures";
 import { Canvas } from "../Canvas";
 import {
@@ -1517,7 +1518,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               >
                 <td title={priceTip}>
                   <i class="swatch" style={{ background: status === "depleted" ? "#5b6472" : c.color }} />
-                  {c.name}
+                  {(() => {
+                    const reach = siteReach(state, world, loc.bodyId, d, d.depthM);
+                    return (
+                      <span class={`reach-${reach.tier}`} title={reach.why ?? "You can work this with the gear aboard"}>
+                        {c.name}
+                      </span>
+                    );
+                  })()}
                   {siteOnWater(world, loc.bodyId, d) && <span class="tag sea" title="Seabed deposit: dredge it from the boat"> seabed</span>}
                   {surface.terrainAt(d.x, d.y) === Terrain.mountain && (
                     <span class="tag" title="Up in the mountains: the drill rig needs all-terrain treads to reach it">
@@ -1611,8 +1619,15 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                 }}
               >
                 <td title={tip || undefined}>
-                  <LeafMark species={f.species} />
-                  {f.species}
+                  <LeafMark species={f.species} sea={siteOnWater(world, loc.bodyId, f)} />
+                  {(() => {
+                    const reach = siteReach(state, world, loc.bodyId, f);
+                    return (
+                      <span class={`reach-${reach.tier}`} title={reach.why ?? "You can sample this with the gear aboard"}>
+                        {f.species}
+                      </span>
+                    );
+                  })()}
                   {wanted.length > 0 && !sampled && <span class="tag" title={`Bio-Assay: ${wanted.join(", ")}`}> research</span>}
                   {siteOnWater(world, loc.bodyId, f) && <span class="tag sea" title="Sea life: sample it from the boat"> sea</span>}
                 </td>
@@ -1690,7 +1705,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       title={c.entry.blurb}
                     >
                       <td>
-                        <span class="creature-dot" style={{ background: TEMPERAMENT_COLOR[c.entry.temperament] }} />
+                        <CreatureGlyph aquatic={!!c.entry.aquatic} color={TEMPERAMENT_COLOR[c.entry.temperament]} />
                         {c.entry.name}
                       </td>
                       <td class="num">{hexDistance(home, c)}</td>
@@ -2124,7 +2139,7 @@ function FloraPanel({
         {floraEntry && <CompIcon index={sprites} entryKey={compendiumKey("flora", floraEntry.id)} color={floraEntry.color} found />}
         <div>
           <div class="dep-title">
-            <LeafMark species={site.species} big />
+            <LeafMark species={site.species} big sea={wet} />
             <span>{site.species}</span>
           </div>
           <div class="dep-title">

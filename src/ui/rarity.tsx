@@ -9,13 +9,48 @@ export function floraRarity(species: string): Rarity | undefined {
   return FLORA_BY_NAME.get(species)?.rarity ?? CREATURES_BY_NAME.get(species)?.rarity;
 }
 
-/** The leaf icon for a species, ringed by its rarity. */
-export function LeafMark({ species, big = false, class: cls = "" }: { species: string; big?: boolean; class?: string }) {
+/**
+ * The icon for a species, ringed by its rarity: a leaf, or kelp for sea plants (`sea`); a paw or a fish for
+ * creatures (AW-257), as on the surface map.
+ */
+export function LeafMark({ species, big = false, sea = false, class: cls = "" }: { species: string; big?: boolean; sea?: boolean; class?: string }) {
   const r = floraRarity(species);
-  // Creatures (AW-215) show as a swatch of their color.
   const beast = CREATURES_BY_NAME.get(species);
-  if (beast) return <i class={`creature-dot ${big ? "big" : ""} ${cls}`} style={{ background: beast.color }} title={r ? `${RARITY_LABEL[r]} creature specimen` : undefined} />;
+  if (beast) return <CreatureGlyph aquatic={!!beast.aquatic} color={beast.color} big={big} title={r ? `${RARITY_LABEL[r]} creature specimen` : undefined} />;
+  if (sea)
+    return (
+      <i class={`leaf-mark sea ${big ? "big" : ""} ${r ? `rar${r}` : ""} ${cls}`} title={r ? `${RARITY_LABEL[r]} sea-life specimen` : "sea life"}>
+        <svg viewBox="0 0 12 14" aria-hidden="true">
+          <path d="M3 13c1.5-2 -1.5-4 0-6s0-3 0-4M6 13c-1.5-2 1.5-4 0-7s0-3 0-5M9 13c1.5-2 -1.5-4 0-6s0-3 0-4" />
+        </svg>
+      </i>
+    );
   return <i class={`leaf-mark ${big ? "big" : ""} ${r ? `rar${r}` : ""} ${cls}`} title={r ? `${RARITY_LABEL[r]} specimen` : undefined} />;
+}
+
+/** A creature's icon in a list (AW-257): a paw, or a fish for sea creatures, in the given color. */
+export function CreatureGlyph({ aquatic, color, big = false, title }: { aquatic: boolean; color: string; big?: boolean; title?: string }) {
+  const size = big ? 16 : 13;
+  return (
+    <svg class="creature-glyph" width={size} height={size} viewBox="-10 -10 20 20" aria-label={title ?? (aquatic ? "sea creature" : "creature")} role="img">
+      {title && <title>{title}</title>}
+      <circle r="9.5" fill={aquatic ? "rgb(10, 42, 78)" : "rgb(5, 7, 15)"} />
+      {aquatic ? (
+        <g fill={color}>
+          <ellipse cx="1.5" cy="0" rx="5" ry="3" />
+          <path d="M-2.5 0 L-7.5 -3.5 L-7.5 3.5 Z" />
+        </g>
+      ) : (
+        <g fill={color}>
+          <ellipse cx="0" cy="2.6" rx="3.8" ry="3.1" />
+          <ellipse cx="-4.4" cy="-1.1" rx="1.4" ry="1.7" />
+          <ellipse cx="-1.6" cy="-4.3" rx="1.4" ry="1.7" />
+          <ellipse cx="1.6" cy="-4.3" rx="1.4" ry="1.7" />
+          <ellipse cx="4.4" cy="-1.1" rx="1.4" ry="1.7" />
+        </g>
+      )}
+    </svg>
+  );
 }
 
 /** A tiny key to the ring colors. */
