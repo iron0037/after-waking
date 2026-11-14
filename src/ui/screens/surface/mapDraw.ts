@@ -583,7 +583,15 @@ const LEAF_DIM = "#4f7a5a";
 export interface FloraMark {
   f: SurfaceFlora;
   know: RegionKnowledge;
+  /** Sea life (AW-254): drawn as kelp on a blue disc, so it reads apart from plants on the shore. */
+  wet?: boolean;
 }
+
+/** The disc behind sea life (AW-254): deep blue rather than the near-black of things ashore. */
+const SEA_DISC = "rgba(10, 42, 78, 0.92)";
+/** Sea plants' fronds. */
+const KELP = "#5fd4c0";
+const KELP_DIM = "#3f7a74";
 
 /** A little sprout on each flora site given (the ones the rover has spotted); sampled ones are dimmed and ticked. */
 export function drawFlora(
@@ -595,13 +603,13 @@ export function drawFlora(
 ): void {
   const u = Math.max(5, L.tw * 0.36);
   ctx.setLineDash([]);
-  for (const { f, know } of flora) {
+  for (const { f, know, wet } of flora) {
     const x = cx(L, f.x, f.y);
     const y = cy(L, f.x, f.y);
     const sampled = know.floraSampled.includes(f.id);
-    const color = sampled ? LEAF_DIM : LEAF;
+    const color = wet ? (sampled ? KELP_DIM : KELP) : sampled ? LEAF_DIM : LEAF;
 
-    ctx.fillStyle = "rgba(5, 7, 15, 0.8)";
+    ctx.fillStyle = wet ? SEA_DISC : "rgba(5, 7, 15, 0.8)";
     ctx.beginPath();
     ctx.arc(x, y, u + 2, 0, Math.PI * 2);
     ctx.fill();
@@ -620,17 +628,21 @@ export function drawFlora(
     ctx.fillStyle = color;
     ctx.lineWidth = Math.max(1.2, u * 0.16);
     ctx.lineCap = "round";
-    // stem
-    ctx.beginPath();
-    ctx.moveTo(x, y + u * 0.75);
-    ctx.lineTo(x, y - u * 0.15);
-    ctx.stroke();
-    // leaves: left, right, and a bud on top
-    leaf(ctx, x, y + u * 0.2, -1, u);
-    leaf(ctx, x, y + u * 0.2, 1, u);
-    ctx.beginPath();
-    ctx.ellipse(x, y - u * 0.4, u * 0.2, u * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (wet) {
+      kelp(ctx, x, y, u);
+    } else {
+      // stem
+      ctx.beginPath();
+      ctx.moveTo(x, y + u * 0.75);
+      ctx.lineTo(x, y - u * 0.15);
+      ctx.stroke();
+      // leaves: left, right, and a bud on top
+      leaf(ctx, x, y + u * 0.2, -1, u);
+      leaf(ctx, x, y + u * 0.2, 1, u);
+      ctx.beginPath();
+      ctx.ellipse(x, y - u * 0.4, u * 0.2, u * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.lineCap = "butt";
 
     if (sampled) {
@@ -651,6 +663,28 @@ export function drawFlora(
       ctx.beginPath();
       tilePath(ctx, L, f, 1 + grow);
       ctx.stroke();
+    }
+  }
+}
+
+/** Sea plants (AW-254): three wavy fronds rising from the seabed, with floats on the outer two. */
+function kelp(ctx: CanvasRenderingContext2D, x: number, y: number, u: number): void {
+  ctx.lineWidth = Math.max(1.4, u * 0.2);
+  for (const [dx, sway] of [
+    [-0.45, -1],
+    [0, 1],
+    [0.45, -1],
+  ] as const) {
+    const bx = x + dx * u;
+    const top = y - u * (dx === 0 ? 0.85 : 0.6);
+    ctx.beginPath();
+    ctx.moveTo(bx, y + u * 0.8);
+    ctx.bezierCurveTo(bx + sway * u * 0.35, y + u * 0.35, bx - sway * u * 0.35, y - u * 0.05, bx, top);
+    ctx.stroke();
+    if (dx !== 0) {
+      ctx.beginPath();
+      ctx.arc(bx, top, u * 0.16, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }
@@ -1185,6 +1219,8 @@ export interface CreatureMark {
   temperament: "docile" | "skittish" | "territorial" | "hostile";
   rarity: 1 | 2 | 3;
   down: boolean;
+  /** Lives in the water (AW-254): a fish on a blue disc instead of a paw. */
+  aquatic?: boolean;
 }
 
 /** Paw colors by temperament: green docile, white skittish, yellow territorial, red hostile. */
@@ -1207,7 +1243,7 @@ export function drawCreatures(ctx: CanvasRenderingContext2D, L: Layout, marks: r
     const x = cx(L, m.x, m.y);
     const y = cy(L, m.x, m.y);
     const color = m.down ? "#7f8fa8" : TEMPERAMENT_COLOR[m.temperament];
-    ctx.fillStyle = "rgba(5, 7, 15, 0.8)";
+    ctx.fillStyle = m.aquatic ? SEA_DISC : "rgba(5, 7, 15, 0.8)";
     ctx.beginPath();
     ctx.arc(x, y, u + 2, 0, Math.PI * 2);
     ctx.fill();
@@ -1217,20 +1253,37 @@ export function drawCreatures(ctx: CanvasRenderingContext2D, L: Layout, marks: r
     ctx.beginPath();
     ctx.arc(x, y, u + 2, 0, Math.PI * 2);
     ctx.stroke();
-    // The paw: a broad pad and four toes.
     ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.ellipse(x, y + u * 0.28, u * 0.42, u * 0.34, 0, 0, Math.PI * 2);
-    ctx.fill();
-    for (const [dx, dy] of [
-      [-0.5, -0.12],
-      [-0.18, -0.48],
-      [0.18, -0.48],
-      [0.5, -0.12],
-    ] as const) {
+    if (m.aquatic) {
+      // A fish (AW-254): a body, a forked tail, and a dark eye.
       ctx.beginPath();
-      ctx.ellipse(x + dx * u, y + dy * u, u * 0.15, u * 0.19, dx * 0.6, 0, Math.PI * 2);
+      ctx.ellipse(x + u * 0.12, y, u * 0.55, u * 0.32, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x - u * 0.3, y);
+      ctx.lineTo(x - u * 0.85, y - u * 0.38);
+      ctx.lineTo(x - u * 0.85, y + u * 0.38);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#05070f";
+      ctx.beginPath();
+      ctx.arc(x + u * 0.42, y - u * 0.06, Math.max(1, u * 0.08), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // The paw: a broad pad and four toes.
+      ctx.beginPath();
+      ctx.ellipse(x, y + u * 0.28, u * 0.42, u * 0.34, 0, 0, Math.PI * 2);
+      ctx.fill();
+      for (const [dx, dy] of [
+        [-0.5, -0.12],
+        [-0.18, -0.48],
+        [0.18, -0.48],
+        [0.5, -0.12],
+      ] as const) {
+        ctx.beginPath();
+        ctx.ellipse(x + dx * u, y + dy * u, u * 0.15, u * 0.19, dx * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
     if (m.down && u >= 5) {

@@ -847,10 +847,11 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     // Flagged but unidentified: a "?" until the sensors get close (the sweep in progress identifies some).
     const unknowns = sensedSites(state, surface, loc.bodyId, inView).filter((u) => !rc || (!rc.deposits.has(u.key) && !rc.flora.has(u.key)));
     drawUnknowns(ctx, L, unknowns, t);
+    for (const m of floraMarks) m.wet = siteOnWater(world, loc.bodyId, m.f);
     drawFlora(ctx, L, floraMarks, selectedFlora?.f.key ?? null, t);
     const peaks = new Set(depMarks.filter(({ d }) => mountainBlocker(state, session.world, loc.bodyId, d)).map(({ d }) => d.key));
     drawDeposits(ctx, L, depMarks, selected?.d.key ?? null, t, stats.drillMaxDepthM, peaks);
-    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, x: c.x, y: c.y, temperament: c.entry.temperament, rarity: c.entry.rarity, down: c.down }));
+    const creatureMarks: CreatureMark[] = creatures.map((c) => ({ key: c.key, x: c.x, y: c.y, temperament: c.entry.temperament, rarity: c.entry.rarity, down: c.down, aquatic: !!c.entry.aquatic }));
     drawCreatures(ctx, L, creatureMarks, creatureKey, t);
 
     // hover: route preview and tooltip
