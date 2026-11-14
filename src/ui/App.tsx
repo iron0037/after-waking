@@ -21,6 +21,8 @@ import { SurfaceView } from "./screens/SurfaceView";
 import { SystemView } from "./screens/SystemView";
 import { warmTerrain } from "./screens/surface/terrainImage";
 
+const SIDE_KEY = "after-waking/ui/side-hidden";
+
 export function App() {
   const [session, setSession] = useState<GameSession | null>(null);
   return session ? <Game session={session} onQuit={() => setSession(null)} /> : <TitleScreen onStart={setSession} />;
@@ -34,6 +36,23 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   const [clansOpen, setClansOpen] = useState(false);
   const [shipOpen, setShipOpen] = useState(false);
   const [crewOpen, setCrewOpen] = useState(false);
+  // The side panel can be tucked away for a full-width map (AW-255). A view setting, kept in this browser.
+  const [sideHidden, setSideHidden] = useState(() => {
+    try {
+      return localStorage.getItem(SIDE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleSide = () =>
+    setSideHidden((h) => {
+      try {
+        localStorage.setItem(SIDE_KEY, h ? "0" : "1");
+      } catch {
+        // Not remembered; it still works for this visit.
+      }
+      return !h;
+    });
 
   // Get the terrain workers going as soon as the game is up (and tell them which world is in orbit), so the first
   // surface doesn't wait for threads, textures or the universe to be built.
@@ -60,6 +79,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       // H is "home" on the map screens (center on the ship); each screen handles it. The ship window is I ("inventory").
       else if (ev.key === "i" || ev.key === "I") setShipOpen((o) => !o);
       else if (ev.key === "o" || ev.key === "O") setCrewOpen((o) => !o);
+      else if (ev.key === "p" || ev.key === "P") toggleSide();
       else if (ev.key === "Escape") {
         if (session.perkTree) session.openPerkTree(null);
         else setCrewOpen(false);
@@ -91,7 +111,15 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
       <TopBar session={session} onJournal={() => setJournalOpen(true)} onCompendium={() => setCompendiumOpen(true)}
         onContracts={() => setContractsOpen(true)} onClans={() => setClansOpen(true)} onCrew={() => setCrewOpen(true)} onShip={() => setShipOpen(true)}
         onQuit={onQuit} />
-      <main class="main">
+      <main class={`main ${sideHidden ? "side-hidden" : ""}`}>
+        <button
+          class="side-toggle"
+          onClick={toggleSide}
+          aria-label={sideHidden ? "Show the side panel" : "Hide the side panel"}
+          title={sideHidden ? "Show the side panel (P)" : "Hide the side panel (P)"}
+        >
+          {sideHidden ? "◂" : "▸"}
+        </button>
         {session.view === "hub" && <Hub session={session} />}
         {session.view === "starmap" && <StarMap session={session} />}
         {session.view === "system" && <SystemView session={session} />}

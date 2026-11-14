@@ -79,9 +79,45 @@ h3 {
 }
 
 .main {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr var(--side-width);
   min-height: 0;
+}
+/* The side panel tucked away (AW-255): the map takes the width; the handle stays on the edge. */
+.main.side-hidden {
+  grid-template-columns: 1fr 0;
+}
+.main.side-hidden > .side {
+  display: none;
+}
+.side-toggle {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  right: var(--side-width);
+  transform: translateY(-50%);
+  width: 16px;
+  height: 56px;
+  padding: 0;
+  font-size: 10px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  cursor: pointer;
+}
+.side-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.main.side-hidden .side-toggle {
+  right: 0;
+}
+/* Full-screen views (the Intrepid) have no side panel to hide. */
+.main:has(> .full) .side-toggle {
+  display: none;
 }
 
 /* A screen's map area and its side panel. Full-width screens can use .full instead. */

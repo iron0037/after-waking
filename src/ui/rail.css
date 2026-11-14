@@ -1,0 +1,107 @@
+/* The action rail (AW-255): icon buttons down the map's edge beside the side panel. */
+.action-rail {
+  position: absolute;
+  top: 10px;
+  right: 24px; /* clear of the side panel's handle */
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(13, 19, 34, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  user-select: none;
+}
+.rail-label {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rail-sep {
+  width: 70%;
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+.rail-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.rail-btn:hover,
+.rail-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.rail-btn.active {
+  background: #2a2212;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.rail-btn.danger {
+  color: var(--danger);
+  border-color: #6b2a2a;
+}
+.rail-btn.blocked {
+  color: #4f5b70;
+  cursor: not-allowed;
+}
+.rail-btn.blocked:hover {
+  border-color: var(--border);
+  color: #4f5b70;
+}
+/* The tooltip opens to the left, over the map. */
+.rail-tip {
+  display: none;
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 280px;
+  padding: 7px 9px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  background: #0d1322;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.rail-btn:hover .rail-tip,
+.rail-btn:focus-visible .rail-tip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rail-tip-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+.rail-tip-head kbd {
+  font: 11px ui-monospace, monospace;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+}
+.rail-tip-detail {
+  color: var(--muted);
+}
+.rail-tip-why {
+  color: var(--accent);
+}

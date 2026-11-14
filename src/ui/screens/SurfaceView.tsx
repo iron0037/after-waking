@@ -172,6 +172,7 @@ import {
 } from "./surface/mapDraw";
 import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
+import { ActionRail } from "../ActionRail";
 import { CreaturePanel } from "./surface/CreaturePanel";
 import { OutpostPanel } from "./surface/OutpostPanel";
 import { CompIcon, useSpriteIndex } from "../compendiumSprites";
@@ -1284,6 +1285,151 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
             ))}
           </div>
         </div>
+        <ActionRail
+          busy={busy}
+          groups={[
+            {
+              label: isBoat ? "Boat" : "Rover",
+              actions: [
+                ...(!rover
+                  ? [
+                      { id: "deploy", icon: "rover" as const, label: "Deploy rover", hotkey: "R", detail: "Charge the cells and roll the rover out.", onClick: doDeploy },
+                      ...(hasBoat(state)
+                        ? [
+                            {
+                              id: "launch",
+                              icon: "boat" as const,
+                              label: "Launch boat",
+                              hotkey: "B",
+                              detail: "Charge the cells and lower the survey boat into the water beside the ship.",
+                              blocked: launchBlock,
+                              onClick: () => doLaunch(false),
+                            },
+                            {
+                              id: "launch-rover",
+                              icon: "boatRover" as const,
+                              label: "Launch boat with rover",
+                              detail: "The rover rides on deck, to put it ashore on another coast.",
+                              blocked: launchBlock,
+                              onClick: () => doLaunch(true),
+                            },
+                          ]
+                        : []),
+                    ]
+                  : [
+                      {
+                        id: "return",
+                        icon: "home" as const,
+                        label: "Return to ship",
+                        detail: isBoat ? "Sail back to the water beside the ship." : "Drive back to the ship.",
+                        blocked: (isBoat ? nearShip : rover.x === ship.x && rover.y === ship.y) ? `The ${noun} is already at the ship.` : null,
+                        onClick: () => void driveTo(isBoat ? homeSpot : ship, false),
+                      },
+                      {
+                        id: "stow",
+                        icon: "stow" as const,
+                        label: "Stow & unload",
+                        hotkey: "R",
+                        detail: `Unloads the ${isBoat ? "hold" : "cargo bed"}${roverAboard ? " (and the rover on deck)" : ""} and recharges. 30 min.`,
+                        blocked: parkedBoat
+                          ? "The boat is still moored offshore: board it and sail it back first."
+                          : !nearShip
+                            ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship first.`
+                            : null,
+                        onClick: doStow,
+                      },
+                      {
+                        id: "recharge",
+                        icon: "bolt" as const,
+                        label: "Recharge",
+                        detail: `Top up the cells from the ship's reactor without stowing: ${formatDuration(rechargeHours * HOUR)}.`,
+                        blocked: !nearShip
+                          ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship to recharge.`
+                          : !canRecharge
+                            ? `The ${noun}'s cells are already full.`
+                            : null,
+                        onClick: doRecharge,
+                      },
+                      ...(!isBoat
+                        ? [
+                            {
+                              id: "auto",
+                              icon: "compass" as const,
+                              label: "Auto-explore",
+                              detail:
+                                "The crew drive into this region's fog until it's swept, coming back to recharge as needed. Can take days. They collect nothing.",
+                              blocked: autoBlocker,
+                              onClick: doAutoExplore,
+                            },
+                          ]
+                        : []),
+                    ]),
+                ...(isBoat && roverAboard
+                  ? [
+                      {
+                        id: "ashore",
+                        icon: "ashore" as const,
+                        label: ashoreOn ? "Cancel putting ashore" : "Put rover ashore",
+                        hotkey: ashoreOn ? "Esc" : undefined,
+                        detail: "Pick a shore hex next to the boat and drive the rover off. The boat waits, moored. 20 min.",
+                        blocked: !ashoreOn && shoreTargets.length === 0 ? "No drivable shore beside the boat: sail up to a coast first." : null,
+                        active: ashoreOn,
+                        onClick: () => setAshoreMode(!ashoreOn),
+                      },
+                    ]
+                  : []),
+                ...(!isBoat && parkedBoat && rover
+                  ? [
+                      {
+                        id: "board",
+                        icon: "board" as const,
+                        label: "Board the boat",
+                        detail: "Drive the rover back aboard the boat. 20 min.",
+                        blocked: hexDistance(rover, parkedBoat) > 1 ? "Drive to the shore beside the boat first." : null,
+                        onClick: doBoard,
+                      },
+                    ]
+                  : []),
+                ...(stranded || rover?.disabled
+                  ? [
+                      {
+                        id: "recall",
+                        icon: "rescue" as const,
+                        label: `Recall ${noun}`,
+                        tone: "danger" as const,
+                        detail: `The ${noun} can't get home on its own. The ship hops over and winches ${isBoat || parkedBoat ? "everything" : "it"} aboard: ${RECALL_FUEL} fuel and 3 h.`,
+                        blocked: state.ship.fuel < RECALL_FUEL ? `Needs ${RECALL_FUEL} fuel.` : null,
+                        onClick: () => session.act((s, w) => recallRover(s, w)),
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            {
+              label: "Ship",
+              actions: [
+                {
+                  id: "move",
+                  icon: "move" as const,
+                  label: moveMode && !rover ? "Cancel move" : "Move ship",
+                  hotkey: moveMode && !rover ? "Esc" : undefined,
+                  detail: `Hop to another open tile anywhere on the planet: from ${hopBase.toFixed(1)} fuel, more the farther it goes, ${formatDuration(HOP_MINUTES)}. Cheaper than lifting off and landing again.`,
+                  blocked: rover ? `${outText} before moving the ship.` : !moveMode && hopBase > state.ship.fuel ? `A hop needs at least ${hopBase.toFixed(1)} fuel.` : null,
+                  active: moveMode && !rover,
+                  onClick: toggleMoveMode,
+                },
+                {
+                  id: "liftoff",
+                  icon: "liftoff" as const,
+                  label: `Lift off (${burnFuel.toFixed(1)} fuel)`,
+                  detail: `Take the ship back to orbit. Ascent burns ${burnFuel.toFixed(1)} fuel; landing again costs the same.`,
+                  blocked: rover ? `${outText} first.` : null,
+                  onClick: doLiftOff,
+                },
+              ],
+            },
+          ]}
+        />
         {rechargeHint && rover && nearShip && canRecharge && !busy && (
           <div class="recharge-hint" role="status">
             <span>
@@ -1301,161 +1447,6 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       </div>
       <aside class="side surface-side">
         <RescuePanel session={session} busy={busy} />
-        <div class="action-bar">
-          <div class="ab-group">
-            <span class="ab-label">{isBoat ? "Boat" : "Rover"}</span>
-            {!rover && (
-              <>
-                <button class="btn" disabled={busy} title="Charge the cells and roll the rover out (R)" onClick={doDeploy}>
-                  Deploy rover
-                </button>
-                {hasBoat(state) && (
-                  <>
-                    <button
-                      class="btn"
-                      disabled={busy || launchBlock !== null}
-                      title={launchBlock ?? "Charge the cells and lower the survey boat into the water beside the ship (B)"}
-                      onClick={() => doLaunch(false)}
-                    >
-                      Launch boat
-                    </button>
-                    <button
-                      class="btn"
-                      disabled={busy || launchBlock !== null}
-                      title={launchBlock ?? "Launch the boat with the rover lashed to its deck, to put it ashore on another coast"}
-                      onClick={() => doLaunch(true)}
-                    >
-                      Launch boat with rover
-                    </button>
-                    {launchBlock && <p class="muted small ab-hint">{launchBlock}</p>}
-                  </>
-                )}
-              </>
-            )}
-            {rover && (
-              <>
-                <button
-                  class="btn"
-                  disabled={busy || (isBoat ? nearShip : rover.x === ship.x && rover.y === ship.y)}
-                  title={isBoat ? "Sail back to the water beside the ship" : "Drive back to the ship"}
-                  onClick={() => void driveTo(isBoat ? homeSpot : ship, false)}
-                >
-                  Return to ship
-                </button>
-                <button
-                  class="btn"
-                  disabled={busy || !nearShip || parkedBoat !== null}
-                  title={
-                    parkedBoat
-                      ? "The boat is still moored offshore: board it and sail it back first"
-                      : !nearShip
-                        ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship first`
-                        : `Unloads the ${isBoat ? "hold" : "cargo bed"}${roverAboard ? " (and the rover on deck)" : ""} and recharges, 30 min (R)`
-                  }
-                  onClick={doStow}
-                >
-                  Stow &amp; unload
-                </button>
-                <button
-                  class="btn"
-                  disabled={busy || !canRecharge}
-                  title={
-                    !nearShip
-                      ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship to recharge`
-                      : !canRecharge
-                        ? `The ${noun}'s cells are already full`
-                        : `Top up the cells from the ship's reactor without stowing: ${formatDuration(rechargeHours * HOUR)}`
-                  }
-                  onClick={doRecharge}
-                >
-                  Recharge
-                </button>
-                {!isBoat && (
-                  <button
-                    class="btn"
-                    disabled={busy || autoBlocker !== null}
-                    title={
-                      autoBlocker ??
-                      "The rover crew drive into this region's fog and keep going, coming back to the ship to recharge as needed, until it is swept or nothing more is reachable. Can take days. They collect nothing and ignore \"?\" readings."
-                    }
-                    onClick={doAutoExplore}
-                  >
-                    Auto-explore
-                  </button>
-                )}
-              </>
-            )}
-            {isBoat && roverAboard && (
-              <button
-                class={`btn ${ashoreOn ? "active" : ""}`}
-                disabled={busy}
-                title={
-                  ashoreOn
-                    ? "Cancel (Esc)"
-                    : shoreTargets.length === 0
-                      ? "No drivable shore beside the boat: sail up to a coast first"
-                      : "Pick a shore hex next to the boat and drive the rover off. The boat waits, moored. 20 min"
-                }
-                onClick={() => setAshoreMode(!ashoreOn)}
-              >
-                {ashoreOn ? "Cancel" : "Put rover ashore"}
-              </button>
-            )}
-            {!isBoat && parkedBoat && rover && (
-              <button
-                class="btn"
-                disabled={busy || hexDistance(rover, parkedBoat) > 1}
-                title={hexDistance(rover, parkedBoat) > 1 ? "Drive to the shore beside the boat" : "Drive the rover back aboard the boat. 20 min"}
-                onClick={doBoard}
-              >
-                Board the boat
-              </button>
-            )}
-            {(stranded || rover?.disabled) && (
-              <button
-                class="btn danger"
-                disabled={busy || state.ship.fuel < RECALL_FUEL}
-                title={`The ${noun} can't get home on its remaining energy. The ship hops over and winches ${isBoat || parkedBoat ? "everything" : "it"} aboard: ${RECALL_FUEL} fuel and 3 h`}
-                onClick={() => session.act((s, w) => recallRover(s, w))}
-              >
-                Recall {noun}
-              </button>
-            )}
-            {parkedBoat && !isBoat && <p class="muted small ab-hint">The boat is moored offshore. Board it before you stow.</p>}
-          </div>
-          <div class="ab-group ship">
-            <span class="ab-label">Ship</span>
-            <button
-              class={`btn ${moveMode && !rover ? "active" : ""}`}
-              disabled={busy || rover !== null || (!moveMode && hopBase > state.ship.fuel)}
-              title={
-                rover
-                  ? `${outText} before moving the ship`
-                  : hopBase > state.ship.fuel
-                    ? `A hop needs at least ${hopBase.toFixed(1)} fuel`
-                    : `Hop the ship to another open tile, anywhere on the planet: from ${hopBase.toFixed(1)} fuel (more the farther it goes), ${formatDuration(HOP_MINUTES)}. A hop is cheaper than lifting off and landing again (${burnFuel.toFixed(1)} fuel each way): it costs about half a burn plus distance, so a region over is roughly one burn versus two.`
-              }
-              onClick={toggleMoveMode}
-            >
-              {moveMode && !rover ? "Cancel move" : "Move ship"}
-            </button>
-            <button
-              class="btn liftoff"
-              disabled={busy || rover !== null}
-              title={
-                rover
-                  ? `Take the ship back to orbit (${outText.charAt(0).toLowerCase()}${outText.slice(1)} first)`
-                  : state.ship.fuel < burnFuel
-                    ? `Ascent needs ${burnFuel.toFixed(1)} fuel and you have ${state.ship.fuel.toFixed(1)}`
-                    : `Take the ship back to orbit. Ascent burns ${burnFuel.toFixed(1)} fuel (landing again costs the same).`
-              }
-              onClick={doLiftOff}
-            >
-              Lift off ({burnFuel.toFixed(1)} fuel)
-            </button>
-          </div>
-        </div>
-
         <Section id="planet" level={2} title={body.name} summary={`region ${active + 1} · explored ${exploredPct}%`}>
           <div class="muted small">
             Region {active + 1} of {body.regions} · {KIND_LABEL[body.kind]}
