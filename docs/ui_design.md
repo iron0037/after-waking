@@ -34,9 +34,11 @@ map, a star system, and a planet's surface.
    - Buttons are grouped by subject (Rover or Boat, Ship) with a small label over each group.
 7. **Actions on one item stay with that item**, inside its component: Hand in, Buy, Sell. The rail is
    for verbs about where you are. Where you are includes what's under or beside the vehicle (AW-258): when
-   the rover or boat is on or next to a deposit or an unsampled plant, a **Here** group on the rail offers
-   Prospect, Mine (or Dredge, **F**) and Sample. The selected site wins if it's that close, else the
-   nearest. The same verbs stay in the site's own component too.
+   a deposit or an unsampled plant is selected (on the map or in a list), or the rover or boat is on or
+   next to one, a **Site** group on the rail offers Prospect, Mine (or Dredge, **F**) and Sample (AW-259).
+   The selection wins, wherever it is: the verb drives the vehicle there first. With nothing selected,
+   it's the nearest site beside the vehicle. A site drops off once it's sampled or worked out. The same
+   verbs stay in the site's own component too.
 8. This follows what strategy games do: Stellaris and Civilization put a selected thing's actions in
    one place near it; RTS games use a fixed command grid with tooltips and hotkeys; Starflight itself had
    one menu that changed with where you were.

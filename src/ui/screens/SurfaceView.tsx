@@ -1233,14 +1233,18 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     }
   };
 
-  // The site the rover or boat is on or beside (AW-258): the selected one if it's that close, else the nearest.
-  // Its verbs go on the action rail, so you needn't find it in the panel.
+  // The site whose verbs go on the action rail (AW-258, AW-259): the one selected on the map or in a list,
+  // wherever it is (the verb drives there first), or else the one the rover or boat is on or beside.
   const hereOf = <T,>(items: T[], at: (t: T) => Vec2, chosen: T | null | undefined): T | null => {
+    // Only while there's still work there: not once it's sampled or worked out.
+    if (chosen && items.includes(chosen)) return chosen;
     if (!rover) return null;
     const close = items.filter((t) => hexDistance(rover, at(t)) <= 1 && vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, at(t)), "deposit") === null);
-    if (chosen && close.includes(chosen)) return chosen;
     return close.sort((a, b) => hexDistance(rover, at(a)) - hexDistance(rover, at(b)))[0] ?? null;
   };
+  /** Drive beside a site if the vehicle isn't already; true once it's there. */
+  const reach = async (site: Vec2): Promise<boolean> => (rover !== null && hexDistance(rover, site) <= 1) || driveTo(site, true, true);
+  const farNote = (site: Vec2): string => (rover && hexDistance(rover, site) > 1 ? ` The ${noun} ${isBoat ? "sails" : "drives"} there first.` : "");
   const hereDep = hereOf(
     discovered.filter((m) => depositStatus(m.know, m.d) !== "depleted"),
     (m) => m.d,
@@ -1436,7 +1440,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
               ],
             },
             {
-              label: "Here",
+              label: "Site",
               actions: [
                 ...(hereDep && !hereDep.know.prospected.includes(hereDep.d.id)
                   ? [
@@ -1444,11 +1448,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         id: "prospect",
                         icon: "prospect" as const,
                         label: `Prospect the ${COMMODITIES[hereDep.d.commodity].name.toLowerCase()}`,
-                        detail: "Take core samples to learn the seam's grade and size.",
-                        blocked: rover && rover.energy < PROSPECT_ENERGY ? `Core samples need ${PROSPECT_ENERGY} ${noun} energy.` : null,
-                        onClick: () => {
+                        detail: `Take core samples to learn the seam's grade and size.${farNote(hereDep.d)}`,
+                        blocked:
+                          vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, hereDep.d), "deposit") ??
+                          (rover && rover.energy < PROSPECT_ENERGY ? `Core samples need ${PROSPECT_ENERGY} ${noun} energy.` : null),
+                        onClick: async () => {
                           setSelectedKey(hereDep.d.key);
-                          session.act((s, w) => prospect(s, w, hereDep.d.key));
+                          if (await reach(hereDep.d)) session.act((s, w) => prospect(s, w, hereDep.d.key));
                         },
                       },
                     ]
@@ -1458,9 +1464,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       {
                         id: "work",
                         icon: "drill" as const,
-                        label: `${isBoat ? "Dredge" : "Mine"} the ${COMMODITIES[hereDep.d.commodity].name.toLowerCase()}`,
+                        label: `${siteOnWater(world, loc.bodyId, hereDep.d) ? "Dredge" : "Mine"} the ${COMMODITIES[hereDep.d.commodity].name.toLowerCase()}`,
                         hotkey: "F",
-                        detail: `The crew ${isBoat ? "dredge" : "drill"} it and haul loads to the ship${lastHaulTarget > 0 ? `, ${lastHaulTarget} t` : " until the hold is full or the seam runs out"}.`,
+                        detail: `The crew ${siteOnWater(world, loc.bodyId, hereDep.d) ? "dredge" : "drill"} it and haul loads to the ship${lastHaulTarget > 0 ? `, ${lastHaulTarget} t` : " until the hold is full or the seam runs out"}.`,
                         blocked: workBlockers(state, world, hereDep.know, hereDep.d)[0] ?? null,
                         onClick: () => workHere(hereDep),
                       },
@@ -1472,15 +1478,17 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         id: "sample",
                         icon: "sample" as const,
                         label: `Sample the ${hereFlora.f.species}`,
-                        detail: "Take a living sample into the sample cases.",
+                        detail: `Take a living sample into the sample cases.${farNote(hereFlora.f)}`,
                         blocked:
-                          rover && specimenCount(rover.specimens) >= roverSpecimenSlots(state)
+                          vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, hereFlora.f), "plants") ??
+                          (rover && specimenCount(rover.specimens) >= roverSpecimenSlots(state)
                             ? `The ${noun}'s sample cases are full: stow at the ship.`
                             : rover && rover.energy < SAMPLE_ENERGY
                               ? `The sample kit needs ${SAMPLE_ENERGY} ${noun} energy.`
-                              : null,
-                        onClick: () => {
+                              : null),
+                        onClick: async () => {
                           setFloraKey(hereFlora.f.key);
+                          if (!(await reach(hereFlora.f))) return;
                           const r = session.act((s, w) => collectSample(s, w, hereFlora.f.key));
                           if (r.ok) session.notify(`Collected a living sample of ${hereFlora.f.species}.`);
                         },
