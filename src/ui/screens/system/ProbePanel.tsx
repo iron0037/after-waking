@@ -17,6 +17,7 @@ import { DEPTHS } from "../../../data/probes";
 import { useArchiveTopic } from "../../ArchivePanel";
 import { cr, tonnes } from "../../format";
 import type { GameSession } from "../../session";
+import { Section } from "../../Section";
 import "../../probes.css";
 
 export function ProbePanel({ session, body, orbiting, scanned, busy }: { session: GameSession; body: Body; orbiting: boolean; scanned: boolean; busy: boolean }) {
@@ -27,12 +28,11 @@ export function ProbePanel({ session, body, orbiting, scanned, busy }: { session
 
   if (stats.probeCapacity === 0) {
     return (
-      <section class="probe-panel">
-        <h3>Atmospheric probe</h3>
+      <Section id="sys-probe" title="Atmospheric probe" summary="no probe bay" class="probe-panel">
         <div class="muted small probe-teaser">
           An atmospheric probe bay (Shipyard) lets your science officer dive into giants like this for gas.
         </div>
-      </section>
+      </Section>
     );
   }
 
@@ -45,8 +45,7 @@ export function ProbePanel({ session, body, orbiting, scanned, busy }: { session
   const profiled = readingsFor(state, body.id);
 
   return (
-    <section class="probe-panel">
-      <h3>Atmospheric probe</h3>
+    <Section id="sys-probe" title="Atmospheric probe" summary={`${have} of ${stats.probeCapacity} in the bay`} class="probe-panel">
       <dl class="kv">
         <dt>In the bay</dt>
         <dd class={have === 0 ? "danger" : ""}>
@@ -128,6 +127,6 @@ export function ProbePanel({ session, body, orbiting, scanned, busy }: { session
           })}
         </div>
       )}
-    </section>
+    </Section>
   );
 }

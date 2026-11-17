@@ -64,5 +64,8 @@ map, a star system, and a planet's surface.
 2. **Surface view** (done): planet → outpost → ship → rover or boat → the lists (Deposits found,
    Flora, Creatures) → the selection's detail, which scrolls into view when picked. Every component
    has a summary, and the "select something" placeholder is gone.
-3. **System view:** split the world details and add selection filtering.
+3. **System view** (done): the system → Bodies → the selected world (with a ✕ to clear it) → Exploration,
+   Flight, Surface regions or Landing, Known deposits, Atmospheric probe, Environment, Resource
+   signatures, each its own component. The rail has Ship (Fly to system edge, Hold for the refit,
+   Star map) and World (Fly to it, Scan, Detailed survey, Land in region N).
 4. **Star map:** the same treatment.

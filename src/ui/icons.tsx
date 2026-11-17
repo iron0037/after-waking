@@ -19,7 +19,14 @@ export type IconName =
   | "liftoff"
   | "prospect"
   | "drill"
-  | "sample";
+  | "sample"
+  | "edge"
+  | "clock"
+  | "starmap"
+  | "fly"
+  | "scan"
+  | "survey"
+  | "land";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -125,6 +132,60 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M9 3h6" />
       <path d="M10 3v14a2 2 0 0 0 4 0V3" />
       <path d="M12 15c0-3 1.5-4.5 3.5-5M12 12.5c0-2-1-3-2.5-3.5" />
+    </>
+  ),
+  // Out past the dashed fold limit.
+  edge: (
+    <>
+      <circle cx="9" cy="12" r="6.5" stroke-dasharray="2.5 2.5" />
+      <path d="M9 12h12" />
+      <path d="M17 8l4 4-4 4" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7v5l3.5 2" />
+    </>
+  ),
+  // Three stars: the star map.
+  starmap: (
+    <>
+      <path d="M7 4l1 2.5 2.5 1-2.5 1L7 11l-1-2.5-2.5-1 2.5-1z" />
+      <path d="M17 9l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+      <path d="M10 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+    </>
+  ),
+  // A course to a world.
+  fly: (
+    <>
+      <circle cx="17" cy="7" r="3.5" />
+      <path d="M4 20c3-1 7-4 10-9" stroke-dasharray="2.5 2.2" />
+      <path d="M3.5 20.5l3-1-2-2z" />
+    </>
+  ),
+  // A sensor sweep.
+  scan: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 12l6-6" />
+    </>
+  ),
+  // A world with a grid over it: the detailed survey.
+  survey: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+    </>
+  ),
+  // Down onto the ground.
+  land: (
+    <>
+      <path d="M12 3v11" />
+      <path d="M8 10l4 4 4-4" />
+      <path d="M4 19h16" />
+      <path d="M7 19l-1.5 2M17 19l1.5 2" />
     </>
   ),
   // Up to orbit.

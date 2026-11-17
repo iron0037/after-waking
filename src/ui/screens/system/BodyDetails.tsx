@@ -1,6 +1,7 @@
 /** Selected-body readout: orbit summary always, full environment profile once scanned. */
 import { OUTPOST_TYPES, outpostTitle, type Outpost } from "../../../sim";
 import { OutpostIcon } from "../../OutpostIcon";
+import { Section } from "../../Section";
 import { COMMODITIES, type CommodityId } from "../../../data/commodities";
 import { SEAS } from "../../../data/seas";
 import type { Ratings } from "../../../data/ship";
@@ -95,14 +96,30 @@ function NicknameLine({ session, body }: { session: GameSession; body: Body }) {
   );
 }
 
-export function BodyHeader({ body, detail, scanned, session }: { body: Body; detail: SystemDetail; scanned: boolean; session: GameSession }) {
+export function BodyHeader({
+  body,
+  detail,
+  scanned,
+  session,
+  onClear,
+}: {
+  body: Body;
+  detail: SystemDetail;
+  scanned: boolean;
+  session: GameSession;
+  /** Drop the selection (docs/ui_design.md: the filter is always shown, and can be cleared). */
+  onClear?: () => void;
+}) {
   return (
     <div class="sys-body-head">
+      {onClear && (
+        <button class="sys-clear" title="Clear the selection" aria-label="Clear the selection" onClick={onClear}>
+          ✕
+        </button>
+      )}
       <span class="sys-swatch" style={{ background: BODY_COLOR[body.kind] }} />
       <div>
-        <h2 class="sys-body-name">
-          {body.name}
-        </h2>
+        {/* The name is the component's title (AW-255); the nickname line stays. */}
         <NicknameLine session={session} body={body} />
         <div class="muted small">
           {KIND_LABEL[body.kind]} · {body.radiusEarth.toFixed(2)} R⊕ {scanned && <span class="tag">scanned</span>}
@@ -129,10 +146,16 @@ export function Exploration({
 }) {
   const landed = progress.regionsVisited > 0;
   const showSurface = progress.regions > 0 && (progress.scanned || landed);
-  if (!showSurface && contracts.length === 0) return null;
+  if (!showSurface && contracts.length === 0 && outposts.length === 0) return null;
+  const summary = [
+    showSurface ? `${progress.regionsVisited}/${progress.regions} regions · ${Math.round(progress.explored * 100)}%` : "",
+    contracts.length ? `${contracts.length} job${contracts.length === 1 ? "" : "s"}` : "",
+    outposts.length ? "outpost" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <>
-      <h3>Exploration</h3>
+    <Section id="sys-explore" title="Exploration" summary={summary}>
       {showSurface && (
         <dl class="kv sys-explore">
           <dt>Regions visited</dt>
@@ -162,7 +185,7 @@ export function Exploration({
           </div>
         );
       })}
-    </>
+    </Section>
   );
 }
 
@@ -171,7 +194,6 @@ export function Exploration({
  * hover), so a glance tells you whether a trip there is worth it.
  */
 export function Environment({ body, ratings, state }: { body: Body; ratings: Ratings; state: GameState }) {
-  const resources = (Object.entries(body.resources) as [CommodityId, number][]).sort((a, b) => b[1] - a[1]);
   const regionText = body.regions > 0 ? `${body.regions}` : "None";
   const over = {
     gravity: body.gravityG > ratings.maxGravityG ? `Your thrusters lift off from up to ${ratings.maxGravityG.toFixed(1)} g.` : null,
@@ -187,9 +209,13 @@ export function Environment({ body, ratings, state }: { body: Body; ratings: Rat
     radiation: body.radiation > ratings.maxRadiation ? `Your shielding is rated to ${RADIATION_LABEL[ratings.maxRadiation]}.` : null,
   };
   const cls = (why: string | null) => (why ? "danger" : "");
+  const blocks = Object.values(over).filter(Boolean).length;
   return (
-    <>
-      <h3>Environment</h3>
+    <Section
+      id="sys-env"
+      title="Environment"
+      summary={`${body.gravityG.toFixed(2)} g · ${Math.round(body.tempC)} °C${blocks ? ` · ${blocks} too much for this ship` : ""}`}
+    >
       <dl class="kv sys-env">
         <dt>Gravity</dt>
         <dd class={cls(over.gravity)} title={over.gravity ?? undefined}>
@@ -239,10 +265,18 @@ export function Environment({ body, ratings, state }: { body: Body; ratings: Rat
         })()}
       </dl>
       {body.sea && <div class="muted small sys-sea-note">{SEAS[body.sea].note}</div>}
+    </Section>
+  );
+}
 
-      <h3 class="sys-sub" title="Read from orbit. Faint traces may have no seam worth digging anywhere on the surface.">
-        Potential resource signatures
-      </h3>
+/** What the orbital scan read of the world's minerals (AW-255: split from Environment). */
+export function ResourceSignatures({ body }: { body: Body }) {
+  const resources = (Object.entries(body.resources) as [CommodityId, number][]).sort((a, b) => b[1] - a[1]);
+  return (
+    <Section id="sys-resources" title="Resource signatures" summary={resources.length ? resources.slice(0, 3).map(([id]) => COMMODITIES[id].name).join(", ") : "none"}>
+      <div class="muted small" title="Read from orbit. Faint traces may have no seam worth digging anywhere on the surface.">
+        Read from orbit: faint traces may have no seam worth digging.
+      </div>
       {resources.length === 0 ? (
         <div class="muted small">No mineral signatures.</div>
       ) : (
@@ -257,6 +291,6 @@ export function Environment({ body, ratings, state }: { body: Body; ratings: Rat
           ))}
         </ul>
       )}
-    </>
+    </Section>
   );
 }

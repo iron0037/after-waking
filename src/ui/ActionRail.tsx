@@ -21,6 +21,8 @@ export interface RailAction {
   active?: boolean;
   tone?: "danger";
   onClick: () => void;
+  /** Called as the pointer comes and goes, e.g. to preview a route on the map. */
+  onHover?: (on: boolean) => void;
 }
 
 export interface RailGroup {
@@ -49,6 +51,8 @@ export function ActionRail({ groups, busy = false }: { groups: RailGroup[]; busy
                 onClick={() => {
                   if (!blocked) a.onClick();
                 }}
+                onMouseEnter={a.onHover && (() => a.onHover?.(true))}
+                onMouseLeave={a.onHover && (() => a.onHover?.(false))}
               >
                 <Icon name={a.icon} />
                 <span class="rail-tip" role="tooltip">

@@ -2,7 +2,7 @@
  * The system orrery: where the ship is, where everything else is, and how to get there.
  * Flight is animated with time compression; the sim only advances when the burn completes.
  */
-import { knownOutposts, landingTiers, type Outpost } from "../../sim";
+import { KIND_LABEL, knownOutposts, landingTiers, type Outpost } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   bodyProgress,
@@ -36,7 +36,9 @@ import { RescuePanel } from "../Rescue";
 import { DeepSweepPanel } from "../DeepSweep";
 import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
-import { BodyHeader, Environment, Exploration } from "./system/BodyDetails";
+import { BodyHeader, Environment, Exploration, ResourceSignatures } from "./system/BodyDetails";
+import { ActionRail } from "../ActionRail";
+import { Section } from "../Section";
 import { BodyList } from "./system/BodyList";
 import { UI } from "../palette";
 import {
@@ -53,7 +55,7 @@ import {
   type ViewState,
 } from "./system/projection";
 import { ProbePanel } from "./system/ProbePanel";
-import { RegionPicker, bestRegion } from "./system/RegionPicker";
+import { KnownDeposits, RegionPicker, bestRegion } from "./system/RegionPicker";
 import { prefetchSurface } from "./surface/terrainImage";
 import { contractTargets, fmtAU } from "./system/util";
 import "./system.css";
@@ -504,6 +506,92 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             <span>no ring: can't land, or not scanned</span>
           </div>
         )}
+        <ActionRail
+          busy={busy}
+          groups={[
+            {
+              label: "Ship",
+              actions: [
+                {
+                  id: "edge",
+                  icon: "edge" as const,
+                  label: "Fly to system edge",
+                  detail: edgeRes.ok
+                    ? `Out past the fold limit to fold: ${fmtAU(edgeRes.value.distanceAU)} AU, ${formatDuration(edgeRes.value.minutes)}, ${edgeRes.value.fuel} fuel.`
+                    : "Out past the fold limit, to fold.",
+                  blocked: atEdge ? "Already clear to fold." : !edgeRes.ok ? edgeRes.reason : edgeFuelShort ? `The edge burn needs ${edgeRes.value.fuel} fuel.` : null,
+                  onClick: () => startFlight({ edge: true }),
+                  onHover: (on) => setHoverEdge(on),
+                },
+                ...(state.time < state.foldReadyAt
+                  ? [
+                      {
+                        id: "refit",
+                        icon: "clock" as const,
+                        label: `Hold for the refit (${formatDuration(state.foldReadyAt - state.time)})`,
+                        detail: "Hold position and let the fold drive finish its refit.",
+                        onClick: () => session.act((s) => wait(s, s.foldReadyAt - s.time)),
+                      },
+                    ]
+                  : []),
+                { id: "starmap", icon: "starmap" as const, label: "Star map", hotkey: "M", detail: "Plot a fold to another star.", onClick: () => session.go("starmap") },
+              ],
+            },
+            {
+              label: "World",
+              actions: selected
+                ? [
+                    ...(!orbitingSel && planRes
+                      ? [
+                          {
+                            id: "engage",
+                            icon: "fly" as const,
+                            label: `Fly to ${selected.name}`,
+                            detail: planRes.ok ? `${fmtAU(planRes.value.distanceAU)} AU, ${formatDuration(planRes.value.minutes)}, ${planRes.value.fuel} fuel, into orbit.` : undefined,
+                            blocked: !planRes.ok ? planRes.reason : planFuelShort ? `This burn needs ${planRes.value.fuel} fuel.` : null,
+                            onClick: () => startFlight({ bodyId: selected.id }),
+                          },
+                        ]
+                      : []),
+                    ...(orbitingSel && !scanned
+                      ? [
+                          {
+                            id: "scan",
+                            icon: "scan" as const,
+                            label: `Scan (${formatDuration(SCAN_MINUTES)})`,
+                            detail: "A full sensor sweep profiles the world and its regions.",
+                            onClick: () => session.act((s, w) => scanBody(s, w)),
+                          },
+                        ]
+                      : []),
+                    ...(orbitingSel && scanned && selected.regions > 0 && !state.surveyedBodies.includes(selected.id)
+                      ? [
+                          {
+                            id: "survey",
+                            icon: "survey" as const,
+                            label: `Detailed survey (${formatDuration(surveyMinutes(state))})`,
+                            detail: "Sharpens the region readings from orbit; no landing needed.",
+                            onClick: () => session.act((s, w) => surveyBody(s, w)),
+                          },
+                        ]
+                      : []),
+                    ...(orbitingSel && scanned && selected.regions > 0 && access?.ok
+                      ? [
+                          {
+                            id: "land",
+                            icon: "land" as const,
+                            label: `Land in region ${region + 1} (${surfaceBurnFuel(state, selected).toFixed(1)} fuel)`,
+                            detail: `Descent burns ${surfaceBurnFuel(state, selected).toFixed(1)} fuel; lifting off again costs the same. Pick the region on the chart.`,
+                            blocked: landBlockers[0] ?? null,
+                            onClick: () => session.act((s, w) => land(s, w, region)),
+                          },
+                        ]
+                      : []),
+                  ]
+                : [],
+            },
+          ]}
+        />
         {flying && (
           <button class="btn sys-skip" onClick={finishFlight}>
             Skip ▸▸
@@ -516,8 +604,12 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
 
       <aside class="side sys-side">
         <RescuePanel session={session} busy={busy} />
-        <section class="sys-head">
-          <h2>{sys.name}</h2>
+        <Section
+          id="sys-system"
+          level={2}
+          title={sys.name}
+          summary={orbitingId ? `orbiting ${world.body(orbitingId).body.name}${atEdge ? " · clear to fold" : ""}` : `${fmtAU(starDist)} AU out${atEdge ? " · clear to fold" : ""}`}
+        >
           <div class="sys-star muted small">
             <span class="sys-star-dot" style={{ background: SPECTRAL[sys.spectral].color }} />
             {SPECTRAL[sys.spectral].label} · class {sys.spectral} ·{" "}
@@ -537,33 +629,8 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             )}
             {atEdge && <span class="good"> · Clear to fold</span>}
           </div>
-          <div class="btn-row">
-            <button
-              class="btn"
-              disabled={busy || atEdge || !edgeRes.ok || edgeFuelShort}
-              onClick={() => startFlight({ edge: true })}
-              onMouseEnter={() => setHoverEdge(true)}
-              onMouseLeave={() => setHoverEdge(false)}
-              title={edgeRes.ok ? `${fmtAU(edgeRes.value.distanceAU)} AU · ${formatDuration(edgeRes.value.minutes)} · ${edgeRes.value.fuel} fuel` : ""}
-            >
-              Fly to system edge
-            </button>
-            <button class="btn" disabled={busy} onClick={() => session.go("starmap")} title="Star map (M)">
-              Star map
-            </button>
-          </div>
-          {state.time < state.foldReadyAt && (
-            <button
-              class="btn"
-              disabled={busy}
-              onClick={() => session.act((s) => wait(s, s.foldReadyAt - s.time))}
-              title="Hold position and let the fold drive finish its refit"
-            >
-              Hold until the fold drive is refitted ({formatDuration(state.foldReadyAt - state.time)})
-            </button>
-          )}
           {edgeFuelShort && edgeRes.ok && <div class="danger small">The edge burn needs {edgeRes.value.fuel} fuel.</div>}
-        </section>
+        </Section>
 
         <DeepSweepPanel session={session} busy={busy} />
 
@@ -584,10 +651,11 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
           </section>
         )}
 
-        <section>
-          <h3>
-            Bodies <span class="muted">· {state.scannedBodies.filter((id) => id.startsWith(`${systemId}.`)).length}/{detail.bodies.length} scanned</span>
-          </h3>
+        <Section
+          id="sys-bodies"
+          title="Bodies"
+          summary={`${state.scannedBodies.filter((id) => id.startsWith(`${systemId}.`)).length}/${detail.bodies.length} scanned`}
+        >
           <BodyList
             detail={detail}
             time={state.time}
@@ -604,11 +672,20 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             onSelect={select}
             onHover={(id) => !busy && setHoverId(id)}
           />
-        </section>
+        </Section>
 
-        {selected ? (
-          <section class="panel sys-selected">
-            <BodyHeader body={selected} detail={detail} scanned={scanned} session={session} />
+        {/* The selected world (docs/ui_design.md): everything below is about it, broad to detailed. */}
+        {selected && (
+          <>
+            <Section id="sys-world" level={2} title={selected.name} summary={KIND_LABEL[selected.kind]} revealKey={selected.id}>
+              <BodyHeader body={selected} detail={detail} scanned={scanned} session={session} onClear={() => select(null)} />
+              {!scanned && (
+                <div class="sys-unscanned muted small">
+                  Unscanned: {orbitingSel ? "scan it (on the toolbar) to reveal its environment and resources." : "enter orbit and scan to reveal its environment and resources."}
+                </div>
+              )}
+            </Section>
+
             <Exploration
               state={state}
               progress={progress.get(selected.id) ?? bodyProgress(state, selected)}
@@ -617,8 +694,11 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             />
 
             {!orbitingSel && planRes && (
-              <>
-                <h3>Flight</h3>
+              <Section
+                id="sys-flight"
+                title="Flight"
+                summary={planRes.ok ? `${fmtAU(planRes.value.distanceAU)} AU · ${formatDuration(planRes.value.minutes)} · ${planRes.value.fuel} fuel` : "can't plot"}
+              >
                 {planRes.ok ? (
                   <>
                     <dl class="kv">
@@ -632,44 +712,35 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       </dd>
                     </dl>
                     {planFuelShort && <ul class="blockers"><li>Not enough fuel for this burn.</li></ul>}
-                    <button class="btn primary big" disabled={busy || planFuelShort} onClick={() => startFlight({ bodyId: selected.id })}>
-                      Engage
-                    </button>
                   </>
                 ) : (
                   <div class="danger small">{planRes.reason}</div>
                 )}
-              </>
+              </Section>
             )}
 
-            {orbitingSel && !scanned && (
-              <>
-                <h3>Orbit</h3>
-                <div class="muted small">Unscanned. A full sensor sweep profiles the world and its regions.</div>
-                <button
-                  class="btn primary big"
-                  disabled={busy}
-                  onClick={() => session.act((s, w) => scanBody(s, w))}
-                >
-                  Scan ({formatDuration(SCAN_MINUTES)})
-                </button>
-              </>
-            )}
-
-            {!orbitingSel && scanned && access && !access.ok && (
-              <div class="sys-noland">
-                <div class="danger small">Your ship can't land here:</div>
-                <ul class="blockers">
-                  {access.reasons.map((r) => (
-                    <li key={r}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* From afar (AW-209): the scan records and known deposits help pick where to fly next. */}
-            {!orbitingSel && scanned && selected.regions > 0 && (
-              <>
+            {scanned && selected.regions > 0 && (
+              <Section
+                id="sys-regions"
+                title={orbitingSel && access?.ok ? "Landing" : "Surface regions"}
+                summary={`region ${region + 1} of ${selected.regions}${orbitingSel && access?.ok ? " · ready to land" : ""}`}
+              >
+                {access && !access.ok && (
+                  <>
+                    <div class="danger small">{orbitingSel ? "Can't land with the current ship:" : "Your ship can't land here:"}</div>
+                    <ul class="blockers">
+                      {access.reasons.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {orbitingSel && !state.surveyedBodies.includes(selected.id) && (
+                  <div class="muted small sys-survey">
+                    A detailed survey (on the toolbar) sharpens these readings and, with penetrating sensors, counts only seams your drill can
+                    reach. Rover sensors also reach farther on this world.{access && !access.ok && " It needs no landing: it's flown from orbit."}
+                  </div>
+                )}
                 <RegionPicker
                   session={session}
                   body={selected}
@@ -678,91 +749,34 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                   sensorTier={orbTier}
                   reachM={stats.drillMaxDepthM}
                   selected={region}
-                  landable={false}
-                  remote
+                  landable={orbitingSel && !!access?.ok}
+                  remote={!orbitingSel}
                   onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
+                  action={
+                    orbitingSel &&
+                    access?.ok &&
+                    landBlockers.length > 0 && (
+                      <ul class="blockers">
+                        {landBlockers.map((r) => (
+                          <li key={r}>{r}</li>
+                        ))}
+                      </ul>
+                    )
+                  }
                 />
-              </>
+              </Section>
             )}
+            {orbitingSel && scanned && access?.ok && selected.regions === 0 && <div class="panel muted small">Nothing to set down on.</div>}
 
-            {orbitingSel && scanned && access && (
-              <>
-                <h3>{access.ok ? "Landing" : "Surface"}</h3>
-                {!access.ok && (
-                  <>
-                    <div class="danger small">Can't land with the current ship:</div>
-                    <ul class="blockers">
-                      {access.reasons.map((r) => (
-                        <li key={r}>{r}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                {selected.regions > 0 ? (
-                  <>
-                    {!state.surveyedBodies.includes(selected.id) && (
-                      <div class="sys-survey">
-                        <div class="muted small">
-                          A detailed survey sharpens these readings and, with penetrating sensors, counts only seams your drill can
-                          reach. Rover sensors also reach farther on this world.
-                          {!access.ok && " It needs no landing: the survey is flown from orbit."}
-                        </div>
-                        <button class="btn" disabled={busy} onClick={() => session.act((s, w) => surveyBody(s, w))}>
-                          Detailed survey ({formatDuration(surveyMinutes(state))})
-                        </button>
-                      </div>
-                    )}
-                    <RegionPicker
-                      session={session}
-                      body={selected}
-                      state={state}
-                      world={world}
-                      sensorTier={orbTier}
-                      reachM={stats.drillMaxDepthM}
-                      selected={region}
-                      landable={access.ok}
-                      onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })}
-                      action={
-                        access.ok && (
-                          <>
-                            {landBlockers.length > 0 && (
-                              <ul class="blockers">
-                                {landBlockers.map((r) => (
-                                  <li key={r}>{r}</li>
-                                ))}
-                              </ul>
-                            )}
-                            <button
-                              class="btn primary big"
-                              disabled={busy || landBlockers.length > 0}
-                              title={`Descent burns ${surfaceBurnFuel(state, selected).toFixed(1)} fuel; lifting off again costs the same`}
-                              onClick={() => session.act((s, w) => land(s, w, region))}
-                            >
-                              Land in region {region + 1} ({surfaceBurnFuel(state, selected).toFixed(1)} fuel)
-                            </button>
-                          </>
-                        )
-                      }
-                    />
-                  </>
-                ) : (
-                  access.ok && <div class="muted small">Nothing to set down on.</div>
-                )}
-              </>
+            {scanned && selected.regions > 0 && (
+              <KnownDeposits state={state} world={world} body={selected} selected={region} onSelect={(r) => setRegionPick({ bodyId: selected.id, region: r })} />
             )}
 
             <ProbePanel session={session} body={selected} orbiting={orbitingSel} scanned={scanned} busy={busy} />
 
-            {scanned ? (
-              <Environment body={selected} ratings={stats.ratings} state={state} />
-            ) : (
-              <div class="sys-unscanned muted small">
-                Unscanned: {orbitingSel ? "scan to reveal its environment and resources." : "enter orbit and scan to reveal its environment and resources."}
-              </div>
-            )}
-          </section>
-        ) : (
-          <section class="panel muted small">Select a body on the map or in the list to plan a burn.</section>
+            {scanned && <Environment body={selected} ratings={stats.ratings} state={state} />}
+            {scanned && <ResourceSignatures body={selected} />}
+          </>
         )}
       </aside>
     </>

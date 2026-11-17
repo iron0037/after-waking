@@ -28,6 +28,7 @@ import {
   type World,
 } from "../../../sim";
 import { Canvas } from "../../Canvas";
+import { Section } from "../../Section";
 import { UI } from "../../palette";
 import { surfaceMap } from "./planetArt";
 import { rgba, roughCredits } from "./util";
@@ -429,7 +430,6 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
       )}
       <RegionRecapBox state={state} world={world} bodyId={body.id} region={selected} />
       {action}
-      <KnownDepositsBox known={known} selected={selected} onSelect={onSelect} />
     </div>
   );
 }
@@ -454,12 +454,28 @@ function RegionRecapBox({ state, world, bodyId, region }: { state: GameState; wo
   );
 }
 
-/** Untapped deposits found on earlier landings, anywhere on this world: pick one to land near it. */
-function KnownDepositsBox({ known, selected, onSelect }: { known: KnownDeposit[]; selected: number; onSelect: (region: number) => void }) {
+/**
+ * Untapped deposits found on earlier landings, anywhere on this world: pick one to pick its region
+ * (AW-255: its own component, under the region chart).
+ */
+export function KnownDeposits({
+  state,
+  world,
+  body,
+  selected,
+  onSelect,
+}: {
+  state: GameState;
+  world: World;
+  body: Body;
+  selected: number;
+  onSelect: (region: number) => void;
+}) {
+  const known = knownDeposits(state, world, body.id);
   if (known.length === 0) return null;
+  const reachable = known.filter((k) => k.reachable).length;
   return (
-    <div class="sys-known">
-      <h3>Known deposits</h3>
+    <Section id="sys-known" title="Known deposits" summary={`${known.length} found${reachable < known.length ? ` · ${known.length - reachable} too deep` : ""}`}>
       <table class="data sys-known-table">
         <thead>
           <tr>
@@ -488,7 +504,7 @@ function KnownDepositsBox({ known, selected, onSelect }: { known: KnownDeposit[]
         </tbody>
       </table>
       <div class="muted small">Found by your rover on earlier landings. Dots on the chart mark where they are.</div>
-    </div>
+    </Section>
   );
 }
 
