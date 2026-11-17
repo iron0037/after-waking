@@ -9,7 +9,8 @@ import { changeRep, clanRefuses } from "./reputation";
 import { arriveDeep, blindFoldFuel, blindFoldRange, deepPointBlockers, isBlindFold } from "./deepspace";
 import { covenantOnDocked, noticeArrival, noticeLanding, noticeScan } from "./covenant";
 import { fleetOnDocked } from "./fleet";
-import { denClearanceChance, outpostAt } from "./outposts";
+import { denClearanceChance, outpostAt, outpostOnHex, outpostTitle } from "./outposts";
+import { currentOutpost } from "./outpostservices";
 import { refreshOutpostBoard } from "./outpostjobs";
 import { guardJob, homeReserve, strandingBlocker } from "./saferange";
 import { diggersLeadOnDocked } from "./leads";
@@ -757,6 +758,18 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   if (here.x === x && here.y === y) return fail("The ship is already there.");
   const fuel = hopFuelTo(state, world, x, y);
   if (fuel > state.ship.fuel) return fail(`That hop needs ${fuel} fuel.`);
+  // Hopping into an outpost's region is arriving there (AW-260). A pirate's den clears ships coming
+  // down from orbit, where its tower can see them: a hop can't slip past that.
+  const from = surface.regionAt(here.x, here.y);
+  const to = surface.regionAt(x, y);
+  const arriving = to !== null && to !== from ? outpostAt(world, loc.bodyId, to) : undefined;
+  if (arriving?.clan === "freebooters" && state.denCleared !== loc.systemId) {
+    return fail(
+      state.denBarred === loc.systemId
+        ? `${arriving.name} won't clear you again this visit.`
+        : `${arriving.name}'s tower only clears ships coming down from orbit. Lift off and land in region ${(to ?? 0) + 1} to ask.`,
+    );
+  }
   state.ship.fuel -= fuel;
   advanceTime(state, HOP_MINUTES);
   if (loc.freeHop) {
@@ -769,6 +782,10 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   log(state, "travel", `Hopped the ship ${Math.round(hexDistance(here, { x, y }) * TILE_KM)} km to a new landing site.`);
   const landedIn = surface.regionAt(x, y);
   if (landedIn !== null) senseRegionDeposits(state, world, loc.bodyId, landedIn);
+  if (arriving) {
+    refreshOutpostBoard(state, world, arriving);
+    log(state, "info", `${arriving.name} is nearby. Its fuel, shop and jobs are in the Outpost panel.`);
+  }
   return ok(undefined);
 }
 
@@ -1908,6 +1925,8 @@ export interface HexRoute {
 export interface HexInfo {
   x: number;
   y: number;
+  /** A clan outpost's buildings on this hex (AW-260), and whether the ship is in its region to use it. */
+  outpost: { name: string; title: string; here: boolean } | null;
   terrain: string;
   region: number | null;
   /** Swept by the rover's sensors (otherwise only orbital readings). */
@@ -1972,9 +1991,11 @@ export function hexInfo(state: GameState, world: World, x: number, y: number): H
     }
   }
   const parkedState = loc.parkedBoat ? { vehicle: "boat" as const, p: loc.parkedBoat } : null;
+  const post = outpostOnHex(state, world, loc.bodyId, here);
   return {
     x,
     y,
+    outpost: post ? { name: post.name, title: outpostTitle(post), here: currentOutpost(state, world)?.id === post.id } : null,
     terrain: terrainName(body, t),
     region,
     explored,

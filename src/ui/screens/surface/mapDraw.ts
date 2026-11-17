@@ -10,6 +10,7 @@ import {
   hexCorners,
   hexDistance,
   hexToPixel,
+  outpostSite,
   pixelToHex,
   REGION_SIZE,
   remainingTonnes,
@@ -317,10 +318,6 @@ function outpostSprite(clan: string): HTMLImageElement | null {
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
-/** Where an outpost's buildings stand: beside its landing pad, so the ship has room to set down. */
-export function outpostSite(pad: Vec2): Vec2 {
-  return { x: pad.x + 3, y: pad.y };
-}
 
 /** A clan outpost's buildings (AW-23): its sprite, or a small teal block if the sprite isn't there. */
 export function drawOutpost(ctx: CanvasRenderingContext2D, L: Layout, pad: Vec2, clan: string): void {

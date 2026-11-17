@@ -8,12 +8,16 @@ import {
   DAY,
   DEFAULT_UNIVERSE,
   fuelPriceFor,
+  hexInfo,
   newGame,
   OUTPOST_GEAR_MARKUP,
   outpostFuelPrice,
   outpostGear,
   outpostGearPrice,
+  outpostAt,
   outposts,
+  outpostSite,
+  relocateShip,
   sell,
   sellAtOutpost,
   TRADING_POST_RATE,
@@ -82,5 +86,44 @@ describe("outpost services (AW-23)", () => {
     expect(before - s.credits).toBe(price);
     expect(s.time - t0).toBeGreaterThanOrEqual(2 * DAY);
     expect(buyOutpostGear(s, world, u.id).ok).toBe(false);
+  });
+});
+
+describe("hopping to an outpost (AW-260)", () => {
+  /** Landed in another region of the outpost's world, on open ground the ship can hop from. */
+  function nextDoor(clan: ClanId): { s: GameState; o: ReturnType<typeof outposts>[number] } {
+    const o = outposts(world).find((x) => x.clan === clan)!;
+    const surface = world.surface(o.bodyId);
+    const body = world.body(o.bodyId).body;
+    const other = Array.from({ length: body.regions }, (_, r) => r).find((r) => r !== o.region && !outpostAt(world, o.bodyId, r))!;
+    const s = newGame({ seed: SEED });
+    s.ship.fuel = 60;
+    s.location = { kind: "surface", systemId: o.systemId, bodyId: o.bodyId, region: other, rover: null, ship: surface.landing(other), globalCoords: true };
+    return { s, o };
+  }
+
+  it("a hop into the outpost's region arrives there: its panel and its board", () => {
+    const { s, o } = nextDoor("lyceum");
+    expect(currentOutpost(s, world)).toBeNull();
+    const r = relocateShip(s, world, o.pad.x, o.pad.y);
+    if (!r.ok) throw new Error(r.reason);
+    expect(currentOutpost(s, world)?.id).toBe(o.id);
+    expect(s.contracts.some((c) => c.postedAt === o.id)).toBe(true);
+  });
+
+  it("a pirate's den won't take a hop from a ship its tower hasn't cleared", () => {
+    const { s, o } = nextDoor("freebooters");
+    const r = relocateShip(s, world, o.pad.x, o.pad.y);
+    expect(r.ok).toBe(false);
+    expect(r.ok ? "" : r.reason).toMatch(/coming down from orbit/);
+    s.denCleared = o.systemId;
+    expect(relocateShip(s, world, o.pad.x, o.pad.y).ok).toBe(true);
+  });
+
+  it("the hex card names the outpost on its buildings", () => {
+    const s = at("lyceum");
+    const o = outposts(world).find((x) => x.clan === "lyceum")!;
+    const site = outpostSite(o.pad);
+    expect(hexInfo(s, world, site.x, site.y)?.outpost).toMatchObject({ name: o.name, here: true });
   });
 });

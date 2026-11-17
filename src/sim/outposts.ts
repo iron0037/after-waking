@@ -18,6 +18,7 @@ import { rngFor } from "./rng";
 import { outpostCountOf } from "./settings";
 import type { GameState } from "./state";
 import { dist, type Vec2 } from "./units";
+import { hexDistance } from "./hex";
 import type { World } from "./world";
 
 export interface Outpost {
@@ -144,6 +145,16 @@ export function outpostById(world: World, id: string): Outpost | undefined {
 /** The outpost in this region of this world, if any. */
 export function outpostAt(world: World, bodyId: string, region: number): Outpost | undefined {
   return outposts(world).find((o) => o.bodyId === bodyId && o.region === region);
+}
+
+/** Where an outpost's buildings stand: beside its landing pad, so a ship has room to set down. */
+export function outpostSite(pad: Vec2): Vec2 {
+  return { x: pad.x + 3, y: pad.y };
+}
+
+/** A known outpost whose buildings cover this hex (they span about three hexes), if any (AW-260). */
+export function outpostOnHex(state: GameState, world: World, bodyId: string, hex: Vec2): Outpost | null {
+  return knownOutposts(state, world).find((o) => o.bodyId === bodyId && hexDistance(outpostSite(o.pad), hex) <= 1) ?? null;
 }
 
 /**

@@ -31,7 +31,10 @@ const OUTPOST_STOCK = 5;
 export function currentOutpost(state: GameState, world: World = worldFor(state.seed, state.worldGen ?? 1)): Outpost | null {
   const loc = state.location;
   if (loc.kind !== "surface") return null;
-  return outpostAt(world, loc.bodyId, loc.region) ?? null;
+  // The region the ship stands in now: a hop can carry it out of the one it landed in (AW-260).
+  const surface = world.surface(loc.bodyId);
+  const ship = loc.ship ?? surface.landing(loc.region);
+  return outpostAt(world, loc.bodyId, surface.regionAt(ship.x, ship.y) ?? loc.region) ?? null;
 }
 
 export function outpostFuelPrice(state: GameState): number {

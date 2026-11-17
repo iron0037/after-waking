@@ -76,6 +76,9 @@ import {
   roverMobility,
   siteOnWater,
   siteReach,
+  currentOutpost,
+  outpostOnHex,
+  outpostTitle,
   roverSpecimenSlots,
   routeEnergyMult,
   hasPerk,
@@ -174,6 +177,7 @@ import {
 import { affordablePrefix, energyHome, evaluate, planPath, type Mover, type RoutePlan } from "./surface/routing";
 import { Section } from "../Section";
 import { ActionRail } from "../ActionRail";
+import { OutpostIcon } from "../OutpostIcon";
 import { CreaturePanel } from "./surface/CreaturePanel";
 import { OutpostPanel } from "./surface/OutpostPanel";
 import { CompIcon, useSpriteIndex } from "../compendiumSprites";
@@ -935,6 +939,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     const info = TERRAIN_INFO[terrain];
     const needsClimber = info.passable === "climb" && !canClimb;
     lines.push({ text: tileName(tile), color: UI.text });
+    // A clan outpost's buildings (AW-260).
+    const post = outpostOnHex(state, world, loc.bodyId, tile);
+    if (post) {
+      const here = currentOutpost(state, world)?.id === post.id;
+      lines.push({ text: `${post.name}, ${outpostTitle(post)}`, color: UI.outpost });
+      lines.push({ text: here ? "Its services are in the Outpost panel" : "Land or hop the ship into this region to use it", color: UI.muted });
+    }
     const dep = depositAt(tile);
     const flora = floraAt(tile);
     const beast = creatureAt(tile);
@@ -2120,6 +2131,12 @@ function HexPanel({ info, onClose }: { info: HexInfo; onClose: () => void }) {
           ×
         </button>
       </div>
+      {info.outpost && (
+        <div class="small hex-outpost">
+          <OutpostIcon /> <b>{info.outpost.name}</b>, {info.outpost.title}.{" "}
+          <span class="muted">{info.outpost.here ? "Its services are in the Outpost panel." : "Land or hop the ship into this region to use it."}</span>
+        </div>
+      )}
       <dl class="kv">
         <dt>Position</dt>
         <dd>
