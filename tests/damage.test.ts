@@ -5,6 +5,9 @@ import {
   damageWarning,
   flightPlan,
   foldPlan,
+  helmOwed,
+  netWorth,
+  settleHelmAccount,
   newGame,
   reputation,
   scanBody,
@@ -56,11 +59,25 @@ describe("drive damage after a fight (AW-263)", () => {
     const r = callTow(s, world);
     if (!r.ok) throw new Error(r.reason);
     expect(s.location.kind).toBe("intrepid");
-    expect(s.credits).toBeLessThanOrEqual(50_000 - cr); // docking also settles wages
+    expect(s.credits).toBeLessThanOrEqual(50_000 - cr); // paid off at once from plenty; docking also settles wages
+    expect(helmOwed(s)).toBe(0);
     expect(reputation(s, "helm")).toBeLessThan(helm);
+  });
+
+  it("a captain who can't pay has it put on Helm's account, paid off later from credits to spare (AW-267)", () => {
     const broke = inSystem(100);
-    broke.credits = 10;
-    expect(towBlockers(broke, world).join()).toMatch(/tug costs/);
+    broke.credits = 500;
+    expect(towBlockers(broke, world)).toEqual([]);
+    const r = callTow(broke, world);
+    if (!r.ok) throw new Error(r.reason);
+    const owed = helmOwed(broke);
+    expect(owed).toBeGreaterThan(0);
+    expect(broke.credits).toBeGreaterThanOrEqual(0);
+    expect(netWorth(broke)).toBeLessThan(broke.credits);
+    // Flush later: Helm collects, leaving a month of wages and upkeep in hand.
+    broke.credits = 1_000_000;
+    expect(settleHelmAccount(broke)).toBe(owed);
+    expect(helmOwed(broke)).toBe(0);
   });
 
   it("warns about damage that matters outside a fight", () => {

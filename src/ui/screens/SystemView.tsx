@@ -559,7 +559,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                         id: "tow",
                         icon: "tow" as const,
                         label: `Call a Helm tow (${towTerms(state, world).cr.toLocaleString()} cr)`,
-                        detail: `A tug hauls the ship home to the Intrepid in ${formatDuration(towTerms(state, world).minutes)}. Helm thinks a little less of you for it.`,
+                        detail: `A tug hauls the ship home to the Intrepid in ${formatDuration(towTerms(state, world).minutes)}. Helm puts it on your account, paid off when you dock with credits to spare, and thinks a little less of you for it.`,
                         blocked: towBlockers(state, world)[0] ?? null,
                         onClick: () => session.act((s, w) => callTow(s, w)),
                       },

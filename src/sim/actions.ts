@@ -66,7 +66,7 @@ import { CREATURES_BY_NAME } from "../data/creatures";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
 import { specimenFits, specimenKey } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
-import { helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
+import { chargeHelmAccount, helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
 import { effectiveStats, finishRetraining, hasPerk, hasTalent, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
 import {
@@ -278,22 +278,23 @@ export function towBlockers(state: GameState, world: World): string[] {
   if (!drivesDead(state)) return ["The drives still run: a tow is for a ship that can't move."];
   if (loc.kind === "surface") return ["Lift off first: the tug meets you in orbit."];
   if (state.encounter) return ["A raider has you under its guns."];
-  const { cr } = towTerms(state, world);
-  if (state.credits < cr) return [`Helm's tug costs ${cr.toLocaleString()} cr; you have ${Math.floor(state.credits).toLocaleString()}.`];
   return [];
 }
 
-/** Helm sends a tug: the ship is hauled home and docked. It costs credits and a little standing. */
+/**
+ * Helm sends a tug: the ship is hauled home and docked. It goes on Helm's account (AW-267), paid off
+ * at docking from credits to spare, and costs a little standing.
+ */
 export function callTow(state: GameState, world: World): Result<{ cr: number; minutes: number }> {
   const why = towBlockers(state, world);
   if (why.length > 0) return fail(why[0]!);
   const { cr, minutes, ly } = towTerms(state, world);
-  state.credits -= cr;
+  chargeHelmAccount(state, cr);
   advanceTime(state, minutes);
   changeRep(state, "helm", TOW_HELM_REP, "Towed home by a Helm tug");
   state.denBarred = undefined;
   state.denCleared = undefined;
-  dockWithIntrepid(state, world, `A Helm tug hauled the ship ${ly.toFixed(1)} ly home to the Intrepid for ${cr.toLocaleString()} cr.`);
+  dockWithIntrepid(state, world, `A Helm tug hauled the ship ${ly.toFixed(1)} ly home to the Intrepid. Helm put the ${cr.toLocaleString()} cr on your account.`);
   return ok({ cr, minutes });
 }
 

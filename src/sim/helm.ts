@@ -45,6 +45,41 @@ export interface HelmRecord {
   shunnedUntil?: number;
   /** Obligation contracts already counted against the captain. */
   penalized?: string[];
+  /** Tows Helm put on the captain's account (AW-267), paid off at docking from credits to spare. */
+  towOwed?: number;
+}
+
+/** Days of wages and upkeep Helm leaves the captain when it collects on the account. */
+export const HELM_ACCOUNT_RESERVE_DAYS = 30;
+
+/** What the captain owes Helm for tows. */
+export function helmOwed(state: GameState): number {
+  return Math.round(state.helm?.towOwed ?? 0);
+}
+
+/** Put a tow on Helm's account (AW-267). */
+export function chargeHelmAccount(state: GameState, cr: number): void {
+  const h = helm(state);
+  h.towOwed = (h.towOwed ?? 0) + cr;
+}
+
+/** At docking: Helm collects what it can on the account, leaving a month of wages and upkeep in hand. */
+export function settleHelmAccount(state: GameState): number {
+  const h = helm(state);
+  const owed = h.towOwed ?? 0;
+  if (owed <= 0) return 0;
+  const reserve = (dailyWages(state) + dailyUpkeep(state)) * HELM_ACCOUNT_RESERVE_DAYS;
+  const pay = Math.floor(Math.min(owed, Math.max(0, state.credits - reserve)));
+  if (pay <= 0) return 0;
+  state.credits -= pay;
+  h.towOwed = owed - pay;
+  if (h.towOwed < 1) h.towOwed = undefined;
+  log(
+    state,
+    "trade",
+    h.towOwed ? `Paid Helm ${pay.toLocaleString()} cr toward the tow; ${Math.round(h.towOwed).toLocaleString()} cr still on the account.` : `Paid off Helm's tow account: ${pay.toLocaleString()} cr.`,
+  );
+  return pay;
 }
 
 function helm(state: GameState): HelmRecord {
@@ -55,7 +90,7 @@ function helm(state: GameState): HelmRecord {
 /** Credits plus cargo at today's prices, minus the note and anything owed. */
 export function netWorth(state: GameState): number {
   const cargo = COMMODITY_IDS.reduce((sum, id) => sum + (state.ship.cargo[id] ?? 0) * sellPrice(state.market, id), 0);
-  return Math.round(state.credits + cargo - state.loan.balance - state.payrollOwed - (state.upkeepOwed ?? 0));
+  return Math.round(state.credits + cargo - state.loan.balance - state.payrollOwed - (state.upkeepOwed ?? 0) - helmOwed(state));
 }
 
 export type HelmStatus =
@@ -84,6 +119,7 @@ export function helmOnDeparture(state: GameState): void {
 export function helmOnDocked(state: GameState): void {
   const h = helm(state);
   checkObligations(state);
+  settleHelmAccount(state);
   if (h.departWorth !== undefined) {
     h.streak = netWorth(state) < h.departWorth ? h.streak + 1 : 0;
     h.departWorth = undefined;
