@@ -768,7 +768,7 @@ export function land(state: GameState, world: World, region: number): Result {
   const outpost = outpostAt(world, body.id, region);
   if (outpost) {
     refreshOutpostBoard(state, world, outpost);
-    log(state, "info", `${outpost.name} is beside the pad. Its fuel, shop and jobs are in the Outpost panel.`);
+    log(state, "info", `${outpost.name} is beside the pad. Enter it from the toolbar for its fuel, shop and jobs.`);
   }
   senseRegionDeposits(state, world, body.id, region);
   noticeLanding(state, body.id, region);
@@ -885,7 +885,7 @@ export function relocateShip(state: GameState, world: World, x: number, y: numbe
   if (landedIn !== null) senseRegionDeposits(state, world, loc.bodyId, landedIn);
   if (arriving) {
     refreshOutpostBoard(state, world, arriving);
-    log(state, "info", `${arriving.name} is nearby. Its fuel, shop and jobs are in the Outpost panel.`);
+    log(state, "info", `${arriving.name} is nearby. Enter it from the toolbar for its fuel, shop and jobs.`);
   }
   return ok(undefined);
 }

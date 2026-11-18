@@ -311,3 +311,14 @@ table.data tbody tr.hub-subhead:first-child th {
 .research-needs li {
   margin: 2px 0;
 }
+
+/* A clan outpost's screen (AW-256) */
+.outpost-hub .outpost-hub-art {
+  width: 128px;
+  height: auto;
+  image-rendering: pixelated;
+  border-radius: 8px;
+}
+.outpost-hub-pane {
+  max-width: 760px;
+}

@@ -18,6 +18,7 @@ import { defaultView, GameSession, useSession } from "./session";
 import { Hub } from "./screens/Hub";
 import { StarMap } from "./screens/StarMap";
 import { SurfaceView } from "./screens/SurfaceView";
+import { OutpostHub } from "./screens/OutpostHub";
 import { SystemView } from "./screens/SystemView";
 import { warmTerrain } from "./screens/surface/terrainImage";
 
@@ -124,6 +125,7 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
         {session.view === "starmap" && <StarMap session={session} />}
         {session.view === "system" && <SystemView session={session} />}
         {session.view === "surface" && <SurfaceView session={session} />}
+        {session.view === "outpost" && <OutpostHub session={session} />}
       </main>
       <ArchivePanel session={session} floating={windowOpen} />
       <footer class="journal-strip" onClick={() => setJournalOpen(true)} title="Open journal (J)">

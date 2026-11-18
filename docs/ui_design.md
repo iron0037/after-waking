@@ -53,13 +53,14 @@ map, a star system, and a planet's surface.
    The handle stays on the screen's edge while hidden, so the way back is obvious. Full-screen views
    (the Intrepid) have no side panel to hide.
 
-## Settlements [PROPOSED] (AW-256)
+## Settlements [DECIDED] (AW-256)
 
 10. **Settlements are full screen.** The Intrepid has its own full-screen hub; an outpost should too,
     rather than a component in the surface panel. Landing in an outpost's region puts an "Enter
     outpost" action on the rail, which opens a smaller hub in the Intrepid's style, with one tab per
     service: Jobs, Fuel, Shop, Trading post, and the den's yard. Leaving goes back to the surface,
-    where the ship is still parked.
+    where the ship is still parked. Built: src/ui/screens/OutpostHub.tsx; number keys pick tabs, Escape
+    leaves. The surface panel keeps a short summary of the outpost (its name, its jobs).
 
 ## Rollout
 

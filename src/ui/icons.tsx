@@ -30,7 +30,8 @@ export type IconName =
   | "probe"
   | "fold"
   | "capture"
-  | "tow";
+  | "tow"
+  | "outpost";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -181,6 +182,15 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+    </>
+  ),
+  // A dome with a pennant: a clan outpost, as on the maps.
+  outpost: (
+    <>
+      <path d="M5 18a7 7 0 0 1 14 0z" />
+      <path d="M3 18h18" />
+      <path d="M12 11V4" />
+      <path d="M12 4l4.5 1.5L12 7" />
     </>
   ),
   // A net: capture a creature.

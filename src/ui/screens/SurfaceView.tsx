@@ -950,7 +950,7 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     if (post) {
       const here = currentOutpost(state, world)?.id === post.id;
       lines.push({ text: `${post.name}, ${outpostTitle(post)}`, color: UI.outpost });
-      lines.push({ text: here ? "Its services are in the Outpost panel" : "Land or hop the ship into this region to use it", color: UI.muted });
+      lines.push({ text: here ? "Enter it from the toolbar" : "Land or hop the ship into this region to use it", color: UI.muted });
     }
     const dep = depositAt(tile);
     const flora = floraAt(tile);
@@ -1571,6 +1571,21 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         },
                       ]
                     : [],
+            },
+            {
+              // A clan outpost in this region (AW-256): its services are on its own screen.
+              label: "Outpost",
+              actions: currentOutpost(state, world)
+                ? [
+                    {
+                      id: "outpost",
+                      icon: "outpost" as const,
+                      label: `Enter ${currentOutpost(state, world)!.name}`,
+                      detail: "Its jobs, fuel and shop, and whatever else this clan offers.",
+                      onClick: () => session.go("outpost"),
+                    },
+                  ]
+                : [],
             },
             {
               label: "Ship",
@@ -2200,7 +2215,7 @@ function HexPanel({ info, onClose }: { info: HexInfo; onClose: () => void }) {
       {info.outpost && (
         <div class="small hex-outpost">
           <OutpostIcon /> <b>{info.outpost.name}</b>, {info.outpost.title}.{" "}
-          <span class="muted">{info.outpost.here ? "Its services are in the Outpost panel." : "Land or hop the ship into this region to use it."}</span>
+          <span class="muted">{info.outpost.here ? "Enter it from the toolbar." : "Land or hop the ship into this region to use it."}</span>
         </div>
       )}
       <dl class="kv">

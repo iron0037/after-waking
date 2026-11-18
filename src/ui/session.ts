@@ -11,6 +11,7 @@ import type { Station } from "../data/crew";
 import type { ClanId } from "../data/ship";
 import type { PeopleSettings, UniverseSettings } from "../sim/settings";
 import type { ProbeDepth } from "../data/probes";
+import { currentOutpost } from "../sim/outpostservices";
 import {
   clueCount,
   chooseProbeOption,
@@ -33,7 +34,7 @@ import {
 export const SAVE_KEY = "after-waking/save";
 
 /** UI-only navigation; not saved. Which views are valid depends on state.location. */
-export type View = "hub" | "starmap" | "system" | "surface";
+export type View = "hub" | "starmap" | "system" | "surface" | "outpost";
 
 /** A long action is playing back as a time-lapse clock. */
 export interface TimeLapse {
@@ -329,7 +330,8 @@ export function validViews(state: GameState): View[] {
     case "space":
       return ["system", "starmap"];
     case "surface":
-      return ["surface"];
+      // A clan outpost's own screen (AW-256), while the ship stands in its region.
+      return currentOutpost(state) ? ["surface", "outpost"] : ["surface"];
     case "deep":
       // Between the stars there is only the chart (AW-165).
       return ["starmap"];
