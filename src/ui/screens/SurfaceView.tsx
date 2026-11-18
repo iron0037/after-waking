@@ -1880,7 +1880,14 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                     <tr
                       key={c.key}
                       class={`${c.key === creatureKey ? "sel" : ""} ${c.down ? "dim" : ""}`}
-                      onClick={() => setCreatureKey(c.key === creatureKey ? null : c.key)}
+                      onClick={() => {
+                        // Like the flora and deposit rows (AW-273): select it and center the map on it.
+                        if (c.key === creatureKey) setCreatureKey(null);
+                        else {
+                          setCreatureKey(c.key);
+                          centreOn(c);
+                        }
+                      }}
                       title={c.entry.blurb}
                     >
                       <td>
