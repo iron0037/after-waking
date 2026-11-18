@@ -5,7 +5,7 @@ import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER
 import { fitBlocker, hullOf, turnInOutpost, yardStatus } from "../../sim";
 import { VEHICLE_WEAPONS } from "../../data/vehicleWeapons";
 import { ShipsPanel } from "./Ships";
-import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
+import { clanMods, clanRefuses, requirementProgress, researchBlockers, researchCost, researchFilterStatus, researchFor, researchStatus, specimenResearchUses, startResearch, toggleTrackResearch, upgradePriceFor, upgradeUnlocked, yardUpgrades } from "../../sim";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { COMMODITIES, COMMODITY_IDS, CONC_IDS, GAS_IDS, ORE_IDS, type CommodityId } from "../../data/commodities";
@@ -1229,11 +1229,30 @@ function Shipyard({ session }: { session: GameSession }) {
 
 // --- research (AW-15) -------------------------------------------------------------------
 
+/** The Research page's filter (AW-272), like the Shipyard's. */
+type ResearchFilter = "all" | "purchasable" | "short" | "completed";
+
+const RESEARCH_FILTERS: Record<ResearchFilter, string> = {
+  all: "All",
+  purchasable: "Purchasable",
+  short: "Insufficient credits",
+  completed: "Completed",
+};
+
+let researchFilterChoice: ResearchFilter = "all";
+
 function Research({ session }: { session: GameSession }) {
   useSession(session);
   useArchiveTopic(session, "research");
   const { state } = session;
   const running = RESEARCH.filter((p) => researchStatus(state, p.id) === "running").length;
+  const [filter, setFilterRaw] = useState<ResearchFilter>(researchFilterChoice);
+  const setFilter = (f: ResearchFilter) => {
+    researchFilterChoice = f;
+    setFilterRaw(f);
+  };
+  const statusOf = new Map(RESEARCH.map((p) => [p.id, researchFilterStatus(state, p.id)]));
+  const shown = filter === "all" ? RESEARCH : RESEARCH.filter((p) => statusOf.get(p.id) === filter);
   return (
     <div class="hub-grid">
       <section class="panel hub-wide">
@@ -1247,8 +1266,21 @@ function Research({ session }: { session: GameSession }) {
           Each clan can turn a piece of the Archive into gear you can buy, if you bring back what the work needs and pay for the lab time. Goods
           are handed over when the project starts; survey data, readings and charts are copied, not used up.
         </p>
+        <div class="yard-filter">
+          <label class="small" for="research-filter">
+            Show
+          </label>
+          <select id="research-filter" value={filter} onChange={(e) => setFilter((e.currentTarget as HTMLSelectElement).value as ResearchFilter)}>
+            {(Object.keys(RESEARCH_FILTERS) as ResearchFilter[]).map((f) => (
+              <option key={f} value={f}>
+                {RESEARCH_FILTERS[f]} ({f === "all" ? RESEARCH.length : RESEARCH.filter((p) => statusOf.get(p.id) === f).length})
+              </option>
+            ))}
+          </select>
+        </div>
+        {shown.length === 0 && <p class="muted small">No research projects match that filter.</p>}
         <div class="hub-cards">
-          {RESEARCH.map((p) => {
+          {shown.map((p) => {
             const status = researchStatus(state, p.id);
             const rec = state.research?.[p.id];
             const gear = UPGRADES.find((u) => u.id === p.unlocks);

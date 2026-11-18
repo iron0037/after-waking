@@ -8,6 +8,7 @@ import {
   newGame,
   refineOre,
   researchBlockers,
+  researchFilterStatus,
   researchStatus,
   startResearch,
   upgradeUnlocked,
@@ -70,5 +71,22 @@ describe("research projects (AW-15)", () => {
     state.ship.cargo = { plicite: 10 };
     state.visitedSystems = Array.from({ length: 8 }, (_, i) => `s${i}`);
     expect(researchBlockers(state, "fold-harmonics").some((b) => b.includes("at a time"))).toBe(true);
+  });
+});
+
+describe("the Research page's filter (AW-272)", () => {
+  it("sorts projects like the Shipyard: purchasable, short of credits only, locked, running, completed", () => {
+    const state = newGame({ seed: 4 });
+    state.credits = 100_000;
+    expect(researchFilterStatus(state, "plicite-bits")).toBe("locked"); // missing the titanium and plicite
+    state.ship.cargo = { titanium: 30, plicite: 5 };
+    expect(researchFilterStatus(state, "plicite-bits")).toBe("purchasable");
+    state.credits = 100;
+    expect(researchFilterStatus(state, "plicite-bits")).toBe("short");
+    state.credits = 100_000;
+    expect(startResearch(state, "plicite-bits").ok).toBe(true);
+    expect(researchFilterStatus(state, "plicite-bits")).toBe("running");
+    advanceTime(state, 21 * DAY + 1);
+    expect(researchFilterStatus(state, "plicite-bits")).toBe("completed");
   });
 });

@@ -112,6 +112,26 @@ export function researchBlockers(state: GameState, id: string): string[] {
   return out;
 }
 
+/**
+ * How a project sorts on the Research page's filter (AW-272), like the Shipyard's: "short" is a project
+ * you could start but for the credits; one missing anything else (goods, surveys, a free lab slot, the
+ * clan's goodwill) is "locked" and shows only under All.
+ */
+export type ResearchFilterStatus = "completed" | "running" | "purchasable" | "short" | "locked";
+
+export function researchFilterStatus(state: GameState, id: string): ResearchFilterStatus {
+  const status = researchStatus(state, id);
+  if (status === "done") return "completed";
+  if (status === "running") return "running";
+  const p = RESEARCH_BY_ID.get(id);
+  if (!p) return "locked";
+  // The page is aboard the Intrepid; being docked isn't what sorts a project.
+  const blockers = researchBlockers(state, id).filter((b) => !b.startsWith("Projects are commissioned aboard"));
+  if (blockers.length === 0) return "purchasable";
+  const cost = `Costs ${researchCost(state, p).toLocaleString()} cr.`;
+  return blockers.length === 1 && blockers[0] === cost ? "short" : "locked";
+}
+
 /** Commission a project: hand over the goods, pay, and the clock starts. */
 export function startResearch(state: GameState, id: string): Result<ResearchProject> {
   const blockers = researchBlockers(state, id);
