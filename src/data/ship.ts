@@ -313,7 +313,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Deep-core drill",
     vendor: "diggers",
     price: 24_000,
-    description: "Drill to 700 m at double the extraction rate.",
+    description: "Drill to 700 m at double the extraction rate. Rides on the rover's rig, so it goes with you from ship to ship.",
     apply: (s) => {
       s.drillMaxDepthM = Math.max(s.drillMaxDepthM, 700);
       s.drillRateTph *= 2;
@@ -401,7 +401,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Lattice drill sleeves",
     vendor: "diggers",
     price: 28_000,
-    description: "Drill sleeves grown on a reef-lace lattice: they stay sharp. +30% extraction rate. (Research: Reef-lattice sleeves.)",
+    description: "Drill sleeves grown on a reef-lace lattice: they stay sharp. +30% extraction rate. Go with the rover from ship to ship. (Research: Reef-lattice sleeves.)",
     apply: (s) => {
       s.drillRateTph *= 1.3;
     },
@@ -611,7 +611,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Plicite-bit core drill",
     vendor: "diggers",
     price: 48_000,
-    description: "Drill to 1,200 m at 1.5x the deep-core rate.",
+    description: "Drill to 1,200 m at 1.5x the deep-core rate. Only a Bulker's heavy crane and reactor taps can carry and power it.",
     apply: (s) => {
       s.drillMaxDepthM = Math.max(s.drillMaxDepthM, 1200);
       s.drillRateTph *= 1.5;

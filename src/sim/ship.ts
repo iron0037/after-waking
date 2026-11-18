@@ -55,9 +55,13 @@ export function hasFitted(ship: ShipState, id: string): boolean {
 }
 
 /** Gear that belongs to the rover or the boat, which go with the captain from ship to ship (AW-103). */
+/** Drill gear rides on the rover with its rig (AW-268), so it goes from ship to ship with the rover. */
+const DRILL_GEAR = new Set(["deepDrill", "coreDrill", "latticeSleeves"]);
+
+/** Gear that belongs to the rover or the boat, not the ship: it moves with the crew when they change ships. */
 export function isVehicleGear(id: string): boolean {
   const c = UPGRADES_BY_ID.get(id)?.category;
-  return c === "rover" || c === "boat";
+  return c === "rover" || c === "boat" || DRILL_GEAR.has(id);
 }
 
 /** Why this hull can't take this gear, or null if it can. */

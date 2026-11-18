@@ -130,6 +130,33 @@ describe("buying a hull", () => {
 });
 
 describe("taking command of another ship", () => {
+  it("the drills ride on the rover and move with it; the Bulker-only core drill stays aboard (AW-268)", () => {
+    const s = rich();
+    s.ship.hull = "bulker";
+    s.ship.upgrades.push("deepDrill", "coreDrill", "latticeSleeves");
+    buyHull(s, "scout");
+    expect(commandShip(s, 0).ok).toBe(true);
+    expect(s.ship.hull).toBe("scout");
+    expect(s.ship.upgrades).toEqual(expect.arrayContaining(["deepDrill", "latticeSleeves"]));
+    expect(s.ship.upgrades).not.toContain("coreDrill");
+    expect(s.berthed![0]!.upgrades).toContain("coreDrill");
+    expect(s.berthed![0]!.upgrades).not.toContain("deepDrill");
+    expect(s.journal.some((e) => /stays aboard/.test(e.text))).toBe(true);
+    // Back to the Bulker: the core drill is still there, and the others come home.
+    expect(commandShip(s, 0).ok).toBe(true);
+    expect(s.ship.upgrades).toEqual(expect.arrayContaining(["deepDrill", "coreDrill", "latticeSleeves"]));
+  });
+
+  it("a spare the new ship already has stays with the old one (AW-268)", () => {
+    const s = rich();
+    s.ship.upgrades.push("deepDrill");
+    buyHull(s, "bulker");
+    s.berthed![0]!.upgrades.push("deepDrill");
+    expect(commandShip(s, 0).ok).toBe(true);
+    expect(s.ship.upgrades.filter((id) => id === "deepDrill")).toHaveLength(1);
+    expect(s.berthed![0]!.upgrades).toContain("deepDrill");
+  });
+
   it("the rover, the boat, the hold and the racks come across; fitted gear, fuel and probes stay", () => {
     const s = rich();
     s.ship.upgrades.push("roverCells", "boat", "expandedHold", "probeBay");

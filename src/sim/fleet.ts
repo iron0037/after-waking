@@ -10,7 +10,7 @@ import { effectiveStats, shipSpecimenSlots } from "./perks";
 import { changeRep, clanRefuses, TIER_INFO, tierOf, type RepTier } from "./reputation";
 import { fail, ok, type Result } from "./result";
 import { bondClan } from "./sentiment";
-import { cargoTonnes, hullOf, isVehicleGear, specimenCount, type ShipState } from "./ship";
+import { cargoTonnes, fitBlocker, hullOf, isVehicleGear, specimenCount, type ShipState } from "./ship";
 import { advanceTime, log, withRng, type GameState } from "./state";
 import { worldFor } from "./contracts";
 import { outposts } from "./outposts";
@@ -141,9 +141,14 @@ export function commandShip(state: GameState, index: number): Result<ShipState> 
   const berthed = [...(state.berthed ?? [])];
   const next = berthed[index]!;
   const prev = state.ship;
-  const vehicles = prev.upgrades.filter(isVehicleGear);
-  next.upgrades = [...next.upgrades.filter((id) => !isVehicleGear(id)), ...vehicles.filter((id) => !next.upgrades.includes(id))];
-  prev.upgrades = prev.upgrades.filter((id) => !isVehicleGear(id));
+  // The rover's and the boat's gear moves across (AW-268: drills too). What the new hull can't take
+  // (the Bulker-only core drill) stays aboard the old ship, and so does a spare the new one already has.
+  const nextHull = hullOf(next);
+  const moving = prev.upgrades.filter((id) => isVehicleGear(id) && !next.upgrades.includes(id) && fitBlocker(nextHull, id) === null);
+  const leftBehind = prev.upgrades.filter((id) => isVehicleGear(id) && !moving.includes(id) && !next.upgrades.includes(id));
+  next.upgrades = [...next.upgrades, ...moving];
+  prev.upgrades = prev.upgrades.filter((id) => !moving.includes(id));
+  const vehicles = [...moving, ...next.upgrades.filter((id) => isVehicleGear(id) && !moving.includes(id))];
   next.cargo = prev.cargo;
   prev.cargo = {};
   if (prev.specimens) next.specimens = prev.specimens;
@@ -164,6 +169,9 @@ export function commandShip(state: GameState, index: number): Result<ShipState> 
   state.ship = next;
   advanceTime(state, SWAP_MINUTES);
   log(state, "trade", `Moved the crew, the rover${vehicles.includes("boat") ? " and the boat" : ""} across to the ${next.name}. The ${prev.name} is berthed at the Intrepid.`);
+  for (const id of leftBehind) {
+    log(state, "trade", `The ${UPGRADES_BY_ID.get(id)?.name ?? id} stays aboard the ${prev.name}: ${fitBlocker(nextHull, id) ?? "it won't fit"}`);
+  }
   return ok(next);
 }
 
