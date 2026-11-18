@@ -5,6 +5,7 @@ Music is its own ticket (AW-274). This covers the game's sound effects and ambie
 ## Decisions [DECIDED]
 
 - **Style:** retro and synthesized, close to the intro's music. Soft by default; nothing plays every frame.
+- **Voice call-outs** are recorded alerts in the intro narrator's voice (Kokoro, offline): a recording, not a crewmate.
 - **Three sources, each where it fits best:**
   1. **Synthesized in the browser** (Web Audio, `src/ui/audio/synth.ts`): clicks, beeps, scanner sweeps,
      pings, alarms, zaps, and anything abstract. No files, easy to tweak, no licensing.
@@ -42,5 +43,11 @@ and narration follow them too.
 
 1. **Done:** the engine, volume settings, and the synthesized interface and travel sounds: click, blocked,
    notice, credits, purchase, level-up, discovery, fold, land, lift-off, dock, undock, orbit, and the burn loop.
-2. The surface: rover, boat, drill, scans, samples, capture, and per-world ambience (Stable Audio Open).
+   **Pass 2 (AW-281), done:** every sound gets a shared reverb and stereo; notices and credits no longer
+   chime like bells. New: refuel (pouring liquid), orbital scan, survey (stylus on a chart), probe whoosh,
+   raider-hail danger sting, rover bay open and close, boat splash, ship hop, recharge (power-up), drilling
+   (hammer strikes for as long as the job's time-lapse runs), the rover and boat motors while driving, and
+   the voice call-outs "Mineral detected" and "Lifeform detected" (intro narrator, Kokoro bf_emma;
+   `tools/audio/callouts.py`), at most one of each per action.
+2. The rest of the surface: samples, capture, creature calls, storms and quakes, and per-world ambience (Stable Audio Open).
 3. Combat.

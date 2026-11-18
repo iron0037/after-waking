@@ -2,6 +2,7 @@
  * Planet surface: a survey map over the whole world (one continuous hex map in planet-wide coordinates, drawn
  * region by region as the camera follows the rover), and the prospect → drill → haul loop.
  */
+import { audio } from "../audio/engine";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
 import { CREATURES_BY_ID } from "../../data/creatures";
@@ -633,7 +634,10 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     hoverRef.current = null;
     setRechargeHint(false);
     session.setBusy(true);
+    // The motor runs for the drive (AW-281).
+    const motor = audio.loop(isBoat ? "boat" : "rover");
     await new Promise<void>((resolve) => setTimeout(resolve, steps.length * STEP_MS + 40));
+    motor.stop();
     if (!aliveRef.current) return false;
     animRef.current = null;
     const last = pts[pts.length - 1] as Vec2;
@@ -1146,6 +1150,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const doAutoExplore = (): void => {
     const region = world.surface(loc.bodyId).regionAt(ship.x, ship.y) ?? loc.region;
     const r = session.act((s, w) => autoExplore(s, w));
+    // The sweep plays as a time-lapse: the motor runs for it (AW-281).
+    if (r.ok && session.timelapse) audio.loopFor(isBoat ? "boat" : "rover", session.timelapse.durMs);
     setRechargeHint(false);
     if (!r.ok) return;
     const { before, after, days } = r.value;

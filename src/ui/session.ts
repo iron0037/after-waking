@@ -13,7 +13,7 @@ import type { PeopleSettings, UniverseSettings } from "../sim/settings";
 import type { ProbeDepth } from "../data/probes";
 import { currentOutpost } from "../sim/outpostservices";
 import { audio, noticeSound } from "./audio/engine";
-import { soundSnapshot, soundsFor } from "./audio/triggers";
+import { soundSchedule, soundSnapshot, soundsFor } from "./audio/triggers";
 import {
   clueCount,
   chooseProbeOption,
@@ -163,13 +163,20 @@ export class GameSession {
     // A new clue for the Covenant's dossier gets its own, quieter notice.
     for (const c of (this.state.clues ?? []).slice(cluesBefore)) this.notify(`Covenant dossier: ${CLUES_BY_ID.get(c.id)?.title ?? c.id}`, "covenant");
     const passed = this.state.time - before;
+    const lapseBefore = this.timelapse;
     if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
+    const lapse = this.timelapse !== lapseBefore ? this.timelapse : null;
     // A raider's hail fails the fold, but it isn't an error: the encounter window says it all.
     if (!result.ok && !(encounterAfter && !encounterBefore)) this.notify(result.reason, "error");
-    // The sound of what just happened (AW-31): a fold, a landing, money changing hands.
-    if (result.ok) {
+    // The sound of what just happened (AW-31, AW-281): a fold, a landing, the rover bay, a call-out. A hail sounds even though the fold failed.
+    if (result.ok || (encounterAfter && !encounterBefore)) {
       const kinds = this.state.journal.slice(journalBefore).map((e) => e.kind);
-      for (const id of soundsFor(soundBefore, soundSnapshot(this.state), kinds)) audio.play(id);
+      const soundAfter = soundSnapshot(this.state);
+      for (const { id, delay } of soundSchedule(soundsFor(soundBefore, soundAfter, kinds))) {
+        // A long drilling job hammers away for as long as its time-lapse clock runs.
+        if (id === "drill" && lapse) audio.loopFor("drill", lapse.durMs);
+        else audio.play(id, delay);
+      }
     }
     const valid = validViews(this.state);
     if (!valid.includes(this.view)) this.view = defaultView(this.state);
