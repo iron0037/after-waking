@@ -20,7 +20,19 @@ import { clanMods, upgradePriceFor } from "./clan";
 import { bodyNickname } from "./nicknames";
 import { COMMODITIES, COMMODITY_IDS, CONC_RATIO, CONC_SOURCE, type CommodityId } from "../data/commodities";
 import { isConcentrate } from "./refinery";
-import { denPicket, driveDamageMult, finishRepairs, maybeInterdict, routeContact, startContact, type RouteContact } from "./combat";
+import {
+  denPicket,
+  driveDamageMult,
+  driveFuelMult,
+  drivesDead,
+  finishRepairs,
+  maybeInterdict,
+  routeContact,
+  sensorsDead,
+  sensorTimeMult,
+  startContact,
+  type RouteContact,
+} from "./combat";
 import { matchingSpecimens, researchFor, trackedProjects, upgradeUnlocked } from "./research";
 import { CLAN_NAMES, UPGRADES, UPGRADES_BY_ID, type Upgrade } from "../data/ship";
 import { bodyPosition, KIND_LABEL, type Body } from "./bodies";
@@ -197,12 +209,14 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   const crew = crewBonuses(state);
   // A blind fold (AW-165): no star to lock onto, so it's shorter-ranged and thirstier. A charted site counts as a star (AW-203).
   const blind = isBlindFold(state, world, targetId);
-  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? blindFoldFuel(state) : 1) * 10) / 10;
+  const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? blindFoldFuel(state) : 1) * driveFuelMult(state) * 10) / 10;
   const range = stats.foldRangeLy * (blind ? blindFoldRange(state) : 1);
   const blockers: string[] = [];
   if (isDeepId(targetId)) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
 
   if (from === targetId) blockers.push("You're already here.");
+  // Dead drives (AW-263): the one fold left is the limp home.
+  if (drivesDead(state) && targetId !== "intrepid") blockers.push("The drives are dead: the only fold they'll make is a limp home to the Intrepid.");
   if (state.location.kind === "surface") blockers.push("Launch from the surface first.");
   if (state.location.kind === "space") {
     const edge = world.system(state.location.systemId).edgeAU;
@@ -228,6 +242,59 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   // Quick plotter (AW-207): folds the drive likes.
   const plotter = hasTalent(state, "quick-plotter") ? 0.75 : 1;
   return { ly, fuel, refitMinutes: Math.round(foldRefitMinutes(ly) * crew.foldRefit * clanMods(state).foldRefit * plotter), blockers };
+}
+
+/** Arrive at the Intrepid and dock: everything that happens on coming home. */
+function dockWithIntrepid(state: GameState, world: World, message: string): void {
+  state.location = { kind: "intrepid" };
+  advanceTime(state, DOCKING_MINUTES);
+  log(state, "travel", message);
+  const departWorth = state.helm?.departWorth;
+  sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
+  retirementsOnDocked(state);
+  helmOnDocked(state);
+  covenantOnDocked(state);
+  fleetOnDocked(state);
+  diggersLeadOnDocked(state, world);
+  notePrices(state);
+}
+
+// --- a tow home (AW-263) ------------------------------------------------------------------
+
+export const TOW_BASE_CR = 2_500;
+export const TOW_CR_PER_LY = 500;
+export const TOW_HELM_REP = -3;
+
+/** What a Helm tow home costs from here: credits, and how long it takes. */
+export function towTerms(state: GameState, world: World): { cr: number; minutes: number; ly: number } {
+  const ly = distanceLy(world.galaxy, currentSystemId(state), "intrepid");
+  return { cr: Math.round((TOW_BASE_CR + TOW_CR_PER_LY * ly) / 100) * 100, minutes: Math.round(DAY * (1 + 0.5 * ly)), ly };
+}
+
+/** Why the captain can't call a tow right now (empty if they can). Only a ship with dead drives needs one. */
+export function towBlockers(state: GameState, world: World): string[] {
+  const loc = state.location;
+  if (loc.kind === "intrepid") return ["You're docked at the Intrepid."];
+  if (!drivesDead(state)) return ["The drives still run: a tow is for a ship that can't move."];
+  if (loc.kind === "surface") return ["Lift off first: the tug meets you in orbit."];
+  if (state.encounter) return ["A raider has you under its guns."];
+  const { cr } = towTerms(state, world);
+  if (state.credits < cr) return [`Helm's tug costs ${cr.toLocaleString()} cr; you have ${Math.floor(state.credits).toLocaleString()}.`];
+  return [];
+}
+
+/** Helm sends a tug: the ship is hauled home and docked. It costs credits and a little standing. */
+export function callTow(state: GameState, world: World): Result<{ cr: number; minutes: number }> {
+  const why = towBlockers(state, world);
+  if (why.length > 0) return fail(why[0]!);
+  const { cr, minutes, ly } = towTerms(state, world);
+  state.credits -= cr;
+  advanceTime(state, minutes);
+  changeRep(state, "helm", TOW_HELM_REP, "Towed home by a Helm tug");
+  state.denBarred = undefined;
+  state.denCleared = undefined;
+  dockWithIntrepid(state, world, `A Helm tug hauled the ship ${ly.toFixed(1)} ly home to the Intrepid for ${cr.toLocaleString()} cr.`);
+  return ok({ cr, minutes });
 }
 
 export function fold(state: GameState, world: World, targetId: string): Result {
@@ -259,17 +326,7 @@ export function fold(state: GameState, world: World, targetId: string): Result {
     return ok(undefined);
   }
   if (targetId === "intrepid") {
-    state.location = { kind: "intrepid" };
-    advanceTime(state, DOCKING_MINUTES);
-    log(state, "travel", `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
-    const departWorth = state.helm?.departWorth;
-    sentimentOnDocked(state, departWorth === undefined ? null : netWorth(state) - departWorth);
-    retirementsOnDocked(state);
-    helmOnDocked(state);
-    covenantOnDocked(state);
-    fleetOnDocked(state);
-    diggersLeadOnDocked(state, world);
-    notePrices(state);
+    dockWithIntrepid(state, world, `Folded ${plan.ly.toFixed(1)} ly home and docked with the Intrepid.`);
     return ok(undefined);
   }
 
@@ -378,7 +435,7 @@ export function flightPlan(state: GameState, world: World, target: FlightTarget)
 
   const minutes = burnMinutes(distanceAU);
   const fuel =
-    Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * 100) / 100;
+    Math.round(IN_SYSTEM_FUEL_PER_AU_PER_KT * (shipMassT(state.ship, stats) / 1000) * distanceAU * crewBonuses(state).flightFuel * driveFuelMult(state) * 100) / 100;
   const contact = routeContact(state, world, loc.systemId, distanceAU, "edge" in target ? "edge" : target.bodyId);
   return ok({ distanceAU, minutes, fuel, arrival, ...(contact ? { contact } : {}) });
 }
@@ -520,7 +577,12 @@ export function drillRate(state: GameState, d: Deposit): number {
 /** A slow, careful orbital pass: sharper region readings and wider rover detection on this body. */
 /** A detailed survey's duration (Close Orbit halves it). */
 export function surveyMinutes(state: GameState): number {
-  return SURVEY_MINUTES * (hasPerk(state, "close-orbit") ? 0.5 : 1) * clanMods(state).scanTime;
+  return SURVEY_MINUTES * (hasPerk(state, "close-orbit") ? 0.5 : 1) * clanMods(state).scanTime * sensorTimeMult(state);
+}
+
+/** A standard scan's duration (damaged sensors take longer, AW-263). */
+export function scanMinutes(state: GameState): number {
+  return SCAN_MINUTES * clanMods(state).scanTime * sensorTimeMult(state);
 }
 
 /** Prospector's Eye: the survey charts every deposit on the world, so they're known before landing. */
@@ -549,6 +611,7 @@ export function surveyBody(state: GameState, world: World): Result<Body> {
   state.surveyedBodies ??= [];
   if (state.surveyedBodies.includes(body.id)) return fail("Already surveyed in detail.");
   if (body.regions === 0) return fail("There's no surface to survey.");
+  if (sensorsDead(state)) return fail("The sensors are knocked out: the Intrepid's yard can repair them.");
   advanceTime(state, surveyMinutes(state));
   state.surveyedBodies.push(body.id);
   awardXp(state, "science", 25);
@@ -560,7 +623,8 @@ export function scanBody(state: GameState, world: World): Result<Body> {
   const body = orbitingBody(state, world);
   if (!body) return fail("Enter orbit first.");
   if (state.scannedBodies.includes(body.id)) return ok(body);
-  advanceTime(state, SCAN_MINUTES * clanMods(state).scanTime);
+  if (sensorsDead(state)) return fail("The sensors are knocked out: the Intrepid's yard can repair them.");
+  advanceTime(state, scanMinutes(state));
   state.scannedBodies.push(body.id);
   awardXp(state, "science", 8);
   noticeScan(state, body.id);

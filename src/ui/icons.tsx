@@ -28,7 +28,9 @@ export type IconName =
   | "survey"
   | "land"
   | "probe"
-  | "fold";
+  | "fold"
+  | "capture"
+  | "tow";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -179,6 +181,22 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+    </>
+  ),
+  // A net: capture a creature.
+  capture: (
+    <>
+      <path d="M4 5c5 2 11 2 16 0l-2 14c-4 1.5-8 1.5-12 0z" />
+      <path d="M9 5.8l1 13.9M15 5.8l-1 13.9M4.6 10c5 1.5 9.8 1.5 14.8 0M5.3 15c4.6 1.3 8.8 1.3 13.4 0" />
+    </>
+  ),
+  // A tug's line: a tow home.
+  tow: (
+    <>
+      <rect x="2.5" y="9" width="6" height="6" rx="1.5" />
+      <path d="M8.5 12c3 0 4-3 7-3" stroke-dasharray="2 2" />
+      <path d="M15 6.5l6 2.5-6 2.5z" />
+      <path d="M15.5 13.5l5 3.5" />
     </>
   ),
   // A fold: space pinched between two stars.

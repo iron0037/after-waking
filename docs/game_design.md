@@ -345,6 +345,11 @@ Damage hits four systems: **hull, drives, weapons, sensors**. Crippled drives ca
 
 **Endings.** Either side can **strike its colors**. Pirates strike when badly hurt or disarmed. You win their bounty (Helm pays for raiders) and salvage. If you strike, or your hull fails, they take most of the hold and your credits are safe: they want cargo, not a murder charge. You can also **escape** by opening range and folding when the drive is ready. Nobody dies in v1; damage carries over until the Intrepid's yard repairs it (credits and days).
 
+**Damage after the fight [DECIDED] (AW-263).** What a fight breaks keeps mattering until the yard fixes it:
+- **Drives:** burns take longer (up to 2×) and burns and folds cost more fuel (up to 1.5×). Dead drives (100%) crawl: burns take 4× as long and twice the fuel, and the only fold they make is a limp home to the Intrepid. Or call a **Helm tow** home: 2,500 cr + 500 cr per ly, half a day per ly plus a day, and −3 Helm standing.
+- **Sensors:** scans and surveys take longer (up to 2×); dead sensors can't scan or survey.
+- After a fight that leaves either at 20% or worse, the journal warns you to head back for repairs, and the system view shows it.
+
 **Gear.** Midshipmen and Helm sell weapons (laser battery, kinetic battery), deflector shields and armor plate. The stock freighter carries one light laser. Captain and comms experience come from encounters; the gunnery and evasion perks already planned come alive.
 
 **Balance target.** An honest freighter that pays costs about 5% of career income; a fitted ship that fights well breaks even or profits on bounties. The bot pays by default, so the career report measures the cost.

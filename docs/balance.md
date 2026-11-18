@@ -192,3 +192,13 @@ Career report (6 seeds, 60 trips), with outpost placement only against the full 
 | Novice | 470k → 462k | 0/6 → 0/6 |
 
 The bot never lands at outposts, buys from them or signs their jobs, so this measures only the side effects. The outpost jobs pay 1.4× an Intrepid job for bigger loads and shorter deadlines (cut from 1.8× before release). Passenger runs pay about 140 cr a passenger plus 350 cr per light-year. Both need playtesting.
+
+## Battle damage after the fight (AW-263, 2026-11-18)
+Career report (6 seeds, 60 trips), with damaged drives making burns and folds slower and thirstier, dead drives limping home or calling a tow, and damaged sensors slowing scans:
+
+| Profile | Credits at trip 60 (last report → now) | Broke |
+|---|---|---|
+| Competent | 654k → 687k | 0/6 |
+| Novice | 462k → 560k | 0/6 |
+
+The rise isn't from the damage rules, which only cost time and fuel. It's the changes since the last report: probe jobs now count earlier dives (AW-248), hops count as arriving at outposts (AW-260), and so on. The bot repairs at every docking, so it rarely carries damage between trips. What matters here is that no career spirals: the damage rules bite a captain who keeps flying hurt, not one who goes home to repair.

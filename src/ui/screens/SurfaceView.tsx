@@ -76,6 +76,10 @@ import {
   roverMobility,
   siteOnWater,
   siteReach,
+  captureBlockers,
+  captureCreature,
+  captureOdds,
+  collectCreature,
   currentOutpost,
   outpostOnHex,
   outpostTitle,
@@ -1507,6 +1511,56 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                     ]
                   : []),
               ],
+            },
+            {
+              // The selected creature (AW-263 follow-up): capture it, or collect it once it's out cold.
+              label: "Creature",
+              actions:
+                selectedCreature && rover
+                  ? selectedCreature.down
+                    ? [
+                        {
+                          id: "collect",
+                          icon: "capture" as const,
+                          label: `Collect the ${selectedCreature.entry.name}`,
+                          detail: `Out cold: ${isBoat ? "sail" : "drive"} alongside and load it (${selectedCreature.entry.size} slot${selectedCreature.entry.size === 1 ? "" : "s"}, 30 min).`,
+                          onClick: async () => {
+                            if (hexDistance(rover, selectedCreature) > 1 && !(await driveTo(selectedCreature, true, true))) return;
+                            const r = session.act((s, w) => collectCreature(s, w, selectedCreature.key));
+                            if (r.ok) session.notify(`Loaded the ${r.value} into the sample cases.`);
+                          },
+                        },
+                      ]
+                    : [
+                        (() => {
+                          const odds = captureOdds(state, world, selectedCreature.key);
+                          const why = captureBlockers(state, world, selectedCreature.key)[0] ?? null;
+                          return {
+                            id: "capture",
+                            icon: "capture" as const,
+                            label: `Capture the ${selectedCreature.entry.name}${odds ? ` (${Math.round(odds.chance * 100)}%)` : ""}`,
+                            detail: odds
+                              ? `${odds.method}: about ${Math.round(odds.energy)} energy and ${formatDuration(odds.minutes)}.${
+                                  isHunter(selectedCreature.entry) ? ` ${Math.round(odds.injuryRisk * 100)}% chance someone is hurt.` : ""
+                                }`
+                              : undefined,
+                            blocked: why,
+                            tone: isHunter(selectedCreature.entry) ? ("danger" as const) : undefined,
+                            onClick: () => session.act((s, w) => captureCreature(s, w, selectedCreature.key)),
+                          };
+                        })(),
+                      ]
+                  : selectedCreature
+                    ? [
+                        {
+                          id: "capture",
+                          icon: "capture" as const,
+                          label: `Capture the ${selectedCreature.entry.name}`,
+                          blocked: selectedCreature.entry.aquatic ? "Launch the boat first." : "Deploy the rover first.",
+                          onClick: () => {},
+                        },
+                      ]
+                    : [],
             },
             {
               label: "Ship",

@@ -899,6 +899,9 @@ function finish(state: GameState, outcome: EncounterOutcome, text: string, cargo
   const result: EncounterResult = { outcome, text, cargoLost, bounty, xp, ...(e?.resume ? { resume: e.resume, resumeName: e.destName } : {}) };
   state.lastEncounter = result;
   log(state, outcome === "won" || outcome === "escaped" || outcome === "talked off" || outcome === "driven off" ? "info" : "warning", text);
+  // What the fight left broken that matters from here on (AW-263).
+  const warn = damageWarning(state);
+  if (warn) log(state, "warning", warn);
   return result;
 }
 
@@ -981,8 +984,48 @@ export function finishRepairs(state: GameState): void {
 }
 
 /** Drive damage slows the ship in flight (1 = undamaged). */
+/**
+ * Battle damage outside a fight (AW-263). Drives: burns take longer (up to 2x) and burn more fuel (up
+ * to 1.5x); dead drives (100%) crawl at 4x the time and twice the fuel, and can only fold home.
+ * Sensors: scans and surveys take longer (up to 2x); dead sensors can't scan at all.
+ */
+export const SYSTEM_DEAD = 100;
+
+export function drivesDead(state: GameState): boolean {
+  return shipDamage(state).drives >= SYSTEM_DEAD;
+}
+
+export function sensorsDead(state: GameState): boolean {
+  return shipDamage(state).sensors >= SYSTEM_DEAD;
+}
+
+/** In-system burn time multiplier. */
 export function driveDamageMult(state: GameState): number {
-  return 1 + shipDamage(state).drives / 100;
+  const d = shipDamage(state).drives;
+  return d >= SYSTEM_DEAD ? 4 : 1 + d / 100;
+}
+
+/** Fuel multiplier for burns and folds. */
+export function driveFuelMult(state: GameState): number {
+  const d = shipDamage(state).drives;
+  return d >= SYSTEM_DEAD ? 2 : 1 + d / 200;
+}
+
+/** Scan and survey time multiplier. */
+export function sensorTimeMult(state: GameState): number {
+  return 1 + Math.min(SYSTEM_DEAD, shipDamage(state).sensors) / 100;
+}
+
+/** A warning about damage that matters outside a fight, or null if there's none worth saying. */
+export function damageWarning(state: GameState): string | null {
+  const d = shipDamage(state);
+  const parts: string[] = [];
+  if (d.drives >= SYSTEM_DEAD) parts.push("The drives are dead: burns crawl, and the only fold left is a limp home to the Intrepid (or call a Helm tow).");
+  else if (d.drives >= 20) parts.push(`The drives are ${d.drives}% damaged: burns are slower and thirstier.`);
+  if (d.sensors >= SYSTEM_DEAD) parts.push("The sensors are knocked out: no scans or surveys.");
+  else if (d.sensors >= 20) parts.push(`The sensors are ${d.sensors}% damaged: scans and surveys take longer.`);
+  if (parts.length === 0) return null;
+  return `${parts.join(" ")} Head back to the Intrepid's yard for repairs.`;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

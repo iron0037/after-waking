@@ -2,7 +2,23 @@
  * The system orrery: where the ship is, where everything else is, and how to get there.
  * Flight is animated with time compression; the sim only advances when the burn completes.
  */
-import { diveOdds, isGiant, KIND_LABEL, knownOutposts, landingTiers, launchProbe, probeBlockers, type Outpost } from "../../sim";
+import {
+  callTow,
+  damageWarning,
+  diveOdds,
+  drivesDead,
+  isGiant,
+  KIND_LABEL,
+  knownOutposts,
+  landingTiers,
+  launchProbe,
+  probeBlockers,
+  scanMinutes,
+  sensorsDead,
+  towBlockers,
+  towTerms,
+  type Outpost,
+} from "../../sim";
 import { DEPTHS } from "../../data/probes";
 import { cr, tonnes } from "../format";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -536,6 +552,19 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                       },
                     ]
                   : []),
+                // Dead drives (AW-263): Helm sends a tug.
+                ...(drivesDead(state)
+                  ? [
+                      {
+                        id: "tow",
+                        icon: "tow" as const,
+                        label: `Call a Helm tow (${towTerms(state, world).cr.toLocaleString()} cr)`,
+                        detail: `A tug hauls the ship home to the Intrepid in ${formatDuration(towTerms(state, world).minutes)}. Helm thinks a little less of you for it.`,
+                        blocked: towBlockers(state, world)[0] ?? null,
+                        onClick: () => session.act((s, w) => callTow(s, w)),
+                      },
+                    ]
+                  : []),
                 { id: "starmap", icon: "starmap" as const, label: "Star map", hotkey: "M", detail: "Plot a fold to another star.", onClick: () => session.go("starmap") },
               ],
             },
@@ -560,8 +589,9 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                           {
                             id: "scan",
                             icon: "scan" as const,
-                            label: `Scan (${formatDuration(SCAN_MINUTES)})`,
+                            label: `Scan (${formatDuration(scanMinutes(state))})`,
                             detail: "A full sensor sweep profiles the world and its regions.",
+                            blocked: sensorsDead(state) ? "The sensors are knocked out: the Intrepid's yard can repair them." : null,
                             onClick: () => session.act((s, w) => scanBody(s, w)),
                           },
                         ]
@@ -573,6 +603,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                             icon: "survey" as const,
                             label: `Detailed survey (${formatDuration(surveyMinutes(state))})`,
                             detail: "Sharpens the region readings from orbit; no landing needed.",
+                            blocked: sensorsDead(state) ? "The sensors are knocked out: the Intrepid's yard can repair them." : null,
                             onClick: () => session.act((s, w) => surveyBody(s, w)),
                           },
                         ]
@@ -659,6 +690,7 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
             {atEdge && <span class="good"> · Clear to fold</span>}
           </div>
           {edgeFuelShort && edgeRes.ok && <div class="danger small">The edge burn needs {edgeRes.value.fuel} fuel.</div>}
+          {damageWarning(state) && <div class="danger small sys-damage">{damageWarning(state)}</div>}
         </Section>
 
         <DeepSweepPanel session={session} busy={busy} />

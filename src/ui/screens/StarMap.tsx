@@ -1,5 +1,5 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
-import { bodyNickname, bodyProgress, covenantErrands, researchWants } from "../../sim";
+import { bodyNickname, bodyProgress, callTow, covenantErrands, drivesDead, researchWants, towBlockers, towTerms } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   prepareFold,
@@ -1177,17 +1177,32 @@ export function StarMap({ session }: { session: GameSession }) {
             },
             {
               label: "Ship",
-              actions: inDeep
-                ? []
-                : [
-                    {
-                      id: "back",
-                      icon: "home" as const,
-                      label: `Back to ${docked ? "the Intrepid" : "the system"}`,
-                      hotkey: "M",
-                      onClick: back,
-                    },
-                  ],
+              actions: [
+                ...(inDeep
+                  ? []
+                  : [
+                      {
+                        id: "back",
+                        icon: "home" as const,
+                        label: `Back to ${docked ? "the Intrepid" : "the system"}`,
+                        hotkey: "M",
+                        onClick: back,
+                      },
+                    ]),
+                // Dead drives (AW-263): Helm sends a tug.
+                ...(drivesDead(state) && !docked
+                  ? [
+                      {
+                        id: "tow",
+                        icon: "tow" as const,
+                        label: `Call a Helm tow (${towTerms(state, world).cr.toLocaleString()} cr)`,
+                        detail: `A tug hauls the ship home to the Intrepid in ${formatDuration(towTerms(state, world).minutes)}. Helm thinks a little less of you for it.`,
+                        blocked: towBlockers(state, world)[0] ?? null,
+                        onClick: () => session.act((s, w) => callTow(s, w)),
+                      },
+                    ]
+                  : []),
+              ],
             },
           ]}
         />
