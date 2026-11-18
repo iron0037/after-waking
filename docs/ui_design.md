@@ -72,4 +72,8 @@ map, a star system, and a planet's surface.
    Flight, Surface regions or Landing, Known deposits, Atmospheric probe, Environment, Resource
    signatures, each its own component. The rail has Ship (Fly to system edge, Hold for the refit,
    Star map) and World (Fly to it, Scan, Detailed survey, Land in region N).
-4. **Star map:** the same treatment.
+4. **Star map** (done): where you are (in deep space) → All systems by distance (its own scroll box, so
+   what's below stays in reach) → the picked star (✕ to clear) → Fold plan → Known bodies → Exploration
+   → Minerals. Picking a world in Known bodies narrows Exploration and Minerals to it ("Showing X ✕ whole
+   system"). The rail has Fold (now, or when ready: it flies to the edge and waits out the refit) and
+   Back to the system or the Intrepid.

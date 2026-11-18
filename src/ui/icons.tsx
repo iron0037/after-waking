@@ -27,7 +27,8 @@ export type IconName =
   | "scan"
   | "survey"
   | "land"
-  | "probe";
+  | "probe"
+  | "fold";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -178,6 +179,15 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+    </>
+  ),
+  // A fold: space pinched between two stars.
+  fold: (
+    <>
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+      <path d="M7 12c3-5 7-5 10 0" />
+      <path d="M7 12c3 5 7 5 10 0" />
     </>
   ),
   // A probe dropping into cloud bands.

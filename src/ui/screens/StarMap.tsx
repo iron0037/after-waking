@@ -1,5 +1,5 @@
 /** The navigator's chart of the Verge: pick a star, read the plan, fold. */
-import { bodyNickname, covenantErrands, researchWants } from "../../sim";
+import { bodyNickname, bodyProgress, covenantErrands, researchWants } from "../../sim";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   prepareFold,
@@ -62,6 +62,8 @@ import { AnomalyPanel, EdgePanel } from "../Ending";
 import { RescuePanel } from "../Rescue";
 import { useArchiveTopic } from "../ArchivePanel";
 import { drawOutpostIcon, OutpostIcon } from "../OutpostIcon";
+import { ActionRail } from "../ActionRail";
+import { Section } from "../Section";
 import "./starmap.css";
 import "../covenant.css";
 
@@ -225,6 +227,9 @@ export function StarMap({ session }: { session: GameSession }) {
       })()
     : null;
   const target = deepTarget ?? (selected ? (byId.get(selected) ?? null) : null);
+  // A world picked in Known bodies narrows Exploration and Minerals to it (docs/ui_design.md rule 5).
+  const [pickedBody, setPickedBody] = useState<string | null>(null);
+  useEffect(() => setPickedBody(null), [target?.id]);
   const blind = !!deepTarget && isBlindFold(state, world, deepTarget.id);
   const deepSite = deepTarget ? sites.find((x) => dist(x.site.pos, deepTarget.pos) <= SITE_REACH_LY) : undefined;
   const hereSite = inDeep ? (sites.find((x) => x.level === "known" && dist(x.site.pos, here) <= SITE_REACH_LY)?.site ?? null) : null;
@@ -1144,80 +1149,57 @@ export function StarMap({ session }: { session: GameSession }) {
             <span class="sm-blind">···</span> blind range · <span class="sm-anomaly">◎</span> deep site · <span class="sm-faint">?</span> faint return
           </div>
         </div>
+        <ActionRail
+          busy={session.busy}
+          groups={[
+            {
+              label: "Fold",
+              actions:
+                target && plan && target.id !== fromId
+                  ? [
+                      {
+                        id: "fold",
+                        icon: "fold" as const,
+                        label:
+                          plan.blockers.length === 0
+                            ? blind
+                              ? "Fold here"
+                              : `Fold to ${target.name}`
+                            : `${blind ? "Fold here" : `Fold to ${target.name}`} when ready${autoLabel ? ` (${autoLabel})` : ""}`,
+                        detail: `${plan.ly.toFixed(1)} ly, ${plan.fuel} fuel; the drive needs ${formatDuration(plan.refitMinutes)} of refit after.${
+                          plan.blockers.length > 0 && canDepart ? " The ship flies to the edge and waits out the refit first, as you would by hand." : ""
+                        }`,
+                        blocked: canDepart || plan.blockers.length === 0 ? null : (hardBlockers[0] ?? edgeProblem ?? "Can't fold yet."),
+                        onClick: () => doFold(plan.blockers.length > 0),
+                      },
+                    ]
+                  : [],
+            },
+            {
+              label: "Ship",
+              actions: inDeep
+                ? []
+                : [
+                    {
+                      id: "back",
+                      icon: "home" as const,
+                      label: `Back to ${docked ? "the Intrepid" : "the system"}`,
+                      hotkey: "M",
+                      onClick: back,
+                    },
+                  ],
+            },
+          ]}
+        />
         <div class="viewport-hint">Wheel: zoom · Drag: pan · Click: pick a star, or empty space to fold blind · H: home (center on ship) · Esc: clear</div>
       </div>
 
       <aside class="side">
-        {target && plan && target.id !== fromId && (
-          <section class="panel sm-depart">
-            <h3>Fold plan: {target.name}</h3>
-            <dl class="kv">
-              <dt>Distance</dt>
-              <dd class={plan.ly > rangeLy ? "danger" : ""}>
-                {plan.ly.toFixed(1)} / {rangeLy.toFixed(1)} ly {blind ? "blind range" : "range"}
-              </dd>
-              <dt>Fuel</dt>
-              <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
-                {plan.fuel} of {state.ship.fuel.toFixed(1)}
-              </dd>
-              <dt>Refit after</dt>
-              <dd>{formatDuration(plan.refitMinutes)}</dd>
-              <dt>Drive now</dt>
-              <dd class={refitLeft > 0 ? "accent" : "good"}>{refitLeft > 0 ? `Refit, ${formatDuration(refitLeft)} left` : "Ready"}</dd>
-              {yardLeft > 0 && (
-                <>
-                  <dt>Yard work</dt>
-                  <dd class="accent">Done in {formatDuration(yardLeft)}</dd>
-                </>
-              )}
-            </dl>
-            {(hardBlockers.length > 0 || edgeProblem) && (
-              <ul class="blockers sm-blockers">
-                {hardBlockers.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-                {edgeProblem && hardBlockers.length === 0 && <li>{edgeProblem}</li>}
-              </ul>
-            )}
-            <div class="btn-row sm-fold">
-              {plan.blockers.length === 0 ? (
-                <button class="btn primary big" disabled={session.busy} onClick={() => doFold(false)}>
-                  {blind ? "Fold here" : "Fold now"}
-                </button>
-              ) : canDepart ? (
-                <button class="btn primary big" disabled={session.busy} onClick={() => doFold(true)}>
-                  {blind ? "Fold here when ready" : "Fold when ready"}
-                  {autoLabel ? ` (${autoLabel})` : ""}
-                </button>
-              ) : (
-                <button class="btn primary big" disabled>
-                  Can't fold yet
-                </button>
-              )}
-            </div>
-            {deepTarget && !blind && (
-              <p class="muted small sm-auto-note">Charted: the navigators lock onto it like a star, so this fold has full range and the usual fuel.</p>
-            )}
-            {blind && (
-              <p class="muted small sm-auto-note">
-                A blind fold has no star to lock onto: the drive reaches {Math.round(blindFoldRange(state) * 100)}% of its range and burns{" "}
-                {Math.round((blindFoldFuel(state) - 1) * 100)}% more plicite.
-              </p>
-            )}
-            {softBlockers.length > 0 && canDepart && (
-              <p class="muted small sm-auto-note">
-                {needsEdge ? "Folds start at the system edge, so the ship flies out first. " : ""}
-                {waitMinutes > 0 ? (docked ? "Then it waits aboard until the refit and the yard are done. " : "Then it holds position until the drive's refit is done. ") : ""}
-                Same time and fuel as doing it by hand.
-              </p>
-            )}
-          </section>
-        )}
-
-        {inDeep ? (
+        {/* docs/ui_design.md: broad to detailed. Where you are, every star, the one picked, then its worlds. */}
+        <RescuePanel session={session} busy={session.busy} />
+        {inDeep && (
           <>
-            <section class="panel sm-deep">
-              <h3>Between the stars</h3>
+            <Section id="sm-here" level={2} title="Between the stars" summary={`${dist(here, INTREPID_POS).toFixed(1)} ly from the Intrepid`}>
               <dl class="kv">
                 <dt>Position</dt>
                 <dd>
@@ -1231,124 +1213,16 @@ export function StarMap({ session }: { session: GameSession }) {
                 </dd>
               </dl>
               {hereSite && <p class="small sm-site-report">{hereSite.report}</p>}
-            </section>
+            </Section>
             <AnomalyPanel session={session} />
             <EdgePanel session={session} />
-            <RescuePanel session={session} busy={session.busy} />
           </>
-        ) : (
-          <div class="btn-row sm-top">
-            <button class="btn" onClick={back} disabled={session.busy}>
-              ◂ Back to {docked ? "the Intrepid" : "the system"}
-            </button>
-          </div>
         )}
         <DeepSweepPanel session={session} />
 
-        {deepTarget ? (
-          <section class="panel">
-            <h2>{deepTarget.name}</h2>
-            <dl class="kv">
-              <dt>Type</dt>
-              <dd>Interstellar space</dd>
-              <dt>Position</dt>
-              <dd>
-                {deepTarget.pos.x.toFixed(1)}, {deepTarget.pos.y.toFixed(1)} ly
-              </dd>
-              <dt>From the Intrepid</dt>
-              <dd>{dist(deepTarget.pos, INTREPID_POS).toFixed(1)} ly</dd>
-              <dt>Distance</dt>
-              <dd>{distanceLy(world.galaxy, fromId, deepTarget.id).toFixed(1)} ly</dd>
-            </dl>
-            {deepSite && (
-              <p class="small sm-site-report">
-                {deepSite.level === "known" ? deepSite.site.report : "A faint return on the deep-field array: something is out there. Fold close and sweep to identify it."}
-              </p>
-            )}
-          </section>
-        ) : target ? (
-          <>
-            <section class="panel">
-              <h2>{target.name}</h2>
-              <dl class="kv">
-                <dt>Type</dt>
-                <dd>{target.star ? SPECTRAL[target.star.spectral].label : "Generation ship"}</dd>
-                {target.star && (
-                  <>
-                    <dt>Mass</dt>
-                    <dd>{target.star.mass.toFixed(2)} M☉</dd>
-                    <dt>Luminosity</dt>
-                    <dd>{target.star.luminosity.toFixed(2)} L☉</dd>
-                  </>
-                )}
-                <dt>Distance</dt>
-                <dd>{target.id === fromId ? "You are here" : `${distanceLy(world.galaxy, fromId, target.id).toFixed(1)} ly`}</dd>
-                <dt>Status</dt>
-                <dd>
-                  {target.star ? (
-                    <>
-                      <span class={`tag ${target.star.charted ? "" : "sm-uncharted"}`}>{target.star.charted ? "Charted" : "Uncharted"}</span>{" "}
-                      {state.visitedSystems.includes(target.id) && <span class="tag good">Visited</span>}
-                    </>
-                  ) : (
-                    <span class="tag good">Home</span>
-                  )}
-                </dd>
-                {intel && (
-                  <>
-                    <dt>Raiders</dt>
-                    <dd>
-                      <span class={INTEL_CLASS[intel.level]}>{intel.label}</span>
-                      <div class="muted small sm-intel-text">{intel.text}</div>
-                      {intel.raiders.length > 0 && <div class="muted small sm-intel-text">Reported: {intel.raiders.join(", ")}</div>}
-                    </dd>
-                  </>
-                )}
-              </dl>
-            </section>
-
-            {target.star && (
-              <ExplorationBlock
-                star={target.star}
-                paint={paint.get(target.id)}
-                contracts={targets.get(target.id) ?? []}
-              />
-            )}
-
-            {target.star && (
-              <section class="panel">
-                <h3>Known bodies</h3>
-                {known(target) ? (
-                  <>
-                    <LandableSummary session={session} systemId={target.id} />
-                    <BodyList session={session} systemId={target.id} />
-                  </>
-                ) : (
-                  <div class="muted">Uncharted: no survey data.</div>
-                )}
-              </section>
-            )}
-
-            {target.star && known(target) && (
-              <section class="panel">
-                <h3>Minerals</h3>
-                <MineralList session={session} systemId={target.id} />
-              </section>
-            )}
-          </>
-        ) : (
-          <section class="panel">
-            <h2>Navigation</h2>
-            <p class="muted">
-              Pick a star on the chart or from the list below. The dashed circle is how far the fold drive can reach from where you
-              are. Click empty space to plan a blind fold into the dark: it reaches only {Math.round(blindFoldRange(state) * 100)}% as far
-              (the dotted amber ring).
-            </p>
-          </section>
-        )}
-
-        <section class="panel">
-          <h3>All systems by distance</h3>
+        <Section id="sm-systems" title="All systems by distance" summary={`${list.length} · ${list.filter((x) => x.ly <= stats.foldRangeLy).length} in range`}>
+          {/* Its own scroll box, so the picked star's components stay in reach below (docs/ui_design.md). */}
+          <div class="sm-list-box">
           <table class="data sm-list">
             <tbody>
               {list.map(({ n, ly }) => (
@@ -1394,17 +1268,219 @@ export function StarMap({ session }: { session: GameSession }) {
               ))}
             </tbody>
           </table>
-        </section>
+          </div>
+        </Section>
+
+        {deepTarget ? (
+          <Section id="sm-target" level={2} title={deepTarget.name} summary="interstellar space" revealKey={deepTarget.id}>
+            <button class="sys-clear sm-clear" title="Clear the selection (Esc)" aria-label="Clear the selection" onClick={() => pick(null)}>
+              ✕
+            </button>
+            <dl class="kv">
+              <dt>Type</dt>
+              <dd>Interstellar space</dd>
+              <dt>Position</dt>
+              <dd>
+                {deepTarget.pos.x.toFixed(1)}, {deepTarget.pos.y.toFixed(1)} ly
+              </dd>
+              <dt>From the Intrepid</dt>
+              <dd>{dist(deepTarget.pos, INTREPID_POS).toFixed(1)} ly</dd>
+              <dt>Distance</dt>
+              <dd>{distanceLy(world.galaxy, fromId, deepTarget.id).toFixed(1)} ly</dd>
+            </dl>
+            {deepSite && (
+              <p class="small sm-site-report">
+                {deepSite.level === "known" ? deepSite.site.report : "A faint return on the deep-field array: something is out there. Fold close and sweep to identify it."}
+              </p>
+            )}
+          </Section>
+        ) : (
+          target && (
+            <Section
+              id="sm-target"
+              level={2}
+              title={target.name}
+              summary={target.id === fromId ? "you are here" : `${distanceLy(world.galaxy, fromId, target.id).toFixed(1)} ly`}
+              revealKey={target.id}
+            >
+              <button class="sys-clear sm-clear" title="Clear the selection (Esc)" aria-label="Clear the selection" onClick={() => pick(null)}>
+                ✕
+              </button>
+              <dl class="kv">
+                <dt>Type</dt>
+                <dd>{target.star ? SPECTRAL[target.star.spectral].label : "Generation ship"}</dd>
+                {target.star && (
+                  <>
+                    <dt>Mass</dt>
+                    <dd>{target.star.mass.toFixed(2)} M☉</dd>
+                    <dt>Luminosity</dt>
+                    <dd>{target.star.luminosity.toFixed(2)} L☉</dd>
+                  </>
+                )}
+                <dt>Distance</dt>
+                <dd>{target.id === fromId ? "You are here" : `${distanceLy(world.galaxy, fromId, target.id).toFixed(1)} ly`}</dd>
+                <dt>Status</dt>
+                <dd>
+                  {target.star ? (
+                    <>
+                      <span class={`tag ${target.star.charted ? "" : "sm-uncharted"}`}>{target.star.charted ? "Charted" : "Uncharted"}</span>{" "}
+                      {state.visitedSystems.includes(target.id) && <span class="tag good">Visited</span>}
+                    </>
+                  ) : (
+                    <span class="tag good">Home</span>
+                  )}
+                </dd>
+                {intel && (
+                  <>
+                    <dt>Raiders</dt>
+                    <dd>
+                      <span class={INTEL_CLASS[intel.level]}>{intel.label}</span>
+                      <div class="muted small sm-intel-text">{intel.text}</div>
+                      {intel.raiders.length > 0 && <div class="muted small sm-intel-text">Reported: {intel.raiders.join(", ")}</div>}
+                    </dd>
+                  </>
+                )}
+              </dl>
+            </Section>
+          )
+        )}
+
+        {target && plan && target.id !== fromId && (
+          <Section
+            id="sm-fold"
+            title={`Fold plan${blind ? "" : `: ${target.name}`}`}
+            summary={`${plan.ly.toFixed(1)} ly · ${plan.fuel} fuel · ${plan.blockers.length === 0 ? "ready" : canDepart ? "when ready" : "can't fold"}`}
+            class="sm-depart"
+          >
+            <dl class="kv">
+              <dt>Distance</dt>
+              <dd class={plan.ly > rangeLy ? "danger" : ""}>
+                {plan.ly.toFixed(1)} / {rangeLy.toFixed(1)} ly {blind ? "blind range" : "range"}
+              </dd>
+              <dt>Fuel</dt>
+              <dd class={plan.fuel > state.ship.fuel ? "danger" : ""}>
+                {plan.fuel} of {state.ship.fuel.toFixed(1)}
+              </dd>
+              <dt>Refit after</dt>
+              <dd>{formatDuration(plan.refitMinutes)}</dd>
+              <dt>Drive now</dt>
+              <dd class={refitLeft > 0 ? "accent" : "good"}>{refitLeft > 0 ? `Refit, ${formatDuration(refitLeft)} left` : "Ready"}</dd>
+              {yardLeft > 0 && (
+                <>
+                  <dt>Yard work</dt>
+                  <dd class="accent">Done in {formatDuration(yardLeft)}</dd>
+                </>
+              )}
+            </dl>
+            {(hardBlockers.length > 0 || edgeProblem) && (
+              <ul class="blockers sm-blockers">
+                {hardBlockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+                {edgeProblem && hardBlockers.length === 0 && <li>{edgeProblem}</li>}
+              </ul>
+            )}
+            {deepTarget && !blind && (
+              <p class="muted small sm-auto-note">Charted: the navigators lock onto it like a star, so this fold has full range and the usual fuel.</p>
+            )}
+            {blind && (
+              <p class="muted small sm-auto-note">
+                A blind fold has no star to lock onto: the drive reaches {Math.round(blindFoldRange(state) * 100)}% of its range and burns{" "}
+                {Math.round((blindFoldFuel(state) - 1) * 100)}% more plicite.
+              </p>
+            )}
+            {softBlockers.length > 0 && canDepart && (
+              <p class="muted small sm-auto-note">
+                {needsEdge ? "Folds start at the system edge, so the ship flies out first. " : ""}
+                {waitMinutes > 0 ? (docked ? "Then it waits aboard until the refit and the yard are done. " : "Then it holds position until the drive's refit is done. ") : ""}
+                Same time and fuel as doing it by hand.
+              </p>
+            )}
+          </Section>
+        )}
+
+        {target?.star && (
+          <Section
+            id="sm-bodies"
+            title="Known bodies"
+            summary={known(target) ? `${session.world.system(target.id).bodies.length} worlds · ${landableBodies(state, world, target.id).length} landable` : "uncharted"}
+          >
+            {known(target) ? (
+              <>
+                <LandableSummary session={session} systemId={target.id} />
+                <BodyList session={session} systemId={target.id} picked={pickedBody} onPick={(id) => setPickedBody(id === pickedBody ? null : id)} />
+                {pickedBody && (
+                  <div class="small sm-showing">
+                    Showing <b>{world.body(pickedBody).body.name}</b> below{" "}
+                    <button class="linklike" onClick={() => setPickedBody(null)} title="Show the whole system again">
+                      ✕ whole system
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div class="muted">Uncharted: no survey data.</div>
+            )}
+          </Section>
+        )}
+
+        {target?.star && (
+          <ExplorationBlock
+            session={session}
+            star={target.star}
+            paint={paint.get(target.id)}
+            contracts={targets.get(target.id) ?? []}
+            bodyId={pickedBody}
+          />
+        )}
+
+        {target?.star && known(target) && (
+          <Section id="sm-minerals" title={pickedBody ? `Minerals: ${world.body(pickedBody).body.name}` : "Minerals"} summary={`${systemMinerals(state, world, target.id).length} known`}>
+            <MineralList session={session} systemId={target.id} bodyId={pickedBody} />
+          </Section>
+        )}
       </aside>
     </>
   );
 }
 
-function ExplorationBlock({ star, paint, contracts }: { star: StarSystem; paint: Paint | undefined; contracts: Contract[] }) {
+function ExplorationBlock({
+  session,
+  star,
+  paint,
+  contracts,
+  bodyId,
+}: {
+  session: GameSession;
+  star: StarSystem;
+  paint: Paint | undefined;
+  contracts: Contract[];
+  /** A world picked in Known bodies: show its progress instead of the system's. */
+  bodyId: string | null;
+}) {
   const p = paint?.progress;
+  if (bodyId) {
+    const body = session.world.body(bodyId).body;
+    const bp = bodyProgress(session.state, body);
+    return (
+      <Section id="sm-explore" title={`Exploration: ${body.name}`} summary={`${bp.regionsVisited}/${bp.regions} regions · ${Math.round(bp.explored * 100)}%`}>
+        <dl class="kv">
+          <dt>Scanned</dt>
+          <dd class={bp.scanned ? "good" : "muted"}>{bp.scanned ? "Yes" : "Not yet"}</dd>
+          <dt>Orbital survey</dt>
+          <dd class={bp.surveyed ? "good" : "muted"}>{bp.surveyed ? "Done" : "Not yet"}</dd>
+          <dt>Regions visited</dt>
+          <dd>
+            {bp.regionsVisited} / {bp.regions}
+          </dd>
+          <dt>Surface explored</dt>
+          <dd>{Math.round(bp.explored * 100)}%</dd>
+        </dl>
+      </Section>
+    );
+  }
   return (
-    <section class="panel">
-      <h3>Exploration</h3>
+    <Section id="sm-explore" title="Exploration" summary={p ? `${Math.round((paint?.score ?? 0) * 100)}% · ${p.regionsVisited}/${p.regionsTotal} regions` : "uncharted"}>
       {star.home && (
         <div class="good small sm-gap">⌂ Home system: calm, surveyed by the first scouts. A gentle place to learn the work.</div>
       )}
@@ -1447,7 +1523,7 @@ function ExplorationBlock({ star, paint, contracts }: { star: StarSystem; paint:
           </ul>
         </div>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -1484,10 +1560,13 @@ function LandableSummary({ session, systemId }: { session: GameSession; systemId
 const MINERAL_BODIES_SHOWN = 3;
 
 /** Known minerals in a system (orbital scans plus deposits the rover has found), flagging what active delivery jobs need. */
-function MineralList({ session, systemId }: { session: GameSession; systemId: string }) {
+function MineralList({ session, systemId, bodyId = null }: { session: GameSession; systemId: string; bodyId?: string | null }) {
   const { state, world } = session;
-  const minerals: SystemMineral[] = systemMinerals(state, world, systemId);
-  if (minerals.length === 0) return <div class="muted small">No scans on record here yet. Scan the worlds to see what they hold.</div>;
+  const all: SystemMineral[] = systemMinerals(state, world, systemId);
+  // One world's (docs/ui_design.md rule 5): only its signatures; the rover's finds are counted system-wide.
+  const minerals = bodyId ? all.filter((m) => m.bodies.some((b) => b.bodyId === bodyId)).map((m) => ({ ...m, bodies: m.bodies.filter((b) => b.bodyId === bodyId) })) : all;
+  if (minerals.length === 0)
+    return <div class="muted small">{bodyId ? "No mineral signatures on record for this world." : "No scans on record here yet. Scan the worlds to see what they hold."}</div>;
   const wanted = new Map<string, number>();
   for (const c of state.contracts ?? []) {
     if (c.status === "active" && c.kind === "deliver" && c.commodity) wanted.set(c.commodity, (wanted.get(c.commodity) ?? 0) + (c.tonnes ?? 0));
@@ -1538,7 +1617,7 @@ function MineralList({ session, systemId }: { session: GameSession; systemId: st
                 </span>
               )}
             </div>
-            {m.found.count > 0 && (
+            {!bodyId && m.found.count > 0 && (
               <div class="small accent" title="Deposits the rover has found and not yet worked out; reachable means within your drill's depth on a world you can land on">
                 found: {tonnes(m.found.tonnes)}, {tonnes(m.found.reachableTonnes)} reachable
               </div>
@@ -1550,7 +1629,7 @@ function MineralList({ session, systemId }: { session: GameSession; systemId: st
   );
 }
 
-function BodyList({ session, systemId }: { session: GameSession; systemId: string }) {
+function BodyList({ session, systemId, picked, onPick }: { session: GameSession; systemId: string; picked: string | null; onPick: (id: string) => void }) {
   const { bodies } = session.world.system(systemId);
   const landable = new Set(landableBodies(session.state, session.world, systemId).map((b) => b.id));
   const byId = new Map(bodies.map((b) => [b.id, b]));
@@ -1567,7 +1646,19 @@ function BodyList({ session, systemId }: { session: GameSession; systemId: strin
   return (
     <ul class="sm-bodies">
       {rows.map(({ body, moon }) => (
-        <li key={body.id} class={moon ? "moon" : ""}>
+        <li
+          key={body.id}
+          class={`${moon ? "moon" : ""} sm-pickable ${picked === body.id ? "sel" : ""}`}
+          tabIndex={0}
+          title="Click to narrow Exploration and Minerals to this world"
+          onClick={() => onPick(body.id)}
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              onPick(body.id);
+            }
+          }}
+        >
           <span class="sm-dot" style={{ background: BODY_COLOR[body.kind] }} />
           <span class="sm-body-name">
             {body.name}

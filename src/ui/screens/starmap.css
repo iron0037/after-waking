@@ -221,3 +221,28 @@
   letter-spacing: 1px;
 }
 /* Clan outposts (AW-23). */
+
+/* Star map components (AW-255 step 4) */
+.sm-clear {
+  position: static;
+  float: right;
+  margin: -2px 0 4px 8px;
+}
+.sm-pickable {
+  cursor: pointer;
+  border-radius: 4px;
+}
+.sm-pickable:hover {
+  background: #17223a;
+}
+.sm-pickable.sel {
+  background: #2a2212;
+  color: var(--accent);
+}
+.sm-showing {
+  margin-top: 6px;
+}
+.sm-list-box {
+  max-height: 240px;
+  overflow-y: auto;
+}
