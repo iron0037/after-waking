@@ -21,11 +21,14 @@ import { SurfaceView } from "./screens/SurfaceView";
 import { OutpostHub } from "./screens/OutpostHub";
 import { SystemView } from "./screens/SystemView";
 import { warmTerrain } from "./screens/surface/terrainImage";
+import { installAudioGestures } from "./audio/engine";
 
 const SIDE_KEY = "after-waking/ui/side-hidden";
 
 export function App() {
   const [session, setSession] = useState<GameSession | null>(null);
+  // Audio starts on the first click or key, and buttons click softly (AW-31).
+  useEffect(() => installAudioGestures(), []);
   return session ? <Game session={session} onQuit={() => setSession(null)} /> : <TitleScreen onStart={setSession} />;
 }
 

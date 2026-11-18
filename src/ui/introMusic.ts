@@ -43,7 +43,11 @@ export class IntroMusic {
   private chimeTimer: number | undefined;
   private stopped = false;
 
-  constructor(private ctx: BaseAudioContext) {
+  /** `scale`: the sound settings' music level against the default (AW-31); 1 plays as composed. */
+  constructor(
+    private ctx: BaseAudioContext,
+    private scale = 1,
+  ) {
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
@@ -100,7 +104,7 @@ export class IntroMusic {
     const t = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(t);
     this.master.gain.setValueAtTime(0, t);
-    this.master.gain.linearRampToValueAtTime(LEVEL, t + 4);
+    this.master.gain.linearRampToValueAtTime(LEVEL * this.scale, t + 4);
     this.scheduleChime(2.5);
   }
 
@@ -116,7 +120,7 @@ export class IntroMusic {
     const t = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(t);
     this.master.gain.setValueAtTime(this.master.gain.value, t);
-    this.master.gain.linearRampToValueAtTime(LEVEL * 1.2, t + 1);
+    this.master.gain.linearRampToValueAtTime(LEVEL * this.scale * 1.2, t + 1);
     this.master.gain.linearRampToValueAtTime(0, t + holdS + 1.5);
   }
 
@@ -137,7 +141,7 @@ export class IntroMusic {
   setMuted(muted: boolean): void {
     const t = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(t);
-    this.master.gain.setTargetAtTime(muted ? 0 : LEVEL, t, 0.3);
+    this.master.gain.setTargetAtTime(muted ? 0 : LEVEL * this.scale, t, 0.3);
   }
 
   private glide(chord: readonly number[]): void {

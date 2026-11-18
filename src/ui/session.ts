@@ -12,6 +12,8 @@ import type { ClanId } from "../data/ship";
 import type { PeopleSettings, UniverseSettings } from "../sim/settings";
 import type { ProbeDepth } from "../data/probes";
 import { currentOutpost } from "../sim/outpostservices";
+import { audio, noticeSound } from "./audio/engine";
+import { soundSnapshot, soundsFor } from "./audio/triggers";
 import {
   clueCount,
   chooseProbeOption,
@@ -140,6 +142,7 @@ export class GameSession {
   /** Run a sim action. Failures become an on-screen notice. Always re-renders and autosaves. */
   act<T>(fn: (state: GameState, world: World) => Result<T>, options: ActOptions = {}): Result<T> {
     const before = this.state.time;
+    const soundBefore = soundSnapshot(this.state);
     const journalBefore = this.state.journal.length;
     const encounterBefore = this.state.encounter;
     const cluesBefore = clueCount(this.state);
@@ -163,6 +166,11 @@ export class GameSession {
     if (options.timelapse !== false && passed >= TIMELAPSE_MIN_MINUTES) this.playTimelapse(before, this.state.time);
     // A raider's hail fails the fold, but it isn't an error: the encounter window says it all.
     if (!result.ok && !(encounterAfter && !encounterBefore)) this.notify(result.reason, "error");
+    // The sound of what just happened (AW-31): a fold, a landing, money changing hands.
+    if (result.ok) {
+      const kinds = this.state.journal.slice(journalBefore).map((e) => e.kind);
+      for (const id of soundsFor(soundBefore, soundSnapshot(this.state), kinds)) audio.play(id);
+    }
     const valid = validViews(this.state);
     if (!valid.includes(this.view)) this.view = defaultView(this.state);
     this.save();
@@ -277,6 +285,7 @@ export class GameSession {
   }
 
   notify(text: string, kind: Notice["kind"] = "info"): void {
+    noticeSound(kind);
     const id = ++this.noticeId;
     this.notices = [...this.notices.slice(-3), { id, text, kind }];
     this.emit();

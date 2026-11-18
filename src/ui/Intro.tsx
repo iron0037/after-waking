@@ -4,6 +4,7 @@
  * (tools/art/moss.py intro-1 ...) and the voice is Kokoro (tools/audio/narrate.py).
  * Skip with the button or Esc; click, Space, Enter or → moves to the next panel.
  */
+import { audio as gameAudio, DEFAULT_AUDIO } from "./audio/engine";
 import { useEffect, useRef, useState } from "preact/hooks";
 import script from "../data/intro.json";
 import { IntroMusic } from "./introMusic";
@@ -31,6 +32,8 @@ const TITLE_S = 3.2;
 const MUTE_KEY = "after-waking/intro-muted";
 
 function readMuted(): boolean {
+  // Muted in the sound settings (AW-31), or with the intro's own button.
+  if (gameAudio.get().muted) return true;
   try {
     return localStorage.getItem(MUTE_KEY) === "1";
   } catch {
@@ -57,6 +60,8 @@ export function Intro({ onDone }: { onDone: () => void }) {
     audio.current = SCENES.map((_, i) => {
       const a = new Audio(`./assets/intro/vo-${i + 1}.ogg`);
       a.preload = "auto";
+      // The narrator follows the master volume (AW-31).
+      a.volume = Math.min(1, gameAudio.level("voice") / DEFAULT_AUDIO.master);
       a.addEventListener("loadedmetadata", () => {
         if (Number.isFinite(a.duration)) setDurations((d) => d.map((v, j) => (j === i ? a.duration + LEAD_S + TAIL_S : v)));
       });
@@ -65,7 +70,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
     for (const s of SCENES) new Image().src = `./assets/intro/${s.image}.png`;
     // The music (AW-235). Begin or "Watch the intro" was just clicked, so the browser lets it play.
     try {
-      music.current = new IntroMusic(new AudioContext());
+      music.current = new IntroMusic(new AudioContext(), gameAudio.level("music") / (DEFAULT_AUDIO.master * DEFAULT_AUDIO.music));
       music.current.start();
       if (readMuted()) music.current.setMuted(true);
     } catch {

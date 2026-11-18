@@ -1,3 +1,4 @@
+import { SoundSettings } from "./SoundSettings";
 import { useState } from "preact/hooks";
 import { Intro } from "./Intro";
 import { CAPTAIN_CLANS } from "../data/clans";
@@ -72,7 +73,9 @@ function Options({ onBack, onIntro }: { onBack: () => void; onIntro: () => void 
     <div class="title-screen">
       <div class="title-card title-menu">
         <h2>Options</h2>
-        <p class="muted">Coming soon: sound and music, text size, difficulty (fuel strictness, combat speed, clock pressure), and keyboard shortcuts.</p>
+        <h3>Sound</h3>
+        <SoundSettings />
+        <p class="muted">Coming soon: text size, difficulty (fuel strictness, combat speed, clock pressure), and keyboard shortcuts.</p>
         <div class="title-buttons">
           <button class="btn big" onClick={onIntro}>
             Watch the intro

@@ -1,0 +1,71 @@
+/** Volume sliders and a mute (AW-31): on the title screen's Options and behind the top bar's Sound button. */
+import { useEffect, useRef, useState } from "preact/hooks";
+import { audio, type AudioSettings } from "./audio/engine";
+import "./sound.css";
+
+function useAudioSettings(): AudioSettings {
+  const [s, setS] = useState(audio.get());
+  useEffect(() => audio.subscribe(() => setS(audio.get())), []);
+  return s;
+}
+
+const SLIDERS: { key: Exclude<keyof AudioSettings, "muted">; label: string; hint: string }[] = [
+  { key: "master", label: "Master", hint: "Everything" },
+  { key: "ui", label: "Interface", hint: "Clicks, notices, money" },
+  { key: "sfx", label: "Effects", hint: "Folds, landings, docking, finds" },
+  { key: "music", label: "Music", hint: "The intro's score, for now" },
+];
+
+export function SoundSettings() {
+  const s = useAudioSettings();
+  return (
+    <div class="sound-settings">
+      <label class="sound-mute">
+        <input type="checkbox" checked={s.muted} onChange={(e) => audio.set({ muted: (e.currentTarget as HTMLInputElement).checked })} /> Mute all
+      </label>
+      {SLIDERS.map(({ key, label, hint }) => (
+        <label key={key} class="sound-row" title={hint}>
+          <span>{label}</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={Math.round(s[key] * 100)}
+            disabled={s.muted}
+            onInput={(e) => audio.set({ [key]: Number((e.currentTarget as HTMLInputElement).value) / 100 })}
+            onChange={() => audio.play(key === "ui" || key === "master" ? "notify" : "discovery")}
+          />
+          <span class="sound-val">{Math.round(s[key] * 100)}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** The top bar's Sound button: mute at a glance, the sliders in a drop-down. */
+export function SoundButton() {
+  const s = useAudioSettings();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (ev: MouseEvent) => {
+      if (!box.current?.contains(ev.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", away);
+    return () => window.removeEventListener("mousedown", away);
+  }, [open]);
+  return (
+    <div class="sound-button" ref={box}>
+      <button class="btn" onClick={() => setOpen(!open)} title="Sound: volumes and mute" aria-expanded={open}>
+        {s.muted ? "Sound off" : "Sound"}
+      </button>
+      {open && (
+        <div class="sound-pop panel">
+          <SoundSettings />
+        </div>
+      )}
+    </div>
+  );
+}

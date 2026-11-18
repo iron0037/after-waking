@@ -1,0 +1,38 @@
+/* Sound settings (AW-31) */
+.sound-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  text-align: left;
+}
+.sound-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.sound-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.sound-val {
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sound-mute {
+  font-size: 13px;
+}
+.sound-button {
+  position: relative;
+}
+.sound-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}

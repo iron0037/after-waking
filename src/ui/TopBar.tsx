@@ -1,3 +1,4 @@
+import { SoundButton } from "./SoundSettings";
 import { activeRegion, ageAt, captainTitle, compendiumTotals, criticalPatient, crewAlerts, crewFreePoints, dist, effectiveStats, formatDate, formatDuration, INTREPID_POS, siteHere, type GameState, type World } from "../sim";
 import { STATION_INFO } from "../data/crew";
 import { cargoSummary, cr, pct } from "./format";
@@ -104,6 +105,7 @@ export function TopBar({
       <button class="btn" onClick={onJournal} title="Journal (J)">
         Journal
       </button>
+      <SoundButton />
       <button class="btn" onClick={onQuit} title="Return to title (progress is autosaved)">
         Title
       </button>

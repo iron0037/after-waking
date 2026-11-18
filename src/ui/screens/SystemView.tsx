@@ -56,6 +56,7 @@ import { Canvas } from "../Canvas";
 import { drawOrrery, type FlightOverlay, type HitTarget, type Route } from "./system/draw";
 import { BodyHeader, Environment, Exploration, ResourceSignatures } from "./system/BodyDetails";
 import { ActionRail } from "../ActionRail";
+import { audio } from "../audio/engine";
 import { Section } from "../Section";
 import { BodyList } from "./system/BodyList";
 import { UI } from "../palette";
@@ -121,6 +122,16 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
   const [hoverEdge, setHoverEdge] = useState(false);
   const [camera, setCameraState] = useState<Camera>(HOME_CAMERA);
   const [flying, setFlying] = useState(false);
+  // The burn's rumble while the ship is under way, and the settle into orbit when it arrives (AW-31).
+  useEffect(() => {
+    if (!flying) return;
+    const burn = audio.loop("burn");
+    return () => {
+      burn.stop();
+      const loc = session.state.location;
+      if (loc.kind === "space" && loc.orbiting && !session.state.encounter) audio.play("orbit");
+    };
+  }, [flying]);
   const [regionPick, setRegionPick] = useState<{ bodyId: string; region: number } | null>(null);
 
   const flightRef = useRef<Flight | null>(null);
