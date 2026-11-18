@@ -508,15 +508,39 @@ export function regionReading(state: GameState, body: Body, region: number, sens
  * The region the landing chart suggests: the strongest reading, halved for regions already visited, skipping open sea
  * (AW-210). Readings count only what's left, so a worked-out region drops away (AW-228).
  */
+const setDownCache = new WeakMap<object, Map<number, Vec2 | null>>();
+
 /**
- * Whether the ship can set down in this region at all (AW-270): its set-down point must be dry, level
- * ground. Some ocean regions have only rough ground ashore, so their set-down point falls in the sea.
- * The same test as the landing itself, so the region pickers never suggest a region you can't land in.
+ * Where the ship sets down coming from orbit (AW-270, AW-271): the region's landing point if it's open
+ * ground, else the nearest hex in the region the ship could hop to (open, level ground, rough included).
+ * Some ocean regions have only rough ground ashore, so their landing point is at sea. Null: no ground at all.
+ * The landing point itself never moves, so deposits placed around it stay where they are.
  */
+export function setDownSpot(world: World, bodyId: string, region: number): Vec2 | null {
+  const surface = world.surface(bodyId);
+  let cache = setDownCache.get(surface);
+  if (!cache) setDownCache.set(surface, (cache = new Map()));
+  if (cache.has(region)) return cache.get(region) ?? null;
+  const p = surface.landing(region);
+  let spot: Vec2 | null = canEnter(surface, p.x, p.y, false) ? p : null;
+  if (!spot) {
+    const o = surface.origin(region);
+    let bestD = Infinity;
+    for (let y = o.y; y < o.y + REGION_SIZE; y++) {
+      for (let x = o.x; x < o.x + REGION_SIZE; x++) {
+        if (surface.regionAt(x, y) !== region || !canEnter(surface, x, y, false)) continue;
+        const d = hexDistance(p, { x, y });
+        if (d < bestD) [bestD, spot] = [d, { x, y }];
+      }
+    }
+  }
+  cache.set(region, spot);
+  return spot;
+}
+
+/** Whether the ship can set down in this region at all: the region pickers never suggest one it can't (AW-270). */
 export function canSetDownIn(state: GameState, body: Body, region: number): boolean {
-  const surface = worldFor(state.seed, state.worldGen ?? 1).surface(body.id);
-  const spot = surface.landing(region);
-  return canEnter(surface, spot.x, spot.y, false);
+  return setDownSpot(worldFor(state.seed, state.worldGen ?? 1), body.id, region) !== null;
 }
 
 export function suggestedRegion(state: GameState, body: Body, sensorTier: number, reachM: number): number {
@@ -686,9 +710,7 @@ export function landingBlockers(state: GameState, world: World, region: number):
     blockers.push("Choose a valid landing region.");
   } else if (body.regions > 0) {
     // Ocean worlds (AW-17): the ship needs an island to set down on.
-    const surface = world.surface(body.id);
-    const spot = surface.landing(region);
-    if (!canEnter(surface, spot.x, spot.y, false)) blockers.push("No dry land in this region to set down on. Pick another.");
+    if (!setDownSpot(world, body.id, region)) blockers.push("No dry land in this region to set down on. Pick another.");
   }
   const fuel = surfaceBurnFuel(state, body);
   if (fuel > state.ship.fuel) blockers.push(`Descent needs ${fuel} fuel.`);
@@ -734,7 +756,7 @@ export function land(state: GameState, world: World, region: number): Result {
     bodyId: body.id,
     region,
     rover: null,
-    ship: world.surface(body.id).landing(region),
+    ship: setDownSpot(world, body.id, region) ?? world.surface(body.id).landing(region),
     globalCoords: true,
   };
   knowledge(state, body.id, region).visits++;
