@@ -64,7 +64,7 @@ import { advanceTime, log, settlePayroll, withRng, type GameState, type RoverSta
 import { FLORA_BY_NAME } from "../data/catalog";
 import { CREATURES_BY_NAME } from "../data/creatures";
 import { foundMineralSpecimen, recordFind, rollMineralSpecimen } from "./compendium";
-import { specimenFits, specimenKey } from "./contracts";
+import { specimenFits, specimenKey, worldFor } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
 import { chargeHelmAccount, helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
@@ -508,12 +508,23 @@ export function regionReading(state: GameState, body: Body, region: number, sens
  * The region the landing chart suggests: the strongest reading, halved for regions already visited, skipping open sea
  * (AW-210). Readings count only what's left, so a worked-out region drops away (AW-228).
  */
+/**
+ * Whether the ship can set down in this region at all (AW-270): its set-down point must be dry, level
+ * ground. Some ocean regions have only rough ground ashore, so their set-down point falls in the sea.
+ * The same test as the landing itself, so the region pickers never suggest a region you can't land in.
+ */
+export function canSetDownIn(state: GameState, body: Body, region: number): boolean {
+  const surface = worldFor(state.seed, state.worldGen ?? 1).surface(body.id);
+  const spot = surface.landing(region);
+  return canEnter(surface, spot.x, spot.y, false);
+}
+
 export function suggestedRegion(state: GameState, body: Body, sensorTier: number, reachM: number): number {
   let best = 0;
   let bestScore = -1;
   for (let r = 0; r < body.regions; r++) {
     const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
-    if (regionLandShare(state.seed, body, r) < 0.05) continue;
+    if (regionLandShare(state.seed, body, r) < 0.05 || !canSetDownIn(state, body, r)) continue;
     const score = regionReading(state, body, r, sensorTier, reachM) * (visited ? 0.5 : 1);
     if (score > bestScore) {
       bestScore = score;
@@ -543,11 +554,13 @@ export function hunchRegion(state: GameState, body: Body): number | null {
   let best = 0;
   let bestScore = -1;
   for (let r = 0; r < body.regions; r++) {
+    // A hunch is still a place to land (AW-270).
+    if (!canSetDownIn(state, body, r)) continue;
     const visited = (state.regions[regionKey(body.id, r)]?.visits ?? 0) > 0;
     const score = regionReading(state, body, r, 3, effectiveStats(state).drillMaxDepthM) * (visited ? 0.5 : 1);
     if (score > bestScore) [best, bestScore] = [r, score];
   }
-  return best;
+  return bestScore < 0 ? null : best;
 }
 
 /**
