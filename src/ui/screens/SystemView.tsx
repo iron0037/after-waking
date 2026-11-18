@@ -2,7 +2,9 @@
  * The system orrery: where the ship is, where everything else is, and how to get there.
  * Flight is animated with time compression; the sim only advances when the burn completes.
  */
-import { KIND_LABEL, knownOutposts, landingTiers, type Outpost } from "../../sim";
+import { diveOdds, isGiant, KIND_LABEL, knownOutposts, landingTiers, launchProbe, probeBlockers, type Outpost } from "../../sim";
+import { DEPTHS } from "../../data/probes";
+import { cr, tonnes } from "../format";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   bodyProgress,
@@ -572,6 +574,33 @@ function SystemScreen({ session, systemId }: { session: GameSession; systemId: s
                             label: `Detailed survey (${formatDuration(surveyMinutes(state))})`,
                             detail: "Sharpens the region readings from orbit; no landing needed.",
                             onClick: () => session.act((s, w) => surveyBody(s, w)),
+                          },
+                        ]
+                      : []),
+                    // An atmospheric probe (AW-261): one button, a menu of depths with their odds.
+                    ...(isGiant(selected) && stats.probeCapacity > 0
+                      ? [
+                          {
+                            id: "probe",
+                            icon: "probe" as const,
+                            label: `Launch a probe (${state.ship.probes ?? 0} in the bay)`,
+                            detail: "Pick a depth: deeper layers hold rarer gases, and lose more probes.",
+                            blocked: !orbitingSel
+                              ? `Enter orbit around ${selected.name} to launch a probe.`
+                              : !scanned
+                                ? "Scan the giant first."
+                                : (probeBlockers(state, world)[0] ?? null),
+                            onClick: () => {},
+                            menu: (scanned ? diveOdds(state, world, selected) : []).map((o) => {
+                              const band = DEPTHS[o.depth - 1];
+                              return {
+                                id: `d${o.depth}`,
+                                label: `${band?.name ?? `Depth ${o.depth}`} · ${(band?.km ?? 0).toLocaleString()} km`,
+                                detail: `${Math.round(o.risk * 100)}% lost · ${o.estimated ? "est. " : ""}~${tonnes(o.tonnes)} (~${cr(o.value)}) · ${o.hours} h`,
+                                blocked: o.blocked,
+                                onClick: () => session.act((s, w) => launchProbe(s, w, o.depth), { timelapse: false }),
+                              };
+                            }),
                           },
                         ]
                       : []),

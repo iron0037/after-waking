@@ -26,7 +26,8 @@ export type IconName =
   | "fly"
   | "scan"
   | "survey"
-  | "land";
+  | "land"
+  | "probe";
 
 const PATHS: Record<IconName, JSX.Element> = {
   // A rover: body, mast, and three wheels.
@@ -177,6 +178,16 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="M3.5 12h17M12 3.5c-3 3-3 14 0 17M12 3.5c3 3 3 14 0 17" />
+    </>
+  ),
+  // A probe dropping into cloud bands.
+  probe: (
+    <>
+      <path d="M12 3v3" />
+      <path d="M9 6h6l-1 6h-4z" />
+      <path d="M12 12v3" />
+      <path d="M3 17c3 0 3-1.5 6-1.5s3 1.5 6 1.5 3-1.5 6-1.5" />
+      <path d="M3 21c3 0 3-1.5 6-1.5s3 1.5 6 1.5 3-1.5 6-1.5" />
     </>
   ),
   // Down onto the ground.

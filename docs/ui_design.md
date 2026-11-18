@@ -32,6 +32,10 @@ map, a star system, and a planet's surface.
      the player wondering where it went.
    - Hovering shows the name, its hotkey, and what it does.
    - Buttons are grouped by subject (Rover or Boat, Ship) with a small label over each group.
+6a. **One verb, several choices: a menu** (AW-261). Where an action needs a choice, like a probe's dive
+   depth, the rail shows one button that opens a small menu beside it, rather than a near-identical
+   icon per choice. Each choice shows its odds or cost, and one that can't be taken stays, dimmed, with
+   the reason. Escape or a click elsewhere closes it.
 7. **Actions on one item stay with that item**, inside its component: Hand in, Buy, Sell. The rail is
    for verbs about where you are. Where you are includes what's under or beside the vehicle (AW-258): when
    a deposit or an unsampled plant is selected (on the map or in a list), or the rover or boat is on or

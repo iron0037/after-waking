@@ -60,6 +60,64 @@
   border-color: var(--border);
   color: #4f5b70;
 }
+/* A button with a menu (AW-261): the menu opens to the left, over the map, in place of the tooltip. */
+.rail-slot {
+  position: relative;
+}
+.rail-btn.menu-open .rail-tip {
+  display: none !important;
+}
+.rail-menu {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 0;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 270px;
+  padding: 8px;
+  background: #0d1322;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.rail-menu-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 0 2px 2px;
+}
+.rail-menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.rail-menu-item:hover,
+.rail-menu-item:focus-visible {
+  border-color: var(--accent);
+}
+.rail-menu-item.blocked {
+  color: #4f5b70;
+  cursor: not-allowed;
+}
+.rail-menu-item.blocked:hover {
+  border-color: var(--border);
+}
+.rail-menu-label {
+  font-weight: 600;
+}
+
 /* The tooltip opens to the left, over the map. */
 .rail-tip {
   display: none;
