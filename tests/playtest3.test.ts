@@ -4,6 +4,7 @@ import {
   acceptContract,
   DAY,
   DOCKING_MINUTES,
+  effectiveStats,
   fold,
   flyTo,
   knownDeposits,
@@ -12,8 +13,10 @@ import {
   landingAccess,
   loanOutlook,
   newGame,
+  regionRecap,
   sellAll,
   shipStats,
+  systemMinerals,
   wait,
   World,
 } from "../src/sim";
@@ -88,6 +91,16 @@ describe("known deposits from orbit", () => {
     const known = knownDeposits(state, world, body.id);
     expect(known).toHaveLength(1);
     expect(known[0]).toMatchObject({ region: 2, key: `2:${d.id}`, commodity: d.commodity });
+    // AW-280: the size stays unknown from orbit until the seam is prospected.
+    expect(known[0]?.remainingT).toBeNull();
+    knowledge(state, body.id, 2).visits = 1;
+    const recap = regionRecap(state, world, body.id, 2);
+    expect(recap?.reachableTonnes).toBe(0);
+    expect(recap?.unmeasured).toBe(d.depthM <= effectiveStats(state).drillMaxDepthM ? 1 : 0);
+    const found = systemMinerals(state, world, "s0").find((m) => m.commodity === d.commodity)?.found;
+    expect(found).toMatchObject({ count: 1, tonnes: 0, unmeasured: 1 });
+    knowledge(state, body.id, 2).prospected.push(d.id);
+    expect(knownDeposits(state, world, body.id)[0]?.remainingT).toBeCloseTo(d.tonnes);
     knowledge(state, body.id, 2).extracted[d.id] = d.tonnes;
     expect(knownDeposits(state, world, body.id)).toHaveLength(0);
   });

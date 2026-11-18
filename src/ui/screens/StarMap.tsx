@@ -1634,7 +1634,13 @@ function MineralList({ session, systemId, bodyId = null }: { session: GameSessio
             </div>
             {!bodyId && m.found.count > 0 && (
               <div class="small accent" title="Deposits the rover has found and not yet worked out; reachable means within your drill's depth on a world you can land on">
-                found: {tonnes(m.found.tonnes)}, {tonnes(m.found.reachableTonnes)} reachable
+                found: {m.found.count > m.found.unmeasured && <>{tonnes(m.found.tonnes)}, {tonnes(m.found.reachableTonnes)} reachable</>}
+                {m.found.unmeasured > 0 && (
+                  <span title="Found but not prospected: a core sample measures the seam">
+                    {m.found.count > m.found.unmeasured ? " + " : ""}
+                    {m.found.unmeasured} unmeasured
+                  </span>
+                )}
               </div>
             )}
           </li>

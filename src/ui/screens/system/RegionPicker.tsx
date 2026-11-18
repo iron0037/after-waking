@@ -438,11 +438,17 @@ export function RegionPicker({ session, body, state, world, sensorTier, reachM, 
 function RegionRecapBox({ state, world, bodyId, region }: { state: GameState; world: World; bodyId: string; region: number }) {
   const recap = regionRecap(state, world, bodyId, region);
   if (!recap) return null;
-  const worked = recap.reachableTonnes <= 0 && recap.floraUnsampled === 0 && recap.explored > 0.5;
+  const worked = recap.reachableTonnes <= 0 && recap.unmeasured === 0 && recap.floraUnsampled === 0 && recap.explored > 0.5;
   return (
     <div class="sys-recap small">
       You've been here before ({recap.visits}×): {Math.round(recap.explored * 100)}% explored · {recap.depositsKnown}{" "}
       {recap.depositsKnown === 1 ? "deposit" : "deposits"} known · {Math.round(recap.reachableTonnes).toLocaleString()} t reachable left
+      {recap.unmeasured > 0 && (
+        <span title="Found but not prospected: a core sample measures the seam">
+          {" "}
+          (+{recap.unmeasured} unmeasured)
+        </span>
+      )}
       {recap.floraUnsampled > 0 && (
         <>
           {" "}
@@ -497,7 +503,15 @@ export function KnownDeposits({
                 {COMMODITIES[k.commodity].name}
                 {!k.reachable && <span class="danger small"> too deep</span>}
               </td>
-              <td class="num">{Math.round(k.remainingT).toLocaleString()} t</td>
+              <td class="num">
+                {k.remainingT === null ? (
+                  <span class="muted" title="Not yet prospected: a core sample measures the seam">
+                    ?
+                  </span>
+                ) : (
+                  `${Math.round(k.remainingT).toLocaleString()} t`
+                )}
+              </td>
               <td class="num">{k.region + 1}</td>
             </tr>
           ))}

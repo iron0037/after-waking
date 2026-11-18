@@ -116,8 +116,10 @@ export interface RegionRecap {
   visits: number;
   explored: number;
   depositsKnown: number;
-  /** Tonnes left in known, reachable (drill depth) deposits. */
+  /** Tonnes left in prospected, reachable (drill depth) deposits. */
   reachableTonnes: number;
+  /** Found, reachable deposits not yet prospected, so their size is unknown (AW-280). */
+  unmeasured: number;
   floraUnsampled: number;
 }
 
@@ -127,15 +129,20 @@ export function regionRecap(state: GameState, world: World, bodyId: string, regi
   if (!k || k.visits === 0) return null;
   const map = world.region(bodyId, region);
   const reach = effectiveStats(state).drillMaxDepthM;
+  // Only prospected seams have a measured size (AW-280); the rest are counted, not weighed.
   let reachableTonnes = 0;
+  let unmeasured = 0;
   for (const d of map.deposits) {
-    if (k.discovered.includes(d.id) && d.depthM <= reach) reachableTonnes += remainingTonnes(k, d);
+    if (!k.discovered.includes(d.id) || d.depthM > reach || remainingTonnes(k, d) <= 0.05) continue;
+    if (k.prospected.includes(d.id)) reachableTonnes += remainingTonnes(k, d);
+    else unmeasured++;
   }
   return {
     visits: k.visits,
     explored: exploredFraction(k),
     depositsKnown: k.discovered.length,
     reachableTonnes,
+    unmeasured,
     floraUnsampled: (k.floraFound ?? []).filter((id) => !(k.floraSampled ?? []).includes(id)).length,
   };
 }
@@ -145,7 +152,8 @@ export interface KnownDeposit {
   /** Site key "region:id" (see bodysurface.ts). */
   key: string;
   commodity: Deposit["commodity"];
-  remainingT: number;
+  /** Tonnes left, or null until the seam is prospected: only a core sample measures it (AW-280). */
+  remainingT: number | null;
   depthM: number;
   grade: number;
   prospected: boolean;
@@ -172,7 +180,7 @@ export function knownDeposits(state: GameState, world: World, bodyId: string): K
         region: r,
         key: siteKey(r, d.id),
         commodity: d.commodity,
-        remainingT,
+        remainingT: know.prospected.includes(d.id) ? remainingT : null,
         depthM: d.depthM,
         grade: d.grade,
         prospected: know.prospected.includes(d.id),
@@ -180,15 +188,16 @@ export function knownDeposits(state: GameState, world: World, bodyId: string): K
       });
     }
   }
-  return out.sort((a, b) => Number(b.reachable) - Number(a.reachable) || b.remainingT - a.remainingT);
+  // Measured seams by size, then the unmeasured ones.
+  return out.sort((a, b) => Number(b.reachable) - Number(a.reachable) || (b.remainingT ?? -1) - (a.remainingT ?? -1));
 }
 
 export interface SystemMineral {
   commodity: Deposit["commodity"];
   /** Scanned worlds whose orbital scan shows this mineral, and whether the ship can land on each. */
   bodies: { bodyId: string; name: string; abundance: number; landable: boolean }[];
-  /** Untapped deposits the rover has actually found, across the system. */
-  found: { count: number; tonnes: number; reachableTonnes: number };
+  /** Untapped deposits the rover has actually found, across the system. Tonnes count prospected seams only. */
+  found: { count: number; tonnes: number; reachableTonnes: number; unmeasured: number };
 }
 
 /**
@@ -201,7 +210,7 @@ export function systemMinerals(state: GameState, world: World, systemId: string)
   const entry = (c: Deposit["commodity"]) => {
     let m = byId.get(c);
     if (!m) {
-      m = { commodity: c, bodies: [], found: { count: 0, tonnes: 0, reachableTonnes: 0 } };
+      m = { commodity: c, bodies: [], found: { count: 0, tonnes: 0, reachableTonnes: 0, unmeasured: 0 } };
       byId.set(c, m);
     }
     return m;
@@ -216,6 +225,10 @@ export function systemMinerals(state: GameState, world: World, systemId: string)
     for (const k of knownDeposits(state, world, body.id)) {
       const m = entry(k.commodity);
       m.found.count++;
+      if (k.remainingT === null) {
+        m.found.unmeasured++;
+        continue;
+      }
       m.found.tonnes += k.remainingT;
       if (k.reachable && landable) m.found.reachableTonnes += k.remainingT;
     }
