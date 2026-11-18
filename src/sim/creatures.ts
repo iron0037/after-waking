@@ -20,6 +20,7 @@ import { hexDistance, neighbors } from "./hex";
 import { injureCrew, type SeverityWeights } from "./injuries";
 import { canEnter, findPath, type Mobility } from "./pathfinding";
 import { effectiveStats, hasPerk, roverSpecimenSlots } from "./perks";
+import { specimenRoomBlocker } from "./racks";
 import { fail, ok, type Result } from "./result";
 import { specimenCount } from "./ship";
 import { advanceTime, log, withRng, type GameState, type RoverState } from "./state";
@@ -509,6 +510,9 @@ export function captureBlockers(state: GameState, world: World, key: SiteKey): s
   if (c.down) return ["It's already down: drive alongside and collect it."];
   if (!!c.entry.aquatic !== (vehicleOf(rover) === "boat")) return [c.entry.aquatic ? "That lives in the water: take the boat out." : "That lives ashore: put the rover ashore."];
   if (vehicleWeapons(state).length === 0) return ["The rover's gear is offline until the Intrepid's yard repairs it."];
+  // A capture with nowhere to keep it would only leave it stunned (AW-269).
+  const noRoom = specimenRoomBlocker(state, rover, c.entry.size);
+  if (noRoom) return [noRoom];
   const odds = captureOdds(state, world, key);
   if (!odds || odds.budget <= 0) return ["No energy to spare: the rover needs all it has to get home. Recharge first."];
   if (odds.chance <= 0) return [odds.notes[0] ?? "No way to reach it from here."];
@@ -616,7 +620,7 @@ function takeAboard(state: GameState, bodyId: string, c: LiveCreature): boolean 
   const loc = state.location;
   if (loc.kind !== "surface" || !loc.rover) return false;
   const v = loc.rover;
-  if (specimenCount(v.specimens) + c.entry.size > roverSpecimenSlots(state)) return false;
+  if (specimenRoomBlocker(state, v, c.entry.size)) return false;
   v.specimens ??= {};
   const skey = `${bodyId}|${c.entry.name}`;
   v.specimens[skey] = (v.specimens[skey] ?? 0) + 1;
@@ -664,7 +668,8 @@ export function collectCreature(state: GameState, world: World, key: SiteKey): R
   if (!c.down) return fail("It isn't down: capture it first.");
   if (hexDistance(v, c) > 1) return fail("Drive alongside it first.");
   if (!!c.entry.aquatic !== (vehicleOf(v) === "boat")) return fail(c.entry.aquatic ? "Take the boat out to haul it in." : "Use the rover to load it.");
-  if (specimenCount(v.specimens) + c.entry.size > roverSpecimenSlots(state)) return fail(`The sample cases are full (it needs ${c.entry.size} slot${c.entry.size === 1 ? "" : "s"}).`);
+  const noRoom = specimenRoomBlocker(state, v, c.entry.size);
+  if (noRoom) return fail(noRoom);
   takeAboard(state, loc.bodyId, c);
   advanceTime(state, 30);
   log(state, "discovery", `Loaded the stunned ${c.entry.name} into the sample cases.`);

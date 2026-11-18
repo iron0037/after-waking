@@ -3,6 +3,7 @@ export * from "./fleet";
 export * from "./saferange";
 export * from "./landing";
 export * from "./sitereach";
+export * from "./racks";
 export * from "./specimenjobs";
 export * from "./outposts";
 export * from "./outpostservices";

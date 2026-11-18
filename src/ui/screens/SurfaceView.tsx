@@ -76,6 +76,8 @@ import {
   roverMobility,
   siteOnWater,
   siteReach,
+  hasSamplesAboard,
+  specimenRoomBlocker,
   captureBlockers,
   captureCreature,
   captureOdds,
@@ -1131,7 +1133,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const doRecharge = (): void => {
     const r = session.act((s, w) => rechargeRover(s, w));
     setRechargeHint(false);
-    if (r.ok) session.notify(`Recharged the ${noun}'s cells in ${formatDuration(r.value.hours * HOUR)}.`);
+    if (r.ok) {
+      const parts = [
+        r.value.hours > 0 ? `recharged the ${noun}'s cells in ${formatDuration(r.value.hours * HOUR)}` : "",
+        r.value.samples > 0 ? `handed ${r.value.samples} sample${r.value.samples === 1 ? "" : "s"} to the ship's racks` : "",
+      ].filter(Boolean);
+      if (parts.length) session.notify(`${parts.join(" and ").replace(/^./, (c) => c.toUpperCase())}.`);
+    }
   };
 
   /** The rover crew sweeps the whole fog of this region on their own (sim: autoExplore). It can pass days, so the clock time-lapses. */
@@ -1196,7 +1204,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   };
 
   const rechargeHours = rover ? Math.max(0, energyMax - rover.energy) / roverChargePerHour(state) : 0;
-  const canRecharge = rover !== null && nearShip && energyMax - rover.energy >= 0.5;
+  // Recharge also drops the living samples off at the racks (AW-269), so it's worth doing with full cells too.
+  const samplesAboard = hasSamplesAboard(rover);
+  const canRecharge = rover !== null && nearShip && (energyMax - rover.energy >= 0.5 || samplesAboard);
   const autoBlocker = rover !== null && !isBoat ? (autoExploreBlockers(state, world)[0] ?? null) : null;
 
   keyRef.current = (ev: KeyboardEvent): void => {
@@ -1390,12 +1400,12 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                       {
                         id: "recharge",
                         icon: "bolt" as const,
-                        label: "Recharge",
-                        detail: `Top up the cells from the ship's reactor without stowing: ${formatDuration(rechargeHours * HOUR)}.`,
+                        label: samplesAboard ? "Recharge & drop off samples" : "Recharge",
+                        detail: `Top up the cells from the ship's reactor without stowing (${formatDuration(rechargeHours * HOUR)}), and hand any living samples over to the ship's racks.`,
                         blocked: !nearShip
                           ? `${isBoat ? "Sail the boat" : "Drive the rover"} back to the ship to recharge.`
                           : !canRecharge
-                            ? `The ${noun}'s cells are already full.`
+                            ? `The ${noun}'s cells are already full, and there are no samples to drop off.`
                             : null,
                         onClick: doRecharge,
                       },
@@ -1496,8 +1506,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
                         detail: `Take a living sample into the sample cases.${farNote(hereFlora.f)}`,
                         blocked:
                           vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, hereFlora.f), "plants") ??
-                          (rover && specimenCount(rover.specimens) >= roverSpecimenSlots(state)
-                            ? `The ${noun}'s sample cases are full: stow at the ship.`
+                          (rover && specimenRoomBlocker(state, rover, 1)
+                            ? specimenRoomBlocker(state, rover, 1)
                             : rover && rover.energy < SAMPLE_ENERGY
                               ? `The sample kit needs ${SAMPLE_ENERGY} ${noun} energy.`
                               : null),
@@ -1590,11 +1600,13 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
         {rechargeHint && rover && nearShip && canRecharge && !busy && (
           <div class="recharge-hint" role="status">
             <span>
-              {isBoat ? "Boat" : "Rover"} is beside the ship at {Math.round(pct(rover.energy, energyMax))}% energy. Top up the cells (
-              {formatDuration(rechargeHours * HOUR)})?
+              {isBoat ? "Boat" : "Rover"} is beside the ship
+              {energyMax - rover.energy >= 0.5
+                ? ` at ${Math.round(pct(rover.energy, energyMax))}% energy. Top up the cells (${formatDuration(rechargeHours * HOUR)})${samplesAboard ? " and drop off the samples" : ""}?`
+                : " with samples aboard. Drop them off at the racks?"}
             </span>
             <button class="btn primary" onClick={doRecharge}>
-              Recharge
+              {energyMax - rover.energy >= 0.5 ? "Recharge" : "Drop off"}
             </button>
             <button class="btn" title="Dismiss" onClick={() => setRechargeHint(false)}>
               Not now
@@ -2281,9 +2293,9 @@ function FloraPanel({
   if (wrong) blockers.push(wrong);
   else if (rover) {
     if (!near && !sampled) blockers.push(`The ${noun} is ${dist} tiles away: ${vehicle === "boat" ? "sail" : "drive"} it next to the ${wet ? "sea life" : "plants"}.`);
-    if (specimenCount(rover.specimens) >= roverSpecimenSlots(session.state)) {
-      blockers.push(`The ${noun}'s sample cases are full. ${vehicle === "boat" ? "Sail" : "Drive"} back to the ship and stow.`);
-    }
+    // Room in the cases, and in the ship's racks once it's home (AW-269).
+    const noRoom = specimenRoomBlocker(session.state, rover, 1);
+    if (noRoom) blockers.push(noRoom);
     if (rover.energy < SAMPLE_ENERGY) blockers.push(`The sample kit needs ${SAMPLE_ENERGY} ${noun} energy.`);
   }
   const collect = async (): Promise<void> => {

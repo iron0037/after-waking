@@ -594,6 +594,7 @@ Unintelligent animals of the land and seas, collected as specimens like plants. 
   - **Short energy:** if the job should take more than the rover can spare, the odds fall with the shortfall.
   - **A hunter catching the rover mid-job** is settled the same way, at once. A failure stops the drive with just enough energy to get home.
 - **Taken alive (user's rule):** a creature brought down is stunned. In a capture it goes into the sample cases if there's room. Otherwise it lies where it fell as a pickup for 30 days.
+- **Room for samples [DECIDED] (AW-269):** the crew won't take a sample, plant or creature, that the ship's containment racks couldn't hold once it's home, counting everything already in the field. There's no way to release one to make room: out of space is out of space. **Recharge** at the ship also hands the samples over to the racks, so a sample run needn't stow the rover.
 - **Disabled, not destroyed (user's choice):**
   - A rover whose plating is torn through can't move, and its cargo and samples are lost.
   - The crew takes a heavy injury (AW-214).

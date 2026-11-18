@@ -68,7 +68,8 @@ import { specimenFits, specimenKey } from "./contracts";
 import { awardXp, crewBonuses, retirementsOnDocked } from "./crew";
 import { chargeHelmAccount, helmCoversRescue, helmOnDeparture, helmOnDocked, netWorth } from "./helm";
 import { bondClan, cheerAll, cheerStation, payShare, sentimentOnDocked } from "./sentiment";
-import { effectiveStats, finishRetraining, hasPerk, hasTalent, roverSpecimenSlots, shipSpecimenSlots } from "./perks";
+import { effectiveStats, finishRetraining, hasPerk, hasTalent, shipSpecimenSlots } from "./perks";
+import { specimenRoomBlocker } from "./racks";
 import {
   emptyKnowledge,
   isExplored,
@@ -1344,8 +1345,9 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   if (wet && vehicleOf(rover) !== "boat") return fail("That's sea life: take the boat out to sample it.");
   if (!wet && vehicleOf(rover) === "boat") return fail("Those grow ashore: put the rover ashore to sample them.");
   if (hexDistance(site, rover) > 1) return fail(wet ? "Sail the boat next to it first." : "Drive the rover next to the plants first.");
-  const slots = roverSpecimenSlots(state);
-  if (specimenCount(rover.specimens) >= slots) return fail("The rover's sample cases are full.");
+  // Room in the cases, and in the ship's racks for when it's home (AW-269).
+  const noRoom = specimenRoomBlocker(state, rover, 1);
+  if (noRoom) return fail(noRoom);
   if (rover.disabled) return fail("The rover is disabled. Recall it with the ship.");
   const safe = guardJob(state, world, SAMPLE_ENERGY, "sampling");
   if (!safe.ok) return safe;
@@ -1357,7 +1359,7 @@ export function collectSample(state: GameState, world: World, key: SiteKey): Res
   rover.specimens ??= {};
   const specimen = specimenKey(bodyId, site.species);
   // Careful Hands: two samples from one site, if the cases have room.
-  const count = hasPerk(state, "careful-hands") && specimenCount(rover.specimens) + 2 <= slots ? 2 : 1;
+  const count = hasPerk(state, "careful-hands") && specimenRoomBlocker(state, rover, 2) === null ? 2 : 1;
   rover.specimens[specimen] = (rover.specimens[specimen] ?? 0) + count;
   state.stats.specimens = (state.stats.specimens ?? 0) + count;
   know.floraSampled.push(site.id);
@@ -1416,8 +1418,32 @@ function unloadAll(state: GameState): { unloaded: number; jettisoned: number } {
   return { unloaded, jettisoned };
 }
 
-/** Plug the rover into the ship's reactor without stowing it: tops up the cells, takes time. */
-export function rechargeRover(state: GameState, world: World): Result<{ hours: number }> {
+/** Move the vehicle's living samples into the ship's racks (as far as they'll go). Returns how many moved. */
+function handOverSamples(state: GameState, v: RoverState): number {
+  let moved = 0;
+  state.ship.specimens ??= {};
+  for (const [key, n] of Object.entries(v.specimens ?? {})) {
+    const room = shipSpecimenSlots(state) - specimenCount(state.ship.specimens);
+    const take = Math.min(room, n);
+    if (take <= 0) continue;
+    state.ship.specimens[key] = (state.ship.specimens[key] ?? 0) + take;
+    v.specimens![key] = n - take;
+    if (v.specimens![key] === 0) delete v.specimens![key];
+    moved += take;
+  }
+  return moved;
+}
+
+/** Whether the vehicle beside the ship has samples to hand over (AW-269: Recharge drops them off). */
+export function hasSamplesAboard(v: RoverState | null): boolean {
+  return !!v && specimenCount(v.specimens) > 0;
+}
+
+/**
+ * Plug the rover into the ship's reactor without stowing it: tops up the cells, takes time, and hands
+ * the living samples over to the ship's racks (AW-269), so a sample run needn't stow the rover.
+ */
+export function rechargeRover(state: GameState, world: World): Result<{ hours: number; samples: number }> {
   const ctx = surfaceCtx(state, world);
   if (!ctx.ok) return ctx;
   const { rover } = ctx.value;
@@ -1425,7 +1451,14 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
     return fail("Drive the rover back to the ship to recharge.");
   }
   const full = vehicleEnergyMax(state, vehicleOf(rover));
-  if (rover.energy >= full - 0.5) return fail(vehicleOf(rover) === "boat" ? "The boat's cells are already full." : "The rover's cells are already full.");
+  const charged = rover.energy >= full - 0.5;
+  if (charged && !hasSamplesAboard(rover)) return fail(vehicleOf(rover) === "boat" ? "The boat's cells are already full." : "The rover's cells are already full.");
+  const samples = handOverSamples(state, rover);
+  if (samples > 0) {
+    advanceTime(state, SAMPLE_HANDOVER_MINUTES);
+    log(state, "info", `Handed ${samples} living sample${samples === 1 ? "" : "s"} over to the ship's racks.`);
+  }
+  if (charged) return ok({ hours: 0, samples });
   const hours = (full - rover.energy) / roverChargePerHour(state);
   advanceTime(state, hours * HOUR);
   rover.energy = full;
@@ -1433,8 +1466,11 @@ export function rechargeRover(state: GameState, world: World): Result<{ hours: n
   rover.hull = effectiveStats(state).roverHull;
   // The spare pack charges alongside (Long Shifts).
   if (vehicleOf(rover) === "rover" && hasPerk(state, "long-shifts")) rover.spareCells = true;
-  return ok({ hours });
+  return ok({ hours, samples });
 }
+
+/** Carrying the samples across to the racks during a recharge. */
+export const SAMPLE_HANDOVER_MINUTES = 10;
 
 /** Rescue a rover that can't make it home: the ship hops over and picks it up. */
 export function recallRover(state: GameState, world: World): Result {
