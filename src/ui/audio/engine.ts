@@ -193,7 +193,7 @@ class AudioEngine {
           const src = ctx.createBufferSource();
           src.buffer = buf;
           const g = ctx.createGain();
-          g.gain.value = 0.5;
+          g.gain.value = 0.32;
           const send = ctx.createGain();
           send.gain.value = 0.12;
           src.connect(g).connect(mix.dry);

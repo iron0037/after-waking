@@ -250,6 +250,46 @@ function strike(ctx: AudioContext, out: AudioNode, t: number, peak = 0.16): void
   thud(ctx, out, t, peak * 0.8, 110);
 }
 
+/** A low-frequency oscillator wobbling `target` by `depth`. */
+function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): OscillatorNode {
+  const o = ctx.createOscillator();
+  const d = ctx.createGain();
+  o.frequency.value = hz;
+  d.gain.value = depth;
+  o.connect(d).connect(target);
+  return o;
+}
+
+/** The drill's motor: a high, whirring whine with a wobble, into `out`. Returns its sources (unstarted). */
+function drillMotorNodes(ctx: AudioContext, out: AudioNode): OscillatorNode[] {
+  const m = ctx.createOscillator();
+  m.type = "sawtooth";
+  m.frequency.value = 190;
+  const w = ctx.createOscillator();
+  w.frequency.value = 760;
+  const wob = lfo(ctx, 3.2, 6, m.frequency);
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 1500;
+  const mg = ctx.createGain();
+  mg.gain.value = 0.16;
+  const wg = ctx.createGain();
+  wg.gain.value = 0.05;
+  m.connect(lp).connect(mg).connect(out);
+  w.connect(wg).connect(out);
+  return [m, w, wob];
+}
+
+/** The drill motor for a one-shot job: fades in and out over `dur` seconds. */
+function drillMotor(ctx: AudioContext, out: AudioNode, t: number, dur: number): void {
+  const g = env(ctx, t, 0.5, 0.15, dur);
+  g.connect(out);
+  for (const n of drillMotorNodes(ctx, g)) {
+    n.start(t);
+    n.stop(t + dur + 0.2);
+  }
+}
+
 // --- the sounds ---------------------------------------------------------------------------
 
 export const RECIPES: Record<SoundId, Recipe> = {
@@ -274,21 +314,30 @@ export const RECIPES: Record<SoundId, Recipe> = {
     tone(ctx, o, t + 0.07, { type: "square", f0: 930, peak: 0.035, decay: 0.07, lp: 1800 });
   },
 
-  // Credits in: a spill of coins.
+  // Credits in (a sale, a bounty): a cash register. Keys clack, the bell rings, the drawer slides out, coins rattle.
   credits: (ctx, mix, t) => {
-    for (let i = 0; i < 6; i++) {
-      const o = route(ctx, mix, { pan: rand(-0.5, 0.5), verb: 0.2 });
-      metal(ctx, o, t + i * 0.055 + rand(0, 0.03), rand(2300, 3300), 0.07, rand(0.12, 0.25), [1, 1.73, 2.61]);
+    const o = route(ctx, mix, { verb: 0.15 });
+    for (const dt of [0, 0.07]) {
+      noise(ctx, o, t + dt, { filter: "bandpass", f0: 2600, q: 2.5, peak: 0.1, decay: 0.03 });
+      tone(ctx, o, t + dt, { f0: 320, f1: 200, peak: 0.06, decay: 0.04 });
+    }
+    // The bell: a bright, slightly clangy ding.
+    metal(ctx, o, t + 0.16, 2093, 0.13, 0.9, [1, 2.0, 2.76, 4.1]);
+    // The drawer: a rolling rumble ending in a thunk.
+    noise(ctx, o, t + 0.2, { filter: "bandpass", f0: 700, f1: 350, q: 1.2, peak: 0.12, attack: 0.03, decay: 0.22 });
+    thud(ctx, o, t + 0.42, 0.16, 120);
+    for (let i = 0; i < 4; i++) {
+      const c = route(ctx, mix, { pan: rand(-0.4, 0.4), verb: 0.15 });
+      metal(ctx, c, t + 0.44 + i * 0.05 + rand(0, 0.03), rand(2600, 3400), 0.035, rand(0.08, 0.16), [1, 1.73, 2.61]);
     }
   },
 
-  // Money out: a register's clack and drawer, one coin.
+  // Money out (a purchase): the keys and the drawer, no bell.
   purchase: (ctx, mix, t) => {
     const o = route(ctx, mix, { verb: 0.12 });
     noise(ctx, o, t, { filter: "bandpass", f0: 2400, q: 2, peak: 0.12, decay: 0.05 });
     tone(ctx, o, t + 0.02, { f0: 110, f1: 70, peak: 0.18, decay: 0.12 });
     noise(ctx, o, t + 0.09, { filter: "bandpass", f0: 900, f1: 400, q: 1.5, peak: 0.08, decay: 0.15 });
-    metal(ctx, o, t + 0.16, 2700, 0.05, 0.2, [1, 1.73, 2.61]);
   },
 
   // A level up: a warm, wide arpeggio over a swelling pad.
@@ -508,17 +557,18 @@ export const RECIPES: Record<SoundId, Recipe> = {
   // Recharging: a machine powering up, the hum climbing, then ready.
   recharge: (ctx, mix, t) => {
     const o = route(ctx, mix, { verb: 0.25 });
-    tone(ctx, o, t, { type: "sawtooth", f0: 55, f1: 440, glide: 1.4, peak: 0.08, attack: 0.3, decay: 1.25, detune: 10, lp: 250, lp1: 3200 });
-    tone(ctx, o, t, { f0: 110, f1: 880, glide: 1.4, peak: 0.05, attack: 0.3, decay: 1.25 });
-    tone(ctx, o, t, { type: "square", f0: 60, peak: 0.02, attack: 0.15, decay: 1.6, lp: 500 });
-    noise(ctx, o, t + 0.2, { filter: "bandpass", f0: 5000, q: 4, peak: 0.02, attack: 0.6, decay: 0.7 });
-    [0, 0.09].forEach((dt, i) => tone(ctx, o, t + 1.55 + dt, { type: "square", f0: i ? 1320 : 990, peak: 0.03, decay: 0.06, lp: 2400 }));
+    tone(ctx, o, t, { type: "sawtooth", f0: 55, f1: 440, glide: 1.4, peak: 0.18, attack: 0.3, decay: 1.25, detune: 10, lp: 250, lp1: 3200 });
+    tone(ctx, o, t, { f0: 110, f1: 880, glide: 1.4, peak: 0.11, attack: 0.3, decay: 1.25 });
+    tone(ctx, o, t, { type: "square", f0: 60, peak: 0.045, attack: 0.15, decay: 1.6, lp: 500 });
+    noise(ctx, o, t + 0.2, { filter: "bandpass", f0: 5000, q: 4, peak: 0.045, attack: 0.6, decay: 0.7 });
+    [0, 0.09].forEach((dt, i) => tone(ctx, o, t + 1.55 + dt, { type: "square", f0: i ? 1320 : 990, peak: 0.06, decay: 0.06, lp: 2400 }));
   },
 
   // A short drilling job: a few strikes. (Long ones run the drill loop for the time-lapse; see session.ts.)
   drill: (ctx, mix, t) => {
     const o = route(ctx, mix, { verb: 0.3 });
-    for (let i = 0; i < 4; i++) strike(ctx, o, t + i * 0.42);
+    for (let i = 0; i < 3; i++) strike(ctx, o, t + i * 0.9);
+    drillMotor(ctx, o, t, 2.2);
   },
 
   // Voice call-outs: recorded files, played by the engine (these only make the tone before the words).
@@ -564,15 +614,6 @@ function loopNoise(ctx: AudioContext): AudioBufferSourceNode {
   return src;
 }
 
-function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): OscillatorNode {
-  const o = ctx.createOscillator();
-  const d = ctx.createGain();
-  o.frequency.value = hz;
-  d.gain.value = depth;
-  o.connect(d).connect(target);
-  return o;
-}
-
 export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> = {
   // An in-system burn: a low, breathing rumble for as long as the ship is under way.
   burn: (ctx, mix) => {
@@ -592,45 +633,52 @@ export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> 
     return loopShell(ctx, g, 0.22, [src, l, hum]);
   },
 
-  // The rover driving: a growling motor that labors and eases, and gravel under the wheels.
+  // The rover driving over rough ground: a low electric drive hum, tires rumbling and bumping, and gravel
+  // crunching under them (grains scheduled at random), with the odd creak from the suspension.
   rover: (ctx, mix) => {
     const g = ctx.createGain();
     g.connect(route(ctx, mix, { verb: 0.15 }));
-    const m1 = ctx.createOscillator();
-    const m2 = ctx.createOscillator();
-    m1.type = "sawtooth";
-    m2.type = "sawtooth";
-    m1.frequency.value = 52;
-    m2.frequency.value = 52.8;
-    const rpm = lfo(ctx, 0.7, 6, m1.frequency);
-    const rpm2 = lfo(ctx, 0.7, 6, m2.frequency);
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 420;
-    lp.Q.value = 2;
-    const growl = lfo(ctx, 5.5, 90, lp.frequency);
-    const mg = ctx.createGain();
-    mg.gain.value = 0.5;
-    m1.connect(lp);
-    m2.connect(lp);
-    lp.connect(mg).connect(g);
-    // Gravel: crackly mid noise that flutters.
-    const grit = loopNoise(ctx);
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 1700;
-    bp.Q.value = 0.9;
-    const gg = ctx.createGain();
-    gg.gain.value = 0.12;
-    const crackle = lfo(ctx, 13, 0.08, gg.gain);
-    grit.connect(bp).connect(gg).connect(g);
-    // A servo whine on top.
+    // Drive train: a smooth low hum and a faint electric whine, not a buzzing engine.
+    const hum = ctx.createOscillator();
+    hum.type = "triangle";
+    hum.frequency.value = 46;
+    const hg = ctx.createGain();
+    hg.gain.value = 0.18;
+    hum.connect(hg).connect(g);
     const whine = ctx.createOscillator();
-    whine.frequency.value = 620;
+    whine.frequency.value = 410;
+    const wv = lfo(ctx, 0.3, 25, whine.frequency);
     const wg = ctx.createGain();
-    wg.gain.value = 0.012;
+    wg.gain.value = 0.015;
     whine.connect(wg).connect(g);
-    return loopShell(ctx, g, 0.3, [m1, m2, rpm, rpm2, growl, grit, crackle, whine]);
+    // Tire rumble: dark noise whose level wanders as the ground changes.
+    const rumble = loopNoise(ctx);
+    const rl = ctx.createBiquadFilter();
+    rl.type = "lowpass";
+    rl.frequency.value = 180;
+    const rg = ctx.createGain();
+    rg.gain.value = 0.55;
+    const ground = lfo(ctx, 0.9, 0.25, rg.gain);
+    const ground2 = lfo(ctx, 2.3, 0.15, rg.gain);
+    rumble.connect(rl).connect(rg).connect(g);
+    // Gravel, bumps and creaks, scheduled a little ahead.
+    let next = ctx.currentTime + 0.1;
+    let bump = ctx.currentTime + rand(0.3, 0.8);
+    const tick = () => {
+      const until = ctx.currentTime + 0.25;
+      while (next < until) {
+        noise(ctx, g, next, { filter: "bandpass", f0: rand(900, 2600), q: rand(1.5, 3), peak: rand(0.04, 0.12), attack: 0.003, decay: rand(0.015, 0.05) });
+        next += rand(0.015, 0.06);
+      }
+      while (bump < until) {
+        thud(ctx, g, bump, rand(0.08, 0.18), rand(60, 95));
+        if (Math.random() < 0.3) tone(ctx, g, bump + 0.05, { type: "sawtooth", f0: rand(300, 500), f1: rand(250, 400), peak: 0.012, attack: 0.04, decay: 0.15, lp: 1200 });
+        bump += rand(0.35, 1.1);
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 80);
+    return loopShell(ctx, g, 0.75, [hum, whine, wv, rumble, ground, ground2], () => clearInterval(timer));
   },
 
   // The boat under way: an outboard motor and water slapping the hull.
@@ -664,17 +712,9 @@ export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> 
     const g = ctx.createGain();
     const out = route(ctx, mix, { verb: 0.3 });
     g.connect(out);
-    const m = ctx.createOscillator();
-    m.type = "sawtooth";
-    m.frequency.value = 68;
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 300;
-    const mg = ctx.createGain();
-    mg.gain.value = 0.25;
-    m.connect(lp).connect(mg).connect(g);
-    // Schedule strikes a little ahead, every 0.45 s.
-    const PERIOD = 0.45;
+    const sources = drillMotorNodes(ctx, g);
+    // Schedule strikes a little ahead, every 0.9 s.
+    const PERIOD = 0.9;
     let next = ctx.currentTime + 0.15;
     const tick = () => {
       while (next < ctx.currentTime + 0.3) {
@@ -684,6 +724,6 @@ export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> 
     };
     tick();
     const timer = setInterval(tick, 100);
-    return loopShell(ctx, g, 0.5, [m], () => clearInterval(timer));
+    return loopShell(ctx, g, 0.4, sources, () => clearInterval(timer));
   },
 };
