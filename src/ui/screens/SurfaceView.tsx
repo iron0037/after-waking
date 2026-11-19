@@ -700,8 +700,16 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
 
   // --- map -------------------------------------------------------------------------------
 
+  /** Why the vehicle that's out can't work the site on this tile (sea life from the rover, a shore seam from the boat), or null. */
+  const siteMismatch = (tile: Vec2): string | null => {
+    const dep = depositAt(tile);
+    const flora = floraAt(tile);
+    if (!rover || (!dep && !flora)) return null;
+    return vehicleMismatch(vehicle, siteOnWater(world, loc.bodyId, tile), dep ? "deposit" : "plants");
+  };
+
   const hoverPlan = (tile: Vec2): RoutePlan | null => {
-    if (!rover) return null;
+    if (!rover || siteMismatch(tile)) return null;
     const key = `${vehicle},${rover.x},${rover.y},${tile.x},${tile.y},${rover.energy},${homeSpot.x},${homeSpot.y}`;
     if (routeRef.current.key === key) return routeRef.current.plan;
     const site = depositAt(tile) !== undefined || floraAt(tile) !== undefined;
@@ -1004,6 +1012,9 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
       lines.push({ text: "Rover can't climb this", color: UI.muted });
     } else if (!rover) {
       lines.push({ text: sea && hasBoat(state) ? "Launch the boat to sail" : "Deploy the rover to drive", color: UI.muted });
+    } else if (site && siteMismatch(tile)) {
+      // AW-284: no route to a site this vehicle can't work; say which vehicle it needs instead.
+      lines.push({ text: siteMismatch(tile) as string, color: UI.muted });
     } else {
       const plan = hoverPlan(tile);
       if (plan) {
@@ -1086,6 +1097,8 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
     } else if (dep) setSelectedKey(dep.d.key);
     else if (flora) setFloraKey(flora.f.key);
     else setHexSel(tile); // a bare hex: show its card (and drop any deposit selection); driving below is unchanged
+    // AW-284: the wrong vehicle for the site (sea life from the rover) stays put; the panel says to take the boat.
+    if (siteMismatch(tile)) return;
     void driveTo(tile, dep !== undefined || flora !== undefined);
   };
 

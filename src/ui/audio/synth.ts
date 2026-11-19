@@ -265,36 +265,6 @@ function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): 
   return o;
 }
 
-/** The drill's motor: a high, whirring whine with a wobble, into `out`. Returns its sources (unstarted). */
-function drillMotorNodes(ctx: AudioContext, out: AudioNode): OscillatorNode[] {
-  const m = ctx.createOscillator();
-  m.type = "sawtooth";
-  m.frequency.value = 500;
-  const w = ctx.createOscillator();
-  w.frequency.value = 1000;
-  const wob = lfo(ctx, 3.2, 12, m.frequency);
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 2400;
-  const mg = ctx.createGain();
-  mg.gain.value = 0.07;
-  const wg = ctx.createGain();
-  wg.gain.value = 0.02;
-  m.connect(lp).connect(mg).connect(out);
-  w.connect(wg).connect(out);
-  return [m, w, wob];
-}
-
-/** The drill motor for a one-shot job: fades in and out over `dur` seconds. */
-function drillMotor(ctx: AudioContext, out: AudioNode, t: number, dur: number): void {
-  const g = env(ctx, t, 0.5, 0.15, dur);
-  g.connect(out);
-  for (const n of drillMotorNodes(ctx, g)) {
-    n.start(t);
-    n.stop(t + dur + 0.2);
-  }
-}
-
 // --- the sounds ---------------------------------------------------------------------------
 
 export const RECIPES: Record<SoundId, Recipe> = {
@@ -579,7 +549,6 @@ export const RECIPES: Record<SoundId, Recipe> = {
   drill: (ctx, mix, t) => {
     const o = route(ctx, mix, { verb: 0.3 });
     for (let i = 0; i < 3; i++) strike(ctx, o, t + i * 0.9);
-    drillMotor(ctx, o, t, 2.2);
   },
 
   // Voice call-outs: recorded files, played by the engine (these only make the tone before the words).
@@ -718,12 +687,11 @@ export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> 
     return loopShell(ctx, g, 0.28, [m, p, water, lap, swell]);
   },
 
-  // The drill at work: a motor under steady hammer strikes, for as long as the job's timer runs.
+  // The drill at work: steady hammer strikes for as long as the job's timer runs (no motor: AW-284).
   drill: (ctx, mix) => {
     const g = ctx.createGain();
     const out = route(ctx, mix, { verb: 0.3 });
     g.connect(out);
-    const sources = drillMotorNodes(ctx, g);
     // Schedule strikes a little ahead, every 0.9 s.
     const PERIOD = 0.9;
     let next = ctx.currentTime + 0.15;
@@ -735,6 +703,6 @@ export const LOOPS: Record<LoopId, (ctx: AudioContext, mix: Mix) => LoopHandle> 
     };
     tick();
     const timer = setInterval(tick, 100);
-    return loopShell(ctx, g, 0.4, sources, () => clearInterval(timer));
+    return loopShell(ctx, g, 0.4, [], () => clearInterval(timer));
   },
 };
