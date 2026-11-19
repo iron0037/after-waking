@@ -13,7 +13,7 @@ import type { PeopleSettings, UniverseSettings } from "../sim/settings";
 import type { ProbeDepth } from "../data/probes";
 import { currentOutpost } from "../sim/outpostservices";
 import { audio, noticeSound } from "./audio/engine";
-import { soundSchedule, soundSnapshot, soundsFor } from "./audio/triggers";
+import { combatSoundsFor, soundSchedule, soundSnapshot, soundsFor } from "./audio/triggers";
 import {
   clueCount,
   chooseProbeOption,
@@ -145,6 +145,7 @@ export class GameSession {
     const soundBefore = soundSnapshot(this.state);
     const journalBefore = this.state.journal.length;
     const encounterBefore = this.state.encounter;
+    const combatLogBefore = encounterBefore?.log.length ?? 0;
     const cluesBefore = clueCount(this.state);
     const result = fn(this.state, this.world);
     const encounterAfter = this.state.encounter;
@@ -172,7 +173,11 @@ export class GameSession {
     if (result.ok || (encounterAfter && !encounterBefore)) {
       const entries = this.state.journal.slice(journalBefore);
       const soundAfter = soundSnapshot(this.state);
-      for (const { id, delay } of soundSchedule(soundsFor(soundBefore, soundAfter, entries.map((e) => e.kind), entries.map((e) => e.text)))) {
+      // A raider fight's turn has its own sounds; the rest of the action's follow.
+      const combatLines = encounterAfter && encounterAfter === encounterBefore ? encounterAfter.log.slice(combatLogBefore) : [];
+      const combat = combatSoundsFor(soundBefore, soundAfter, combatLines);
+      const ids = combat.length > 0 ? combat : soundsFor(soundBefore, soundAfter, entries.map((e) => e.kind), entries.map((e) => e.text));
+      for (const { id, delay } of soundSchedule(ids)) {
         // A long drilling job hammers away for as long as its time-lapse clock runs.
         if (id === "drill" && lapse) audio.loopFor("drill", lapse.durMs);
         else audio.play(id, delay);

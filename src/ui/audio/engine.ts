@@ -71,6 +71,19 @@ const BUS_OF: Record<SoundId, Bus> = {
   storm: "sfx",
   quake: "sfx",
   breakdown: "sfx",
+  thrusters: "sfx",
+  laser: "sfx",
+  kinetic: "sfx",
+  enemyFire: "sfx",
+  hitThem: "sfx",
+  hullHit: "sfx",
+  shieldHit: "sfx",
+  nearMiss: "sfx",
+  alarm: "sfx",
+  victory: "sfx",
+  defeat: "sfx",
+  escape: "sfx",
+  talked: "sfx",
 };
 
 /** Recorded call-outs (AW-281, tools/audio/callouts.py), played after their recipe's tone. */

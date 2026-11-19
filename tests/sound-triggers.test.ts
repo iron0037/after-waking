@@ -1,7 +1,10 @@
 /** AW-31 phase 1: which sound an action makes, from the game before and after it. */
 import { describe, expect, it } from "vitest";
 import {
+  answerHail,
   autoExplore,
+  combatTurn,
+  maybeInterdict,
   buyFuel,
   DAY,
   INCIDENT_TEXT,
@@ -17,7 +20,7 @@ import {
   type Result,
 } from "../src/sim";
 import { ambienceFor } from "../src/ui/audio/ambience";
-import { soundSchedule, soundSnapshot, soundsFor, type SoundSnapshot, type SurfaceSnapshot } from "../src/ui/audio/triggers";
+import { combatSoundsFor, soundSchedule, soundSnapshot, soundsFor, type CombatSnapshot, type SoundSnapshot, type SurfaceSnapshot } from "../src/ui/audio/triggers";
 
 const base: SoundSnapshot = { kind: "space", systemId: "a", orbiting: null, credits: 1000, levelUps: 0, time: 0 };
 const snap = (patch: Partial<SoundSnapshot>): SoundSnapshot => ({ ...base, ...patch });
@@ -133,5 +136,50 @@ describe("sound triggers (AW-31)", () => {
     expect(ambienceFor({ kind: "barren", pressureAtm: 0 })).toEqual(["vacuum"]);
     expect(ambienceFor({ kind: "ice", pressureAtm: 1.4, sea: "methane" })).toEqual(["ice", "surf"]);
     expect(ambienceFor({ kind: "ocean", pressureAtm: 1 })).toEqual(["ocean"]);
+  });
+
+  it("a battle turn: maneuver, our guns, their fire, hits, alarms; and how it ends (AW-286)", () => {
+    const c: CombatSnapshot = { stage: "battle", range: 1, myHull: 100, myWorst: 0, myShields: 10, myLaser: true, myKinetic: false, theirHull: 80, theirArmed: true };
+    const at = (patch: Partial<CombatSnapshot>, more: Partial<SoundSnapshot> = {}): SoundSnapshot => snap({ encounter: true, combat: { ...c, ...patch }, ...more });
+    const turn = combatSoundsFor(at({}), at({ range: 0, theirHull: 70, myHull: 90 }), ["Range medium to close.", "Your guns hit for 10.", "They hit you for 10."]);
+    expect(turn).toEqual(["thrusters", "laser", "hitThem", "enemyFire", "hullHit"]);
+    expect(soundSchedule(turn).map((x) => x.delay)).toEqual([0, 0.2, 0.75, 1.0, 1.35]);
+    // Their fire soaked by the shields; ours wide; a system knocked out.
+    expect(combatSoundsFor(at({}), at({ myWorst: 100 }), ["Your shots go wide.", "Their fire misses."])).toEqual(["laser", "enemyFire", "shieldHit", "alarm"]);
+    expect(combatSoundsFor(at({ myShields: 0 }), at({ myShields: 0 }), ["Their fire misses."])).toEqual(["enemyFire", "nearMiss"]);
+    // Endings.
+    expect(combatSoundsFor(at({}), at({ stage: "prize" }), [])).toEqual(["victory"]);
+    const over = (o: SoundSnapshot["lastOutcome"]) => combatSoundsFor(at({}), snap({ combat: null, lastOutcome: o }), []);
+    expect(over("escaped")).toEqual(["escape"]);
+    expect(over("overwhelmed")).toEqual(["defeat"]);
+    expect(over("talked off")).toEqual(["talked"]);
+    expect(over("paid")).toEqual(["purchase"]);
+  });
+
+  it("a real raider fight makes battle sounds (AW-286)", () => {
+    const world = new World(42);
+    for (let i = 0; i < 200; i++) {
+      const sys = world.galaxy.systems.find((x) => !x.home && !x.charted)!;
+      const s = newGame({ seed: 42 });
+      s.location = { kind: "space", systemId: sys.id, pos: { x: 40, y: 0 }, orbiting: null };
+      s.ship.cargo = { platinum: 40, copper: 60 };
+      s.rngState = (42 * 7919 + i) >>> 0;
+      if (!maybeInterdict(s, world, sys.id)) continue;
+      expect(soundSnapshot(s).encounter).toBe(true);
+      answerHail(s, "fight");
+      const heard = new Set<string>();
+      for (let t = 0; t < 25 && s.encounter?.stage === "battle"; t++) {
+        const b = soundSnapshot(s);
+        const n = s.encounter.log.length;
+        combatTurn(s, { helm: "close", guns: "hull", engineering: "guns", comms: "quiet" });
+        const lines = s.encounter ? s.encounter.log.slice(n) : [];
+        for (const id of combatSoundsFor(b, soundSnapshot(s), lines)) heard.add(id);
+      }
+      expect(heard.has("enemyFire")).toBe(true);
+      expect([...heard].some((id) => id === "laser" || id === "kinetic")).toBe(true);
+      expect([...heard].some((id) => ["victory", "defeat", "talked", "escape"].includes(id))).toBe(true);
+      return;
+    }
+    throw new Error("no raider in 200 departures");
   });
 });

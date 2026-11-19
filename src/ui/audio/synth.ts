@@ -42,7 +42,21 @@ export type SoundId =
   | "roverHit"
   | "storm"
   | "quake"
-  | "breakdown";
+  | "breakdown"
+  // AW-286: combat
+  | "thrusters"
+  | "laser"
+  | "kinetic"
+  | "enemyFire"
+  | "hitThem"
+  | "hullHit"
+  | "shieldHit"
+  | "nearMiss"
+  | "alarm"
+  | "victory"
+  | "defeat"
+  | "escape"
+  | "talked";
 
 export type LoopId = "burn" | "rover" | "boat" | "drill";
 
@@ -90,8 +104,9 @@ export function reverbImpulse(ctx: BaseAudioContext, seconds = 2.2): AudioBuffer
 export const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 /** A send point for one sound: panned into the bus, with `verb` of it sent to the reverb. */
-export function route(ctx: AudioContext, mix: Mix, o: { pan?: number; verb?: number } = {}): GainNode {
+export function route(ctx: AudioContext, mix: Mix, o: { pan?: number; verb?: number; gain?: number } = {}): GainNode {
   const input = ctx.createGain();
+  input.gain.value = o.gain ?? 1;
   if (o.pan && typeof ctx.createStereoPanner === "function") {
     const p = ctx.createStereoPanner();
     p.pan.value = o.pan;
@@ -661,6 +676,138 @@ export const RECIPES: Record<SoundId, Recipe> = {
     jit.stop(t + 0.8);
     strike(ctx, o, t + 0.75, 0.16);
     [0, 0.2].forEach((dt) => tone(ctx, o, t + 1.1 + dt, { type: "square", f0: 520, peak: 0.04, decay: 0.12, lp: 2000 }));
+  },
+
+  // --- combat (AW-286) ---
+
+  // Maneuvering: the thrusters fire hard to change the range.
+  thrusters: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 3, verb: 0.3 });
+    const tb = turbulence(ctx, t, t + 1, 0.3);
+    tb.connect(o);
+    noise(ctx, tb, t, { filter: "bandpass", f0: 500, f1: 1400, q: 1.2, peak: 0.16, attack: 0.08, decay: 0.55 });
+    tone(ctx, tb, t, { type: "sawtooth", f0: 50, f1: 70, peak: 0.08, attack: 0.08, decay: 0.55, lp: 220 });
+  },
+
+  // Our lasers: two bright, sizzling bolts that sweep away toward the target.
+  laser: (ctx, mix, t) => {
+    for (const dt of [0, 0.14]) {
+      const o = route(ctx, mix, { gain: 2.5, pan: 0.25, verb: 0.35 });
+      tone(ctx, o, t + dt, { type: "sawtooth", f0: 2600, f1: 320, glide: 0.28, peak: 0.08, decay: 0.3, detune: 15, lp: 6000, lp1: 1200 });
+      tone(ctx, o, t + dt, { type: "square", f0: 1300, f1: 160, glide: 0.28, peak: 0.03, decay: 0.3 });
+      noise(ctx, o, t + dt, { filter: "bandpass", f0: 5000, f1: 1500, q: 2, peak: 0.06, decay: 0.25 });
+    }
+  },
+
+  // Our kinetic battery: heavy rounds thumping out, the breech clacking between.
+  kinetic: (ctx, mix, t) => {
+    for (let i = 0; i < 3; i++) {
+      const o = route(ctx, mix, { pan: 0.15 * (i - 1), verb: 0.3 });
+      thud(ctx, o, t + i * 0.13, 0.22, 65);
+      noise(ctx, o, t + i * 0.13, { filter: "bandpass", f0: 1500, q: 1, peak: 0.12, decay: 0.08 });
+      metal(ctx, o, t + i * 0.13 + 0.06, 420, 0.03, 0.1);
+    }
+  },
+
+  // Their fire coming in: a rising whine from off to one side.
+  enemyFire: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 5, pan: -0.4, verb: 0.4 });
+    tone(ctx, o, t, { type: "sawtooth", f0: 500, f1: 1500, glide: 0.3, peak: 0.05, attack: 0.2, decay: 0.15, detune: 20, lp: 3000 });
+    noise(ctx, o, t, { filter: "bandpass", f0: 800, f1: 2500, q: 2, peak: 0.06, attack: 0.25, decay: 0.1 });
+  },
+
+  // Our shots land: a far-off explosion, crackling.
+  hitThem: (ctx, mix, t) => {
+    const o = route(ctx, mix, { pan: 0.4, verb: 0.6 });
+    noise(ctx, o, t, { f0: 1400, f1: 180, peak: 0.2, attack: 0.01, decay: 0.9 });
+    tone(ctx, o, t, { f0: 70, f1: 35, peak: 0.12, decay: 0.8 });
+    for (let i = 0; i < 6; i++) noise(ctx, o, t + rand(0.05, 0.6), { filter: "highpass", f0: 3000, peak: rand(0.02, 0.05), decay: 0.02 });
+  },
+
+  // We're hit: a jarring impact through the hull, a ring, debris rattling, the frame groaning.
+  hullHit: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 0.75, verb: 0.35 });
+    thud(ctx, o, t, 0.38, 70);
+    metal(ctx, o, t, 150, 0.1, 0.9);
+    noise(ctx, o, t, { f0: 4000, f1: 300, peak: 0.25, decay: 0.4 });
+    for (let i = 0; i < 8; i++) noise(ctx, o, t + rand(0.1, 0.7), { filter: "bandpass", f0: rand(1200, 3500), q: 3, peak: rand(0.02, 0.05), decay: 0.03 });
+    tone(ctx, o, t + 0.4, { type: "sawtooth", f0: 110, f1: 85, peak: 0.025, attack: 0.15, decay: 0.6, lp: 800 });
+  },
+
+  // The shields take it: a shimmering, crackling ripple instead of an impact.
+  shieldHit: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.45 });
+    for (const f of [880, 1170, 1480]) tone(ctx, o, t, { f0: f, f1: f * 0.8, peak: 0.05, attack: 0.01, decay: 0.5, detune: 25 });
+    noise(ctx, o, t, { filter: "highpass", f0: 4000, peak: 0.08, attack: 0.01, decay: 0.35 });
+    thud(ctx, o, t, 0.08, 90);
+  },
+
+  // A near miss: something big tearing past.
+  nearMiss: (ctx, mix, t) => {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx);
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 3;
+    bp.frequency.setValueAtTime(2500, t);
+    bp.frequency.exponentialRampToValueAtTime(500, t + 0.5);
+    const g = env(ctx, t, 0.54, 0.15, 0.4);
+    const out = ctx.createGain();
+    if (typeof ctx.createStereoPanner === "function") {
+      const p = ctx.createStereoPanner();
+      p.pan.setValueAtTime(0.8, t);
+      p.pan.linearRampToValueAtTime(-0.8, t + 0.55);
+      out.connect(p).connect(mix.dry);
+    } else out.connect(mix.dry);
+    src.connect(bp).connect(g).connect(out);
+    src.start(t);
+    src.stop(t + 0.7);
+  },
+
+  // A system badly damaged: the klaxon whoops.
+  alarm: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 2.5, verb: 0.3 });
+    for (let i = 0; i < 3; i++) tone(ctx, o, t + i * 0.42, { type: "square", f0: 420, f1: 640, glide: 0.3, peak: 0.05, attack: 0.02, decay: 0.32, lp: 1800 });
+  },
+
+  // They strike their colors: a brassy fanfare.
+  victory: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 1.6, verb: 0.5 });
+    const notes: [number, number, number][] = [
+      [392, 0, 0.18],
+      [523.25, 0.16, 0.18],
+      [659.25, 0.32, 0.18],
+      [783.99, 0.48, 1.2],
+    ];
+    for (const [f, dt, len] of notes) tone(ctx, o, t + dt, { type: "sawtooth", f0: f, peak: 0.08, attack: 0.02, decay: len, detune: 8, lp: 2400, lp1: 1200 });
+    for (const f of [261.63, 329.63, 392]) tone(ctx, o, t + 0.48, { type: "sawtooth", f0: f, peak: 0.04, attack: 0.05, decay: 1.4, detune: 6, lp: 1600 });
+    thud(ctx, o, t + 0.48, 0.15, 70);
+  },
+
+  // Beaten: a falling, minor phrase, and the hold being stripped.
+  defeat: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 2.2, verb: 0.5 });
+    [[293.66, 0], [261.63, 0.3], [220, 0.6]].forEach(([f, dt]) => tone(ctx, o, t + (dt as number), { type: "sawtooth", f0: f as number, f1: (f as number) * 0.97, peak: 0.07, attack: 0.03, decay: 0.7, detune: 8, lp: 1400 }));
+    tone(ctx, o, t + 0.6, { type: "sawtooth", f0: 110, peak: 0.05, attack: 0.1, decay: 1.5, lp: 500 });
+    for (let i = 0; i < 4; i++) {
+      metal(ctx, o, t + 1.4 + i * 0.25, rand(200, 320), 0.05, 0.3);
+      noise(ctx, o, t + 1.4 + i * 0.25, { filter: "bandpass", f0: 900, f1: 400, q: 1, peak: 0.05, attack: 0.02, decay: 0.2 });
+    }
+  },
+
+  // Away clean: the drives surge and the ship pulls clear.
+  escape: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 3, verb: 0.4 });
+    noise(ctx, o, t, { filter: "bandpass", f0: 300, f1: 3500, q: 1, peak: 0.16, attack: 0.4, decay: 1.0, sweep: 1.2 });
+    tone(ctx, o, t, { type: "sawtooth", f0: 60, f1: 240, glide: 1.2, peak: 0.08, attack: 0.3, decay: 1.0, detune: 10, lp: 1200 });
+  },
+
+  // Talked down or paid off: a breath out, two warm notes.
+  talked: (ctx, mix, t) => {
+    const o = route(ctx, mix, { gain: 2, verb: 0.45 });
+    tone(ctx, o, t, { type: "triangle", f0: 392, peak: 0.06, attack: 0.05, decay: 0.6, detune: 6 });
+    tone(ctx, o, t + 0.18, { type: "triangle", f0: 587.33, peak: 0.06, attack: 0.05, decay: 0.9, detune: 6 });
   },
 
   // Voice call-outs: recorded files, played by the engine (these only make the tone before the words).

@@ -2,7 +2,7 @@
  * Which sounds an action makes (AW-31, AW-281): worked out from the game before and after it, so the
  * rules in src/sim stay silent. Pure, so it's tested without a browser.
  */
-import { DAY, incidentKindOf, type GameState } from "../../sim";
+import { DAY, incidentKindOf, playerSide, type EncounterOutcome, type GameState } from "../../sim";
 import type { SoundId } from "./synth";
 
 export interface SurfaceSnapshot {
@@ -18,6 +18,20 @@ export interface SurfaceSnapshot {
   prospected?: number;
   sampled?: number;
   specimens?: number;
+}
+
+/** A fight with raiders in progress (AW-286): both ships' state, to hear what a turn did. */
+export interface CombatSnapshot {
+  stage: "contact" | "hail" | "battle" | "prize";
+  range: number;
+  myHull: number;
+  /** Worst damage to any of our systems (0-100). */
+  myWorst: number;
+  myShields: number;
+  myLaser: boolean;
+  myKinetic: boolean;
+  theirHull: number;
+  theirArmed: boolean;
 }
 
 /** The last creature fight (AW-285): a new id means one just happened. */
@@ -41,7 +55,75 @@ export interface SoundSnapshot {
   encounter?: boolean;
   surface?: SurfaceSnapshot | null;
   fight?: FightSnapshot | null;
+  combat?: CombatSnapshot | null;
+  /** How the last encounter ended (AW-286). */
+  lastOutcome?: EncounterOutcome | null;
 }
+
+function combatSnapshot(state: GameState): CombatSnapshot | null {
+  const e = state.encounter;
+  if (!e) return null;
+  const me = playerSide(state);
+  return {
+    stage: e.stage,
+    range: e.range,
+    myHull: me.hull,
+    myWorst: Math.max(...Object.values(me.damage)),
+    myShields: me.shields,
+    myLaser: me.laser > 0 && me.damage.weapons < 100,
+    myKinetic: me.kinetic > 0 && me.damage.weapons < 100,
+    theirHull: e.enemy.hull,
+    theirArmed: e.enemy.damage.weapons < 100 && e.enemy.laser + e.enemy.kinetic > 0,
+  };
+}
+
+/**
+ * A raider fight (AW-286): one turn's maneuver, both sides' fire and what it hit, alarms; or how it ended.
+ * `lines` are the turn's new log lines (they say whether our guns fired: "Your guns hit" / "Your shots go wide").
+ */
+export function combatSoundsFor(before: SoundSnapshot, after: SoundSnapshot, lines: readonly string[]): SoundId[] {
+  const b = before.combat;
+  const a = after.combat;
+  if (!b) return [];
+  if (!a) {
+    // It's over.
+    const end = after.lastOutcome;
+    if (end === "escaped" || end === "slipped past") return ["escape"];
+    if (end === "surrendered" || end === "overwhelmed") return ["defeat"];
+    if (end === "talked off" || end === "driven off") return ["talked"];
+    if (end === "paid") return ["purchase"];
+    return [];
+  }
+  const out: SoundId[] = [];
+  if (a.stage === "prize" && b.stage !== "prize") return ["victory"];
+  if (a.stage !== "battle" || b.stage !== "battle") return out;
+  if (a.range !== b.range || lines.some((l) => l.startsWith("Range "))) out.push("thrusters");
+  const fired = lines.some((l) => l.startsWith("Your guns hit") || l.startsWith("Your shots go wide"));
+  if (fired && b.myLaser) out.push("laser");
+  if (fired && b.myKinetic) out.push("kinetic");
+  if (a.theirHull < b.theirHull - 0.01) out.push("hitThem");
+  if (b.theirArmed) {
+    out.push("enemyFire");
+    if (a.myHull < b.myHull - 0.01 || lines.some((l) => l.startsWith("They hit you"))) out.push("hullHit");
+    else out.push(b.myShields > 0 ? "shieldHit" : "nearMiss");
+  }
+  // A system knocked past half, or out entirely.
+  if ((b.myWorst < 50 && a.myWorst >= 50) || (b.myWorst < 100 && a.myWorst >= 100)) out.push("alarm");
+  return out;
+}
+
+/** When each combat sound lands in a turn: the maneuver, our guns, their fire, the hits, then any alarm. */
+const COMBAT_AT: Partial<Record<SoundId, number>> = {
+  thrusters: 0,
+  laser: 0.2,
+  kinetic: 0.3,
+  hitThem: 0.75,
+  enemyFire: 1.0,
+  hullHit: 1.35,
+  shieldHit: 1.35,
+  nearMiss: 1.3,
+  alarm: 1.8,
+};
 
 function surfaceSnapshot(state: GameState): SurfaceSnapshot | null {
   const loc = state.location;
@@ -91,6 +173,8 @@ export function soundSnapshot(state: GameState): SoundSnapshot {
     encounter: !!state.encounter,
     surface: surfaceSnapshot(state),
     fight: state.lastFight ? { id: state.lastFight.id, mode: state.lastFight.mode, outcome: state.lastFight.outcome } : null,
+    combat: combatSnapshot(state),
+    lastOutcome: state.encounter ? null : (state.lastEncounter?.outcome ?? null),
   };
 }
 
@@ -165,6 +249,8 @@ export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJourna
 
 /** When each sound starts, in seconds: sounds that would talk over each other wait their turn. */
 export function soundSchedule(ids: readonly SoundId[]): { id: SoundId; delay: number }[] {
+  // A battle turn plays out in order (AW-286).
+  if (ids.some((id) => id in COMBAT_AT)) return ids.map((id) => ({ id, delay: COMBAT_AT[id] ?? 0 }));
   const LONG: Partial<Record<SoundId, number>> = { bayOpen: 1.6, hop: 2.4, mineral: 1.7, land: 1.5, stun: 0.5, drill: 2.0 };
   let at = 0;
   return ids.map((id, i) => {

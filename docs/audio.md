@@ -56,4 +56,8 @@ and narration follow them too.
    (`src/ui/audio/ambience.ts`). The drill sound is hammer strikes only (AW-284).
    **Still to come:** creature calls, and anything the synthesized versions don't carry, from Stable Audio Open
    (it needs its model downloaded from Hugging Face after accepting Stability's license).
-3. Combat.
+3. **Combat (AW-286), done:** each battle turn plays in order: thrusters when the range changes, our lasers
+   and kinetic battery, the far-off explosion when they land, their fire coming in, then a hull impact, a
+   shield shimmer or a near miss, and the klaxon when a system is knocked past half or out. Endings: a fanfare
+   when they strike their colors, a falling phrase and the hold being stripped when you lose, a drive surge
+   when you escape, two warm notes when it's talked down or they break off. The hail keeps its danger sting.
