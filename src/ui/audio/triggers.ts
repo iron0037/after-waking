@@ -135,7 +135,7 @@ export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJourna
 
 /** When each sound starts, in seconds: sounds that would talk over each other wait their turn. */
 export function soundSchedule(ids: readonly SoundId[]): { id: SoundId; delay: number }[] {
-  const LONG: Partial<Record<SoundId, number>> = { bayOpen: 1.2, hop: 2.4, mineral: 1.7, land: 1.5 };
+  const LONG: Partial<Record<SoundId, number>> = { bayOpen: 1.6, hop: 2.4, mineral: 1.7, land: 1.5 };
   let at = 0;
   return ids.map((id, i) => {
     const prev = ids[i - 1];

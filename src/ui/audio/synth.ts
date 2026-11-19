@@ -188,40 +188,45 @@ function thud(ctx: AudioContext, out: AudioNode, t: number, peak: number, f = 85
   noise(ctx, out, t, { f0: 600, f1: 90, peak: peak * 0.7, decay: 0.25 });
 }
 
-/** A servo or hydraulic motor running from `f0` to `f1` Hz between t and t + dur. */
-function servo(ctx: AudioContext, out: AudioNode, t: number, dur: number, f0: number, f1: number, peak: number): void {
-  const o1 = ctx.createOscillator();
-  const o2 = ctx.createOscillator();
-  o1.type = "sawtooth";
-  o2.type = "square";
-  o1.frequency.setValueAtTime(f0, t);
-  o1.frequency.exponentialRampToValueAtTime(f1, t + dur);
-  o2.frequency.setValueAtTime(f0 * 2.01, t);
-  o2.frequency.exponentialRampToValueAtTime(f1 * 2.01, t + dur);
-  const vib = ctx.createOscillator();
-  const vd = ctx.createGain();
-  vib.frequency.value = 7;
-  vd.gain.value = f0 * 0.03;
-  vib.connect(vd);
-  vd.connect(o1.frequency);
-  vd.connect(o2.frequency);
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 900;
-  lp.Q.value = 3;
+/** A sustained level: ramps up over `rise`, holds, and ramps down over `fall`, ending at t + dur. */
+function hold(ctx: AudioContext, t: number, dur: number, peak: number, rise = 0.15, fall = 0.2): GainNode {
   const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(peak, t + 0.08);
-  g.gain.setValueAtTime(peak, t + dur - 0.1);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  const m = ctx.createGain();
-  m.gain.value = 0.5;
-  o1.connect(lp);
-  o2.connect(m).connect(lp);
-  lp.connect(g).connect(out);
-  for (const o of [o1, o2, vib]) {
-    o.start(t);
-    o.stop(t + dur + 0.05);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(peak, t + rise);
+  g.gain.setValueAtTime(peak, t + dur - fall);
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  return g;
+}
+
+/**
+ * A heavy industrial door running on its track for `dur` s from t: a steady motor drone (no pitch glide),
+ * the deep rumble of the slab, and the chatter of the drive chain.
+ */
+function doorTravel(ctx: AudioContext, out: AudioNode, t: number, dur: number): void {
+  const motor = ctx.createOscillator();
+  motor.type = "square";
+  motor.frequency.value = 50;
+  const ml = ctx.createBiquadFilter();
+  ml.type = "lowpass";
+  ml.frequency.value = 220;
+  const mg = hold(ctx, t, dur, 0.06);
+  motor.connect(ml).connect(mg).connect(out);
+  motor.start(t);
+  motor.stop(t + dur + 0.05);
+  const slab = ctx.createBufferSource();
+  slab.buffer = noiseBuffer(ctx);
+  slab.loop = true;
+  const sl = ctx.createBiquadFilter();
+  sl.type = "lowpass";
+  sl.frequency.value = 170;
+  sl.Q.value = 1.5;
+  const sg = hold(ctx, t, dur, 0.5, 0.25, 0.25);
+  slab.connect(sl).connect(sg).connect(out);
+  slab.start(t, Math.random());
+  slab.stop(t + dur + 0.05);
+  // The chain: quick metallic ticks, a little uneven.
+  for (let at = t + 0.1; at < t + dur - 0.1; at += rand(0.06, 0.09)) {
+    noise(ctx, out, at, { filter: "bandpass", f0: rand(1300, 2100), q: 4, peak: rand(0.025, 0.045), attack: 0.002, decay: 0.02 });
   }
 }
 
@@ -264,17 +269,17 @@ function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): 
 function drillMotorNodes(ctx: AudioContext, out: AudioNode): OscillatorNode[] {
   const m = ctx.createOscillator();
   m.type = "sawtooth";
-  m.frequency.value = 190;
+  m.frequency.value = 500;
   const w = ctx.createOscillator();
-  w.frequency.value = 760;
-  const wob = lfo(ctx, 3.2, 6, m.frequency);
+  w.frequency.value = 1000;
+  const wob = lfo(ctx, 3.2, 12, m.frequency);
   const lp = ctx.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 1500;
+  lp.frequency.value = 2400;
   const mg = ctx.createGain();
-  mg.gain.value = 0.16;
+  mg.gain.value = 0.07;
   const wg = ctx.createGain();
-  wg.gain.value = 0.05;
+  wg.gain.value = 0.02;
   m.connect(lp).connect(mg).connect(out);
   w.connect(wg).connect(out);
   return [m, w, wob];
@@ -511,24 +516,30 @@ export const RECIPES: Record<SoundId, Recipe> = {
     tone(ctx, hi, t + 0.3, { type: "triangle", f0: 1244.5, f1: 1174.7, glide: 2.6, peak: 0.035, attack: 0.9, decay: 2.0 });
   },
 
-  // The rover bay opens: the latch, a hydraulic hiss, the door motor, and the stop.
+  // The rover bay opens: a heavy industrial door. The locks release, the slab grinds along its track, and it booms into its stops.
   bayOpen: (ctx, mix, t) => {
-    const o = route(ctx, mix, { verb: 0.3 });
-    metal(ctx, o, t, 150, 0.12, 0.3);
-    thud(ctx, o, t, 0.14, 100);
-    noise(ctx, o, t + 0.1, { filter: "highpass", f0: 3500, f1: 2200, peak: 0.07, attack: 0.03, decay: 0.55 });
-    servo(ctx, o, t + 0.2, 1.1, 82, 118, 0.07);
-    thud(ctx, o, t + 1.32, 0.2, 90);
-    metal(ctx, o, t + 1.32, 175, 0.06, 0.35);
+    const o = route(ctx, mix, { verb: 0.4 });
+    // The locks let go with a clank and the seals vent.
+    metal(ctx, o, t, 95, 0.14, 0.7);
+    thud(ctx, o, t, 0.22, 75);
+    noise(ctx, o, t + 0.06, { filter: "highpass", f0: 2800, f1: 1800, peak: 0.06, attack: 0.02, decay: 0.4 });
+    doorTravel(ctx, o, t + 0.25, 1.3);
+    // It hits its stops: a heavy boom with a ring.
+    thud(ctx, o, t + 1.55, 0.3, 65);
+    metal(ctx, o, t + 1.55, 80, 0.1, 0.9);
   },
 
-  // The rover comes back aboard and the bay closes: motor down, then the door seals.
+  // The rover comes back aboard and the bay door runs shut and slams, then the locks drive home.
   bayClose: (ctx, mix, t) => {
-    const o = route(ctx, mix, { verb: 0.3 });
-    servo(ctx, o, t, 1.0, 118, 80, 0.07);
-    thud(ctx, o, t + 1.02, 0.28, 80);
-    metal(ctx, o, t + 1.02, 140, 0.1, 0.45);
-    noise(ctx, o, t + 1.12, { filter: "highpass", f0: 2600, f1: 4200, peak: 0.06, attack: 0.02, decay: 0.45 });
+    const o = route(ctx, mix, { verb: 0.4 });
+    metal(ctx, o, t, 110, 0.07, 0.4);
+    doorTravel(ctx, o, t + 0.05, 1.25);
+    // It slams shut, the ring dies away, and the locks drive home.
+    thud(ctx, o, t + 1.3, 0.3, 60);
+    metal(ctx, o, t + 1.3, 72, 0.1, 1.2);
+    noise(ctx, o, t + 1.3, { f0: 1800, f1: 200, peak: 0.12, decay: 0.5 });
+    metal(ctx, o, t + 1.7, 130, 0.06, 0.3);
+    thud(ctx, o, t + 1.7, 0.12, 90);
   },
 
   // A boat into the water: the splash, bubbles, and droplets falling back.
