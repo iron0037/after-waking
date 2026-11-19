@@ -49,5 +49,11 @@ and narration follow them too.
    (hammer strikes for as long as the job's time-lapse runs), the rover and boat motors while driving, and
    the voice call-outs "Mineral detected" and "Lifeform detected" (intro narrator, Kokoro bf_emma;
    `tools/audio/callouts.py`), at most one of each per action.
-2. The rest of the surface: samples, capture, creature calls, storms and quakes, and per-world ambience (Stable Audio Open).
+2. **The rest of the surface (AW-285), done, synthesized:** prospecting (core sampler), a sample sealed, the
+   stun prod, the net, the rover disabled (crunch and alarm), drill trouble (storm, quake, breakdown), and the
+   background beds on the new Ambience slider: each world's weather by kind (thin wind, desert, living world,
+   ocean surf, ice, hothouse, volcanic, airless), a lapping exotic sea, and the Intrepid's hum while docked
+   (`src/ui/audio/ambience.ts`). The drill sound is hammer strikes only (AW-284).
+   **Still to come:** creature calls, and anything the synthesized versions don't carry, from Stable Audio Open
+   (it needs its model downloaded from Hugging Face after accepting Stability's license).
 3. Combat.

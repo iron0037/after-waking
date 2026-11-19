@@ -33,7 +33,16 @@ export type SoundId =
   | "recharge"
   | "drill"
   | "mineral"
-  | "lifeform";
+  | "lifeform"
+  // AW-285: the rest of the surface
+  | "prospect"
+  | "sample"
+  | "stun"
+  | "net"
+  | "roverHit"
+  | "storm"
+  | "quake"
+  | "breakdown";
 
 export type LoopId = "burn" | "rover" | "boat" | "drill";
 
@@ -50,7 +59,7 @@ type Recipe = (ctx: AudioContext, mix: Mix, t: number) => void;
 const noiseCache = new WeakMap<BaseAudioContext, AudioBuffer>();
 
 /** Two seconds of white noise, made once per context. */
-function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
+export function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
   let b = noiseCache.get(ctx);
   if (!b) {
     b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -78,10 +87,10 @@ export function reverbImpulse(ctx: BaseAudioContext, seconds = 2.2): AudioBuffer
   return b;
 }
 
-const rand = (a: number, b: number): number => a + Math.random() * (b - a);
+export const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 /** A send point for one sound: panned into the bus, with `verb` of it sent to the reverb. */
-function route(ctx: AudioContext, mix: Mix, o: { pan?: number; verb?: number } = {}): GainNode {
+export function route(ctx: AudioContext, mix: Mix, o: { pan?: number; verb?: number } = {}): GainNode {
   const input = ctx.createGain();
   if (o.pan && typeof ctx.createStereoPanner === "function") {
     const p = ctx.createStereoPanner();
@@ -95,7 +104,7 @@ function route(ctx: AudioContext, mix: Mix, o: { pan?: number; verb?: number } =
 }
 
 /** An attack/decay envelope on a gain node: rises to `peak` in `attack` s, falls away over `decay` s. */
-function env(ctx: AudioContext, t: number, peak: number, attack: number, decay: number): GainNode {
+export function env(ctx: AudioContext, t: number, peak: number, attack: number, decay: number): GainNode {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + attack);
@@ -119,7 +128,7 @@ interface ToneOpts {
 }
 
 /** A tone from `f0` gliding to `f1`, enveloped; with `detune`, three voices spread for width. */
-function tone(ctx: AudioContext, out: AudioNode, t: number, o: ToneOpts): void {
+export function tone(ctx: AudioContext, out: AudioNode, t: number, o: ToneOpts): void {
   const attack = o.attack ?? 0.005;
   const end = t + attack + o.decay + 0.05;
   const g = env(ctx, t, o.peak, attack, o.decay);
@@ -149,7 +158,7 @@ function tone(ctx: AudioContext, out: AudioNode, t: number, o: ToneOpts): void {
 }
 
 /** A burst of filtered noise; the filter can sweep from `f0` to `f1`. */
-function noise(
+export function noise(
   ctx: AudioContext,
   out: AudioNode,
   t: number,
@@ -172,24 +181,24 @@ function noise(
 }
 
 /** Struck metal: a few inharmonic partials over a click, the high ones dying first. */
-function metal(ctx: AudioContext, out: AudioNode, t: number, f: number, peak: number, decay: number, ratios = [1, 1.47, 2.09, 2.56, 3.9]): void {
+export function metal(ctx: AudioContext, out: AudioNode, t: number, f: number, peak: number, decay: number, ratios = [1, 1.47, 2.09, 2.56, 3.9]): void {
   ratios.forEach((r, i) => tone(ctx, out, t, { type: i === 0 ? "triangle" : "sine", f0: f * r * rand(0.995, 1.005), peak: peak / (1 + i * 0.7), attack: 0.002, decay: decay / (1 + i * 0.5) }));
   noise(ctx, out, t, { filter: "bandpass", f0: Math.min(9000, f * 3), q: 1.2, peak: peak * 0.6, decay: 0.03 });
 }
 
 /** A bubble: a sine whose pitch jumps up as it pops. */
-function bubble(ctx: AudioContext, out: AudioNode, t: number, f: number, peak: number): void {
+export function bubble(ctx: AudioContext, out: AudioNode, t: number, f: number, peak: number): void {
   tone(ctx, out, t, { f0: f, f1: f * rand(1.6, 2.3), glide: 0.05, peak, attack: 0.004, decay: rand(0.04, 0.08) });
 }
 
 /** A heavy thud: a falling sub tone and a low noise burst. */
-function thud(ctx: AudioContext, out: AudioNode, t: number, peak: number, f = 85): void {
+export function thud(ctx: AudioContext, out: AudioNode, t: number, peak: number, f = 85): void {
   tone(ctx, out, t, { f0: f, f1: f * 0.45, peak, decay: 0.35 });
   noise(ctx, out, t, { f0: 600, f1: 90, peak: peak * 0.7, decay: 0.25 });
 }
 
 /** A sustained level: ramps up over `rise`, holds, and ramps down over `fall`, ending at t + dur. */
-function hold(ctx: AudioContext, t: number, dur: number, peak: number, rise = 0.15, fall = 0.2): GainNode {
+export function hold(ctx: AudioContext, t: number, dur: number, peak: number, rise = 0.15, fall = 0.2): GainNode {
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(peak, t + rise);
@@ -231,7 +240,7 @@ function doorTravel(ctx: AudioContext, out: AudioNode, t: number, dur: number): 
 }
 
 /** A gain whose level flutters, like air or engine turbulence. */
-function turbulence(ctx: AudioContext, t: number, stop: number, depth = 0.3): GainNode {
+export function turbulence(ctx: AudioContext, t: number, stop: number, depth = 0.3): GainNode {
   const g = ctx.createGain();
   g.gain.value = 1 - depth;
   for (const [hz, d] of [
@@ -256,7 +265,7 @@ function strike(ctx: AudioContext, out: AudioNode, t: number, peak = 0.16): void
 }
 
 /** A low-frequency oscillator wobbling `target` by `depth`. */
-function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): OscillatorNode {
+export function lfo(ctx: AudioContext, hz: number, depth: number, target: AudioParam): OscillatorNode {
   const o = ctx.createOscillator();
   const d = ctx.createGain();
   o.frequency.value = hz;
@@ -551,6 +560,109 @@ export const RECIPES: Record<SoundId, Recipe> = {
     for (let i = 0; i < 3; i++) strike(ctx, o, t + i * 0.9);
   },
 
+  // Prospecting: the core sampler spins down into the rock, then the core tube clicks home.
+  prospect: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.2 });
+    noise(ctx, o, t, { filter: "bandpass", f0: 1400, f1: 3800, q: 3, peak: 0.12, attack: 0.08, decay: 0.7 });
+    tone(ctx, o, t, { type: "triangle", f0: 700, f1: 1300, glide: 0.6, peak: 0.05, attack: 0.08, decay: 0.7 });
+    for (let i = 0; i < 10; i++) noise(ctx, o, t + 0.1 + i * 0.06, { filter: "bandpass", f0: rand(1800, 3000), q: 3, peak: rand(0.03, 0.07), decay: 0.02 });
+    metal(ctx, o, t + 0.9, 820, 0.06, 0.15);
+    noise(ctx, o, t + 0.95, { filter: "highpass", f0: 3000, peak: 0.04, attack: 0.01, decay: 0.2 });
+  },
+
+  // A sample sealed: a snip, the jar's clink, the lid's hiss and latch.
+  sample: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.2 });
+    for (const dt of [0, 0.06]) noise(ctx, o, t + dt, { filter: "highpass", f0: 4500, peak: 0.08, decay: 0.012 });
+    metal(ctx, o, t + 0.25, 3100, 0.05, 0.35, [1, 1.83, 2.7]);
+    noise(ctx, o, t + 0.45, { filter: "highpass", f0: 3500, f1: 6000, peak: 0.05, attack: 0.02, decay: 0.35 });
+    noise(ctx, o, t + 0.85, { filter: "bandpass", f0: 2200, q: 3, peak: 0.08, decay: 0.03 });
+    tone(ctx, o, t + 0.85, { f0: 400, f1: 260, peak: 0.05, decay: 0.05 });
+  },
+
+  // The stun prod: a crackling electric zap.
+  stun: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.25 });
+    const buzz = ctx.createGain();
+    buzz.gain.value = 0.5;
+    const am = ctx.createOscillator();
+    const ad = ctx.createGain();
+    am.type = "square";
+    am.frequency.value = 60;
+    ad.gain.value = 0.5;
+    am.connect(ad).connect(buzz.gain);
+    am.start(t);
+    am.stop(t + 0.8);
+    buzz.connect(o);
+    noise(ctx, buzz, t, { filter: "bandpass", f0: 3200, q: 1.5, peak: 0.25, attack: 0.01, decay: 0.6 });
+    tone(ctx, buzz, t, { type: "sawtooth", f0: 1200, f1: 180, glide: 0.5, peak: 0.08, attack: 0.01, decay: 0.55, lp: 4000 });
+    for (let i = 0; i < 8; i++) noise(ctx, o, t + rand(0, 0.6), { filter: "highpass", f0: 5000, peak: rand(0.05, 0.12), decay: 0.01 });
+  },
+
+  // A net fired: a whoosh, the weights thump down, the mesh rustles.
+  net: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.25 });
+    noise(ctx, o, t, { filter: "bandpass", f0: 900, f1: 2800, q: 1.5, peak: 0.12, attack: 0.08, decay: 0.3 });
+    thud(ctx, o, t + 0.4, 0.14, 95);
+    noise(ctx, o, t + 0.42, { filter: "bandpass", f0: 1600, f1: 900, q: 0.8, peak: 0.06, attack: 0.03, decay: 0.5 });
+  },
+
+  // Something hit the rover hard: a crunch of plating, then the damage alarm.
+  roverHit: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.3 });
+    thud(ctx, o, t, 0.3, 75);
+    metal(ctx, o, t, 260, 0.1, 0.5);
+    noise(ctx, o, t, { f0: 3000, f1: 400, peak: 0.2, decay: 0.35 });
+    for (let i = 0; i < 3; i++) {
+      tone(ctx, o, t + 0.5 + i * 0.32, { type: "square", f0: 880, peak: 0.04, decay: 0.12, lp: 2500 });
+      tone(ctx, o, t + 0.66 + i * 0.32, { type: "square", f0: 660, peak: 0.04, decay: 0.12, lp: 2500 });
+    }
+  },
+
+  // A storm over the drill site: wind swelling, rain hissing, thunder rolling.
+  storm: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.45 });
+    const gust = turbulence(ctx, t, t + 3.5, 0.4);
+    gust.connect(o);
+    noise(ctx, gust, t, { filter: "bandpass", f0: 400, f1: 900, q: 1.2, peak: 0.18, attack: 0.9, decay: 2.4, sweep: 1.5 });
+    noise(ctx, o, t + 0.3, { filter: "highpass", f0: 5000, peak: 0.05, attack: 0.6, decay: 2.2 });
+    noise(ctx, o, t + 0.8, { f0: 700, f1: 90, peak: 0.25, attack: 0.05, decay: 2.2 });
+    tone(ctx, o, t + 0.8, { f0: 55, f1: 32, peak: 0.18, attack: 0.1, decay: 2.0 });
+  },
+
+  // A quake: the ground grinds and shakes, loose things rattle, the rig groans.
+  quake: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.35 });
+    const shake = turbulence(ctx, t, t + 3.2, 0.5);
+    shake.connect(o);
+    noise(ctx, shake, t, { f0: 220, f1: 110, peak: 0.9, attack: 0.4, decay: 2.4 });
+    tone(ctx, shake, t, { type: "sawtooth", f0: 32, f1: 26, peak: 0.22, attack: 0.4, decay: 2.4, lp: 140 });
+    for (let i = 0; i < 14; i++) noise(ctx, o, t + rand(0.3, 2.3), { filter: "bandpass", f0: rand(800, 2400), q: 3, peak: rand(0.03, 0.08), decay: rand(0.02, 0.06) });
+    tone(ctx, o, t + 1.2, { type: "sawtooth", f0: 140, f1: 110, peak: 0.03, attack: 0.3, decay: 0.8, lp: 900 });
+  },
+
+  // A breakdown: the drill head grinds, jams with a clunk, and the warning sounds.
+  breakdown: (ctx, mix, t) => {
+    const o = route(ctx, mix, { verb: 0.3 });
+    const grind = ctx.createOscillator();
+    grind.type = "sawtooth";
+    grind.frequency.setValueAtTime(320, t);
+    grind.frequency.exponentialRampToValueAtTime(90, t + 0.7);
+    const jit = lfo(ctx, 31, 40, grind.frequency);
+    const gl = ctx.createBiquadFilter();
+    gl.type = "bandpass";
+    gl.frequency.value = 900;
+    gl.Q.value = 1.2;
+    const gg = env(ctx, t, 0.1, 0.05, 0.7);
+    grind.connect(gl).connect(gg).connect(o);
+    grind.start(t);
+    jit.start(t);
+    grind.stop(t + 0.8);
+    jit.stop(t + 0.8);
+    strike(ctx, o, t + 0.75, 0.16);
+    [0, 0.2].forEach((dt) => tone(ctx, o, t + 1.1 + dt, { type: "square", f0: 520, peak: 0.04, decay: 0.12, lp: 2000 }));
+  },
+
   // Voice call-outs: recorded files, played by the engine (these only make the tone before the words).
   mineral: (ctx, mix, t) => {
     const o = route(ctx, mix, { verb: 0.2 });
@@ -567,7 +679,7 @@ export const RECIPES: Record<SoundId, Recipe> = {
 // --- loops --------------------------------------------------------------------------------
 
 /** Fade a loop's gain up now and give back a stop that fades it out and ends its sources. */
-function loopShell(ctx: AudioContext, g: GainNode, level: number, sources: AudioScheduledSourceNode[], onStop?: () => void): LoopHandle {
+export function loopShell(ctx: AudioContext, g: GainNode, level: number, sources: AudioScheduledSourceNode[], onStop?: () => void): LoopHandle {
   const t = ctx.currentTime;
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(level, t + 0.4);
@@ -587,7 +699,7 @@ function loopShell(ctx: AudioContext, g: GainNode, level: number, sources: Audio
   };
 }
 
-function loopNoise(ctx: AudioContext): AudioBufferSourceNode {
+export function loopNoise(ctx: AudioContext): AudioBufferSourceNode {
   const src = ctx.createBufferSource();
   src.buffer = noiseBuffer(ctx);
   src.loop = true;

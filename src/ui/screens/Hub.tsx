@@ -1,4 +1,5 @@
 /** The Intrepid: market, shipyard, Exchange counter and the way out. */
+import { audio } from "../audio/engine";
 import { CouncilPanel } from "../Ending";
 import { MAX_ACTIVE_RESEARCH, RESEARCH } from "../../data/research";
 import { acceptErrand, covenantErrands, covenantWhisper, recorderFolds, RECORDER_FOLDS, type ErrandOffer } from "../../sim";
@@ -108,6 +109,11 @@ const TAB_BLURB: Record<Tab, string> = {
 
 export function Hub({ session }: { session: GameSession }) {
   useSession(session);
+  // The Intrepid's air handlers and hull hum while docked (AW-285).
+  useEffect(() => {
+    const hum = audio.ambience("intrepid");
+    return () => hum.stop();
+  }, []);
   const { state } = session;
   const contracts = state.contracts ?? [];
   const starterOffers = contracts.filter((c) => c.status === "offered" && c.starter).length;

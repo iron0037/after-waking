@@ -1328,25 +1328,38 @@ function rollIncident(rng: Rng, body: Body, hours: number, rateMult = 1, hoursMu
   return { ...incident, kind, lostHours: incident.lostHours * hoursMult };
 }
 
+/** What each kind of incident says in the journal (the sound of it keys off these: AW-285). */
+export const INCIDENT_TEXT: Record<Incident["kind"], string> = {
+  storm: "A storm rolled over the drill site; the crew sealed up and waited it out.",
+  quake: "A quake shook the rig loose and the bore had to be re-seated.",
+  breakdown: "The drill head jammed and the crew spent a shift freeing it.",
+};
+
+/** Which incident a journal line reports, if any. */
+export function incidentKindOf(text: string): Incident["kind"] | null {
+  for (const [kind, t] of Object.entries(INCIDENT_TEXT) as [Incident["kind"], string][]) if (text.startsWith(t)) return kind;
+  return null;
+}
+
 function pickIncident(rng: Rng, kind: Incident["kind"], atFraction: number): Omit<Incident, "kind"> {
   switch (kind) {
     case "storm":
       return {
-        text: "A storm rolled over the drill site; the crew sealed up and waited it out.",
+        text: INCIDENT_TEXT.storm,
         atFraction,
         lostHours: rng.range(6, 30),
         energy: rng.range(5, 15),
       };
     case "quake":
       return {
-        text: "A quake shook the rig loose and the bore had to be re-seated.",
+        text: INCIDENT_TEXT.quake,
         atFraction,
         lostHours: rng.range(4, 14),
         energy: rng.range(10, 25),
       };
     default:
       return {
-        text: "The drill head jammed and the crew spent a shift freeing it.",
+        text: INCIDENT_TEXT.breakdown,
         atFraction,
         lostHours: rng.range(3, 12),
         energy: rng.range(5, 12),

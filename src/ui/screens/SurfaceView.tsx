@@ -2,6 +2,7 @@
  * Planet surface: a survey map over the whole world (one continuous hex map in planet-wide coordinates, drawn
  * region by region as the camera follows the rover), and the prospect → drill → haul loop.
  */
+import { ambienceFor } from "../audio/ambience";
 import { audio } from "../audio/engine";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { COMMODITIES } from "../../data/commodities";
@@ -362,6 +363,11 @@ function regionAndNeighbors(surface: BodySurface, region: number): number[] {
 function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const { state, world } = session;
   const { body } = world.body(loc.bodyId);
+  // The world's weather under everything (AW-285).
+  useEffect(() => {
+    const beds = ambienceFor(body).map((id) => audio.ambience(id));
+    return () => beds.forEach((b) => b.stop());
+  }, [body.id]);
   const surface = world.surface(loc.bodyId);
   const active = activeRegion(state, world);
   const activeKnow = peekKnowledge(state, loc.bodyId, active);

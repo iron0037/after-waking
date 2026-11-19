@@ -2,7 +2,7 @@
  * Which sounds an action makes (AW-31, AW-281): worked out from the game before and after it, so the
  * rules in src/sim stay silent. Pure, so it's tested without a browser.
  */
-import { DAY, type GameState } from "../../sim";
+import { DAY, incidentKindOf, type GameState } from "../../sim";
 import type { SoundId } from "./synth";
 
 export interface SurfaceSnapshot {
@@ -14,6 +14,17 @@ export interface SurfaceSnapshot {
   deposits: number;
   flora: number;
   extracted: number;
+  /** Seams prospected, plant sites sampled, and specimens riding in the vehicle's cases (AW-285). */
+  prospected?: number;
+  sampled?: number;
+  specimens?: number;
+}
+
+/** The last creature fight (AW-285): a new id means one just happened. */
+export interface FightSnapshot {
+  id: number;
+  mode: "defend" | "capture";
+  outcome: "captured" | "down" | "escaped" | "broke off" | "disabled";
 }
 
 export interface SoundSnapshot {
@@ -29,6 +40,7 @@ export interface SoundSnapshot {
   probing?: boolean;
   encounter?: boolean;
   surface?: SurfaceSnapshot | null;
+  fight?: FightSnapshot | null;
 }
 
 function surfaceSnapshot(state: GameState): SurfaceSnapshot | null {
@@ -37,11 +49,15 @@ function surfaceSnapshot(state: GameState): SurfaceSnapshot | null {
   let deposits = 0;
   let flora = 0;
   let extracted = 0;
+  let prospected = 0;
+  let sampled = 0;
   const prefix = `${loc.bodyId}#`;
   for (const [key, k] of Object.entries(state.regions)) {
     if (!key.startsWith(prefix)) continue;
     deposits += k.discovered.length;
     flora += k.floraFound?.length ?? 0;
+    prospected += k.prospected.length;
+    sampled += k.floraSampled?.length ?? 0;
     for (const t of Object.values(k.extracted)) extracted += t;
   }
   const r = loc.rover;
@@ -53,6 +69,9 @@ function surfaceSnapshot(state: GameState): SurfaceSnapshot | null {
     deposits,
     flora,
     extracted,
+    prospected,
+    sampled,
+    specimens: r ? Object.values(r.specimens ?? {}).reduce((a, b) => a + b, 0) : 0,
   };
 }
 
@@ -71,6 +90,7 @@ export function soundSnapshot(state: GameState): SoundSnapshot {
     probing: !!state.probeDive,
     encounter: !!state.encounter,
     surface: surfaceSnapshot(state),
+    fight: state.lastFight ? { id: state.lastFight.id, mode: state.lastFight.mode, outcome: state.lastFight.outcome } : null,
   };
 }
 
@@ -79,7 +99,7 @@ export function soundSnapshot(state: GameState): SoundSnapshot {
  * launch the rover, drill), what turned up (call-outs, at most one of each), then a level-up, a find,
  * or money changing hands if nothing else spoke. At most three, so a busy action doesn't make a din.
  */
-export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJournalKinds: readonly string[]): SoundId[] {
+export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJournalKinds: readonly string[], newJournalTexts: readonly string[] = []): SoundId[] {
   const out: SoundId[] = [];
   // Trouble first: a raider's hail.
   if (after.encounter && !before.encounter) out.push("danger");
@@ -111,6 +131,16 @@ export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJourna
       else if (br.x === ar.x && br.y === ar.y && ar.energy - br.energy > 0.5) out.push("recharge");
     }
     if (as.extracted - bs.extracted > 0.001) out.push("drill");
+    // Trouble at the drill site: a storm, a quake, a jammed head.
+    const incident = newJournalTexts.map(incidentKindOf).find((k) => k !== null);
+    if (incident) out.push(incident);
+    if ((as.prospected ?? 0) > (bs.prospected ?? 0)) out.push("prospect");
+    // A creature fight: the prod, then the net if it went down, or the crunch if the rover took it.
+    const fought = after.fight && after.fight.id !== before.fight?.id ? after.fight : null;
+    if (fought) {
+      if (fought.outcome === "disabled") out.push("roverHit");
+      else out.push(...(fought.mode === "capture" && (fought.outcome === "captured" || fought.outcome === "down") ? (["stun", "net"] as const) : (["stun"] as const)));
+    } else if ((as.sampled ?? 0) > (bs.sampled ?? 0) || (as.specimens ?? 0) > (bs.specimens ?? 0)) out.push("sample");
     // The call-outs: one per kind, however many turned up on the drive.
     if (as.deposits > bs.deposits) out.push("mineral");
     if (as.flora > bs.flora) out.push("lifeform");
@@ -135,12 +165,13 @@ export function soundsFor(before: SoundSnapshot, after: SoundSnapshot, newJourna
 
 /** When each sound starts, in seconds: sounds that would talk over each other wait their turn. */
 export function soundSchedule(ids: readonly SoundId[]): { id: SoundId; delay: number }[] {
-  const LONG: Partial<Record<SoundId, number>> = { bayOpen: 1.6, hop: 2.4, mineral: 1.7, land: 1.5 };
+  const LONG: Partial<Record<SoundId, number>> = { bayOpen: 1.6, hop: 2.4, mineral: 1.7, land: 1.5, stun: 0.5, drill: 2.0 };
   let at = 0;
   return ids.map((id, i) => {
     const prev = ids[i - 1];
-    // Voices, a splash after the bay, and the recharge wait for what came before; the rest layer.
-    if (prev && (id === "mineral" || id === "lifeform" || id === "splash")) at += LONG[prev] ?? 0.4;
+    // Voices, a splash after the bay, the net after the prod, and trouble after the drill wait their turn; the rest layer.
+    const waits: SoundId[] = ["mineral", "lifeform", "splash", "net", "storm", "quake", "breakdown"];
+    if (prev && waits.includes(id)) at += LONG[prev] ?? 0.4;
     return { id, delay: at };
   });
 }

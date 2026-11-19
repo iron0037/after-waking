@@ -7,6 +7,7 @@
  * Browsers only start audio after the player has clicked something, so the context is created on the
  * first gesture (unlockAudio). Until then, and when muted, play() does nothing.
  */
+import { AMBIENCE, type AmbienceId } from "./ambience";
 import { RECIPES, LOOPS, reverbImpulse, type Mix, type SoundId, type LoopId } from "./synth";
 
 export type Bus = "ui" | "sfx" | "ambience" | "music";
@@ -62,6 +63,14 @@ const BUS_OF: Record<SoundId, Bus> = {
   drill: "sfx",
   mineral: "sfx",
   lifeform: "sfx",
+  prospect: "sfx",
+  sample: "sfx",
+  stun: "sfx",
+  net: "sfx",
+  roverHit: "sfx",
+  storm: "sfx",
+  quake: "sfx",
+  breakdown: "sfx",
 };
 
 /** Recorded call-outs (AW-281, tools/audio/callouts.py), played after their recipe's tone. */
@@ -217,6 +226,18 @@ class AudioEngine {
     if (!ctx || !mix || this.settings[bus] <= 0) return { stop() {} };
     try {
       return LOOPS[id](ctx, mix);
+    } catch {
+      return { stop() {} };
+    }
+  }
+
+  /** Start a background bed (a world's weather, the Intrepid's hum) on the ambience bus; stop() fades it out. */
+  ambience(id: AmbienceId): LoopHandle {
+    const ctx = this.ctx;
+    const mix = this.mix("ambience");
+    if (!ctx || !mix) return { stop() {} };
+    try {
+      return AMBIENCE[id](ctx, mix);
     } catch {
       return { stop() {} };
     }

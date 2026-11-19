@@ -4,6 +4,7 @@ import {
   autoExplore,
   buyFuel,
   DAY,
+  INCIDENT_TEXT,
   deployRover,
   flyTo,
   land,
@@ -15,6 +16,7 @@ import {
   type GameState,
   type Result,
 } from "../src/sim";
+import { ambienceFor } from "../src/ui/audio/ambience";
 import { soundSchedule, soundSnapshot, soundsFor, type SoundSnapshot, type SurfaceSnapshot } from "../src/ui/audio/triggers";
 
 const base: SoundSnapshot = { kind: "space", systemId: "a", orbiting: null, credits: 1000, levelUps: 0, time: 0 };
@@ -107,5 +109,29 @@ describe("sound triggers (AW-31)", () => {
       }
     }
     throw new Error("nowhere to land");
+  });
+
+  it("the rest of the surface: prospecting, samples, fights, drill trouble (AW-285)", () => {
+    const ground: SurfaceSnapshot = { bodyId: "b", shipX: 5, shipY: 5, rover: { vehicle: "rover", x: 5, y: 6, energy: 50 }, deposits: 2, flora: 1, extracted: 0, prospected: 0, sampled: 0, specimens: 0 };
+    const on = (patch: Partial<SurfaceSnapshot>, more: Partial<SoundSnapshot> = {}): SoundSnapshot => snap({ kind: "surface", surface: { ...ground, ...patch }, ...more });
+    expect(soundsFor(on({}), on({ prospected: 1 }), [])).toEqual(["prospect"]);
+    expect(soundsFor(on({}), on({ sampled: 1, specimens: 2 }), [])).toEqual(["sample"]);
+    const fight = (id: number, mode: "defend" | "capture", outcome: "captured" | "down" | "escaped" | "broke off" | "disabled") => ({ fight: { id, mode, outcome } });
+    expect(soundsFor(on({}), on({ specimens: 1 }, fight(1, "capture", "captured")), [])).toEqual(["stun", "net"]);
+    expect(soundsFor(on({}), on({}, fight(1, "defend", "escaped")), [])).toEqual(["stun"]);
+    expect(soundsFor(on({}, fight(1, "defend", "down")), on({}, fight(2, "defend", "disabled")), [])).toEqual(["roverHit"]);
+    // An old fight doesn't sound again.
+    expect(soundsFor(on({}, fight(3, "capture", "down")), on({}, fight(3, "capture", "down")), [])).toEqual([]);
+    const stormy = soundsFor(on({}), on({ extracted: 3 }), ["info", "warning"], ["Drilled 3 t of copper.", `${INCIDENT_TEXT.storm} Lost 12h.`]);
+    expect(stormy).toEqual(["drill", "storm"]);
+    expect(soundSchedule(stormy).map((x) => x.delay)).toEqual([0, 2]);
+    expect(soundsFor(on({}), on({ extracted: 1 }), [], [INCIDENT_TEXT.quake])).toEqual(["drill", "quake"]);
+  });
+
+  it("each world gets its own background (AW-285)", () => {
+    expect(ambienceFor({ kind: "desert", pressureAtm: 0.6 })).toEqual(["desert"]);
+    expect(ambienceFor({ kind: "barren", pressureAtm: 0 })).toEqual(["vacuum"]);
+    expect(ambienceFor({ kind: "ice", pressureAtm: 1.4, sea: "methane" })).toEqual(["ice", "surf"]);
+    expect(ambienceFor({ kind: "ocean", pressureAtm: 1 })).toEqual(["ocean"]);
   });
 });

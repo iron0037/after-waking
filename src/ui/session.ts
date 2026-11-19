@@ -170,9 +170,9 @@ export class GameSession {
     if (!result.ok && !(encounterAfter && !encounterBefore)) this.notify(result.reason, "error");
     // The sound of what just happened (AW-31, AW-281): a fold, a landing, the rover bay, a call-out. A hail sounds even though the fold failed.
     if (result.ok || (encounterAfter && !encounterBefore)) {
-      const kinds = this.state.journal.slice(journalBefore).map((e) => e.kind);
+      const entries = this.state.journal.slice(journalBefore);
       const soundAfter = soundSnapshot(this.state);
-      for (const { id, delay } of soundSchedule(soundsFor(soundBefore, soundAfter, kinds))) {
+      for (const { id, delay } of soundSchedule(soundsFor(soundBefore, soundAfter, entries.map((e) => e.kind), entries.map((e) => e.text)))) {
         // A long drilling job hammers away for as long as its time-lapse clock runs.
         if (id === "drill" && lapse) audio.loopFor("drill", lapse.durMs);
         else audio.play(id, delay);

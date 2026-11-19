@@ -13,6 +13,7 @@ const SLIDERS: { key: Exclude<keyof AudioSettings, "muted">; label: string; hint
   { key: "master", label: "Master", hint: "Everything" },
   { key: "ui", label: "Interface", hint: "Clicks, notices, money" },
   { key: "sfx", label: "Effects", hint: "Folds, landings, docking, finds" },
+  { key: "ambience", label: "Ambience", hint: "Each world's weather, the Intrepid's hum" },
   { key: "music", label: "Music", hint: "The intro's score, for now" },
 ];
 
