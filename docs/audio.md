@@ -20,6 +20,18 @@ Music is its own ticket (AW-274). This covers the game's sound effects and ambie
   action's result and the change it made (`src/ui/audio/triggers.ts`), notices, and the animations that
   start and stop loops.
 
+## Stable Audio Open (setup)
+
+- **Where:** `E:\StableAudio`. A Python 3.11 venv (`.venv`: PyTorch cu128, diffusers, transformers, torchsde), and the
+  model in diffusers format in `models\stable-audio-open-1.0` (5 GB; the duplicate full checkpoints are skipped).
+- **Model access:** the model is gated on Hugging Face. The license was accepted on the user's account, and the CLI is
+  logged in with their read token (`E:\StableAudio\.venv\Scripts\hf.exe auth login`). `E:\StableAudio\download.py`
+  re-downloads it, retrying through dropped connections.
+- **Making sounds:** prompts live in `tools/audio/sfx.json`; `tools/audio/sfx.py` renders takes to
+  `tools/audio/output/<id>/` (not committed). Copy the chosen take into `public/assets/sfx/`. About 22 s per 3-second
+  clip on the 3060 Ti after a 25 s model load. It shares the GPU, so don't run it alongside MOSS or the SD WebUI.
+- **License:** Stability AI Community License. Re-check its terms before shipping anything it made.
+
 ## The engine
 
 `src/ui/audio/engine.ts`: one AudioContext, created on the first click or key (browsers require it), with

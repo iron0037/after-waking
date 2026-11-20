@@ -4,6 +4,7 @@ out/
 *.log
 .vite/
 tools/art/output/
+tools/audio/output/
 .claude/settings.local.json
 
 # Reference images (copyrighted; local only)

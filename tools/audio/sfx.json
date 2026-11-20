@@ -1,0 +1,35 @@
+{
+  "_comment": "Prompts for tools/audio/sfx.py (Stable Audio Open, AW-31). One entry per sound: id, prompt, seconds, seeds. Takes land in tools/audio/output/<id>/; the chosen one is copied to public/assets/sfx/.",
+  "sounds": [
+    {
+      "id": "creature-chirp",
+      "prompt": "a small alien creature chirping and trilling, quick bird-like calls, close up, outdoors, no music",
+      "seconds": 3,
+      "seeds": [1, 2, 3]
+    },
+    {
+      "id": "creature-bellow",
+      "prompt": "a huge alien beast bellowing in the distance, a deep, mournful, echoing call across an open plain, no music",
+      "seconds": 4,
+      "seeds": [1, 2, 3]
+    },
+    {
+      "id": "creature-growl",
+      "prompt": "a large predator growling low and threatening, close, rumbling and snarling, no music",
+      "seconds": 3,
+      "seeds": [1, 2, 3]
+    },
+    {
+      "id": "creature-clicks",
+      "prompt": "an insect-like alien creature clicking and rattling its mandibles, dry chitinous clicks, close up, no music",
+      "seconds": 3,
+      "seeds": [1, 2, 3]
+    },
+    {
+      "id": "creature-sea",
+      "prompt": "a large sea creature calling underwater, long eerie whale-like moans, deep and resonant, no music",
+      "seconds": 5,
+      "seeds": [1, 2, 3]
+    }
+  ]
+}
