@@ -1,6 +1,6 @@
 # Audio: sound effects (AW-31)
 
-Music is its own ticket (AW-274). This covers the game's sound effects and ambience.
+This covers the game's sound effects and ambience, and the soundtrack (AW-274) at the end.
 
 ## Decisions [DECIDED]
 
@@ -76,3 +76,20 @@ and narration follow them too.
    shield shimmer or a near miss, and the klaxon when a system is knocked past half or out. Endings: a fanfare
    when they strike their colors, a falling phrase and the hold being stripped when you lose, a drive surge
    when you escape, two warm notes when it's talked down or they break off. The hail keeps its danger sting.
+
+## Music (AW-274)
+
+The soundtrack is a set of looping cues, each a Stable Audio Open render picked by ear from three takes, like the creature calls.
+
+| Cue | Plays |
+|---|---|
+| `music-title` | The title screen, and under the ending card |
+| `music-intrepid` | The Intrepid and the clan outposts |
+| `music-space` | The star map and system view |
+| `music-surface` | On a planet's surface |
+| `music-combat` | While a raider is on the scope (contact, hail, battle) |
+
+- **Choosing the cue:** `musicFor()` in `src/ui/audio/music.ts` picks it from the screen and the encounter, and `App` plays it. `audio.music()` crossfades between cues over 2.5 s, and a cue asked for before the first click starts with it. Cinematics have their own score, so the soundtrack steps aside for them.
+- **Prompts:** `tools/audio/music.json`, rendered with `sfx.py --manifest music.json` at 45 s (the model's limit is 47).
+- **Mastering:** `tools/audio/master_music.py` turns each pick into a seamless loop by folding its last 4 s over its start, matches the cues' loudness and writes `public/assets/music/<cue>.ogg`. It plays at 0.45 on the music bus, under the effects.
+- **Ogg writing:** libsndfile's Vorbis encoder crashes the process when a long clip is written in one call, so both tools write a second at a time.

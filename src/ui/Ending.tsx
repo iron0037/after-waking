@@ -31,6 +31,8 @@ import {
 } from "../sim";
 import returnScript from "../data/ending-return.json";
 import { Cinematic, type CinematicScene } from "./Cinematic";
+import { audio } from "./audio/engine";
+import { musicUrl } from "./audio/music";
 import { cr } from "./format";
 import "./ending.css";
 import type { GameSession } from "./session";
@@ -240,6 +242,10 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
   useEffect(() => {
     if (ending) enterHall(ending.report);
   }, [ending]);
+  // After the cinematic, the title theme plays under the ending card (AW-274).
+  useEffect(() => {
+    if (!watching) audio.music(musicUrl("music-title"));
+  }, [watching]);
   if (!ending) return null;
   const text = endingText(session.state, ending.id);
   const r = ending.report;

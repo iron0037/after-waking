@@ -21,7 +21,8 @@ import { SurfaceView } from "./screens/SurfaceView";
 import { OutpostHub } from "./screens/OutpostHub";
 import { SystemView } from "./screens/SystemView";
 import { warmTerrain } from "./screens/surface/terrainImage";
-import { installAudioGestures } from "./audio/engine";
+import { audio, installAudioGestures } from "./audio/engine";
+import { musicFor, musicUrl } from "./audio/music";
 
 const SIDE_KEY = "after-waking/ui/side-hidden";
 
@@ -106,6 +107,13 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
     journalOpen || compendiumOpen || contractsOpen || clansOpen || shipOpen || crewOpen || !!session.perkTree || !!levelUp || !!session.state.encounter ||
     !!session.encounterDebrief || !!session.probeReport || !!session.state.probeDive;
   const latest = session.state.journal.slice(-2).reverse();
+
+  // The soundtrack follows the screen, and a raider on the scope (AW-274). The ending picks its own.
+  const stage = session.state.encounter?.stage ?? null;
+  const over = !!session.state.ending;
+  useEffect(() => {
+    if (!over) audio.music(musicUrl(musicFor(session.view, stage)));
+  }, [session.view, stage, over]);
 
   // The career is over (AW-199): the ending takes the whole screen.
   if (session.state.ending) return <EndingScreen session={session} onTitle={onQuit} />;

@@ -94,6 +94,9 @@ const SAMPLES: Partial<Record<SoundId, string>> = {
 /** When the words start after the tone. */
 const SAMPLE_DELAY = 0.16;
 
+/** The soundtrack sits under everything else: the masters are mixed loud, so this is its level on the music bus. */
+const MUSIC_LEVEL = 0.45;
+
 export interface LoopHandle {
   stop(): void;
 }
@@ -135,6 +138,12 @@ class AudioEngine {
       }
       this.apply();
       for (const url of Object.values(SAMPLES)) void this.sample(url);
+      // A cue asked for before the first click starts now.
+      if (this.musicWanted) {
+        const url = this.musicWanted;
+        this.musicWanted = null;
+        this.music(url);
+      }
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
   }
@@ -280,6 +289,46 @@ class AudioEngine {
       head.connect(send).connect(mix.wet);
       src.connect(g);
       src.start();
+    });
+  }
+
+  /** The soundtrack cue that should be playing (null: silence), and what is (AW-274). */
+  private musicWanted: string | null = null;
+  private musicNow: { url: string; src: AudioBufferSourceNode; gain: GainNode } | null = null;
+
+  /**
+   * Play a looping soundtrack cue on the music bus, crossfading from whatever was playing; null fades it out.
+   * Asking before audio is unlocked is fine: the cue starts with the first click. Like ambience, it runs while
+   * muted, so the bus handles the level.
+   */
+  music(url: string | null, fade = 2.5): void {
+    this.musicWanted = url;
+    const ctx = this.ctx;
+    const bus = this.buses.get("music");
+    if (!ctx || !bus || this.musicNow?.url === url) return;
+    if (this.musicNow) {
+      const old = this.musicNow;
+      this.musicNow = null;
+      const t = ctx.currentTime;
+      old.gain.gain.cancelScheduledValues(t);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, t);
+      old.gain.gain.linearRampToValueAtTime(0, t + fade);
+      old.src.stop(t + fade + 0.1);
+    }
+    if (!url) return;
+    void this.sample(url).then((buf) => {
+      // Gone, or another cue asked for while this one loaded.
+      if (!buf || this.musicWanted !== url || this.musicNow) return;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const gain = ctx.createGain();
+      const t = ctx.currentTime;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(MUSIC_LEVEL, t + fade);
+      src.connect(gain).connect(bus);
+      src.start(t);
+      this.musicNow = { url, src, gain };
     });
   }
 

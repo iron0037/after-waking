@@ -10,6 +10,8 @@ Don't run it alongside MOSS or the SD WebUI: they share the 8 GB GPU.
     E:/StableAudio/.venv/Scripts/python tools/audio/sfx.py creature-chirp
     E:/StableAudio/.venv/Scripts/python tools/audio/sfx.py creature-chirp creature-growl --seeds 1 2 3
     E:/StableAudio/.venv/Scripts/python tools/audio/sfx.py --prompt "a metal door slams" --seconds 3
+    E:/StableAudio/.venv/Scripts/python tools/audio/sfx.py --manifest music.json music-intrepid
+        # the soundtrack's takes (AW-274): tools/audio/music.json, same format
 
 License: Stability AI Community License. Re-check its terms before shipping anything it made.
 """
@@ -37,6 +39,14 @@ def load() -> StableAudioPipeline:
     return pipe.to("cuda")
 
 
+def write_ogg(path: Path, data: np.ndarray, rate: int) -> None:
+    """libsndfile's Vorbis encoder crashes the process on a long clip written in one call (music, AW-274),
+    so write it a second at a time."""
+    with sf.SoundFile(path, "w", rate, data.shape[1], format="OGG", subtype="VORBIS") as f:
+        for i in range(0, len(data), rate):
+            f.write(data[i : i + rate])
+
+
 def render(pipe: StableAudioPipeline, name: str, prompt: str, seconds: float, seeds: list[int], steps: int, negative: str) -> None:
     folder = OUT / name
     folder.mkdir(parents=True, exist_ok=True)
@@ -61,24 +71,26 @@ def render(pipe: StableAudioPipeline, name: str, prompt: str, seconds: float, se
         peak = float(np.max(np.abs(data))) or 1.0
         data = data * (0.89 / peak)
         path = folder / f"{name}-{seed}.ogg"
-        sf.write(path, data, rate, format="OGG", subtype="VORBIS")
+        write_ogg(path, data, rate)
         print(f"{path.relative_to(ROOT)}  {seconds:.1f} s  seed {seed}", flush=True)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("sounds", nargs="*", help="ids from sfx.json; the model loads once")
+    ap.add_argument("sounds", nargs="*", help="ids from the manifest; the model loads once")
+    ap.add_argument("--manifest", default=MANIFEST.name, help="prompt list next to this script (default sfx.json; music.json for music)")
     ap.add_argument("--seeds", type=int, nargs="+", help="override each sound's seeds")
     ap.add_argument("--steps", type=int, default=100)
     ap.add_argument("--prompt", help="try a prompt without adding it to sfx.json (saved as 'scratch')")
     ap.add_argument("--seconds", type=float, default=3.0, help="length for --prompt")
     args = ap.parse_args()
 
-    manifest = json.loads(MANIFEST.read_text(encoding="utf-8")) if MANIFEST.exists() else {"sounds": []}
+    path = MANIFEST.parent / args.manifest
+    manifest = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"sounds": []}
     by_id = {s["id"]: s for s in manifest["sounds"]}
     missing = [s for s in args.sounds if s not in by_id]
     if missing:
-        print(f"No sound named {', '.join(missing)} in {MANIFEST.name}", file=sys.stderr)
+        print(f"No sound named {', '.join(missing)} in {path.name}", file=sys.stderr)
         return 1
     if not args.sounds and not args.prompt:
         ap.print_help()

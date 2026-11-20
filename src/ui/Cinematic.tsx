@@ -78,6 +78,9 @@ export function Cinematic({
   const music = useRef<IntroMusic | null>(null);
   const finished = index >= scenes.length;
 
+  // A cinematic has its own score: the soundtrack (AW-274) steps aside for it.
+  useEffect(() => gameAudio.music(null), []);
+
   // Load every clip up front; once a clip's length is known, its panel lasts as long as the line.
   useEffect(() => {
     audio.current = scenes.map((s, i) => {

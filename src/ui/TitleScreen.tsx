@@ -1,5 +1,7 @@
 import { SoundSettings } from "./SoundSettings";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
+import { audio } from "./audio/engine";
+import { musicUrl } from "./audio/music";
 import { Intro } from "./Intro";
 import { CAPTAIN_CLANS } from "../data/clans";
 import { FIRST_NAMES, SURNAMES } from "../data/crew";
@@ -26,6 +28,8 @@ type Page = "menu" | "new" | "options" | "hall" | "intro";
 export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) {
   const saved = GameSession.load();
   const [page, setPage] = useState<Page>("menu");
+  // The title theme (AW-274), except while the intro plays its own music.
+  useEffect(() => audio.music(page === "intro" ? null : musicUrl("music-title")), [page]);
   if (page === "new") return <NewGame saved={!!saved} onStart={onStart} onBack={() => setPage("menu")} />;
   if (page === "options") return <Options onBack={() => setPage("menu")} onIntro={() => setPage("intro")} />;
   if (page === "intro") return <Intro onDone={() => setPage("options")} />;
