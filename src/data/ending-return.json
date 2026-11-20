@@ -95,7 +95,12 @@
       "when": "covenant",
       "speaker": "The eldest listener",
       "voice": "bf_isabella",
-      "text": "They'll wake up now. Or we will.",
+      "text": "They'll wake up now. Or... we will.",
+      "parts": [
+        { "say": "They'll wake up now.", "speed": 0.88, "pause": 1.1 },
+        { "phonemes": "ˈɔːɹ", "speed": 0.8, "pause": 0.75 },
+        { "phonemes": "wˈiː wɪl.", "speed": 0.72 }
+      ],
       "chord": [38, 45, 52, 62],
       "from": { "scale": 1.15, "x": 2, "y": 0 },
       "to": { "scale": 1.35, "x": 6, "y": -2 }

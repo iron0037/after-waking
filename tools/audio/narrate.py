@@ -43,6 +43,53 @@ def render(kokoro: Kokoro, text: str, voice: str, speed: float, path: Path) -> f
     return len(audio) / rate
 
 
+def cut_hiss_tail(samples: np.ndarray, rate: int) -> np.ndarray:
+    """Kokoro sometimes ends a line with a breathy hiss after the last word, heard as a stray "s"
+    ("we wills"). Walk back from the end in 10 ms frames and cut while a frame is mostly high-frequency
+    noise or near silence, stopping at the last voiced sound."""
+    frame = int(rate * 0.01)
+    peak = float(np.sqrt(np.mean(samples**2))) or 1.0
+    end = len(samples)
+    while end > frame * 10:
+        seg = samples[end - frame : end]
+        spec = np.abs(np.fft.rfft(seg)) ** 2
+        freqs = np.fft.rfftfreq(len(seg), 1 / rate)
+        hf = float(spec[freqs > 4000].sum() / max(spec.sum(), 1e-12))
+        rms = float(np.sqrt(np.mean(seg**2)))
+        if hf < 0.4 and rms > 0.2 * peak:
+            break
+        end -= frame
+    return samples[: end + int(rate * 0.02)]
+
+
+def render_parts(kokoro: Kokoro, parts: list[dict], voice: str, speed: float, path: Path) -> float:
+    """A line delivered in pieces (AW-277): each part is "say" (text) or "phonemes" (IPA, to place the stress),
+    with its own "speed" and a "pause" in seconds after it. Each piece's tail is trimmed tight, so nothing
+    trails off into a stray sound, and given a short fade."""
+    rate = 24000
+    chunks = []
+    for part in parts:
+        if "phonemes" in part:
+            samples, rate = kokoro.create(part["phonemes"], voice=voice, speed=part.get("speed", speed), lang="en-us", is_phonemes=True)
+        else:
+            samples, rate = kokoro.create(part["say"], voice=voice, speed=part.get("speed", speed), lang="en-us")
+        loud = np.nonzero(np.abs(samples) > 0.02 * float(np.max(np.abs(samples))))[0]
+        if len(loud):
+            samples = samples[max(0, loud[0] - int(rate * 0.01)) : loud[-1] + int(rate * 0.04)]
+        samples = cut_hiss_tail(samples, rate)
+        fade = int(rate * 0.03)
+        samples = samples.copy()
+        samples[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=samples.dtype)
+        chunks.append(samples)
+        chunks.append(np.zeros(int(rate * part.get("pause", 0.0)), dtype=samples.dtype))
+    pad = np.zeros(int(rate * PAD_S), dtype=chunks[0].dtype)
+    audio = np.concatenate([pad, *chunks, pad])
+    audio = audio * (0.89 / (float(np.max(np.abs(audio))) or 1.0))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sf.write(path, audio, rate, format="OGG", subtype="VORBIS")
+    return len(audio) / rate
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--only", type=int, help="render just this line (1-based)")
@@ -70,7 +117,10 @@ def main() -> int:
             continue
         name = f"vo-{scene.get('id', i)}.ogg"
         voice = scene.get("voice", script["voice"])
-        secs = render(kokoro, scene.get("say", scene["text"]), voice, script["speed"], out / name)
+        if "parts" in scene:
+            secs = render_parts(kokoro, scene["parts"], voice, script["speed"], out / name)
+        else:
+            secs = render(kokoro, scene.get("say", scene["text"]), voice, script["speed"], out / name)
         print(f"{name} {voice} {secs:.1f} s  {scene['text'][:50]}", flush=True)
     return 0
 
