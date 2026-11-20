@@ -28,7 +28,7 @@
       "image": "ret-3",
       "speaker": "Launch control",
       "voice": "am_michael",
-      "text": "Cradle is clear, Captain. Every window on the ship is lit for you. Fly safe, and come back to us.",
+      "text": "Cradle is clear, Captain. Every window on the ship is lit for you. Fly safe and come back to us.",
       "chord": [43, 50, 55, 59],
       "from": { "scale": 1.05, "x": 0, "y": 0 },
       "to": { "scale": 1.2, "x": 4, "y": 0 }
@@ -55,7 +55,7 @@
       "id": "6",
       "image": "ret-6",
       "flash": true,
-      "text": "There was a flash of white, and then a silence longer than any fold.",
+      "text": "There was a flash of white and then a silence longer than any fold.",
       "chord": [46, 53, 57, 64],
       "from": { "scale": 1.05, "x": 0, "y": 0 },
       "to": { "scale": 1.4, "x": 0, "y": 0 }
@@ -84,7 +84,7 @@
       "id": "8c",
       "image": "ret-8c",
       "when": "covenant",
-      "text": "In the Covenant's listening room, the eldest listener watched your drive flare vanish into the lens, and closed your dossier.",
+      "text": "In the Covenant's listening room, the eldest listener watched your drive flare vanish into the lens and closed your dossier.",
       "chord": [38, 45, 53, 64],
       "from": { "scale": 1.05, "x": -4, "y": 0 },
       "to": { "scale": 1.15, "x": 2, "y": 0 }
