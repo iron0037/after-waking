@@ -41,8 +41,12 @@ export function ambienceFor(body: Pick<Body, "kind" | "pressureAtm" | "sea">): A
   return beds;
 }
 
+/** Every wind layer's level, against the other beds: playtest found the wind distracting (AW-287). */
+const WIND_LEVEL = 0.55;
+
 /** A wind layer: bandpassed noise whose pitch and strength wander. Returns its sources. */
-function wind(ctx: AudioContext, out: AudioNode, o: { f: number; q: number; level: number; gust: number; rate: number }): AudioScheduledSourceNode[] {
+function wind(ctx: AudioContext, out: AudioNode, opts: { f: number; q: number; level: number; gust: number; rate: number }): AudioScheduledSourceNode[] {
+  const o = { ...opts, level: opts.level * WIND_LEVEL };
   const src = loopNoise(ctx);
   const bp = ctx.createBiquadFilter();
   bp.type = "bandpass";
