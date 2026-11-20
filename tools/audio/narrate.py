@@ -64,7 +64,7 @@ def cut_hiss_tail(samples: np.ndarray, rate: int) -> np.ndarray:
 
 def render_parts(kokoro: Kokoro, parts: list[dict], voice: str, speed: float, path: Path) -> float:
     """A line delivered in pieces (AW-277): each part is "say" (text) or "phonemes" (IPA, to place the stress),
-    with its own "speed" and a "pause" in seconds after it. Each piece's tail is trimmed tight, so nothing
+    with its own "speed", "gain" (against the loudest part) and a "pause" in seconds after it. Each piece's tail is trimmed tight, so nothing
     trails off into a stray sound, and given a short fade."""
     rate = 24000
     chunks = []
@@ -77,6 +77,8 @@ def render_parts(kokoro: Kokoro, parts: list[dict], voice: str, speed: float, pa
         if len(loud):
             samples = samples[max(0, loud[0] - int(rate * 0.01)) : loud[-1] + int(rate * 0.04)]
         samples = cut_hiss_tail(samples, rate)
+        # Every part to the same peak, then its own "gain": a quieter, unstressed word after a stressed one.
+        samples = samples * (part.get("gain", 1.0) / (float(np.max(np.abs(samples))) or 1.0))
         fade = int(rate * 0.03)
         samples = samples.copy()
         samples[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=samples.dtype)

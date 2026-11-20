@@ -98,8 +98,9 @@
       "text": "They'll wake up now. Or... we will.",
       "parts": [
         { "say": "They'll wake up now.", "speed": 0.88, "pause": 1.1 },
-        { "phonemes": "ˈɔːɹ", "speed": 0.8, "pause": 0.75 },
-        { "phonemes": "wˈiː wɪl.", "speed": 0.72 }
+        { "phonemes": "ˈɔːɹ", "speed": 0.8, "pause": 0.75, "gain": 0.75 },
+        { "phonemes": "wˈiː", "speed": 0.7, "pause": 0.06 },
+        { "phonemes": "wɪl.", "speed": 0.85, "gain": 0.5 }
       ],
       "chord": [38, 45, 52, 62],
       "from": { "scale": 1.15, "x": 2, "y": 0 },
