@@ -1,0 +1,16 @@
+name: Idea or feedback
+description: Suggest a feature, or tell us how a part of the game feels to play.
+labels: [idea]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea or feedback
+      description: What would you like to see, or what felt off? Why?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else?
+      description: Examples from other games, screenshots or sketches all help.

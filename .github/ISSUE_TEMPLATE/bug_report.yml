@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in the game doesn't work the way it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Land on ...
+        2. Drive the rover to ...
+        3. ...
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where in the game?
+      options:
+        - The Intrepid (Exchange, Shipyard, crew, research)
+        - Star map or system view
+        - Planet surface
+        - Encounter or combat
+        - Journal, Archive or menus
+        - Intro or ending
+        - Sound
+        - Somewhere else
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Chrome 140 on Windows 11
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot
+      description: Drag in a screenshot here.
