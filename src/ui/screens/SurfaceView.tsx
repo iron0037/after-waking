@@ -2,6 +2,7 @@
  * Planet surface: a survey map over the whole world (one continuous hex map in planet-wide coordinates, drawn
  * region by region as the camera follows the rover), and the prospect → drill → haul loop.
  */
+import { pickCreatureCall } from "../audio/creatures";
 import { ambienceFor } from "../audio/ambience";
 import { audio } from "../audio/engine";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -513,6 +514,18 @@ function Surface({ session, loc }: { session: GameSession; loc: SurfaceLoc }) {
   const selectedFlora: FloraMark | null = floraFoundSel ? { f: floraFoundSel.site, know: floraFoundSel.know } : null;
   const hexData: HexInfo | null = hexSel ? hexInfo(state, world, hexSel.x, hexSel.y) : null;
   const creatures = visibleCreatures(state, world);
+  // Now and then a creature near the rover (or the ship) calls out (AW-31): nearer is louder, panned to its side.
+  const callRef = useRef({ creatures, listener: (loc.rover ?? loc.ship ?? null) as Vec2 | null });
+  callRef.current = { creatures, listener: loc.rover ?? loc.ship ?? null };
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const { creatures: cs, listener } = callRef.current;
+      if (!listener || session.busy || Math.random() > 0.45) return;
+      const pick = pickCreatureCall(cs, listener, hexDistance, Math.random);
+      if (pick) audio.playFile(`./assets/sfx/${pick.call}.ogg`, "ambience", pick.gain, pick.pan);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [loc.bodyId]);
   const selectedCreature: LiveCreature | null = creatureKey ? creatureByKey(state, world, loc.bodyId, creatureKey) : null;
   const creatureAt = (t: Vec2): LiveCreature | undefined => creatures.find((c) => c.x === t.x && c.y === t.y);
 

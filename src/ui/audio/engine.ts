@@ -256,6 +256,33 @@ class AudioEngine {
     }
   }
 
+  /** Play a recorded sound (a creature's call) on a bus, at `gain` (0-1) and `pan` (-1 left to 1 right). */
+  playFile(url: string, bus: Bus = "ambience", gain = 1, pan = 0): void {
+    const ctx = this.ready();
+    const mix = this.mix(bus);
+    if (!ctx || !mix || this.settings[bus] <= 0) return;
+    void this.sample(url).then((buf) => {
+      if (!buf || !this.ready()) return;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      let head: AudioNode = g;
+      if (typeof ctx.createStereoPanner === "function") {
+        const p = ctx.createStereoPanner();
+        p.pan.value = pan;
+        g.connect(p);
+        head = p;
+      }
+      head.connect(mix.dry);
+      const send = ctx.createGain();
+      send.gain.value = 0.35;
+      head.connect(send).connect(mix.wet);
+      src.connect(g);
+      src.start();
+    });
+  }
+
   /** Run a loop for `ms` milliseconds (a drilling job's time-lapse). */
   loopFor(id: LoopId, ms: number, bus: Bus = "sfx"): void {
     const h = this.loop(id, bus);

@@ -66,8 +66,11 @@ and narration follow them too.
    background beds on the new Ambience slider: each world's weather by kind (thin wind, desert, living world,
    ocean surf, ice, hothouse, volcanic, airless), a lapping exotic sea, and the Intrepid's hum while docked
    (`src/ui/audio/ambience.ts`). The drill sound is hammer strikes only (AW-284).
-   **Still to come:** creature calls, and anything the synthesized versions don't carry, from Stable Audio Open
-   (it needs its model downloaded from Hugging Face after accepting Stability's license).
+   **Creature calls (Stable Audio Open), done:** five calls in `public/assets/sfx/creature-*.ogg`, one per kind:
+   sea life moans, hunters growl, big grazers bellow, skittish things click, the rest chirp
+   (`src/ui/audio/creatures.ts`). Every 7 s or so, a creature within 9 hexes of the rover (or the ship) may call,
+   louder when near and panned to its side, on the ambience bus. Takes are mastered to even loudness by
+   `tools/audio/master_sfx.py`.
 3. **Combat (AW-286), done:** each battle turn plays in order: thrusters when the range changes, our lasers
    and kinetic battery, the far-off explosion when they land, their fire coming in, then a hull impact, a
    shield shimmer or a near miss, and the klaxon when a system is knocked past half or out. Endings: a fanfare
