@@ -451,6 +451,132 @@
         1344,
         768
       ]
+    },
+    {
+      "id": "awk-1",
+      "prompt": "Deep space. a small battered boxy cargo freighter starship with a worn gray hull and faded orange stripes, small, seen from behind, engines glowing orange, flies toward the end of the universe: ahead, the starfield stops at a perfectly straight, razor-sharp vertical line, and beyond it is nothing at all, a flat, featureless pale gray blank like the edge of a sheet of paper. Eerie, quiet, wrong. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Deep space. a small battered boxy cargo freighter starship with a worn gray hull and faded orange stripes, small, seen from behind, engines glowing orange, flies toward the end of the universe: ahead, the starfield stops at a perfectly straight, razor-sharp vertical line, and beyond it is nothing at all, a flat, featureless pale gray blank like the edge of a sheet of paper. Eerie, quiet, wrong. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-2",
+      "prompt": "The cramped cockpit of a small cargo starship, seen from behind the crew. Three crew members in worn flight jackets sit at amber and green consoles whose screens show only flat lines. Through the wide windshield ahead, the stars end at a perfectly straight vertical line, and beyond it is a flat, featureless pale gray blank. Uneasy, hushed. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "The cramped cockpit of a small cargo starship, seen from behind the crew. Three crew members in worn flight jackets sit at amber and green consoles whose screens show only flat lines. Through the wide windshield ahead, the stars end at a perfectly straight vertical line, and beyond it is a flat, featureless pale gray blank. Uneasy, hushed. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-3",
+      "prompt": "A cramped, dim listening room crammed with old radio equipment, tangled cables, glowing oscilloscopes and banks of small screens. An old woman with gray hair and large headphones leans toward a microphone, eyes closed, listening. On the main screen in front of her, a field of stars ends at a perfectly straight line. Calm, knowing, tender. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "A cramped, dim listening room crammed with old radio equipment, tangled cables, glowing oscilloscopes and banks of small screens. An old woman with gray hair and large headphones leans toward a microphone, eyes closed, listening. On the main screen in front of her, a field of stars ends at a perfectly straight line. Calm, knowing, tender. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-4",
+      "prompt": "The cockpit of a small cargo starship dissolving into light: the consoles, the seats and the silhouettes of the crew break apart into drifting square blocks and fading grid lines, scattering into a soft white glow, as if a picture were coming apart. Silent, dreamlike, gentle. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "The cockpit of a small cargo starship dissolving into light: the consoles, the seats and the silhouettes of the crew break apart into drifting square blocks and fading grid lines, scattering into a soft white glow, as if a picture were coming apart. Silent, dreamlike, gentle. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-5",
+      "prompt": "Seen from inside a cryogenic sleep pod, looking up through a curved glass lid thickly frosted with ice crystals. Cold blue light glows blurrily beyond the frost. A thin wisp of white vapor curls along the glass, and a seam of light opens at one edge as the lid begins to lift. Cold, hushed, the first moment of waking. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Seen from inside a cryogenic sleep pod, looking up through a curved glass lid thickly frosted with ice crystals. Cold blue light glows blurrily beyond the frost. A thin wisp of white vapor curls along the glass, and a seam of light opens at one edge as the lid begins to lift. Cold, hushed, the first moment of waking. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-6",
+      "prompt": "Close up of an old, worn status panel set into a white curved wall beside an open cryogenic sleep pod: a small boxy monochrome green screen with rows of glowing blocks and a single blinking cursor, chunky physical buttons beneath it, frost on the bezel, cold blue light. Old, patient, technical. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Close up of an old, worn status panel set into a white curved wall beside an open cryogenic sleep pod: a small boxy monochrome green screen with rows of glowing blocks and a single blinking cursor, chunky physical buttons beneath it, frost on the bezel, cold blue light. Old, patient, technical. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-7",
+      "prompt": "A vast, cold cryogenic sleep deck aboard a generation ship: endless rows of frosted glass sleep pods stretching away into the distance in perfect lines, thousands of them, each with a sleeping person inside, faint blue light, wisps of cold vapor along the floor. One pod in the foreground stands open and empty. Immense, still, sacred. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "A vast, cold cryogenic sleep deck aboard a generation ship: endless rows of frosted glass sleep pods stretching away into the distance in perfect lines, thousands of them, each with a sleeping person inside, faint blue light, wisps of cold vapor along the floor. One pod in the foreground stands open and empty. Immense, still, sacred. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-8",
+      "prompt": "Through a great curved viewport aboard a generation ship, a dense, familiar band of the Milky Way fills the sky, and far ahead one small, steady orange-red star shines a little brighter than the rest. The dark frame of the window and frost on its edges in the foreground. Calm, true, enormous. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "Through a great curved viewport aboard a generation ship, a dense, familiar band of the Milky Way fills the sky, and far ahead one small, steady orange-red star shines a little brighter than the rest. The dark frame of the window and frost on its edges in the foreground. Calm, true, enormous. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
+    },
+    {
+      "id": "awk-10",
+      "prompt": "A lone person in a thin pale gown, seen from behind, barefoot on a cold metal deck between long rows of frosted glass cryogenic sleep pods with sleepers inside. They rest one hand on the frosted lid of the next pod, wiping a clear patch to see the face beneath. Cold blue light, a faint warm glow from one panel. Quiet resolve, the start of something. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_prompt": "A lone person in a thin pale gown, seen from behind, barefoot on a cold metal deck between long rows of frosted glass cryogenic sleep pods with sleepers inside. They rest one hand on the frosted lid of the next pod, wiping a clear patch to see the face beneath. Cold blue light, a faint warm glow from one panel. Quiet resolve, the start of something. Pixel art, wide cinematic illustration, limited palette, crisp pixel edges, no text.",
+      "moss_negative": "text, letters, words, numbers, caption, watermark, border, frame",
+      "seed": 1,
+      "pixel": 4,
+      "colors": 48,
+      "cutout": false,
+      "moss_size": [
+        1344,
+        768
+      ]
     }
   ]
 }

@@ -1,0 +1,98 @@
+{
+  "_comment": "The Awaken ending's cinematic (AW-277). Read by the game (src/ui/Cinematic.tsx) and by tools/audio/narrate.py --script, which renders public/assets/ending-awaken/vo-<id>.ogg. Same format as ending-return.json: a scene's \"voice\" overrides the narrator's, \"speaker\" labels the caption, \"say\" is what's spoken when it differs from the caption, and \"chord\" is the music's chord (MIDI notes, low to high).",
+  "voice": "bf_emma",
+  "speed": 0.92,
+  "title": "AWAKEN",
+  "titleChord": [40, 47, 54, 56, 63],
+  "scenes": [
+    {
+      "id": "1",
+      "image": "awk-1",
+      "text": "Nobody aboard said what they were all thinking. Ahead, the stars ended in a straight line, like the edge of a page.",
+      "chord": [38, 45, 52, 57],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.25, "x": 2, "y": 0 }
+    },
+    {
+      "id": "2",
+      "image": "awk-2",
+      "speaker": "Navigation",
+      "voice": "af_sarah",
+      "text": "Scanner's returning nothing past the line, Captain. Not dark. Nothing. Like it was never drawn.",
+      "chord": [36, 43, 50, 55],
+      "from": { "scale": 1.15, "x": 0, "y": 3 },
+      "to": { "scale": 1.05, "x": 0, "y": 0 }
+    },
+    {
+      "id": "3",
+      "image": "awk-3",
+      "speaker": "The eldest listener",
+      "voice": "bf_isabella",
+      "text": "Thirty years we listened for this seam. Go gently, Captain. And when you wake, wake the rest of us.",
+      "speed": 0.88,
+      "trimTail": true,
+      "chord": [38, 45, 53, 64],
+      "from": { "scale": 1.05, "x": -4, "y": 0 },
+      "to": { "scale": 1.18, "x": 2, "y": 0 }
+    },
+    {
+      "id": "4",
+      "image": "awk-4",
+      "flash": true,
+      "text": "There was no impact. The hull, the cabin, the hum of the drive went out the way a room goes out when you close your eyes.",
+      "chord": [41, 48, 55, 60],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.35, "x": 0, "y": 0 }
+    },
+    {
+      "id": "5",
+      "image": "awk-5",
+      "text": "Cold. Glass, frosted from the inside. A hiss of gas, and a lid that lifts.",
+      "chord": [40, 47, 54, 59],
+      "from": { "scale": 1.3, "x": 0, "y": 0 },
+      "to": { "scale": 1.05, "x": 0, "y": 0 }
+    },
+    {
+      "id": "6",
+      "image": "awk-6",
+      "text": "Above you, a status panel blinks in an old typeface: ISS INTREPID · CRYOSTASIS · VOYAGE YEAR 2,686 OF 3,900.",
+      "say": "Above you, a status panel blinks in an old typeface. Intrepid. Cryostasis. Voyage year two thousand, six hundred and eighty six, of three thousand, nine hundred.",
+      "chord": [40, 47, 52, 59],
+      "from": { "scale": 1.05, "x": -3, "y": 0 },
+      "to": { "scale": 1.2, "x": 3, "y": 0 }
+    },
+    {
+      "id": "7",
+      "image": "awk-7",
+      "text": "The pods stretch away down the deck in their thousands, every face inside asleep and dreaming. Somewhere among them is your crew.",
+      "chord": [36, 43, 52, 59],
+      "from": { "scale": 1.2, "x": 0, "y": 0 },
+      "to": { "scale": 1.05, "x": 0, "y": 2 }
+    },
+    {
+      "id": "8",
+      "image": "awk-8",
+      "text": "Beyond the viewport, the stars are the right ones: the ones on the old charts.",
+      "chord": [45, 52, 56, 61],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.2, "x": 0, "y": -2 }
+    },
+    {
+      "id": "9",
+      "image": "awk-6",
+      "text": "The panel blinks again: SESSION ENDED. RESUME?",
+      "say": "The panel blinks again. Session ended. Resume?",
+      "chord": [40, 47, 54, 56],
+      "from": { "scale": 1.25, "x": 2, "y": 0 },
+      "to": { "scale": 1.4, "x": 2, "y": 0 }
+    },
+    {
+      "id": "10",
+      "image": "awk-10",
+      "text": "You could go back to sleep. Or you could start waking the others.",
+      "chord": [40, 47, 56, 59, 64],
+      "from": { "scale": 1.1, "x": 0, "y": 0 },
+      "to": { "scale": 1.22, "x": 0, "y": 2 }
+    }
+  ]
+}

@@ -28,7 +28,9 @@ import {
   volunteerForAnomaly,
   type CareerReport,
   type EndingId,
+  type GameState,
 } from "../sim";
+import awakenScript from "../data/ending-awaken.json";
 import returnScript from "../data/ending-return.json";
 import { Cinematic, type CinematicScene } from "./Cinematic";
 import { audio } from "./audio/engine";
@@ -82,6 +84,18 @@ export function returnScenes(coda: "covenant" | "plain"): CinematicScene[] {
   return returnScript.scenes
     .filter((s) => !("when" in s) || s.when === coda)
     .map((s) => ({ ...s, audio: `vo-${s.id}` }) as CinematicScene);
+}
+
+/** The Awaken ending's cinematic (AW-277): the edge, the seam, and the cryodeck. */
+export function awakenScenes(): CinematicScene[] {
+  return awakenScript.scenes.map((s) => ({ ...s, audio: `vo-${s.id}` }) as CinematicScene);
+}
+
+/** Each ending's cinematic: its panels, folder and closing title. */
+function cinematicFor(state: GameState, id: EndingId): { scenes: CinematicScene[]; dir: string; title: string; titleChord: number[] } {
+  return id === "return"
+    ? { scenes: returnScenes(returnCoda(state)), dir: "./assets/ending-return", title: returnScript.title, titleChord: returnScript.titleChord }
+    : { scenes: awakenScenes(), dir: "./assets/ending-awaken", title: awakenScript.title, titleChord: awakenScript.titleChord };
 }
 
 // --- the anomaly, on the star map -----------------------------------------------------------------
@@ -237,8 +251,8 @@ function reportRows(r: CareerReport): [string, string][] {
 export function EndingScreen({ session, onTitle }: { session: GameSession; onTitle: () => void }) {
   const ending = session.state.ending;
   const [showReport, setShowReport] = useState(false);
-  // The Return ending opens with its cinematic (AW-277); it can be watched again from the card.
-  const [watching, setWatching] = useState(ending?.id === "return");
+  // Each ending opens with its cinematic (AW-277); it can be watched again from the card.
+  const [watching, setWatching] = useState(!!ending);
   useEffect(() => {
     if (ending) enterHall(ending.report);
   }, [ending]);
@@ -249,13 +263,14 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
   if (!ending) return null;
   const text = endingText(session.state, ending.id);
   const r = ending.report;
-  if (watching && ending.id === "return") {
+  if (watching) {
+    const film = cinematicFor(session.state, ending.id);
     return (
       <Cinematic
-        scenes={returnScenes(returnCoda(session.state))}
-        dir="./assets/ending-return"
-        title={returnScript.title}
-        titleChord={returnScript.titleChord}
+        scenes={film.scenes}
+        dir={film.dir}
+        title={film.title}
+        titleChord={film.titleChord}
         what="ending"
         onDone={() => setWatching(false)}
       />
@@ -280,11 +295,9 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
               </p>
             </div>
             <div class="btn-row ending-actions">
-              {ending.id === "return" && (
-                <button class="btn" onClick={() => setWatching(true)}>
-                  ◂ Watch again
-                </button>
-              )}
+              <button class="btn" onClick={() => setWatching(true)}>
+                ◂ Watch again
+              </button>
               <button class="btn primary big" onClick={() => setShowReport(true)}>
                 Career report ▸
               </button>

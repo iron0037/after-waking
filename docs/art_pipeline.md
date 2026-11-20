@@ -65,6 +65,12 @@ Image-to-image keeps the outline, so it won't add parts outside it. For the land
 - Nine panels, `ret-1` … `ret-8c` in `tools/art/manifest.json`, rendered with MOSS at 1344×768 like the intro (seed 1, except ret-2 at seed 3: seed 1 put garbled lettering on a banner). They live in `public/assets/ending-return/`.
 - Script, speakers, voices, chords and motion are in `src/data/ending-return.json`. Scenes marked `"when": "covenant"` replace the plain coda for a captain with 3+ Covenant clues.
 - Voices: `E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py --script src/data/ending-return.json --out public/assets/ending-return`. The narrator is bf_emma; the council is bm_george, launch control am_michael, navigation af_sarah, and the eldest listener bf_isabella.
+
+## The Awaken ending's cinematic (AW-277)
+- Ten scenes on nine panels, `awk-1` … `awk-10` in `tools/art/manifest.json` (awk-6, the status panel, plays twice), rendered with MOSS at 1344×768, seed 1. They live in `public/assets/ending-awaken/`.
+- The scenes: the edge of the Verge, the cockpit, the eldest listener on the radio, the ship dissolving, the frosted pod lid, the status panel, the cryodeck, the true stars, "Session ended. Resume?", and the captain at the next pod.
+- Script and voices: `src/data/ending-awaken.json`, rendered with `narrate.py --script src/data/ending-awaken.json --out public/assets/ending-awaken`. The narrator is bf_emma, navigation af_sarah, and the eldest listener bf_isabella. The panel's text is spoken plainly ("Intrepid. Cryostasis...") and shown in full in the caption, since MOSS can't letter.
+- Both endings open with their cinematic and can be watched again from the ending card.
 - The player is `src/ui/Cinematic.tsx`, shared with the intro.
 
 ## Voice: Kokoro (`E:\Kokoro`)
