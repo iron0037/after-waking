@@ -79,14 +79,17 @@ and narration follow them too.
 
 ## Music (AW-274)
 
-The soundtrack is a set of looping cues, each a Stable Audio Open render picked by ear from three takes, like the creature calls.
+The soundtrack is a set of looping cues, each a Stable Audio Open render picked by ear from three takes, like the creature calls. The picks are noted in `tools/audio/music.json`. Those are title 3, Intrepid 3 (a lounge prompt; the first prompt sounded like a church fugue), space 2, combat 2, calm 1, wild 3, dire 1 and strange 1.
 
 | Cue | Plays |
 |---|---|
 | `music-title` | The title screen, and under the ending card |
 | `music-intrepid` | The Intrepid and the clan outposts |
 | `music-space` | The star map and system view |
-| `music-surface` | On a planet's surface |
+| `music-surface-calm` | Landed on asteroids, barren rock, ice and desert: serene and contemplative |
+| `music-surface-wild` | Landed on green and ocean worlds: a sense of adventure |
+| `music-surface-dire` | Landed on volcanic and hothouse worlds: foreboding |
+| `music-surface-strange` | Landed on a world with a methane, ammonia, nitrogen or acid sea: discordant and odd |
 | `music-combat` | While a raider is on the scope (contact, hail, battle) |
 
 - **Choosing the cue:** `musicFor()` in `src/ui/audio/music.ts` picks it from the screen and the encounter, and `App` plays it. `audio.music()` crossfades between cues over 2.5 s, and a cue asked for before the first click starts with it. Cinematics have their own score, so the soundtrack steps aside for them.

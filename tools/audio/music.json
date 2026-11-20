@@ -6,35 +6,109 @@
       "prompt": "ambient space synthesizer music, slow warm analog pads, distant shimmering arpeggio, wistful and hopeful, 1980s science fiction soundtrack, 70 BPM",
       "negative": "low quality, distorted, clipping, speech, voices, vocals, drums",
       "seconds": 45,
-      "seeds": [1, 2, 3]
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 3
     },
     {
       "id": "music-intrepid",
-      "prompt": "calm ambient synthesizer music for a starship's living quarters, soft electric piano chords over gentle pads, warm, safe and reflective, retro 1980s synth, 72 BPM",
-      "negative": "low quality, distorted, clipping, speech, voices, vocals, drums",
+      "prompt": "chill lounge music, smooth downtempo, mellow electric piano with soft jazzy seventh chords, warm round bass, gentle brushed drums, relaxed late-night bar aboard a space station, 90 BPM",
+      "negative": "low quality, distorted, clipping, speech, voices, vocals, organ, choir, church",
       "seconds": 45,
-      "seeds": [1, 2, 3]
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 3
     },
     {
       "id": "music-space",
       "prompt": "deep space ambient music, vast slow evolving analog synth drones, sparse bell-like tones, mysterious and lonely, cosmic exploration, 60 BPM",
       "negative": "low quality, distorted, clipping, speech, voices, vocals, drums",
       "seconds": 45,
-      "seeds": [1, 2, 3]
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 2
     },
     {
-      "id": "music-surface",
+      "id": "music-surface-calm",
       "prompt": "minimal ambient synthesizer music for exploring an alien planet, quiet pulsing sequence, airy pads, curious and slightly eerie, retro science fiction, 80 BPM",
       "negative": "low quality, distorted, clipping, speech, voices, vocals, loud drums",
       "seconds": 45,
-      "seeds": [1, 2, 3]
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 1,
+      "note": "Rendered as music-surface with this prompt; take 1 kept for calm worlds."
+    },
+    {
+      "id": "music-surface-calm",
+      "prompt": "minimal ambient synthesizer music for exploring an alien planet, quiet pulsing sequence, airy pads, curious and slightly eerie, retro science fiction, 80 BPM",
+      "negative": "low quality, distorted, clipping, speech, voices, vocals, loud drums",
+      "seconds": 45,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 1
+    },
+    {
+      "id": "music-surface-wild",
+      "prompt": "adventurous exploration music, uplifting synthesizers and soft strings, bright rising arpeggios, a sense of wonder discovering a lush green alien world, retro science fiction soundtrack, 100 BPM",
+      "negative": "low quality, distorted, clipping, speech, voices, vocals",
+      "seconds": 45,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 3
+    },
+    {
+      "id": "music-surface-dire",
+      "prompt": "dark foreboding ambient music, low ominous synth drones, slow heavy distant percussion, deep rumbling, a menacing volcanic alien world, retro science fiction soundtrack, 70 BPM",
+      "negative": "low quality, distorted, clipping, speech, voices, vocals",
+      "seconds": 45,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 1
+    },
+    {
+      "id": "music-surface-strange",
+      "prompt": "quirky discordant experimental electronic music, detuned synth blips and warbles, odd off-kilter rhythm, playful yet unsettling, a strange alien world with seas of methane, retro science fiction, 95 BPM",
+      "negative": "low quality, distorted, clipping, speech, voices, vocals",
+      "seconds": 45,
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 1
     },
     {
       "id": "music-combat",
       "prompt": "tense retro synthesizer battle music, driving bass sequence, urgent pulsing arpeggios, electronic percussion, dark science fiction space combat, 128 BPM",
       "negative": "low quality, distorted, clipping, speech, voices, vocals",
       "seconds": 45,
-      "seeds": [1, 2, 3]
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "picked": 2
     }
   ]
 }

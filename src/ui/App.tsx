@@ -111,9 +111,11 @@ function Game({ session, onQuit }: { session: GameSession; onQuit: () => void })
   // The soundtrack follows the screen, and a raider on the scope (AW-274). The ending picks its own.
   const stage = session.state.encounter?.stage ?? null;
   const over = !!session.state.ending;
+  const landedOn = loc.kind === "surface" ? session.world.body(loc.bodyId).body : null;
+  const cue = musicFor(session.view, stage, landedOn);
   useEffect(() => {
-    if (!over) audio.music(musicUrl(musicFor(session.view, stage)));
-  }, [session.view, stage, over]);
+    if (!over) audio.music(musicUrl(cue));
+  }, [cue, over]);
 
   // The career is over (AW-199): the ending takes the whole screen.
   if (session.state.ending) return <EndingScreen session={session} onTitle={onQuit} />;

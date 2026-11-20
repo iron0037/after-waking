@@ -31,8 +31,13 @@ MODELS = Path("E:/Kokoro/models")
 PAD_S = 0.25
 
 
-def render(kokoro: Kokoro, text: str, voice: str, speed: float, path: Path) -> float:
+def render(kokoro: Kokoro, text: str, voice: str, speed: float, path: Path, trim: bool = False) -> float:
     samples, rate = kokoro.create(text, voice=voice, speed=speed, lang="en-us")
+    if trim:
+        # Cut a trailing hiss (see cut_hiss_tail), with a short fade so the cut doesn't click.
+        samples = cut_hiss_tail(samples, rate).copy()
+        fade = int(rate * 0.03)
+        samples[-fade:] *= np.linspace(1.0, 0.0, fade, dtype=samples.dtype)
     pad = np.zeros(int(rate * PAD_S), dtype=samples.dtype)
     audio = np.concatenate([pad, samples, pad])
     # Leave headroom: normalise to -1 dBFS.
@@ -122,7 +127,7 @@ def main() -> int:
         if "parts" in scene:
             secs = render_parts(kokoro, scene["parts"], voice, script["speed"], out / name)
         else:
-            secs = render(kokoro, scene.get("say", scene["text"]), voice, script["speed"], out / name)
+            secs = render(kokoro, scene.get("say", scene["text"]), voice, scene.get("speed", script["speed"]), out / name, scene.get("trimTail", False))
         print(f"{name} {voice} {secs:.1f} s  {scene['text'][:50]}", flush=True)
     return 0
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "The Return ending's cinematic (AW-277). Read by the game (src/ui/Cinematic.tsx) and by tools/audio/narrate.py --script, which renders public/assets/ending-return/vo-<id>.ogg. A scene's \"voice\" overrides the narrator's; \"speaker\" labels the caption; \"when\" picks the coda: \"plain\", or \"covenant\" for a captain with 3+ Covenant clues. \"chord\" is the music's chord for the scene (MIDI notes, low to high).",
+  "_comment": "The Return ending's cinematic (AW-277). Read by the game (src/ui/Cinematic.tsx) and by tools/audio/narrate.py --script, which renders public/assets/ending-return/vo-<id>.ogg. A scene's \"voice\" overrides the narrator's; \"speaker\" labels the caption; \"when\" picks the coda: \"plain\", or \"covenant\" for a captain with 3+ Covenant clues. \"chord\" is the music's chord for the scene (MIDI notes, low to high). A scene's \"speed\" overrides the script's; \"trimTail\" cuts a trailing hiss; \"parts\" delivers a line in pieces (see narrate.py).",
   "voice": "bf_emma",
   "speed": 0.92,
   "title": "RETURN",
@@ -95,13 +95,9 @@
       "when": "covenant",
       "speaker": "The eldest listener",
       "voice": "bf_isabella",
-      "text": "They'll wake up now. Or... we will.",
-      "parts": [
-        { "say": "They'll wake up now.", "speed": 0.88, "pause": 1.1 },
-        { "phonemes": "ˈɔːɹ", "speed": 0.8, "pause": 0.75, "gain": 0.75 },
-        { "phonemes": "wˈiː", "speed": 0.7, "pause": 0.06 },
-        { "phonemes": "wɪl.", "speed": 0.85, "gain": 0.5 }
-      ],
+      "text": "They'll wake up now... Perhaps we will, too.",
+      "speed": 0.88,
+      "trimTail": true,
       "chord": [38, 45, 52, 62],
       "from": { "scale": 1.15, "x": 2, "y": 0 },
       "to": { "scale": 1.35, "x": 6, "y": -2 }
