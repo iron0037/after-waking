@@ -61,6 +61,12 @@ Image-to-image keeps the outline, so it won't add parts outside it. For the land
 - Seven panels, `intro-1` … `intro-7` in `tools/art/manifest.json`, rendered with MOSS at 1344×768 and pixel-snapped ×4 to 336×192. They're shown full-screen with `image-rendering: pixelated` and panned or zoomed by CSS.
 - Script, captions, spoken forms and motion are in `src/data/intro.json`.
 
+## The Return ending's cinematic (AW-277)
+- Nine panels, `ret-1` … `ret-8c` in `tools/art/manifest.json`, rendered with MOSS at 1344×768 like the intro (seed 1, except ret-2 at seed 3: seed 1 put garbled lettering on a banner). They live in `public/assets/ending-return/`.
+- Script, speakers, voices, chords and motion are in `src/data/ending-return.json`. Scenes marked `"when": "covenant"` replace the plain coda for a captain with 3+ Covenant clues.
+- Voices: `E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py --script src/data/ending-return.json --out public/assets/ending-return`. The narrator is bf_emma; the council is bm_george, launch control am_michael, navigation af_sarah, and the eldest listener bf_isabella.
+- The player is `src/ui/Cinematic.tsx`, shared with the intro.
+
 ## Voice: Kokoro (`E:\Kokoro`)
 - Kokoro-82M, a small open (Apache-2.0) text-to-speech model, run through `kokoro-onnx` on the CPU. The venv is `E:\Kokoro\.venv`, and the models are in `E:\Kokoro\models` (`kokoro-v1.0.onnx`, `voices-v1.0.bin`), outside the repo.
 - `E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py` renders every intro line to `public/assets/intro/vo-<n>.ogg` (Ogg Vorbis, padded, normalised to −1 dBFS). `--only N` re-renders one line.

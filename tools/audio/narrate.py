@@ -1,10 +1,13 @@
-"""Render the intro's voiceover (AW-234) with Kokoro, a local text-to-speech model.
+"""Render a cinematic's voiceover with Kokoro, a local text-to-speech model: the intro (AW-234) by default,
+or another script such as the Return ending (AW-277) with --script and --out.
 
-Reads the lines, voice and speed from src/data/intro.json and writes public/assets/intro/vo-<n>.ogg.
-Runs in the Kokoro venv on E: (models in E:/Kokoro/models):
+Reads the lines, voice and speed from the script and writes <out>/vo-<id>.ogg (vo-<n> when scenes have
+no id). A scene's own "voice" overrides the script's narrator. Runs in the Kokoro venv on E: (models in
+E:/Kokoro/models):
 
     E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py                 # every line
     E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py --only 4        # one line (1-based)
+    E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py --script src/data/ending-return.json --out public/assets/ending-return
     E:/Kokoro/.venv/Scripts/python tools/audio/narrate.py --sample bm_george am_michael af_heart
         # one line in several voices, to tools/audio/samples/, for choosing a narrator
 """
@@ -45,9 +48,12 @@ def main() -> int:
     ap.add_argument("--only", type=int, help="render just this line (1-based)")
     ap.add_argument("--sample", nargs="+", metavar="VOICE", help="render one line in each of these voices")
     ap.add_argument("--line", type=int, default=6, help="which line --sample uses (1-based)")
+    ap.add_argument("--script", type=Path, default=SCRIPT, help="the cinematic's script (default: the intro)")
+    ap.add_argument("--out", type=Path, default=OUT, help="where the vo-*.ogg files go")
     args = ap.parse_args()
 
-    script = json.loads(SCRIPT.read_text(encoding="utf-8"))
+    script = json.loads((args.script if args.script.is_absolute() else ROOT / args.script).read_text(encoding="utf-8"))
+    out = args.out if args.out.is_absolute() else ROOT / args.out
     scenes = script["scenes"]
     kokoro = Kokoro(str(MODELS / "kokoro-v1.0.onnx"), str(MODELS / "voices-v1.0.bin"))
 
@@ -62,8 +68,10 @@ def main() -> int:
     for i, scene in enumerate(scenes, start=1):
         if args.only and i != args.only:
             continue
-        secs = render(kokoro, scene.get("say", scene["text"]), script["voice"], script["speed"], OUT / f"vo-{i}.ogg")
-        print(f"vo-{i}.ogg {secs:.1f} s  {scene['text'][:50]}", flush=True)
+        name = f"vo-{scene.get('id', i)}.ogg"
+        voice = scene.get("voice", script["voice"])
+        secs = render(kokoro, scene.get("say", scene["text"]), voice, script["speed"], out / name)
+        print(f"{name} {voice} {secs:.1f} s  {scene['text'][:50]}", flush=True)
     return 0
 
 

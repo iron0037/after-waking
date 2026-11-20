@@ -15,7 +15,7 @@ export const INTRO_CHORDS: readonly (readonly number[])[] = [
   [38, 45, 53, 64], // Dm9: a city that can't move
   [41, 48, 55, 57], // Fadd9: your freighter
 ];
-const TITLE_CHORD = [36, 43, 50, 52]; // Cadd9: After Waking
+export const TITLE_CHORD: readonly number[] = [36, 43, 50, 52]; // Cadd9: After Waking
 
 const LEVEL = 0.26;
 const GLIDE_S = 2.5;
@@ -39,15 +39,19 @@ export class IntroMusic {
   private drone: OscillatorNode;
   private filter: BiquadFilterNode;
   private wet: ConvolverNode;
-  private chord: readonly number[] = INTRO_CHORDS[0]!;
+  private chord: readonly number[];
   private chimeTimer: number | undefined;
   private stopped = false;
 
   /** `scale`: the sound settings' music level against the default (AW-31); 1 plays as composed. */
+  /** `chords` and `titleChord`: another cinematic's progression (the endings, AW-277); the intro's by default. */
   constructor(
     private ctx: BaseAudioContext,
     private scale = 1,
+    private chords: readonly (readonly number[])[] = INTRO_CHORDS,
+    private titleChord: readonly number[] = TITLE_CHORD,
   ) {
+    this.chord = chords[0] ?? INTRO_CHORDS[0]!;
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
@@ -110,13 +114,13 @@ export class IntroMusic {
 
   /** Glide to scene `i`'s chord; on the anomaly, a swell that peaks at `flashAt` seconds from now. */
   scene(i: number, flashAt?: number): void {
-    this.glide(INTRO_CHORDS[i] ?? this.chord);
+    this.glide(this.chords[i] ?? this.chord);
     if (flashAt !== undefined) this.swell(flashAt);
   }
 
   /** The closing title: the last chord, then a long fade. */
   finale(holdS: number): void {
-    this.glide(TITLE_CHORD);
+    this.glide(this.titleChord);
     const t = this.ctx.currentTime;
     this.master.gain.cancelScheduledValues(t);
     this.master.gain.setValueAtTime(this.master.gain.value, t);

@@ -223,12 +223,17 @@ export interface EndingText {
 }
 
 /** The ending's words. A captain who has read the Covenant's dossier sees one thing more. */
+/** Which coda the Return ending plays: the Covenant's, for a captain who found 3+ of their clues. */
+export function returnCoda(state: GameState): "covenant" | "plain" {
+  return clueCount(state) >= 3 ? "covenant" : "plain";
+}
+
 export function endingText(state: GameState, id: EndingId): EndingText {
   const ship = state.ship.name;
   const n = (state.crew ?? []).length;
   const officers = ["", "your one officer", "your two officers", "your three officers", "your four officers", "your five officers", "your six officers"][n] ?? `your ${n} officers`;
   const checklist = n === 0 ? "You ran the checklist twice, alone." : `You and ${officers} ran the checklist twice. Nobody said much.`;
-  const covenant = clueCount(state) >= 3;
+  const covenant = returnCoda(state) === "covenant";
   if (id === "return") {
     return {
       title: "Return",

@@ -116,6 +116,19 @@
   text-shadow: 0 1px 0 #000;
   animation: intro-caption 1.2s ease-out 0.4s both;
 }
+/* A speaking part (AW-277): the speaker's name over the quoted line. */
+.intro-caption.spoken {
+  font-style: italic;
+}
+.intro-speaker {
+  display: block;
+  margin-bottom: 4px;
+  font-style: normal;
+  font-size: 0.7em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e8a640;
+}
 @keyframes intro-caption {
   from {
     opacity: 0;

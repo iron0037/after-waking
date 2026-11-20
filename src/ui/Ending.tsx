@@ -23,11 +23,14 @@ import {
   formatDate,
   probeAnomaly,
   reportAnomaly,
+  returnCoda,
   volunteerBlockers,
   volunteerForAnomaly,
   type CareerReport,
   type EndingId,
 } from "../sim";
+import returnScript from "../data/ending-return.json";
+import { Cinematic, type CinematicScene } from "./Cinematic";
 import { cr } from "./format";
 import "./ending.css";
 import type { GameSession } from "./session";
@@ -71,6 +74,13 @@ export function enterHall(report: CareerReport): void {
 
 const ENDING_NAMES: Record<EndingId, string> = { return: "Return", awaken: "Awaken" };
 const ENDING_ART: Record<EndingId, string> = { return: "./assets/ending-return.png", awaken: "./assets/ending-awaken.png" };
+
+/** The Return ending's cinematic (AW-277): its panels, with the coda this captain earned. */
+export function returnScenes(coda: "covenant" | "plain"): CinematicScene[] {
+  return returnScript.scenes
+    .filter((s) => !("when" in s) || s.when === coda)
+    .map((s) => ({ ...s, audio: `vo-${s.id}` }) as CinematicScene);
+}
 
 // --- the anomaly, on the star map -----------------------------------------------------------------
 
@@ -225,12 +235,26 @@ function reportRows(r: CareerReport): [string, string][] {
 export function EndingScreen({ session, onTitle }: { session: GameSession; onTitle: () => void }) {
   const ending = session.state.ending;
   const [showReport, setShowReport] = useState(false);
+  // The Return ending opens with its cinematic (AW-277); it can be watched again from the card.
+  const [watching, setWatching] = useState(ending?.id === "return");
   useEffect(() => {
     if (ending) enterHall(ending.report);
   }, [ending]);
   if (!ending) return null;
   const text = endingText(session.state, ending.id);
   const r = ending.report;
+  if (watching && ending.id === "return") {
+    return (
+      <Cinematic
+        scenes={returnScenes(returnCoda(session.state))}
+        dir="./assets/ending-return"
+        title={returnScript.title}
+        titleChord={returnScript.titleChord}
+        what="ending"
+        onDone={() => setWatching(false)}
+      />
+    );
+  }
   return (
     <div class="ending-screen">
       <div class="ending-card">
@@ -250,6 +274,11 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
               </p>
             </div>
             <div class="btn-row ending-actions">
+              {ending.id === "return" && (
+                <button class="btn" onClick={() => setWatching(true)}>
+                  ◂ Watch again
+                </button>
+              )}
               <button class="btn primary big" onClick={() => setShowReport(true)}>
                 Career report ▸
               </button>

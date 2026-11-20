@@ -1,0 +1,104 @@
+{
+  "_comment": "The Return ending's cinematic (AW-277). Read by the game (src/ui/Cinematic.tsx) and by tools/audio/narrate.py --script, which renders public/assets/ending-return/vo-<id>.ogg. A scene's \"voice\" overrides the narrator's; \"speaker\" labels the caption; \"when\" picks the coda: \"plain\", or \"covenant\" for a captain with 3+ Covenant clues. \"chord\" is the music's chord for the scene (MIDI notes, low to high).",
+  "voice": "bf_emma",
+  "speed": 0.92,
+  "title": "RETURN",
+  "titleChord": [36, 43, 50, 52],
+  "scenes": [
+    {
+      "id": "1",
+      "image": "ret-1",
+      "speaker": "The council",
+      "voice": "bm_george",
+      "text": "Captain, two million people have waited thirty years for a door home. Tonight, you carry them through it.",
+      "chord": [45, 52, 59, 60],
+      "from": { "scale": 1.25, "x": 0, "y": 6 },
+      "to": { "scale": 1.08, "x": 0, "y": 0 }
+    },
+    {
+      "id": "2",
+      "image": "ret-2",
+      "text": "They gave your ship a new coat of paint, a hold full of spare probes, and a send-off from every deck of the Intrepid.",
+      "chord": [41, 48, 52, 57],
+      "from": { "scale": 1.12, "x": -5, "y": 0 },
+      "to": { "scale": 1.12, "x": 5, "y": 0 }
+    },
+    {
+      "id": "3",
+      "image": "ret-3",
+      "speaker": "Launch control",
+      "voice": "am_michael",
+      "text": "Cradle is clear, Captain. Every window on the ship is lit for you. Fly safe, and come back to us.",
+      "chord": [43, 50, 55, 59],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.2, "x": 4, "y": 0 }
+    },
+    {
+      "id": "4",
+      "image": "ret-4",
+      "text": "At the mouth, the lens turned slowly against the stars, the way it had the day you found it.",
+      "chord": [46, 53, 57, 64],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.3, "x": 0, "y": -2 }
+    },
+    {
+      "id": "5",
+      "image": "ret-5",
+      "speaker": "Navigation",
+      "voice": "af_sarah",
+      "text": "Drives are steady. Fold reserves holding. On your word, Captain.",
+      "chord": [40, 47, 55, 59],
+      "from": { "scale": 1.15, "x": 0, "y": 3 },
+      "to": { "scale": 1.05, "x": 0, "y": 0 }
+    },
+    {
+      "id": "6",
+      "image": "ret-6",
+      "flash": true,
+      "text": "There was a flash of white, and then a silence longer than any fold.",
+      "chord": [46, 53, 57, 64],
+      "from": { "scale": 1.05, "x": 0, "y": 0 },
+      "to": { "scale": 1.4, "x": 0, "y": 0 }
+    },
+    {
+      "id": "7",
+      "image": "ret-7",
+      "speaker": "Navigation",
+      "voice": "af_sarah",
+      "text": "Captain... I know these stars. That's the old course. We're on the road to Kepler-186.",
+      "say": "Captain... I know these stars. That's the old course. We're on the road to Kepler one eight six.",
+      "chord": [48, 55, 59, 62],
+      "from": { "scale": 1.2, "x": 3, "y": 0 },
+      "to": { "scale": 1.05, "x": -3, "y": 0 }
+    },
+    {
+      "id": "8",
+      "image": "ret-8",
+      "when": "plain",
+      "text": "Behind you, the lens was already fading. The Intrepid is still listening, and waiting for your return.",
+      "chord": [41, 48, 55, 57],
+      "from": { "scale": 1.1, "x": 0, "y": 0 },
+      "to": { "scale": 1.22, "x": 0, "y": 3 }
+    },
+    {
+      "id": "8c",
+      "image": "ret-8c",
+      "when": "covenant",
+      "text": "In the Covenant's listening room, the eldest listener watched your drive flare vanish into the lens, and closed your dossier.",
+      "chord": [38, 45, 53, 64],
+      "from": { "scale": 1.05, "x": -4, "y": 0 },
+      "to": { "scale": 1.15, "x": 2, "y": 0 }
+    },
+    {
+      "id": "9c",
+      "image": "ret-8c",
+      "when": "covenant",
+      "speaker": "The eldest listener",
+      "voice": "bf_isabella",
+      "text": "They'll wake up now. Or we will.",
+      "chord": [38, 45, 52, 62],
+      "from": { "scale": 1.15, "x": 2, "y": 0 },
+      "to": { "scale": 1.35, "x": 6, "y": -2 }
+    }
+  ]
+}
