@@ -213,7 +213,7 @@ export function foldPlan(state: GameState, world: World, targetId: string): Fold
   const fuel = Math.round(FOLD_FUEL_PER_T_LY * shipMassT(state.ship, stats) * ly * crew.foldFuel * (blind ? blindFoldFuel(state) : 1) * driveFuelMult(state) * 10) / 10;
   const range = stats.foldRangeLy * (blind ? blindFoldRange(state) : 1);
   const blockers: string[] = [];
-  if (isDeepId(targetId)) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId)));
+  if (isDeepId(targetId)) blockers.push(...deepPointBlockers(world, positionOf(world.galaxy, targetId), state));
 
   if (from === targetId) blockers.push("You're already here.");
   // Dead drives (AW-263): the one fold left is the limp home.

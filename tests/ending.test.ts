@@ -20,6 +20,9 @@ import {
   crossTheEdge,
   dist,
   edgeLy,
+  EDGE_MARGIN_LY,
+  BLIND_FOLD_RANGE,
+  deepPointBlockers,
   emergenceKnown,
   emergenceZone,
   INTREPID_POS,
@@ -170,6 +173,18 @@ describe("the Covenant trail (AW-202) and the edge (AW-170)", () => {
     if (!r.ok) throw new Error(r.reason);
     expect(r.value.id).toBe("awaken");
     expect(endingText(state, "awaken").paragraphs.join(" ")).toMatch(/CRYOSTASIS/);
+  });
+
+  it("the edge is an expedition: 24 ly past the last star, past the usual navigation limit (AW-294)", () => {
+    const far = Math.max(...world.galaxy.systems.map((s) => dist(s.pos, INTREPID_POS)));
+    expect(edgeLy(world)).toBeCloseTo(far + EDGE_MARGIN_LY, 0);
+    // Five blind folds on the starting drive: 8 ly × 60% = 4.8 ly a fold.
+    expect(Math.ceil(EDGE_MARGIN_LY / (8 * BLIND_FOLD_RANGE))).toBe(5);
+    const out = { x: INTREPID_POS.x + edgeLy(world) + 1, y: INTREPID_POS.y };
+    expect(deepPointBlockers(world, out).join(" ")).toMatch(/can't fix a position/);
+    const sent = newGame({ seed: 42 });
+    sent.awakenFinale = 0;
+    expect(deepPointBlockers(world, out, sent)).toEqual([]);
   });
 });
 

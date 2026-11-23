@@ -80,13 +80,22 @@ export function deepSites(world: World): DeepSite[] {
   return sites;
 }
 
+/**
+ * How far out the navigators can fix a position: DEEP_LIMIT_LY, except for a captain the Covenant has sent
+ * to the edge (AW-294), whose listeners talk them out past it.
+ */
+export function deepLimitLy(state: GameState | null, world: World): number {
+  return state?.awakenFinale !== undefined ? Math.max(DEEP_LIMIT_LY, edgeLy(world) + EDGE_BEYOND_LY) : DEEP_LIMIT_LY;
+}
+
 /** Why the ship can't fold to this point in deep space (empty if it can). */
-export function deepPointBlockers(world: World, p: Vec2): string[] {
+export function deepPointBlockers(world: World, p: Vec2, state: GameState | null = null): string[] {
+  const limit = deepLimitLy(state, world);
   const out: string[] = [];
   const near = world.galaxy.systems.find((s) => dist(s.pos, p) < DEEP_CLEARANCE_LY);
   if (near) out.push(`That's inside ${near.name}'s reach: fold to the star itself.`);
   if (dist(p, INTREPID_POS) < DEEP_CLEARANCE_LY) out.push("That's the Intrepid's doorstep: fold to the Intrepid.");
-  if (dist(p, INTREPID_POS) > DEEP_LIMIT_LY) out.push(`The navigators can't fix a position more than ${DEEP_LIMIT_LY} ly out: the star references thin out.`);
+  if (dist(p, INTREPID_POS) > limit) out.push(`The navigators can't fix a position more than ${limit} ly out: the star references thin out.`);
   return out;
 }
 
@@ -238,13 +247,18 @@ export const EMERGENCE_NOTE =
 
 // --- the edge (AW-170) ----------------------------------------------------------------------------
 
-/** The edge lies this far past the outermost star of the Verge. */
-export const EDGE_MARGIN_LY = 4;
+/**
+ * The edge lies this far past the outermost star of the Verge (AW-294): 5 blind folds on the starting
+ * 8 ly drive, 4 on a 13 ly drive, 3 with Dark Fold. An expedition, not a hop.
+ */
+export const EDGE_MARGIN_LY = 24;
+/** A Covenant-sent captain can fix positions this far past the edge. */
+export const EDGE_BEYOND_LY = 6;
 
-/** How far out the edge of the Verge is: a little past the last star. */
+/** How far out the edge of the Verge is: well past the last star. */
 export function edgeLy(world: World): number {
   const far = Math.max(0, ...world.galaxy.systems.map((s) => dist(s.pos, INTREPID_POS)));
-  return Math.round(Math.min(DEEP_LIMIT_LY - 4, Math.max(22, far + EDGE_MARGIN_LY)) * 10) / 10;
+  return Math.round(Math.max(22, far + EDGE_MARGIN_LY) * 10) / 10;
 }
 
 /** Is the ship out past the last star, at the edge? */

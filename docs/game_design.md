@@ -109,7 +109,7 @@ Epilogue slides would reflect everything you achieved.
   2. Send a probe through (needs a probe bay and a probe). Its one frame shows the sky of the Intrepid's old course: the way home.
   3. Report to the council aboard the Intrepid: a hero's welcome, 25,000 cr, +10 standing with every clan.
   4. Volunteer to fly through, whenever you're ready. The story stops at the threshold. A captain with 3+ Covenant clues gets a stranger coda.
-- **Awaken, as built.** At 5 clues the Covenant marks the edge on your charts: 4 ly past the outermost star of the Verge (22–36 ly out, by seed). A deep-field sweep there finds the seam; flying into it ends the career. The captain wakes in a cryopod on the real Intrepid, voyage year 2,686 of 3,900. One way: no fold back.
+- **Awaken, as built.** At 5 clues the Covenant marks the edge on your charts: 24 ly past the outermost star of the Verge (AW-294; about 40–55 ly out, by seed). That's 5 blind folds on the starting 8 ly drive, 4 on a 13 ly drive and 3 with Dark Fold, an expedition planned around a full tank from the last outpost. A Covenant-sent captain's navigators can fix positions past the usual 40 ly limit, out to 6 ly beyond the edge. A deep-field sweep there finds the seam; flying into it ends the career. The captain wakes in a cryopod on the real Intrepid, voyage year 2,686 of 3,900. One way: no fold back.
 - **The Covenant trail stays hard to find (AW-202).** No new errands. Once the three errands are done, the listeners mutter an oblique hint toward one unfound clue (changing every few weeks); the future-dated journal entry announces itself with one strange log line and glitches now and then; Sixth Sense notices a seam in about one landing region in three.
 
 ## Systems Map (Starflight → ours)
