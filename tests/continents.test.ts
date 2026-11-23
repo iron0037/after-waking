@@ -31,8 +31,9 @@ describe("continents (AW-210)", () => {
     expect(Math.max(...shares)).toBeGreaterThan(0.6);
   });
 
+  // Generation 7: the continent field alone, before latitude climate froze the polar seas (AW-265).
   it("the surface follows the chosen share", () => {
-    const w = new World(42);
+    const w = new World(42, 7);
     let checked = 0;
     for (const sys of w.galaxy.systems) {
       for (const b of w.system(sys.id).bodies) {
@@ -45,7 +46,7 @@ describe("continents (AW-210)", () => {
   });
 
   it("the map's cheap land check agrees with the real terrain", () => {
-    const w = new World(42);
+    const w = new World(42, 7);
     let checked = 0;
     for (const sys of w.galaxy.systems) {
       for (const b of w.system(sys.id).bodies) {

@@ -7,7 +7,8 @@ import { badlandsChance, floraSitesRange, hiddenSeamChance, hostileLifeOf, oreCo
 import { CREATURES, type CreatureEntry } from "../data/creatures";
 import { SEAS } from "../data/seas";
 import { COMMODITIES, type CommodityId } from "../data/commodities";
-import { climateOf, FLORA } from "../data/catalog";
+import { climateOf, FLORA, type Climate } from "../data/catalog";
+import { climateMemo, hasClimateBands, regionZoneShares, worldZones, Zone, zoneAt, zoneClimate } from "./climate";
 import type { Body } from "./bodies";
 import { generateGalaxy, INTREPID_POS, type Galaxy } from "./galaxy";
 import { hashSeed, rngFor, type Rng } from "./rng";
@@ -66,6 +67,8 @@ export interface FloraSpec {
   /** Only crews with an Ecologist can spot it. */
   hidden?: boolean;
   species: string;
+  /** On a world with latitude climate (AW-265), the zone it grows in: it's placed there. */
+  zone?: Zone;
 }
 
 export interface FloraSite extends FloraSpec {
@@ -88,6 +91,8 @@ export interface RegionMap {
   /** Where creatures start out (AW-215), on living worlds only; where they are now lives in the save. */
   creatures?: CreatureSpawn[];
   landing: Vec2;
+  /** Each tile's climate zone (AW-265), on worlds with latitude climate only. */
+  zones?: Uint8Array;
 }
 
 /** A creature's starting place in a region (region-local coordinates). */
@@ -184,12 +189,27 @@ export function exploredFraction(k: RegionKnowledge | undefined): number {
   return count / TILES;
 }
 
-/** The handful of cataloged plant species that grow on a living world, by climate; stable per body. */
+/** The handful of cataloged plant species that grow on a living world, in every climate it has; stable per body. */
 export function bodySpecies(seed: number, body: Body): string[] {
+  const out = new Set<string>();
+  for (const z of worldZones(seed, body)) for (const s of climateSpecies(seed, body, zoneClimate(body, z))) out.add(s);
+  return [...out];
+}
+
+/**
+ * The plants of one climate on a living world. The world's own climate keeps its long-standing list (and stream);
+ * the caps and the desert belt of a world with latitude climate (AW-265) draw theirs from their own streams.
+ */
+export function climateSpecies(seed: number, body: Body, climate: Climate): string[] {
   // Life on a world with exotic seas lives in the sea (AW-189).
   if (!body.life || body.sea) return [];
-  const rng = rngFor(seed, body.id, "species");
-  const climate = climateOf(body.tempC);
+  return speciesMemo(seed, body, climate, () => pickClimateSpecies(seed, body, climate));
+}
+const speciesMemo = climateMemo<string[]>();
+const creatureMemo = climateMemo<{ land: string[]; sea: string[] }>();
+
+function pickClimateSpecies(seed: number, body: Body, climate: Climate): string[] {
+  const rng = rngFor(seed, body.id, climate === climateOf(body.tempC) ? "species" : `species-${climate}`);
   // Land plants only: sea life has its own list (aquaticSpecies), so adding it never reshuffles these.
   const pool = FLORA.filter((f) => !f.aquatic && f.climates.includes(climate));
   const names = new Set<string>();
@@ -255,7 +275,23 @@ export function regionFlora(seed: number, body: Body, region: number): FloraSpec
   if (species.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "flora");
   const [lo, hi] = floraSitesRange(seed);
-  return Array.from({ length: rng.int(lo, hi) }, (_, id) => ({ id, species: rng.pick(species) }));
+  if (!hasClimateBands(body)) return Array.from({ length: rng.int(lo, hi) }, (_, id) => ({ id, species: rng.pick(species) }));
+  const pickZone = zonePicker(seed, body, region, (z) => climateSpecies(seed, body, zoneClimate(body, z)).length > 0);
+  return Array.from({ length: rng.int(lo, hi) }, (_, id) => {
+    const zone = pickZone(rng);
+    return { id, species: rng.pick(climateSpecies(seed, body, zoneClimate(body, zone))), zone };
+  });
+}
+
+/**
+ * Picks a zone for a site in a region of a world with latitude climate (AW-265), weighted by how much of the
+ * region lies in it, among the zones `has` allows (the temperate band, if none of the region's zones qualifies).
+ */
+function zonePicker(seed: number, body: Body, region: number, has: (z: Zone) => boolean): (rng: Rng) => Zone {
+  const shares = regionZoneShares(seed, body, region);
+  const options = ([Zone.temperate, Zone.arid, Zone.polar] as const).filter((z) => shares[z] > 0 && has(z)).map((z) => [z, shares[z]] as const);
+  if (options.length === 0) return () => Zone.temperate;
+  return (rng) => rng.weighted(options);
 }
 
 /**
@@ -291,10 +327,25 @@ export function hostilesAllowed(seed: number, body: Body): boolean {
 
 const fierce = (c: CreatureEntry) => c.temperament === "hostile" || c.temperament === "territorial";
 
-/** The creature species of a living world (ids), land and sea, stable per body. */
-export function bodyCreatureSpecies(seed: number, body: Body): { land: string[]; sea: string[] } {
+/** Every land animal of a living world, in all the climates it has (AW-265). */
+export function allLandCreatures(seed: number, body: Body): string[] {
+  const out = new Set<string>();
+  for (const z of worldZones(seed, body)) for (const id of bodyCreatureSpecies(seed, body, zoneClimate(body, z)).land) out.add(id);
+  return [...out];
+}
+
+/**
+ * The creature species of a living world (ids), land and sea, stable per body. `landClimate` picks the land animals
+ * of one of its climate zones (AW-265); the world's own climate keeps its long-standing list. Sea life is the world's own.
+ */
+export function bodyCreatureSpecies(seed: number, body: Body, landClimate?: Climate): { land: string[]; sea: string[] } {
   if (!body.life) return { land: [], sea: [] };
+  return creatureMemo(seed, body, landClimate ?? "", () => pickCreatureSpecies(seed, body, landClimate));
+}
+
+function pickCreatureSpecies(seed: number, body: Body, landClimate?: Climate): { land: string[]; sea: string[] } {
   const climate = climateOf(body.tempC);
+  const zoneTag = landClimate && landClimate !== climate ? `-${landClimate}` : "";
   const badlands = isBadlands(seed, body);
   const hostile = hostilesAllowed(seed, body);
   const many = hostileLifeOf(seed) === "plentiful";
@@ -314,22 +365,34 @@ export function bodyCreatureSpecies(seed: number, body: Body): { land: string[];
   };
   const allowed = (c: CreatureEntry) => (hostile || !fierce(c)) && (badlands || !c.badlands);
   // Land animals don't live on worlds whose life is all in an exotic sea (AW-189), as with plants.
-  const land = body.sea ? [] : CREATURES.filter((c) => !c.aquatic && c.climates.includes(climate) && allowed(c));
+  const land = body.sea ? [] : CREATURES.filter((c) => !c.aquatic && c.climates.includes(landClimate ?? climate) && allowed(c));
   const wet = !body.sea && (body.kind === "terrestrial" || body.kind === "ocean") && body.tempC >= -10;
   const sea = wet ? CREATURES.filter((c) => c.aquatic && c.climates.includes(climate) && allowed(c)) : [];
-  return { land: choose(land, "creature-species", badlands ? 4 : 3, badlands ? 6 : 5), sea: choose(sea, "sea-creature-species", 1, 2) };
+  return { land: choose(land, `creature-species${zoneTag}`, badlands ? 4 : 3, badlands ? 6 : 5), sea: choose(sea, "sea-creature-species", 1, 2) };
 }
 
 /** Creatures in one region, placed with their own streams so no deposit or plant moves. */
-function regionCreatures(seed: number, body: Body, region: number, terrain: Uint8Array, w: number, h: number, landing: Vec2): CreatureSpawn[] {
+function regionCreatures(
+  seed: number,
+  body: Body,
+  region: number,
+  terrain: Uint8Array,
+  w: number,
+  h: number,
+  landing: Vec2,
+  zones: Uint8Array | null,
+): CreatureSpawn[] {
   const species = bodyCreatureSpecies(seed, body);
-  if (species.land.length + species.sea.length === 0) return [];
+  const banded = hasClimateBands(body);
+  const landOf = (z: Zone) => bodyCreatureSpecies(seed, body, zoneClimate(body, z)).land;
+  const anyLand = banded ? ([Zone.temperate, Zone.arid, Zone.polar] as const).some((z) => landOf(z).length > 0) : species.land.length > 0;
+  if (!anyLand && species.sea.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "creatures");
   const badlands = isBadlands(seed, body);
   const life = universeOf(seed).life;
   const [lo, hi] = life === "scarce" ? [1, 3] : life === "plentiful" ? [3, 6] : [2, 4];
   const out: CreatureSpawn[] = [];
-  const place = (id: string, water: boolean): void => {
+  const place = (id: string, water: boolean, zone?: Zone): void => {
     const entry = CREATURES.find((c) => c.id === id);
     const keepOff = entry && fierce(entry) ? 7 : 4;
     for (let tries = 0; tries < 120; tries++) {
@@ -337,14 +400,25 @@ function regionCreatures(seed: number, body: Body, region: number, terrain: Uint
       const y = rng.int(1, h - 2);
       const t = terrain[y * w + x] as Terrain;
       if (water ? t !== Terrain.liquid : TERRAIN_INFO[t].passable === "no") continue;
+      // Latitude climate (AW-265): a desert or polar animal keeps to its own zone.
+      if (zone !== undefined && zones && tries < 90 && zones[y * w + x] !== zone) continue;
       if (hexDistance({ x, y }, landing) < keepOff) continue;
       out.push({ id: CREATURE_ID_BASE + out.length, species: id, x, y });
       return;
     }
   };
-  if (species.land.length > 0) {
+  if (anyLand && !banded) {
     const n = rng.int(lo, hi) + (badlands ? 3 : 0);
     for (let i = 0; i < n; i++) place(rng.pick(species.land), false);
+  } else if (anyLand) {
+    // Each animal lives in a zone, weighted by how much of the region lies in it, and keeps to it.
+    const pickZone = zonePicker(seed, body, region, (z) => landOf(z).length > 0);
+    const n = rng.int(lo, hi) + (badlands ? 3 : 0);
+    for (let i = 0; i < n; i++) {
+      const zone = pickZone(rng);
+      const pool = landOf(zone);
+      if (pool.length > 0) place(rng.pick(pool), false, zone);
+    }
   }
   if (species.sea.length > 0) {
     let water = 0;
@@ -472,7 +546,12 @@ export function hiddenFlora(seed: number, body: Body, region: number, firstId: n
   const species = bodySpecies(seed, body);
   if (species.length === 0) return [];
   const rng = rngFor(seed, body.id, region, "hidden-flora");
-  return Array.from({ length: rng.int(1, 2) }, (_, i) => ({ id: firstId + i, species: rng.pick(species), hidden: true }));
+  if (!hasClimateBands(body)) return Array.from({ length: rng.int(1, 2) }, (_, i) => ({ id: firstId + i, species: rng.pick(species), hidden: true }));
+  const pickZone = zonePicker(seed, body, region, (z) => climateSpecies(seed, body, zoneClimate(body, z)).length > 0);
+  return Array.from({ length: rng.int(1, 2) }, (_, i) => {
+    const zone = pickZone(rng);
+    return { id: firstId + i, species: rng.pick(climateSpecies(seed, body, zoneClimate(body, zone))), hidden: true, zone };
+  });
 }
 
 /**
@@ -545,6 +624,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
 
   const elevation = new Float32Array(w * h);
   const terrain = new Uint8Array(w * h);
+  // Latitude climate (AW-265): each tile's zone, and ice caps toward the poles.
+  const zones = hasClimateBands(body) ? new Uint8Array(w * h) : null;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       // Sample at each hex's true center in planet-wide space: no row skew, no seams.
@@ -559,10 +640,16 @@ export function generateRegion(seed: number, body: Body, region: number): Region
         const es = contHeight(cont, e, p);
         elevation[i] = es;
         terrain[i] = classifyContinental(body, e, es, rough, seaLevel * 0.3, ruggedness);
-        continue;
+      } else {
+        elevation[i] = e;
+        terrain[i] = classify(body, e, rough, seaLevel, ruggedness);
       }
-      elevation[i] = e;
-      terrain[i] = classify(body, e, rough, seaLevel, ruggedness);
+      if (zones) {
+        const zone = zoneAt(seed, body, origin.x + x, origin.y + y);
+        zones[i] = zone;
+        // The caps: the sea freezes to pack ice and the lowlands lie under ice; the ranges stand up out of it.
+        if (zone === Zone.polar && terrain[i] !== Terrain.mountain) terrain[i] = Terrain.ice;
+      }
     }
   }
 
@@ -595,6 +682,8 @@ export function generateRegion(seed: number, body: Body, region: number): Region
       const t = terrain[y * w + x] as Terrain;
       if (reach && tries < 150 && !reach[y * w + x]) continue;
       if (TERRAIN_INFO[t].passable !== "yes") continue;
+      // Latitude climate (AW-265): a desert or polar plant grows in its own zone.
+      if (spec.zone !== undefined && zones && tries < 150 && zones[y * w + x] !== spec.zone) continue;
       if (hexDistance({ x, y }, landing) < 3) continue;
       return { ...spec, x, y };
     }
@@ -603,26 +692,27 @@ export function generateRegion(seed: number, body: Body, region: number): Region
 
   // The hidden layers, placed with their own stream so the ordinary sites above never move.
   const hiddenRng = rngFor(seed, body.id, region, "hidden-placement");
-  const spot = (minFromLanding: number, needYes: boolean): Vec2 => {
+  const spot = (minFromLanding: number, needYes: boolean, zone?: Zone): Vec2 => {
     for (let tries = 0; tries < 200; tries++) {
       const x = hiddenRng.int(1, w - 2);
       const y = hiddenRng.int(1, h - 2);
       const passable = TERRAIN_INFO[terrain[y * w + x] as Terrain].passable;
       if (passable === "no" || (needYes && passable !== "yes")) continue;
+      if (zone !== undefined && zones && tries < 150 && zones[y * w + x] !== zone) continue;
       if (hexDistance({ x, y }, landing) < minFromLanding) continue;
       return { x, y };
     }
     return { x: landing.x + 2, y: landing.y + 2 };
   };
   for (const spec of hiddenDeposits(seed, body, region, rolled.length)) deposits.push({ ...spec, ...spot(4, false) });
-  for (const spec of hiddenFlora(seed, body, region, flora.length)) flora.push({ ...spec, ...spot(3, true) });
+  for (const spec of hiddenFlora(seed, body, region, flora.length)) flora.push({ ...spec, ...spot(3, true, spec.zone) });
 
   const sea = seaSites(seed, body, region, terrain, w, h);
   deposits.push(...sea.deposits);
   flora.push(...sea.flora);
 
-  const creatures = regionCreatures(seed, body, region, terrain, w, h, landing);
-  return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, creatures, landing };
+  const creatures = regionCreatures(seed, body, region, terrain, w, h, landing, zones);
+  return { bodyId: body.id, region, origin, width: w, height: h, terrain, elevation, deposits, flora, creatures, landing, ...(zones ? { zones } : {}) };
 }
 
 /** Elevation below which a world with exotic seas is sea: lowland seas and lakes, like a terrestrial world's. */

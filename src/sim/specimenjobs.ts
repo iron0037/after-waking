@@ -12,7 +12,7 @@ import { effectiveStats, shipSpecimenSlots } from "./perks";
 import type { Rng } from "./rng";
 import { speciesCaptureChance } from "./creatures";
 import { SPECIMEN_PRICE } from "./actions";
-import { bodyCreatureSpecies, bodySpecies, regionFlora } from "./surface";
+import { allLandCreatures, bodySpecies, regionFlora } from "./surface";
 import { universeOf } from "./settings";
 import type { Contract } from "./contracts";
 import type { GameState } from "./state";
@@ -62,7 +62,7 @@ export function specimenOpportunities(state: GameState, world: World): SpecimenO
       }
       for (const [name, n] of counts) note(name, "flora", FLORA_BY_NAME.get(name)?.rarity ?? 1, n, body.id, ly);
       // Land animals: each region holds a few, shared among the world's species.
-      const { land } = bodyCreatureSpecies(state.seed, body);
+      const land = allLandCreatures(state.seed, body);
       for (const id of land) {
         const entry = CREATURES_BY_ID.get(id);
         if (entry) note(entry.name, "fauna", entry.rarity, Math.floor((body.regions * perRegion) / land.length), body.id, ly);

@@ -33,7 +33,9 @@ import { hexDistance, neighbors } from "../src/sim/hex";
 import { DAY } from "../src/sim/units";
 
 const SEED = 42;
-const world = new World(SEED);
+// Pinned to world generation 7: these capture scenes were written against its creatures (latitude climate, AW-265, reshuffles them).
+const GEN = 7;
+const world = new World(SEED, GEN);
 
 interface Found {
   bodyId: string;
@@ -67,6 +69,7 @@ type Surface = Extract<GameState["location"], { kind: "surface" }>;
 /** Landed on the creature's world with the rover out near the creature's home, and the creature `gap` hexes off. */
 function scene(f: Found, gap: number): GameState {
   const s = newGame({ seed: SEED });
+  s.worldGen = GEN;
   const surface = world.surface(f.bodyId);
   const spawn = surface.creature(f.key)!;
   const land = (p: { x: number; y: number }) => canEnter(surface, p.x, p.y, { canClimb: false });

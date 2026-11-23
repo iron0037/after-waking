@@ -5,7 +5,7 @@
  * Everything is stable per body: noise is seeded from the game seed and the body id.
  */
 import { SEAS } from "../../../data/seas";
-import { continentalLevel, fbm, hashSeed, surfaceLayout, type Body } from "../../../sim";
+import { continentalLevel, fbm, hashSeed, polarCapLat, surfaceLayout, Zone, zoneAt, type Body } from "../../../sim";
 import { BODY_COLOR, TERRAIN_COLORS } from "../../palette";
 import { hexRgb } from "./util";
 
@@ -78,6 +78,8 @@ interface Ctx {
   base: RGB;
   sea: number;
   capLat: number;
+  /** Latitude climate (AW-265): the sim's own caps and desert belt, sampled where each pixel lands on the surface map. */
+  climate: { seed: number; w: number; h: number; desert: RGB; desertRough: RGB } | null;
   bands: number;
   bandPhase: number;
   stormLon: number;
@@ -92,7 +94,7 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
   // A global ocean has no dry land at all: sea level above every peak (depth still shades the water).
   // Worlds with exotic seas (methane, ammonia, acid) have lowland seas in the sea's own color (AW-189).
   const sea = liquidWorld ? 1.05 : body.sea ? 0.44 : body.kind === "terrestrial" ? 0.46 : body.kind === "ocean" ? 0.5 : -1;
-  const capLat = body.tempC > 45 ? 9 : Math.max(0.3, Math.min(1.42, 1.45 - (15 - body.tempC) * 0.025));
+  const capLat = polarCapLat(body.tempC) ?? 9;
   const giant = body.kind === "gasGiant" || body.kind === "iceGiant";
   const layout = surfaceLayout(body);
   return {
@@ -112,6 +114,9 @@ function makeCtx(seed: number, body: Body, size: number): Ctx {
     base: hexRgb(BODY_COLOR[body.kind]),
     sea,
     capLat,
+    climate: body.climateBands
+      ? { seed, w: layout.width, h: layout.height, desert: hexRgb(TERRAIN_COLORS.desert[0]), desertRough: hexRgb(TERRAIN_COLORS.desert[1]) }
+      : null,
     bands: giant ? (body.kind === "gasGiant" ? 6 + Math.floor(rnd() * 5) : 3 + Math.floor(rnd() * 3)) : 0,
     bandPhase: rnd() * 6.28,
     stormLon: (rnd() - 0.5) * 1.1,
@@ -183,10 +188,19 @@ function rockyColor(c: Ctx, lon: number, lat: number, clouds = true): RGB {
     if (r < width) col = mixRGB(col, c.lava, 1 - r / width);
   }
 
-  // Polar caps, ragged at the edge.
-  const edge = c.capLat + (fbm(n.cap, u * 3, 0.5, 2) - 0.5) * 0.4;
-  const cap = smooth(edge - 0.05, edge + 0.05, Math.abs(lat));
-  if (cap > 0) col = mixRGB(col, c.ice, cap * (body.kind === "volcanic" ? 0.5 : 0.9));
+  if (c.climate) {
+    // Latitude climate (AW-265): the caps and the desert belt are the surface's own, read off the sim.
+    const gx = Math.max(0, Math.min(c.climate.w - 1, (lon / (Math.PI * 2) + 0.5) * c.climate.w));
+    const gy = Math.max(0, Math.min(c.climate.h - 1, (0.5 - lat / Math.PI) * c.climate.h));
+    const zone = zoneAt(c.climate.seed, body, Math.round(gx), Math.round(gy));
+    if (zone === Zone.polar) col = mixRGB(col, c.ice, 0.9);
+    else if (zone === Zone.arid && e >= c.sea) col = mixRGB(col, mixRGB(c.climate.desert, c.climate.desertRough, clamp01((e - c.sea) / 0.3)), 0.8);
+  } else {
+    // Polar caps, ragged at the edge.
+    const edge = c.capLat + (fbm(n.cap, u * 3, 0.5, 2) - 0.5) * 0.4;
+    const cap = smooth(edge - 0.05, edge + 0.05, Math.abs(lat));
+    if (cap > 0) col = mixRGB(col, c.ice, cap * (body.kind === "volcanic" ? 0.5 : 0.9));
+  }
 
   // Weather: swirled cloud decks on thick atmospheres, scattered cover on thin ones.
   if (!clouds) return col;

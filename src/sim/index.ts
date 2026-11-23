@@ -34,6 +34,7 @@ export * from "./save";
 export * from "./ship";
 export * from "./state";
 export * from "./surface";
+export * from "./climate";
 export * from "./time";
 export * from "./units";
 export * from "./world";

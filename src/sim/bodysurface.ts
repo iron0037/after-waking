@@ -6,6 +6,7 @@
  * Sites (deposits and flora) are addressed by a key "region:id", since ids are per region.
  */
 import type { Body } from "./bodies";
+import { Zone } from "./climate";
 import {
   regionAt,
   regionOrigin,
@@ -97,6 +98,13 @@ export class BodySurface implements TileSource {
     const local = this.toLocal(gx, gy);
     if (!local) return null;
     return this.regionMap(local.region).terrain[local.y * REGION_SIZE + local.x] as Terrain;
+  }
+
+  /** A tile's climate zone (AW-265): Zone.temperate on worlds without latitude climate, or off the map. */
+  zoneAt(gx: number, gy: number): Zone {
+    const local = this.toLocal(gx, gy);
+    if (!local) return Zone.temperate;
+    return (this.regionMap(local.region).zones?.[local.y * REGION_SIZE + local.x] ?? Zone.temperate) as Zone;
   }
 
   elevationAt(gx: number, gy: number): number | null {

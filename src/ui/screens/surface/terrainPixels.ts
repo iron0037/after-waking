@@ -7,7 +7,7 @@
  * of that shared space, so neighboring images overlap pixel for pixel and the seams between regions don't show.
  */
 import type { BodyKind, BodySurface } from "../../../sim";
-import { hexToPixel, REGION_SIZE, Terrain } from "../../../sim";
+import { hexToPixel, REGION_SIZE, Terrain, Zone } from "../../../sim";
 import { TERRAIN_COLORS } from "../../palette";
 import {
   DEPTH_STEPS,
@@ -309,6 +309,23 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
     const u = Math.min(1, Math.max(0, (g + (edgeNoise(px, py, salt) - 0.5) * 0.3 - 0.22) / 0.5));
     return u * u * (3 - 2 * u);
   };
+  // The desert belt of a world with latitude climate (AW-265): its plains, scrub and ranges are painted with the desert
+  // world's sand, hardpan and rock, fading in over a ragged edge (a smooth field again) rather than at hex outlines.
+  let AF: Float32Array | null = null;
+  const desertTex = [Terrain.plain, Terrain.rough, Terrain.mountain].map((t) => tintedTexture("desert", t));
+  if (surface.body.climateBands && kind === "terrestrial" && desertTex.every((t) => t !== null)) {
+    const aridGrid = new Float32Array(span * span);
+    let any = false;
+    for (let j = 0; j < span; j++) {
+      for (let i = 0; i < span; i++) {
+        if (surface.zoneAt(Math.min(surface.width - 1, Math.max(0, ex0 + i)), Math.min(surface.height - 1, Math.max(0, ey0 + j))) === Zone.arid) {
+          aridGrid[j * span + i] = 1;
+          any = true;
+        }
+      }
+    }
+    if (any) AF = smoothField(aridGrid);
+  }
   const iceTex = textures[Terrain.ice] ?? null;
   const screeTex = textures[Terrain.rough] ?? null;
   const peakTex = textures[Terrain.mountain] ?? null;
@@ -388,9 +405,17 @@ export function computeTerrainPixels(surface: BodySurface, region: number, kind:
             let r0 = tex[ti] as number;
             let g0 = tex[ti + 1] as number;
             let b0 = tex[ti + 2] as number;
-            if (lushTex && lush && t === Terrain.plain) {
-              // Plains near the water are lush meadow, easing into steppe as the ground rises.
-              const w = Math.min(1, Math.max(0, (lush.to - (e - sea)) / (lush.to - lush.from)));
+            // Desert belt: blend toward the desert world's texture for this terrain.
+            const dTex = AF && t <= Terrain.mountain ? desertTex[t] : null;
+            const dry = dTex && AF ? rockShare(AF, (py - py0 + D) * bw + (px - px0 + D), px, py, 3) : 0;
+            if (dTex && dry > 0) {
+              r0 += ((dTex[ti] as number) - r0) * dry;
+              g0 += ((dTex[ti + 1] as number) - g0) * dry;
+              b0 += ((dTex[ti + 2] as number) - b0) * dry;
+            }
+            if (lushTex && lush && t === Terrain.plain && dry < 1) {
+              // Plains near the water are lush meadow, easing into steppe as the ground rises (never in the desert).
+              const w = Math.min(1, Math.max(0, (lush.to - (e - sea)) / (lush.to - lush.from))) * (1 - dry);
               if (w > 0) {
                 r0 += ((lushTex[ti] as number) - r0) * w;
                 g0 += ((lushTex[ti + 1] as number) - g0) * w;
