@@ -49,6 +49,14 @@ export function SoundButton() {
   const s = useAudioSettings();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  // The top bar scrolls sideways on narrow windows, which clips anything hanging below it (AW-292): the menu
+  // is placed against the window instead, under the button.
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const toggle = () => {
+    const r = box.current?.getBoundingClientRect();
+    if (r) setAt({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    setOpen(!open);
+  };
   useEffect(() => {
     if (!open) return;
     const away = (ev: MouseEvent) => {
@@ -59,11 +67,11 @@ export function SoundButton() {
   }, [open]);
   return (
     <div class="sound-button" ref={box}>
-      <button class="btn" onClick={() => setOpen(!open)} title="Sound: volumes and mute" aria-expanded={open}>
+      <button class="btn" onClick={toggle} title="Sound: volumes and mute" aria-expanded={open}>
         {s.muted ? "Sound off" : "Sound"}
       </button>
       {open && (
-        <div class="sound-pop panel">
+        <div class="sound-pop panel" style={at ? { top: `${at.top}px`, right: `${at.right}px` } : undefined}>
           <SoundSettings />
         </div>
       )}

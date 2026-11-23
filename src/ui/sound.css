@@ -29,10 +29,9 @@
   position: relative;
 }
 .sound-pop {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 50;
+  /* Fixed, not absolute: the top bar's sideways scroll would clip it (AW-292). Placed by SoundButton. */
+  position: fixed;
+  z-index: 200;
   padding: 12px 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
