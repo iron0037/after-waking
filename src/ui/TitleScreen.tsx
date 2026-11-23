@@ -8,7 +8,7 @@ import { FIRST_NAMES, SURNAMES } from "../data/crew";
 import { CLAN_NAMES, type ClanId } from "../data/ship";
 import { captainTitle, DEFAULT_PEOPLE, DEFAULT_UNIVERSE, type PeopleSettings, type UniverseSettings } from "../sim";
 import { NewGameSettings } from "./NewGameSettings";
-import { HallOfFame, readHall } from "./Ending";
+import { EndingCinematic, earnedFilms, FILM_NAMES, HallOfFame, readHall, type EndingFilm } from "./Ending";
 import { PortraitPicker } from "./portraits";
 import { GameSession } from "./session";
 
@@ -28,10 +28,12 @@ type Page = "menu" | "new" | "options" | "hall" | "intro";
 export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) {
   const saved = GameSession.load();
   const [page, setPage] = useState<Page>("menu");
-  // The title theme (AW-274), except while the intro plays its own music.
-  useEffect(() => audio.music(page === "intro" ? null : musicUrl("music-title")), [page]);
+  const [film, setFilm] = useState<EndingFilm | null>(null);
+  // The title theme (AW-274), except while a cinematic plays its own music.
+  useEffect(() => audio.music(page === "intro" || film ? null : musicUrl("music-title")), [page, film]);
+  if (film) return <EndingCinematic film={film} onDone={() => setFilm(null)} />;
   if (page === "new") return <NewGame saved={!!saved} onStart={onStart} onBack={() => setPage("menu")} />;
-  if (page === "options") return <Options onBack={() => setPage("menu")} onIntro={() => setPage("intro")} />;
+  if (page === "options") return <Options onBack={() => setPage("menu")} onIntro={() => setPage("intro")} onFilm={setFilm} />;
   if (page === "intro") return <Intro onDone={() => setPage("options")} />;
   if (page === "hall") return <HallOfFame onBack={() => setPage("menu")} />;
   const finished = !!saved?.state.ending;
@@ -72,7 +74,9 @@ export function TitleScreen({ onStart }: { onStart: (s: GameSession) => void }) 
   );
 }
 
-function Options({ onBack, onIntro }: { onBack: () => void; onIntro: () => void }) {
+function Options({ onBack, onIntro, onFilm }: { onBack: () => void; onIntro: () => void; onFilm: (f: EndingFilm) => void }) {
+  // Each ending's cinematic can be watched again here, once it's been reached (AW-293).
+  const films = earnedFilms(readHall());
   return (
     <div class="title-screen">
       <div class="title-card title-menu">
@@ -84,6 +88,11 @@ function Options({ onBack, onIntro }: { onBack: () => void; onIntro: () => void 
           <button class="btn big" onClick={onIntro}>
             Watch the intro
           </button>
+          {films.map((f) => (
+            <button key={f} class="btn big" onClick={() => onFilm(f)}>
+              Watch the ending: {FILM_NAMES[f]}
+            </button>
+          ))}
           <button class="btn big" onClick={onBack}>
             Back
           </button>

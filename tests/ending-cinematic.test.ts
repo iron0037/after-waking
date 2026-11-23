@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import awaken from "../src/data/ending-awaken.json";
 import script from "../src/data/ending-return.json";
-import { newGame, returnCoda } from "../src/sim";
+import { newGame, returnCoda, type CareerReport } from "../src/sim";
+import { earnedFilms } from "../src/ui/Ending";
 
 // What's in the cinematic's folder (Vite lists it; nothing is loaded).
 const FILES = new Set(Object.keys(import.meta.glob("../public/assets/ending-return/*")).map((p) => p.split("/").pop()));
@@ -42,5 +43,19 @@ describe("the Awaken cinematic (AW-277)", () => {
 
   it("ends on the choice the ending card closes with", () => {
     expect(awaken.scenes.at(-1)?.text).toBe("You could go back to sleep. Or you could start waking the others.");
+  });
+});
+
+describe("watching the endings again (AW-293)", () => {
+  const entry = (ending: "return" | "awaken", clues: number) => ({ report: { ending, clues } as CareerReport, finishedOn: "2026-11-23" });
+
+  it("offers each ending's film once it's been reached, and the Covenant's cut only with 3+ clues", () => {
+    expect(earnedFilms([], "")).toEqual([]);
+    expect(earnedFilms([entry("return", 1)], "")).toEqual(["return"]);
+    expect(earnedFilms([entry("return", 4), entry("awaken", 5)], "")).toEqual(["return", "return-covenant", "awaken"]);
+  });
+
+  it("unlocks every film with ?cinematics=all, for testing", () => {
+    expect(earnedFilms([], "?cinematics=all")).toEqual(["return", "return-covenant", "awaken"]);
   });
 });

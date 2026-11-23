@@ -91,11 +91,49 @@ export function awakenScenes(): CinematicScene[] {
   return awakenScript.scenes.map((s) => ({ ...s, audio: `vo-${s.id}` }) as CinematicScene);
 }
 
-/** Each ending's cinematic: its panels, folder and closing title. */
-function cinematicFor(state: GameState, id: EndingId): { scenes: CinematicScene[]; dir: string; title: string; titleChord: number[] } {
-  return id === "return"
-    ? { scenes: returnScenes(returnCoda(state)), dir: "./assets/ending-return", title: returnScript.title, titleChord: returnScript.titleChord }
-    : { scenes: awakenScenes(), dir: "./assets/ending-awaken", title: awakenScript.title, titleChord: awakenScript.titleChord };
+/** The ending cinematics: the Return comes in two cuts, with or without the Covenant's coda. */
+export type EndingFilm = "return" | "return-covenant" | "awaken";
+
+export const FILM_NAMES: Record<EndingFilm, string> = { return: "Return", "return-covenant": "Return (Covenant)", awaken: "Awaken" };
+
+/** Which film an ending plays for this captain. */
+export function filmFor(state: GameState, id: EndingId): EndingFilm {
+  return id === "awaken" ? "awaken" : returnCoda(state) === "covenant" ? "return-covenant" : "return";
+}
+
+/** A film's panels, folder and closing title. */
+function filmParts(film: EndingFilm): { scenes: CinematicScene[]; dir: string; title: string; titleChord: number[] } {
+  return film === "awaken"
+    ? { scenes: awakenScenes(), dir: "./assets/ending-awaken", title: awakenScript.title, titleChord: awakenScript.titleChord }
+    : {
+        scenes: returnScenes(film === "return-covenant" ? "covenant" : "plain"),
+        dir: "./assets/ending-return",
+        title: returnScript.title,
+        titleChord: returnScript.titleChord,
+      };
+}
+
+/** Play an ending's cinematic (also from the title screen's Options, once earned). */
+export function EndingCinematic({ film, onDone }: { film: EndingFilm; onDone: () => void }) {
+  const f = filmParts(film);
+  return <Cinematic scenes={f.scenes} dir={f.dir} title={f.title} titleChord={f.titleChord} what="ending" onDone={onDone} />;
+}
+
+/**
+ * The ending films this browser has earned, from the hall of fame: each ending once reached (the Covenant's cut
+ * once a Return was flown with 3+ clues). Opening the game with ?cinematics=all unlocks every one, for testing.
+ */
+export function earnedFilms(hall: readonly HallEntry[], search = typeof location === "undefined" ? "" : location.search): EndingFilm[] {
+  if (new URLSearchParams(search).get("cinematics") === "all") return ["return", "return-covenant", "awaken"];
+  const out = new Set<EndingFilm>();
+  for (const { report } of hall) {
+    if (report.ending === "awaken") out.add("awaken");
+    else {
+      out.add("return");
+      if ((report.clues ?? 0) >= 3) out.add("return-covenant");
+    }
+  }
+  return (["return", "return-covenant", "awaken"] as const).filter((f) => out.has(f));
 }
 
 // --- the anomaly, on the star map -----------------------------------------------------------------
@@ -263,19 +301,7 @@ export function EndingScreen({ session, onTitle }: { session: GameSession; onTit
   if (!ending) return null;
   const text = endingText(session.state, ending.id);
   const r = ending.report;
-  if (watching) {
-    const film = cinematicFor(session.state, ending.id);
-    return (
-      <Cinematic
-        scenes={film.scenes}
-        dir={film.dir}
-        title={film.title}
-        titleChord={film.titleChord}
-        what="ending"
-        onDone={() => setWatching(false)}
-      />
-    );
-  }
+  if (watching) return <EndingCinematic film={filmFor(session.state, ending.id)} onDone={() => setWatching(false)} />;
   return (
     <div class="ending-screen">
       <div class="ending-card">
